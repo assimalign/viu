@@ -50,7 +50,7 @@ public static class SingleFileComponentParserFactory
         // The registration seam in action: route template blocks to the template compiler's parser and
         // style blocks to the CSS parser ([V01.01.06.04]). First matching registration wins in
         // registration order (base AggregateSyntaxParser contract).
-        options.RegisterParser(IsTemplateBlock, new TemplateSyntaxParser());
+        options.RegisterParser(IsTemplateBlock, new TemplateSyntaxParser(ParserOptions.CreateHtml()));
         options.RegisterParser(IsStyleBlock, new CssSyntaxParser());
 
         return new SingleFileComponentSyntaxParser(options);
@@ -65,7 +65,7 @@ public static class SingleFileComponentParserFactory
     public static VueSingleFileComponentSyntaxParser CreateVue()
     {
         var options = new AggregateSyntaxParserOptions<SingleFileComponentBlock>();
-        options.RegisterParser(IsTemplateBlock, new TemplateSyntaxParser());
+        options.RegisterParser(IsTemplateBlock, new TemplateSyntaxParser(ParserOptions.CreateHtml()));
         options.RegisterParser(IsStyleBlock, new CssSyntaxParser());
         return new VueSingleFileComponentSyntaxParser(options);
     }

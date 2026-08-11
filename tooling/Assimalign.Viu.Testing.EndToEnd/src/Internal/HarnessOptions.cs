@@ -11,9 +11,13 @@ internal sealed class HarnessOptions
     {
     }
 
-    internal required string BrowserRootDirectory { get; init; }
+    internal string? BrowserRootDirectory { get; init; }
 
-    internal required string HydrationRootDirectory { get; init; }
+    internal string? HydrationRootDirectory { get; init; }
+
+    internal string? HotReloadProjectPath { get; init; }
+
+    internal string? HotReloadViuVersion { get; init; }
 
     internal required string ArtifactDirectory { get; init; }
 
@@ -35,6 +39,8 @@ internal sealed class HarnessOptions
         ArgumentNullException.ThrowIfNull(arguments);
         string? browserRootDirectory = null;
         string? hydrationRootDirectory = null;
+        string? hotReloadProjectPath = null;
+        string? hotReloadViuVersion = null;
         string? artifactDirectory = null;
         string? startupResultsPath = null;
         List<BrowserEngine> browserEngines = [];
@@ -53,6 +59,12 @@ internal sealed class HarnessOptions
                     break;
                 case "--hydration-root":
                     hydrationRootDirectory = ReadValue(arguments, ref index, argument);
+                    break;
+                case "--hot-reload-project":
+                    hotReloadProjectPath = ReadValue(arguments, ref index, argument);
+                    break;
+                case "--hot-reload-viu-version":
+                    hotReloadViuVersion = ReadValue(arguments, ref index, argument);
                     break;
                 case "--artifacts":
                     artifactDirectory = ReadValue(arguments, ref index, argument);
@@ -87,19 +99,44 @@ internal sealed class HarnessOptions
             }
         }
 
-        ArgumentException.ThrowIfNullOrEmpty(browserRootDirectory);
-        ArgumentException.ThrowIfNullOrEmpty(hydrationRootDirectory);
         ArgumentException.ThrowIfNullOrEmpty(artifactDirectory);
-        if (!Directory.Exists(browserRootDirectory))
+        if (hotReloadProjectPath is null)
         {
-            throw new DirectoryNotFoundException(
-                $"The Browser fixture publish root does not exist: {browserRootDirectory}");
-        }
+            if (hotReloadViuVersion is not null)
+            {
+                throw new ArgumentException(
+                    "--hot-reload-viu-version requires --hot-reload-project.");
+            }
 
-        if (!Directory.Exists(hydrationRootDirectory))
+            ArgumentException.ThrowIfNullOrEmpty(browserRootDirectory);
+            ArgumentException.ThrowIfNullOrEmpty(hydrationRootDirectory);
+            if (!Directory.Exists(browserRootDirectory))
+            {
+                throw new DirectoryNotFoundException(
+                    $"The Browser fixture publish root does not exist: {browserRootDirectory}");
+            }
+
+            if (!Directory.Exists(hydrationRootDirectory))
+            {
+                throw new DirectoryNotFoundException(
+                    $"The hydration fixture publish root does not exist: {hydrationRootDirectory}");
+            }
+        }
+        else
         {
-            throw new DirectoryNotFoundException(
-                $"The hydration fixture publish root does not exist: {hydrationRootDirectory}");
+            ArgumentException.ThrowIfNullOrEmpty(hotReloadViuVersion);
+            if (browserRootDirectory is not null || hydrationRootDirectory is not null)
+            {
+                throw new ArgumentException(
+                    "--hot-reload-project cannot be combined with published fixture roots.");
+            }
+
+            if (!File.Exists(hotReloadProjectPath))
+            {
+                throw new FileNotFoundException(
+                    "The hot-reload fixture project does not exist.",
+                    hotReloadProjectPath);
+            }
         }
 
         if (browserEngines.Count == 0)
@@ -125,10 +162,34 @@ internal sealed class HarnessOptions
             }
         }
 
+        if (hotReloadProjectPath is not null)
+        {
+            if (measureStartup)
+            {
+                throw new ArgumentException(
+                    "Startup measurement cannot run in the hot-reload lane.");
+            }
+
+            if (browserEngines.Count != 1
+                || browserEngines[0] != BrowserEngine.Chromium)
+            {
+                throw new ArgumentException(
+                    "The hot-reload lane requires exactly the Chromium browser engine.");
+            }
+        }
+
         return new HarnessOptions
         {
-            BrowserRootDirectory = Path.GetFullPath(browserRootDirectory),
-            HydrationRootDirectory = Path.GetFullPath(hydrationRootDirectory),
+            BrowserRootDirectory = browserRootDirectory is null
+                ? null
+                : Path.GetFullPath(browserRootDirectory),
+            HydrationRootDirectory = hydrationRootDirectory is null
+                ? null
+                : Path.GetFullPath(hydrationRootDirectory),
+            HotReloadProjectPath = hotReloadProjectPath is null
+                ? null
+                : Path.GetFullPath(hotReloadProjectPath),
+            HotReloadViuVersion = hotReloadViuVersion,
             ArtifactDirectory = Path.GetFullPath(artifactDirectory),
             BrowserEngines = browserEngines.AsReadOnly(),
             Headed = headed,

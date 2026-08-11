@@ -58,3 +58,63 @@ jobs:
           name: end-to-end-browser-results
           path: _out/test-results/end-to-end/**
           if-no-files-found: warn
+
+  packaged-hot-reload:
+    name: packaged .vue publish and hot reload (Chromium)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET and wasm-tools
+        uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
+
+      - name: Verify packaged base-SDK .vue boundary
+        shell: pwsh
+        run: ./scripts/Test-PackagedVueConsumer.ps1
+
+      - name: Verify packaged Browser .vue Release assets
+        shell: pwsh
+        run: |
+          ./scripts/Test-EndToEnd.ps1 `
+            -PackagedVuePublish `
+            -PublishOnly `
+            -PublishDirectory ./_out/test-results/packaged-vue-release `
+            -Configuration Release `
+            -SkipPack
+
+      - name: Verify packaged Browser .vue AOT assets
+        shell: pwsh
+        run: |
+          ./scripts/Test-EndToEnd.ps1 `
+            -PackagedVuePublish `
+            -PublishOnly `
+            -PublishDirectory ./_out/test-results/packaged-vue-aot `
+            -Configuration Release `
+            -Aot `
+            -SkipPack
+
+      - name: Run isolated packaged hot-reload scenario
+        shell: pwsh
+        run: |
+          ./scripts/Test-EndToEnd.ps1 `
+            -HotReload `
+            -BrowserEngine Chromium `
+            -Configuration Debug `
+            -SkipPack `
+            -ArtifactsDirectory ./_out/test-results/end-to-end-hot-reload
+
+      - name: Upload watch log, trace, screenshot, and result summary
+        if: always()
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: end-to-end-hot-reload-results
+          path: _out/test-results/end-to-end-hot-reload/**
+          if-no-files-found: warn

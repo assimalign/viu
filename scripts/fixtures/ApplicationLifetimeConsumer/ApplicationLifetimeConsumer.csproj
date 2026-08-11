@@ -1,7 +1,6 @@
 <Project Sdk="Assimalign.Viu.Sdk.Browser">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ViuBundleSingleFileComponentCss>false</ViuBundleSingleFileComponentCss>
     <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
     <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
     <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>

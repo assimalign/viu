@@ -32,6 +32,18 @@ public sealed class TransformDiagnosticLocationTests
         yield return C("<div v-show></div>", CompilerErrorCode.XVShowNoExpression, "v-show", 1, 6);
         // v-bind same-name shorthand with a dynamic argument: the error points at the dynamic argument span.
         yield return C("<div :[dynamicName]></div>", CompilerErrorCode.XVBindInvalidSameNameArgument, "[dynamicName]", 1, 7);
+        yield return C(
+            "<div v-for=\"{ item } in items\"></div>",
+            CompilerErrorCode.XViuUnsupportedForAlias,
+            "{ item }",
+            1,
+            13);
+        yield return C(
+            "<Comp v-slot=\"{ label }\"><span /></Comp>",
+            CompilerErrorCode.XViuUnsupportedSlotScopeExpression,
+            "{ label }",
+            1,
+            15);
     }
 
     [Theory]

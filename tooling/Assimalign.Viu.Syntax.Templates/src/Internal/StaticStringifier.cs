@@ -10,10 +10,11 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// It runs at the end of the static-caching walk over a node's children:
 /// contiguous runs of cached, stringifiable static siblings that reach the thresholds
 /// (<see cref="NodeCountThreshold"/> nodes, or <see cref="ElementWithBindingCountThreshold"/> elements with
-/// attribute bindings) collapse into a single <c>createStaticVNode(html, nodeCount)</c> call carrying the
-/// serialized HTML, which the runtime inserts via one <c>innerHTML</c> assignment instead of creating each
-/// vnode across the JS-interop boundary. This is the founding-decision-#4 interop reducer: every avoided
-/// node is a marshaling round-trip saved on WASM.
+    /// attribute bindings) collapse into a single
+    /// <c>createStaticVNode(markup, nodeCount, usesExtensibleMarkupLanguage)</c> call carrying the serialized
+    /// fragment and its parsing mode. The runtime inserts it via one <c>innerHTML</c> assignment instead of
+    /// creating each virtual node across the JS-interop boundary. This is the founding-decision-#4 interop
+    /// reducer: every avoided node is a marshaling round-trip saved on WASM.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -101,6 +102,7 @@ internal static class StaticStringifier
         var nodeCount = 0;
         var elementWithBindingCount = 0;
         var currentChunk = new List<ElementNode>();
+        bool? currentUsesExtensibleMarkupLanguage = null;
 
         var index = 0;
         for (; index < children.Count; index++)
@@ -108,19 +110,56 @@ internal static class StaticStringifier
             if (GetCachedElement(children[index], context) is { } element &&
                 AnalyzeNode(element) is { } analyzed)
             {
+                var usesExtensibleMarkupLanguage =
+                    element.Namespace is ElementNamespace.Svg or ElementNamespace.MathMl;
+                if (currentUsesExtensibleMarkupLanguage is { } currentFormat &&
+                    currentFormat != usesExtensibleMarkupLanguage)
+                {
+                    // A foreign-content integration point can have HTML children even though its parent is
+                    // SVG or MathML. Keep each inserted fragment in one parsing mode; deriving the mode from
+                    // the serialized children also handles a run that crosses back into foreign content.
+                    index -= StringifyCurrentChunk(
+                        children,
+                        index,
+                        nodeCount,
+                        elementWithBindingCount,
+                        currentChunk,
+                        context,
+                        currentFormat);
+                    nodeCount = 0;
+                    elementWithBindingCount = 0;
+                    currentChunk.Clear();
+                }
+
+                currentUsesExtensibleMarkupLanguage = usesExtensibleMarkupLanguage;
                 nodeCount += analyzed.NodeCount;
                 elementWithBindingCount += analyzed.ElementWithBindingCount;
                 currentChunk.Add(element);
                 continue;
             }
 
-            index -= StringifyCurrentChunk(children, index, nodeCount, elementWithBindingCount, currentChunk, context);
+            index -= StringifyCurrentChunk(
+                children,
+                index,
+                nodeCount,
+                elementWithBindingCount,
+                currentChunk,
+                context,
+                currentUsesExtensibleMarkupLanguage ?? false);
             nodeCount = 0;
             elementWithBindingCount = 0;
             currentChunk.Clear();
+            currentUsesExtensibleMarkupLanguage = null;
         }
 
-        StringifyCurrentChunk(children, index, nodeCount, elementWithBindingCount, currentChunk, context);
+        StringifyCurrentChunk(
+            children,
+            index,
+            nodeCount,
+            elementWithBindingCount,
+            currentChunk,
+            context,
+            currentUsesExtensibleMarkupLanguage ?? false);
     }
 
     private static int StringifyCurrentChunk(
@@ -129,7 +168,8 @@ internal static class StaticStringifier
         int nodeCount,
         int elementWithBindingCount,
         List<ElementNode> currentChunk,
-        TransformContext context)
+        TransformContext context,
+        bool usesExtensibleMarkupLanguage)
     {
         if (nodeCount < NodeCountThreshold && elementWithBindingCount < ElementWithBindingCountThreshold)
         {
@@ -142,14 +182,16 @@ internal static class StaticStringifier
             StringifyNode(html, element, context);
         }
 
-        // createStaticVNode(html, nodeCount): the html rides as a static simple expression so the emitter
-        // writes it as a C#-escaped string literal; the count rides as a raw integer literal string.
+        // createStaticVNode(markup, nodeCount, usesExtensibleMarkupLanguage): the markup rides as a static
+        // simple expression so the emitter writes it as a C#-escaped string literal; the count and format
+        // marker ride as raw literals.
         var staticCall = Ir.CallExpression(
             context.Helper(HelperNames.CreateStatic),
             new object[]
             {
                 Ir.SimpleExpression(html.ToString(), isStatic: true),
                 currentChunk.Count.ToString(CultureInfo.InvariantCulture),
+                Ir.SimpleExpression(usesExtensibleMarkupLanguage ? "true" : "false", isStatic: false),
             });
 
         var deleteCount = currentChunk.Count - 1;
@@ -353,15 +395,15 @@ internal static class StaticStringifier
         }
     }
 
-    // Port of isStringifiableAttr: a known attribute for the element's namespace, or a data-/aria- attribute.
-    // MathML has no known-attribute table in the Viu shared DOM knowledge, so it is conservatively
-    // non-stringifiable (the element still caches). See docs/DESIGN.md.
+    // A known attribute for the element's namespace, or a data-/aria- attribute. MathML uses a bounded
+    // MathML Core table from the linked DOM knowledge seam; unknown and dynamic names bail out safely.
     private static bool IsStringifiableAttribute(string name, ElementNamespace ns)
     {
         var known = ns switch
         {
             ElementNamespace.Html => CompilerDomKnowledge.IsKnownHtmlAttribute(name),
             ElementNamespace.Svg => CompilerDomKnowledge.IsKnownSvgAttribute(name),
+            ElementNamespace.MathMl => CompilerDomKnowledge.IsKnownMathMlAttribute(name),
             _ => false,
         };
 

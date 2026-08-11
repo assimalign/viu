@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 using Microsoft.Playwright;
@@ -12,7 +13,15 @@ namespace Assimalign.Viu.Testing.EndToEnd;
 
 internal sealed class EndToEndHarness
 {
+    private const string ManagedHotReloadCompletionMessage =
+        "C# and Razor changes applied";
+    private const string StaticAssetHotReloadCompletionMessage =
+        "Static asset changes applied";
+    private const string UtilityCandidateFileName = "UtilityCandidate.html";
     private static readonly TimeSpan AssertionTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan HotReloadAssertionTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan HotReloadNoOperationObservationWindow =
+        TimeSpan.FromSeconds(3);
     private readonly HarnessOptions _options;
     private readonly List<ScenarioResult> _results = [];
 
@@ -25,21 +34,15 @@ internal sealed class EndToEndHarness
     internal async Task<int> RunAsync()
     {
         Directory.CreateDirectory(_options.ArtifactDirectory);
-        await using StaticWebServer browserServer =
-            StaticWebServer.Start(_options.BrowserRootDirectory);
-        await using StaticWebServer hydrationServer =
-            StaticWebServer.Start(_options.HydrationRootDirectory);
-        Console.WriteLine($"Browser fixture: {browserServer.Address}");
-        Console.WriteLine($"Hydration fixture: {hydrationServer.Address}");
-
-        using IPlaywright playwright = await Playwright.CreateAsync();
-        foreach (BrowserEngine browserEngine in _options.BrowserEngines)
+        if (_options.HotReloadProjectPath is not null)
         {
-            await RunBrowserEngineAsync(
-                playwright,
-                browserEngine,
-                browserServer.Address,
-                hydrationServer.Address);
+            await RunHotReloadLaneAsync(
+                _options.HotReloadProjectPath,
+                _options.HotReloadViuVersion!);
+        }
+        else
+        {
+            await RunPublishedFixtureLaneAsync();
         }
 
         await WriteResultSummaryAsync();
@@ -61,6 +64,329 @@ internal sealed class EndToEndHarness
         }
 
         return failed == 0 ? 0 : 1;
+    }
+
+    private async Task RunPublishedFixtureLaneAsync()
+    {
+        await using StaticWebServer browserServer =
+            StaticWebServer.Start(_options.BrowserRootDirectory!);
+        await using StaticWebServer hydrationServer =
+            StaticWebServer.Start(_options.HydrationRootDirectory!);
+        Console.WriteLine($"Browser fixture: {browserServer.Address}");
+        Console.WriteLine($"Hydration fixture: {hydrationServer.Address}");
+
+        using IPlaywright playwright = await Playwright.CreateAsync();
+        foreach (BrowserEngine browserEngine in _options.BrowserEngines)
+        {
+            await RunBrowserEngineAsync(
+                playwright,
+                browserEngine,
+                browserServer.Address,
+                hydrationServer.Address);
+        }
+    }
+
+    private async Task RunHotReloadLaneAsync(
+        string projectPath,
+        string viuVersion)
+    {
+        string chromiumArtifactDirectory = Path.Combine(
+            _options.ArtifactDirectory,
+            "chromium");
+        await using HotReloadWatchSession session = new(
+            projectPath,
+            viuVersion,
+            chromiumArtifactDirectory);
+        await session.StartAsync();
+        Console.WriteLine($"Hot-reload fixture: {session.Address}");
+
+        using IPlaywright playwright = await Playwright.CreateAsync();
+        await using IBrowser browser = await playwright.Chromium.LaunchAsync(
+            new BrowserTypeLaunchOptions
+            {
+                Headless = !_options.Headed,
+            });
+        await RunScenarioAsync(
+            browser,
+            BrowserEngine.Chromium,
+            "packaged-vue-watch-css-and-remount",
+            page => RunHotReloadScenarioAsync(page, session));
+        await session.StopAsync();
+    }
+
+    private static async Task RunHotReloadScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await NavigateAsync(page, session.Address.AbsoluteUri);
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await RequireTextAsync(page, "hot-count", "0");
+        await RequireStylesheetRulesAsync(
+            page,
+            ".viu.css",
+            minimumRuleCount: 1);
+        await RequireStylesheetRulesAsync(
+            page,
+            ".utilities.css",
+            minimumRuleCount: 1);
+        await RequireComputedDisplayAsync(page, "none");
+
+        string documentToken = await page.EvaluateAsync<string>(
+            "() => { const token = `${Date.now()}-${Math.random()}`; "
+            + "globalThis.__viuHotReloadDocumentToken = token; return token; }");
+        await page.Locator("[data-testid='hot-increment']").ClickAsync();
+        await RequireTextAsync(page, "hot-count", "1");
+
+        int utilityManagedUpdateCount = session.CountOutputLinesContaining(
+            ManagedHotReloadCompletionMessage);
+        int utilityCandidateUpdateCount = session.CountOutputLinesContaining(
+            UtilityCandidateFileName);
+        int completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+        await ReplaceSourceTextAsync(
+            session.UtilityCandidateSourcePath,
+            "class=\"hidden\"",
+            "class=\"block\"");
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await RequireComputedDisplayAsync(page, "block");
+        await WaitForUtilityCandidateAcknowledgementAsync(
+            session,
+            utilityCandidateUpdateCount + 1);
+        await RequireTextAsync(page, "hot-count", "1");
+        await RequireDocumentTokenAsync(page, documentToken);
+
+        DateTime bundleWriteTime = File.GetLastWriteTimeUtc(session.UtilityBundlePath);
+        string stylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".utilities.css");
+        utilityCandidateUpdateCount = session.CountOutputLinesContaining(
+            UtilityCandidateFileName);
+        int managedUpdateCount = session.CountOutputLinesContaining(
+            ManagedHotReloadCompletionMessage);
+        int staticAssetUpdateCount = session.CountOutputLinesContaining(
+            StaticAssetHotReloadCompletionMessage);
+        completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+        await ReplaceSourceTextAsync(
+            session.UtilityCandidateSourcePath,
+            "Unserved utility candidate",
+            "  Unserved utility candidate  ");
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await WaitForUtilityCandidateAcknowledgementAsync(
+            session,
+            utilityCandidateUpdateCount + 1);
+        await Task.Delay(HotReloadNoOperationObservationWindow);
+        Require(
+            File.GetLastWriteTimeUtc(session.UtilityBundlePath) == bundleWriteTime,
+            "A semantic utility-CSS no-op rewrote the generated bundle.");
+        Require(
+            string.Equals(
+                await ReadStylesheetAddressAsync(page, ".utilities.css"),
+                stylesheetAddress,
+                StringComparison.Ordinal),
+            "A semantic utility-CSS no-op replaced the browser stylesheet link.");
+        Require(
+            session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage)
+                == managedUpdateCount,
+            "A semantic utility-CSS no-op triggered a managed hot-reload update.");
+        Require(
+            session.CountOutputLinesContaining(StaticAssetHotReloadCompletionMessage)
+                == staticAssetUpdateCount,
+            "A semantic utility-CSS no-op triggered a static-asset update.");
+        await RequireTextAsync(page, "hot-count", "1");
+        await RequireDocumentTokenAsync(page, documentToken);
+
+        utilityCandidateUpdateCount = session.CountOutputLinesContaining(
+            UtilityCandidateFileName);
+        completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+        await ReplaceSourceTextAsync(
+            session.UtilityCandidateSourcePath,
+            "class=\"block\"",
+            "data-candidate=\"removed\"");
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                File.Exists(session.UtilityBundlePath)
+                && new FileInfo(session.UtilityBundlePath).Length == 0
+                && File.Exists(session.UtilityEmptyMarkerPath)),
+            "the final utility rule to produce a marked zero-byte tombstone",
+            HotReloadAssertionTimeout);
+        await RequireStylesheetRulesAsync(
+            page,
+            ".utilities.css",
+            minimumRuleCount: 0,
+            exactRuleCount: 0);
+        await WaitForUtilityCandidateAcknowledgementAsync(
+            session,
+            utilityCandidateUpdateCount + 1);
+        await Task.Delay(HotReloadNoOperationObservationWindow);
+        await RequireTextAsync(page, "hot-count", "1");
+        await RequireDocumentTokenAsync(page, documentToken);
+        Require(
+            session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage)
+                == utilityManagedUpdateCount,
+            "The non-SFC utility scan input triggered a managed hot-reload update.");
+
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "Hot reload template v1",
+            "Hot reload template v2");
+        await RequireTextAsync(
+            page,
+            "hot-heading",
+            "Hot reload template v2",
+            HotReloadAssertionTimeout);
+        await RequireTextAsync(
+            page,
+            "hot-count",
+            "0",
+            HotReloadAssertionTimeout);
+        await RequireDocumentTokenAsync(page, documentToken);
+
+        await page.Locator("[data-testid='hot-increment']").ClickAsync();
+        await RequireTextAsync(page, "hot-count", "1");
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "CountReference.Value++;",
+            "CountReference.Value += 2;");
+        await RequireTextAsync(
+            page,
+            "hot-count",
+            "0",
+            HotReloadAssertionTimeout);
+        await RequireDocumentTokenAsync(page, documentToken);
+        await page.Locator("[data-testid='hot-increment']").ClickAsync();
+        await RequireTextAsync(
+            page,
+            "hot-count",
+            "2",
+            HotReloadAssertionTimeout);
+        await RequireDocumentTokenAsync(page, documentToken);
+        session.RequireRunning();
+    }
+
+    private static async Task ReplaceSourceTextAsync(
+        string path,
+        string oldText,
+        string newText)
+    {
+        string source = await File.ReadAllTextAsync(path);
+        int firstIndex = source.IndexOf(oldText, StringComparison.Ordinal);
+        if (firstIndex < 0
+            || source.IndexOf(
+                oldText,
+                firstIndex + oldText.Length,
+                StringComparison.Ordinal) >= 0)
+        {
+            throw new InvalidOperationException(
+                $"Expected exactly one '{oldText}' occurrence in staged source {path}.");
+        }
+
+        await File.WriteAllTextAsync(
+            path,
+            source[..firstIndex] + newText + source[(firstIndex + oldText.Length)..],
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static async Task WaitForCssCompletionAsync(
+        HotReloadWatchSession session,
+        int expectedCount)
+    {
+        await WaitUntilAsync(
+            () =>
+            {
+                session.RequireRunning();
+                return Task.FromResult(
+                    ReadCssCompletionCount(session.CssEventLogPath) >= expectedCount);
+            },
+            $"CSS regeneration completion {expectedCount}",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task WaitForUtilityCandidateAcknowledgementAsync(
+        HotReloadWatchSession session,
+        int expectedCount)
+    {
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                session.CountOutputLinesContaining(UtilityCandidateFileName)
+                >= expectedCount),
+            $"dotnet watch to acknowledge utility input update {expectedCount}",
+            HotReloadAssertionTimeout);
+    }
+
+    private static int ReadCssCompletionCount(string path)
+    {
+        try
+        {
+            return File.Exists(path)
+                ? File.ReadLines(path).Count(line => string.Equals(
+                    line,
+                    "complete:0",
+                    StringComparison.Ordinal))
+                : 0;
+        }
+        catch (IOException)
+        {
+            return 0;
+        }
+    }
+
+    private static async Task RequireComputedDisplayAsync(
+        IPage page,
+        string expected)
+    {
+        await WaitUntilAsync(
+            async () => string.Equals(
+                await page
+                    .Locator("[data-testid='utility-probe']")
+                    .EvaluateAsync<string>("element => getComputedStyle(element).display"),
+                expected,
+                StringComparison.Ordinal),
+            $"the utility probe display to become '{expected}'",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task RequireStylesheetRulesAsync(
+        IPage page,
+        string suffix,
+        int minimumRuleCount,
+        int? exactRuleCount = null)
+    {
+        await WaitUntilAsync(
+            async () =>
+            {
+                int count = await page.EvaluateAsync<int>(
+                    "suffix => { const link = [...document.querySelectorAll('link[rel=stylesheet]')]"
+                    + ".find(candidate => candidate.href.includes(suffix)); "
+                    + "if (!link || !link.sheet) return -1; "
+                    + "try { return link.sheet.cssRules.length; } catch { return -1; } }",
+                    suffix);
+                return exactRuleCount is int exact
+                    ? count == exact
+                    : count >= minimumRuleCount;
+            },
+            $"the {suffix} stylesheet to expose the expected rules",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task<string> ReadStylesheetAddressAsync(
+        IPage page,
+        string suffix)
+    {
+        return await page.EvaluateAsync<string>(
+            "suffix => [...document.querySelectorAll('link[rel=stylesheet]')]"
+            + ".find(candidate => candidate.href.includes(suffix))?.href ?? ''",
+            suffix);
+    }
+
+    private static async Task RequireDocumentTokenAsync(
+        IPage page,
+        string expected)
+    {
+        string? actual = await page.EvaluateAsync<string?>(
+            "() => globalThis.__viuHotReloadDocumentToken ?? null");
+        Require(
+            string.Equals(actual, expected, StringComparison.Ordinal),
+            "The browser document reloaded during an accepted hot update.");
     }
 
     private async Task RunBrowserEngineAsync(
@@ -161,6 +487,12 @@ internal sealed class EndToEndHarness
         };
         page.RequestFailed += (_, request) =>
         {
+            if (_options.HotReloadProjectPath is not null
+                && IsExpectedHotReloadRequestAbort(request))
+            {
+                return;
+            }
+
             lock (requestFailures)
             {
                 requestFailures.Add(
@@ -247,6 +579,24 @@ internal sealed class EndToEndHarness
                     screenshotPath,
                     tracePath));
         }
+    }
+
+    private static bool IsExpectedHotReloadRequestAbort(IRequest request)
+    {
+        if (!string.Equals(
+                request.Failure,
+                "net::ERR_ABORTED",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return request.Url.Contains(
+                "/_framework/blazor-hotreload",
+                StringComparison.Ordinal)
+            || request.Url.Contains(
+                "/_framework/clear-browser-cache",
+                StringComparison.Ordinal);
     }
 
     private static async Task RunInteractiveScenarioAsync(IPage page, Uri browserAddress)
@@ -462,7 +812,8 @@ internal sealed class EndToEndHarness
     private static Task RequireTextAsync(
         IPage page,
         string testIdentifier,
-        string expected) => WaitUntilAsync(
+        string expected,
+        TimeSpan? timeout = null) => WaitUntilAsync(
         async () =>
         {
             ILocator locator = page.Locator($"[data-testid='{testIdentifier}']");
@@ -474,7 +825,8 @@ internal sealed class EndToEndHarness
             string? text = await locator.TextContentAsync();
             return string.Equals(text?.Trim(), expected, StringComparison.Ordinal);
         },
-        $"'{testIdentifier}' to contain '{expected}'");
+        $"'{testIdentifier}' to contain '{expected}'",
+        timeout);
 
     private static async Task<string> ReadTextAsync(
         IPage page,
@@ -489,11 +841,12 @@ internal sealed class EndToEndHarness
 
     private static async Task WaitUntilAsync(
         Func<Task<bool>> predicate,
-        string description)
+        string description,
+        TimeSpan? timeout = null)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
         Exception? lastFailure = null;
-        while (stopwatch.Elapsed < AssertionTimeout)
+        while (stopwatch.Elapsed < (timeout ?? AssertionTimeout))
         {
             try
             {

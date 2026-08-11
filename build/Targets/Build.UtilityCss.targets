@@ -202,17 +202,71 @@
       <_ViuUtilityCssLinkBuildRewriteDependency Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'">_ViuInjectSingleFileComponentCssLinkBuild</_ViuUtilityCssLinkBuildRewriteDependency>
       <_ViuUtilityCssLinkPublishRewriteDependency Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'">_ViuInjectSingleFileComponentCssLinkPublish</_ViuUtilityCssLinkPublishRewriteDependency>
       <_ViuUtilityCssLinkBuildRewriteDependency Condition="'$(_ViuUtilityCssLinkBuildRewriteDependency)' == '' and '$(OverrideHtmlAssetPlaceholders)' == 'true'">ResolveHtmlAssetPlaceholdersBuildStaticWebAssets</_ViuUtilityCssLinkBuildRewriteDependency>
+      <_ViuUtilityCssLinkBuildRewriteDependency Condition="'$(_ViuUtilityCssLinkBuildRewriteDependency)' == ''">ResolveStaticWebAssetsInputs</_ViuUtilityCssLinkBuildRewriteDependency>
       <_ViuUtilityCssLinkPublishRewriteDependency Condition="'$(_ViuUtilityCssLinkPublishRewriteDependency)' == '' and '$(OverrideHtmlAssetPlaceholders)' == 'true'">ResolveHtmlAssetPlaceholdersPublishStaticWebAssets</_ViuUtilityCssLinkPublishRewriteDependency>
+      <_ViuUtilityCssLinkPublishRewriteDependency Condition="'$(_ViuUtilityCssLinkPublishRewriteDependency)' == ''">ResolvePublishStaticWebAssets</_ViuUtilityCssLinkPublishRewriteDependency>
     </PropertyGroup>
   </Target>
 
   <Target Name="_ViuInjectUtilityCssLinkBuild"
           Condition="'$(ViuInjectUtilityCssLink)' == 'true' and Exists('$(ViuUtilityCssTaskAssembly)')"
-          BeforeTargets="ResolveBuildCompressedStaticWebAssetsConfiguration"
-          DependsOnTargets="_ViuResolveUtilityCssLinkConfiguration;$(_ViuUtilityCssLinkBuildRewriteDependency)">
+           BeforeTargets="ResolveBuildCompressedStaticWebAssetsConfiguration"
+           DependsOnTargets="_ViuResolveUtilityCssLinkConfiguration;$(_ViuUtilityCssLinkBuildRewriteDependency)">
+    <ItemGroup>
+      <_ViuUtilityCssLinkHostPageBuildPreferred Remove="@(_ViuUtilityCssLinkHostPageBuildPreferred)" />
+      <_ViuUtilityCssLinkHostPageBuildKind Remove="@(_ViuUtilityCssLinkHostPageBuildKind)" />
+      <_ViuUtilityCssLinkHostPageBuildViuFallback Remove="@(_ViuUtilityCssLinkHostPageBuildViuFallback)" />
+      <_ViuUtilityCssLinkHostPageBuildFallback Remove="@(_ViuUtilityCssLinkHostPageBuildFallback)" />
+      <_ViuUtilityCssLinkHostPageBuildRetirementCandidate Remove="@(_ViuUtilityCssLinkHostPageBuildRetirementCandidate)" />
+      <_ViuUtilityCssLinkHostPageBuildPreferredDistinct Remove="@(_ViuUtilityCssLinkHostPageBuildPreferredDistinct)" />
+      <_ViuUtilityCssLinkHostPageBuildKindDistinct Remove="@(_ViuUtilityCssLinkHostPageBuildKindDistinct)" />
+      <_ViuUtilityCssLinkHostPageBuildViuFallbackDistinct Remove="@(_ViuUtilityCssLinkHostPageBuildViuFallbackDistinct)" />
+      <_ViuUtilityCssLinkHostPageBuildFallbackDistinct Remove="@(_ViuUtilityCssLinkHostPageBuildFallbackDistinct)" />
+      <_ViuUtilityCssLinkHostPageBuildRetirementDistinct Remove="@(_ViuUtilityCssLinkHostPageBuildRetirementDistinct)" />
+      <_ViuUtilityCssLinkHostPageBuild Remove="@(_ViuUtilityCssLinkHostPageBuild)" />
+      <_ViuUtilityCssLinkUpdatedHostPageBuildCandidate Remove="@(_ViuUtilityCssLinkUpdatedHostPageBuildCandidate)" />
+      <_ViuUtilityCssLinkUpdatedHostPageBuild Remove="@(_ViuUtilityCssLinkUpdatedHostPageBuild)" />
+      <_ViuUtilityCssLinkUpdatedHostPageBuildEndpoint Remove="@(_ViuUtilityCssLinkUpdatedHostPageBuildEndpoint)" />
+      <_ViuUtilityCssLinkOldHostPageBuildEndpoint Remove="@(_ViuUtilityCssLinkOldHostPageBuildEndpoint)" />
+    </ItemGroup>
     <ItemGroup Condition="'$(_ViuUtilityCssBundleExists)' == 'true' and Exists('$(_ViuUtilityCssBundlePath)')">
-      <_ViuUtilityCssLinkHostPageBuild Include="@(StaticWebAsset)"
-                                       Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Publish'" />
+      <_ViuUtilityCssLinkHostPageBuildPreferred
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Build' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuUtilityCssBundleContentRoot)'))" />
+      <_ViuUtilityCssLinkHostPageBuildKind Include="@(StaticWebAsset)"
+                                           Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Build'" />
+      <_ViuUtilityCssLinkHostPageBuildViuFallback
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuUtilityCssBundleContentRoot)'))" />
+      <_ViuUtilityCssLinkHostPageBuildFallback Include="@(StaticWebAsset)"
+                                               Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All'" />
+      <_ViuUtilityCssLinkHostPageBuildRetirementCandidate Include="@(StaticWebAsset)"
+                                                          Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Publish'" />
+    </ItemGroup>
+
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPageBuildPreferred)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPageBuildPreferredDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPageBuildKind)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPageBuildKindDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPageBuildViuFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPageBuildViuFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPageBuildFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPageBuildFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPageBuildRetirementCandidate)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPageBuildRetirementDistinct" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <_ViuUtilityCssLinkHostPageBuild Include="@(_ViuUtilityCssLinkHostPageBuildPreferredDistinct)" />
+      <_ViuUtilityCssLinkHostPageBuild Include="@(_ViuUtilityCssLinkHostPageBuildKindDistinct)"
+                                       Condition="'@(_ViuUtilityCssLinkHostPageBuildPreferredDistinct)' == ''" />
+      <_ViuUtilityCssLinkHostPageBuild Include="@(_ViuUtilityCssLinkHostPageBuildViuFallbackDistinct)"
+                                       Condition="'@(_ViuUtilityCssLinkHostPageBuildPreferredDistinct)' == '' and '@(_ViuUtilityCssLinkHostPageBuildKindDistinct)' == ''" />
+      <_ViuUtilityCssLinkHostPageBuild Include="@(_ViuUtilityCssLinkHostPageBuildFallbackDistinct)"
+                                       Condition="'@(_ViuUtilityCssLinkHostPageBuildPreferredDistinct)' == '' and '@(_ViuUtilityCssLinkHostPageBuildKindDistinct)' == '' and '@(_ViuUtilityCssLinkHostPageBuildViuFallbackDistinct)' == ''" />
     </ItemGroup>
 
     <ViuInjectCssBundleLink Condition="'@(_ViuUtilityCssLinkHostPageBuild)' != ''"
@@ -233,7 +287,7 @@
     <DefineStaticWebAssets Condition="'@(_ViuUtilityCssLinkUpdatedHostPageBuildCandidate)' != ''"
                            CandidateAssets="@(_ViuUtilityCssLinkUpdatedHostPageBuildCandidate)"
                            SourceType="Computed"
-                           AssetKind="Build">
+                           AssetKind="All">
       <Output TaskParameter="Assets" ItemName="_ViuUtilityCssLinkUpdatedHostPageBuild" />
     </DefineStaticWebAssets>
 
@@ -244,15 +298,15 @@
       <Output TaskParameter="Endpoints" ItemName="_ViuUtilityCssLinkUpdatedHostPageBuildEndpoint" />
     </DefineStaticWebAssetEndpoints>
 
-    <FilterStaticWebAssetEndpoints Condition="'@(_ViuUtilityCssLinkHostPageBuild)' != ''"
+    <FilterStaticWebAssetEndpoints Condition="'@(_ViuUtilityCssLinkHostPageBuildRetirementDistinct)' != ''"
                                    Endpoints="@(StaticWebAssetEndpoint)"
-                                   Assets="@(_ViuUtilityCssLinkHostPageBuild)"
+                                   Assets="@(_ViuUtilityCssLinkHostPageBuildRetirementDistinct)"
                                    Filters="">
       <Output TaskParameter="FilteredEndpoints" ItemName="_ViuUtilityCssLinkOldHostPageBuildEndpoint" />
     </FilterStaticWebAssetEndpoints>
 
     <ItemGroup Condition="'@(_ViuUtilityCssLinkUpdatedHostPageBuild)' != ''">
-      <StaticWebAsset Remove="@(_ViuUtilityCssLinkHostPageBuild)" />
+      <StaticWebAsset Remove="@(_ViuUtilityCssLinkHostPageBuildRetirementDistinct)" />
       <StaticWebAsset Include="@(_ViuUtilityCssLinkUpdatedHostPageBuild)" />
       <StaticWebAssetEndpoint Remove="@(_ViuUtilityCssLinkOldHostPageBuildEndpoint)" />
       <StaticWebAssetEndpoint Include="@(_ViuUtilityCssLinkUpdatedHostPageBuildEndpoint)" />
@@ -261,11 +315,76 @@
 
   <Target Name="_ViuInjectUtilityCssLinkPublish"
           Condition="'$(ViuInjectUtilityCssLink)' == 'true' and Exists('$(ViuUtilityCssTaskAssembly)')"
-          BeforeTargets="ResolvePublishCompressedStaticWebAssetsConfiguration"
-          DependsOnTargets="_ViuResolveUtilityCssLinkConfiguration;$(_ViuUtilityCssLinkPublishRewriteDependency)">
+           BeforeTargets="ResolvePublishCompressedStaticWebAssetsConfiguration"
+           DependsOnTargets="_ViuResolveUtilityCssLinkConfiguration;$(_ViuUtilityCssLinkPublishRewriteDependency)">
+    <!-- ResolvePublish can re-enter the Browser project after an inner publish graph has already run.
+         Rebuild the private item sets for this context. Prefer the Publish-kind candidate because it
+         carries publish-time placeholder fingerprints; otherwise transform the All-kind candidate. -->
+    <ItemGroup>
+      <_ViuUtilityCssLinkHostPagePublishPreferred Remove="@(_ViuUtilityCssLinkHostPagePublishPreferred)" />
+      <_ViuUtilityCssLinkHostPagePublishKind Remove="@(_ViuUtilityCssLinkHostPagePublishKind)" />
+      <_ViuUtilityCssLinkHostPagePublishViuFallback Remove="@(_ViuUtilityCssLinkHostPagePublishViuFallback)" />
+      <_ViuUtilityCssLinkHostPagePublishFallback Remove="@(_ViuUtilityCssLinkHostPagePublishFallback)" />
+      <_ViuUtilityCssLinkHostPagePublishRetirementCandidate Remove="@(_ViuUtilityCssLinkHostPagePublishRetirementCandidate)" />
+      <_ViuUtilityCssLinkHostPagePublishPreferredDistinct Remove="@(_ViuUtilityCssLinkHostPagePublishPreferredDistinct)" />
+      <_ViuUtilityCssLinkHostPagePublishKindDistinct Remove="@(_ViuUtilityCssLinkHostPagePublishKindDistinct)" />
+      <_ViuUtilityCssLinkHostPagePublishViuFallbackDistinct Remove="@(_ViuUtilityCssLinkHostPagePublishViuFallbackDistinct)" />
+      <_ViuUtilityCssLinkHostPagePublishFallbackDistinct Remove="@(_ViuUtilityCssLinkHostPagePublishFallbackDistinct)" />
+      <_ViuUtilityCssLinkHostPagePublishRetirementDistinct Remove="@(_ViuUtilityCssLinkHostPagePublishRetirementDistinct)" />
+      <_ViuUtilityCssLinkHostPagePublish Remove="@(_ViuUtilityCssLinkHostPagePublish)" />
+      <_ViuUtilityCssLinkObsoleteHostPagePublish Remove="@(_ViuUtilityCssLinkObsoleteHostPagePublish)" />
+      <_ViuUtilityCssLinkUpdatedHostPagePublishCandidate Remove="@(_ViuUtilityCssLinkUpdatedHostPagePublishCandidate)" />
+      <_ViuUtilityCssLinkUpdatedHostPagePublish Remove="@(_ViuUtilityCssLinkUpdatedHostPagePublish)" />
+      <_ViuUtilityCssLinkUpdatedHostPagePublishEndpoint Remove="@(_ViuUtilityCssLinkUpdatedHostPagePublishEndpoint)" />
+      <_ViuUtilityCssLinkOldHostPagePublishEndpoint Remove="@(_ViuUtilityCssLinkOldHostPagePublishEndpoint)" />
+    </ItemGroup>
     <ItemGroup Condition="'$(_ViuUtilityCssBundleExists)' == 'true' and Exists('$(_ViuUtilityCssBundlePath)')">
-      <_ViuUtilityCssLinkHostPagePublish Include="@(StaticWebAsset)"
-                                         Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Build'" />
+      <_ViuUtilityCssLinkHostPagePublishPreferred
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Publish' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuUtilityCssBundleContentRoot)'))" />
+      <_ViuUtilityCssLinkHostPagePublishKind Include="@(StaticWebAsset)"
+                                             Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Publish'" />
+      <_ViuUtilityCssLinkHostPagePublishViuFallback
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuUtilityCssBundleContentRoot)'))" />
+      <_ViuUtilityCssLinkHostPagePublishFallback Include="@(StaticWebAsset)"
+                                                 Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All'" />
+      <_ViuUtilityCssLinkHostPagePublishRetirementCandidate Include="@(StaticWebAsset)"
+                                                            Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Build'" />
+    </ItemGroup>
+
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPagePublishPreferred)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPagePublishPreferredDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPagePublishKind)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPagePublishKindDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPagePublishViuFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPagePublishViuFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPagePublishFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPagePublishFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuUtilityCssLinkHostPagePublishRetirementCandidate)">
+      <Output TaskParameter="Filtered" ItemName="_ViuUtilityCssLinkHostPagePublishRetirementDistinct" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <_ViuUtilityCssLinkHostPagePublish Include="@(_ViuUtilityCssLinkHostPagePublishPreferredDistinct)" />
+      <_ViuUtilityCssLinkHostPagePublish Include="@(_ViuUtilityCssLinkHostPagePublishKindDistinct)"
+                                         Condition="'@(_ViuUtilityCssLinkHostPagePublishPreferredDistinct)' == ''" />
+      <_ViuUtilityCssLinkHostPagePublish Include="@(_ViuUtilityCssLinkHostPagePublishViuFallbackDistinct)"
+                                         Condition="'@(_ViuUtilityCssLinkHostPagePublishPreferredDistinct)' == '' and '@(_ViuUtilityCssLinkHostPagePublishKindDistinct)' == ''" />
+      <_ViuUtilityCssLinkHostPagePublish Include="@(_ViuUtilityCssLinkHostPagePublishFallbackDistinct)"
+                                         Condition="'@(_ViuUtilityCssLinkHostPagePublishPreferredDistinct)' == '' and '@(_ViuUtilityCssLinkHostPagePublishKindDistinct)' == '' and '@(_ViuUtilityCssLinkHostPagePublishViuFallbackDistinct)' == ''" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'@(_ViuUtilityCssLinkHostPagePublish)' != ''">
+      <!-- Retire only the previous primary and its build-compression alternatives before inserting the
+           Publish replacement. Every unrelated compressed stylesheet remains in the asset graph. -->
+      <_ViuUtilityCssLinkObsoleteHostPagePublish Include="@(_ViuUtilityCssLinkHostPagePublishRetirementDistinct)" />
+      <_ViuUtilityCssLinkObsoleteHostPagePublish
+        Include="@(StaticWebAsset)"
+        Condition="'%(StaticWebAsset.AssetRole)' == 'Alternative' and '%(StaticWebAsset.RelatedAsset)' != '' and $([System.String]::Copy('%(StaticWebAsset.RelatedAsset)').StartsWith('$(_ViuUtilityCssLinkBuildContentRoot)'))" />
     </ItemGroup>
 
     <ViuInjectCssBundleLink Condition="'@(_ViuUtilityCssLinkHostPagePublish)' != ''"
@@ -297,15 +416,15 @@
       <Output TaskParameter="Endpoints" ItemName="_ViuUtilityCssLinkUpdatedHostPagePublishEndpoint" />
     </DefineStaticWebAssetEndpoints>
 
-    <FilterStaticWebAssetEndpoints Condition="'@(_ViuUtilityCssLinkHostPagePublish)' != ''"
+    <FilterStaticWebAssetEndpoints Condition="'@(_ViuUtilityCssLinkObsoleteHostPagePublish)' != ''"
                                    Endpoints="@(StaticWebAssetEndpoint)"
-                                   Assets="@(_ViuUtilityCssLinkHostPagePublish)"
+                                   Assets="@(_ViuUtilityCssLinkObsoleteHostPagePublish)"
                                    Filters="">
       <Output TaskParameter="FilteredEndpoints" ItemName="_ViuUtilityCssLinkOldHostPagePublishEndpoint" />
     </FilterStaticWebAssetEndpoints>
 
     <ItemGroup Condition="'@(_ViuUtilityCssLinkUpdatedHostPagePublish)' != ''">
-      <StaticWebAsset Remove="@(_ViuUtilityCssLinkHostPagePublish)" />
+      <StaticWebAsset Remove="@(_ViuUtilityCssLinkObsoleteHostPagePublish)" />
       <StaticWebAsset Include="@(_ViuUtilityCssLinkUpdatedHostPagePublish)" />
       <StaticWebAssetEndpoint Remove="@(_ViuUtilityCssLinkOldHostPagePublishEndpoint)" />
       <StaticWebAssetEndpoint Include="@(_ViuUtilityCssLinkUpdatedHostPagePublishEndpoint)" />

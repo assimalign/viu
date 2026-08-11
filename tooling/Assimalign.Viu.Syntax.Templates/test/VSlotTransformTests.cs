@@ -37,12 +37,12 @@ public class VSlotTransformTests
     [Fact]
     public void OnComponentSlot_ProducesDefaultSlotWithProperties()
     {
-        var result = TransformTestHelpers.Transform("<Comp v-slot=\"{ item }\">{{ item }}</Comp>");
+        var result = TransformTestHelpers.Transform("<Comp v-slot=\"slotProperties\">{{ slotProperties }}</Comp>");
 
         var slots = Slots(result);
         var defaultSlot = slots.ObjectProperty("default").Value.ShouldBeOfType<FunctionExpression>();
         defaultSlot.Parameters.Count.ShouldBe(1);
-        defaultSlot.Parameters[0].ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("{ item }");
+        defaultSlot.Parameters[0].ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("slotProperties");
     }
 
     [Fact]

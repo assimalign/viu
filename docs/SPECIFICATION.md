@@ -1230,6 +1230,16 @@ delegate; the `onUpdate:modelValue` prop is still emitted for uniformity but is 
 element, which the DOM patcher skips rather than binding as a listener. The `modelValue` prop is not
 emitted at all on a native element.
 
+`[SFC-CG-8]` **Authored tag case decides native/component collisions.** Tag spelling is preserved
+through parsing and code generation. A tag whose first character is uppercase is a static component
+candidate before case-insensitive native-tag and void-tag classification, so `<Button>` and `<Input>`
+resolve as components and `<Input>...</Input>` is not auto-closed as the native void element. Their
+lowercase spellings `<button>` and `<input>` remain native elements. Runtime/compiler built-ins keep
+their dedicated lowering and do not require an application component declaration; `<component
+:is="...">` remains the explicit runtime-selected component form. The declaration catalog includes
+parameterless generated components, because identity resolution does not depend on whether a component
+declares inputs [V01.01.05.11].
+
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost
 expression and closed with `#line default`. The span form is required because a render expression is
@@ -1256,9 +1266,22 @@ insert. The thresholds are **`NODE_COUNT = 20`** consecutive stringifiable nodes
 `[SFC-OPT-3]` Table-section tags (`caption`, `thead`, `tr`, `th`, `tbody`, `td`, `tfoot`,
 `colgroup`, `col`) **never stringify**, because a raw-HTML insert would reparent them.
 
-`[SFC-OPT-4]` Serialization escapes `"`, `&`, `'`, `<`, `>`, omits end tags for void elements, and
-restricts stringifiable attributes to known HTML/SVG attributes plus the `data-`/`aria-` prefixes,
-so the string round-trips to the same host tree under WHATWG fragment serialization.
+`[SFC-OPT-4]` Serialization escapes `"`, `&`, `'`, `<`, `>`, omits end tags for HTML void elements,
+and restricts stringifiable attributes to the linked shared DOM-knowledge catalogs: known HTML and SVG
+attributes, the bounded MathML Core attribute set, and HTML's `data-`/`aria-` prefixes. An unknown or
+dynamic attribute makes that subtree ineligible instead of guessing. Each collapsed run selects its
+fragment format from the effective namespace of its serialized top-level children and splits before
+that mode changes. HTML-namespace chunks—including children of SVG `foreignObject`/`desc`/`title` and
+MathML text or HTML-integrating `annotation-xml` integration points—use HTML fragment serialization;
+SVG and MathML namespace chunks carry `MarkupFormat.ExtensibleMarkupLanguage`, so namespace-aware hosts
+parse the same static structure [V01.01.05.10].
+
+`[SFC-OPT-5]` **Memoized subtrees.** `v-memo` stores each mount's ordered dependency values and rendered
+subtree in a `ComponentRenderFrame` cache slot. A render with element-wise equal dependencies reuses the
+subtree and performs no descendant patch operations; a changed dependency rebuilds and patches it. On a
+`v-for` item, the item's key participates in the memo entry so reuse cannot cross keyed occurrences. This
+is per-mount state and does not alter the numeric `PatchFlags` layout or the three-state
+`DynamicChildren` ABI [RND-6] [V01.01.05.10].
 
 ### 8.7 Diagnostics
 
@@ -1309,13 +1332,18 @@ supplied to a `string` parameter. Both are errors because neither can be right a
 `IComponentArguments.Get<T>` would yield the parameter type's default [CMP-29]. Every other
 combination is left alone.
 
-`[SFC-USE-5]` **The limits, and the silence they buy.** Validation is skipped entirely for: a
-component the catalog does not resolve — which includes **every component that declares its
-parameters imperatively**, because a `Parameters` collection is arbitrary C# no compiler can read, and
-that gap is the reason the attribute form exists; a tag that resolves to more than one declaration; a
-usage carrying an argument-less `v-bind="…"` spread or a dynamic `:[name]` argument; a bound
-expression that is not a C# literal; and a hyphenated attribute name. A false positive is worse than a
-false negative here, so every undecidable input produces silence rather than a guess.
+`[SFC-USE-5]` **Identity resolution precedes conservative argument validation.** Every authored static
+component tag, including one with no attributes and every declaration whose parameter list is empty,
+must resolve to exactly one declaration. No match reports `VIU1404` with actions to add/reference the
+declaration or use `<component :is="...">` for runtime selection; more than one match reports `VIU1405`
+with an action to remove or rename the conflict. Compiler/runtime built-ins are excluded from this
+catalog check. The generic `<component>` and `<Component>` elements and native-tag `is="vue:..."`
+casts are likewise excluded because their identities resolve at run time. The checker does not probe a
+cast's stripped target in the static catalog because a runtime-only component registration is valid.
+After identity resolves, validation stays silent only for argument facts it cannot prove: an
+argument-less `v-bind="…"` spread or dynamic `:[name]`, a non-literal bound expression, a hyphenated
+attribute name, or an imperative `Parameters` collection whose contents are arbitrary C#. These
+argument-level bailouts do not suppress missing or ambiguous identity diagnostics [V01.01.05.11].
 
 *Authority: `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
 `tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
@@ -1884,10 +1912,15 @@ SDK extracts `.viu.css` when a component library is packed and carries it with g
 `buildTransitive` registration, but does not itself register browser static assets or write to
 `wwwroot`. The Browser SDK consumes that transitive registration as an additional browser static web
 asset and owns application bundling: `ViuBundleCss` writes the app's component stylesheet,
-`ViuBundleUtilityCss` writes the utility stylesheet, and a link-injection task splices each enabled
-app `<link>` into the host page **before** the WebAssembly SDK's compression pipeline so content
-negotiation stays intact. Both app links can be opted out of. The Browser SDK also owns the CSS
-hot-reload worker and publish-budget hooks.
+`ViuBundleUtilityCss` writes the utility stylesheet, and a link-injection task splices referenced
+library component stylesheets in ordinal route order before the application component stylesheet.
+Injection works in Build and Publish with either value of `OverrideHtmlAssetPlaceholders`, runs
+**before** the WebAssembly SDK's compression pipeline, and is idempotent per `href`, so content
+negotiation stays intact without duplicate links. The application's stable plain route is the
+static-hosting default; manifest-aware deployments may opt into the actual static-web-asset endpoint
+labeled `<PackageId>.viu.css`, while an explicit application `LinkHref` takes precedence. Component
+and utility links can be opted out of independently. The Browser SDK also owns the CSS hot-reload
+worker and publish-budget hooks. Specified by [V01.01.12.12.04] through [V01.01.12.12.07].
 
 `[PKG-5]` In-repo projects **dogfood via `ViuProjectReference`**; the two SDKs are the *external
 consumer* surfaces. The in-repo build deliberately does not consume either SDK, so the framework can
@@ -1915,9 +1948,10 @@ it move together.
 | Generator snapshot tests | Emitted source, hint names, diagnostics |
 | `SingleFileComponentProjectionConformanceTests` | Build/editor projection equality [SFC-PIPE-2] |
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
+| `Assimalign.Viu.Sdk.Browser.Tasks.Tests` | Pure host-page stylesheet injection: close-tag placement, href idempotency, comment handling, newline preservation, and missing-head behavior |
 | `tooling/Assimalign.Viu.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
-| `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; a Browser-SDK app consumes and mounts the packed component, flows its stylesheet, and passes Build, trimmed publish, and AOT publish |
-| `scripts/Test-EndToEnd.ps1`, `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance |
+| `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; isolated Browser-SDK consumers pin library-only and library-before-app link delivery, both `OverrideHtmlAssetPlaceholders` states in Build and Publish, labeled fingerprint resolution plus explicit-href precedence, and byte-equivalent identity/gzip/brotli outputs through trimmed and AOT publish |
+| `scripts/Test-EndToEnd.ps1`, `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance; the isolated Chromium watch lane uses an explicit non-served HTML utility input to pin CSS replacement, a no-write/no-managed-update semantic no-op, final-rule removal, and mounted `.vue` remount behavior [V01.01.12.05.02] |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
 | `.github/workflows/area-*.yml` and `benchmarks.yml` | Live per-area CI plus the interop budget gate |
 | `.github/workflows/budget-gates.yml` | Live pull-request trimmed-publish/size and trim-warning checks, with scheduled/on-demand WebAssembly AOT and real-browser `boot-to-interactive` startup lanes |
@@ -1968,11 +2002,9 @@ correct-looking values.
 | Suspense boundary behavior | Timeout and events, fallback-to-reveal choreography, and hidden-branch post-effect delay are absent [BLT-13] |
 | Router | Lazy route components and scroll behavior are not implemented [RTR-8] |
 | DevTools | Area `V01.01.10` has no library in the tree |
-| Static hoisting | Per-component-type static fields are not implemented; **all** static optimization routes through the per-instance render cache [SFC-OPT-1] |
-| `v-memo` | Bodies are serialized but not C#-legal end to end |
-| Handler caching | The cached member-expression handler pass stays off in the generator |
-| Slot/`v-for` destructuring | `v-slot` destructuring and tuple `v-for` aliases emit verbatim and are not valid C# lambda parameters |
-| MathML stringification | MathML attributes never stringify; MathML static content caches but does not fold into a raw-HTML insert |
+| Per-component-type static fields | Deliberately dropped: per-mount caching already removes repeat render and host work; a process-lifetime field would save only a managed allocation per mount while adding hot-reload lifetime and generator/runtime field-ABI complexity [SFC-OPT-1] |
+| Generalized handler caching | Deliberately dropped: syntax alone cannot prove a member-expression delegate has a stable receiver or infer every delegate arity; caching it could freeze mutable receiver state. Authors can supply an explicitly stable delegate when identity matters |
+| Slot/`v-for` destructuring | Deliberately unsupported: C# lambda parameters cannot represent generalized object/array destructuring without choosing new missing-member, null, and conversion semantics. A single valid C# identifier is accepted; other aliases report a located actionable template diagnostic and emit no invalid C# |
 | Server rendering | Compiler-informed server code generation, byte-oriented writer integration, static site generation, and directive-specific server properties are deferred |
 
 ---

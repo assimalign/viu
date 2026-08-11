@@ -3,7 +3,7 @@
 Why the template compiler front end is shaped the way it is, and the decisions C# and WASM force.
 This document accumulates per feature; today it covers expression binding and scope
 analysis ([V01.01.05.04], issue #51) and render-function code generation ([V01.01.05.05], issue #52).
-The normative statements are `[SFC-6]`–`[SFC-8]` and `[SFC-CG-1]`–`[SFC-OPT-4]` in
+The normative statements are `[SFC-6]`–`[SFC-8]` and `[SFC-CG-1]`–`[SFC-OPT-5]` in
 [`docs/SPECIFICATION.md`](../../../docs/SPECIFICATION.md).
 
 ## Expression binding and scope analysis
@@ -342,17 +342,23 @@ line **and** column, proved through the real compiler in the generator's
 scaffolding — and any second expression that happens to share one physical render line — falls back to the
 generated file, the standard generated-code practice.
 
-### Known deferrals (non-goals for [V01.01.05.05])
+### Memo and expression-shape decisions ([V01.01.05.10], issue #321)
 
-- **`v-memo` bodies are serialized but not C#-legal end to end.** The memo condition parts authored by
-  the v-for/v-memo transforms carry JavaScript member accesses (`_cached.key`) and the `_cached`
-  parameter contract; C#-izing them belongs with the caching pass work ([V01.01.05.07] era), so v-memo
-  templates are excluded from the parse-validity suite.
-- **`CacheHandlers` stays off in the generator.** A cached member-expression handler needs a
-  variadic-forwarding wrapper, which has no C# spelling yet; `v-once` caching is
-  independent and fully emitted.
-- **v-slot destructuring and tuple v-for aliases** (`#item="{ label }"`, `(a, b) in pairs`) emit
-  verbatim and are not valid C# lambda parameters; they are follow-up expression-binding work.
+- **`v-memo` is implemented end to end.** Ordinary and keyed `v-for` memo bodies emit valid C# against
+  `ComponentRenderFrame.Memo`. The frame retains ordered dependency values and the immutable subtree per
+  mount: an equal dependency vector returns the prior subtree without descendant patch operations, while
+  a changed value rebuilds it. A list item's key is part of its memo identity. Emission parse tests and the
+  compiled fixture suite pin mount, unchanged-update, changed-update, and operation-count behavior.
+- **Generalized handler caching is deliberately not implemented.** Syntax can identify a member access,
+  but it cannot prove the delegate receiver is stable across renders or infer a type-safe forwarding
+  lambda for every event delegate arity. Caching such a value can freeze a mutable receiver and silently
+  change behavior. `CacheHandlers` therefore stays off; `v-once`, `v-memo`, and explicitly stable delegates
+  remain the supported identity controls.
+- **Generalized `v-slot`/`v-for` destructuring is deliberately unsupported.** C# lambda parameters accept
+  a simple identifier, not generalized object/array destructuring. Synthesizing a lowering would require
+  Viu-specific missing-member, null, conversion, and evaluation-order semantics. The compiler accepts a
+  valid C# identifier and reports `XViuUnsupportedSlotScopeExpression` or
+  `XViuUnsupportedForAlias` at any other authored shape, omitting that invalid shape from generated C#.
 
 ## Static caching and stringification
 
@@ -395,7 +401,8 @@ contract referenced by `createStaticVNode`/`insertStaticContent`).
 
 After the walk, `StaticStringifier.Run` scans a container's children for the largest contiguous run of
 cached, stringifiable siblings and — at or above the thresholds — collapses it into a single
-`createStaticVNode(html, nodeCount)` whose serialized HTML the runtime applies via one `innerHTML`. The
+`createStaticVNode(markup, nodeCount, format)` whose serialized fragment the runtime applies with one host
+insert. The
 thresholds are specified values (`[SFC-OPT-2]`) and are pinned by tests; below them the raw-HTML insert
 costs more than the nodes it replaces:
 
@@ -404,11 +411,15 @@ costs more than the nodes it replaces:
 | `NODE_COUNT` | 20 | consecutive stringifiable nodes |
 | `ELEMENT_WITH_BINDING_COUNT` | 5 | consecutive elements carrying attribute bindings |
 
-Serialization reuses the compiler's existing HTML knowledge: `escapeHtml` (`"`, `&`,
-`'`, `<`, `>`) so the string round-trips through `innerHTML` to the same DOM (WHATWG fragment serialization),
-`CompilerDomKnowledge.IsVoidTag` to omit end tags for void elements, and `IsKnownHtmlAttribute`/
-`IsKnownSvgAttribute` plus the `data-`/`aria-` rule for `isStringifiableAttr`. Table-section tags
-(`caption,thead,tr,th,tbody,td,tfoot,colgroup,col`) never stringify (innerHTML would reparent them).
+Serialization reuses linked shared DOM knowledge: escaping (`"`, `&`, `'`, `<`, `>`),
+`CompilerDomKnowledge.IsVoidTag` for HTML void elements, known HTML/SVG attributes plus `data-`/`aria-`,
+and a bounded MathML Core attribute catalog. Unknown and dynamic attributes bail out before the run is
+folded. The fragment format follows the effective namespace of each run's serialized top-level
+children, and a run splits before that mode changes. HTML children of SVG `foreignObject`/`desc`/`title`
+and MathML text or HTML-integrating `annotation-xml` integration points therefore use
+`MarkupFormat.Html`; SVG and MathML child runs use `MarkupFormat.ExtensibleMarkupLanguage`. Table-section
+tags (`caption,thead,tr,th,tbody,td,tfoot,colgroup,col`) never stringify because fragment insertion
+would reparent them.
 
 ### Scope decisions in the optimization passes
 
@@ -417,17 +428,18 @@ Each is deliberate, forced by the no-dynamic-codegen rule or the immutable-AST m
 
 | Alternative considered | Viu behavior | Why |
 | --- | --- | --- |
-| `context.cache` (vnode subtrees, per-instance `_cache`) **and** `context.hoist` (props objects, per-type module `_hoisted_N` consts) | both route through the per-instance `_cache` seam | the C# generator model owns the render method and has no module-const scope without a new emitter↔generator field contract; each value is still created once per instance and reused across all re-renders — the interop-reduction goal. `context.Hoist`/`result.Hoists` stay reserved for a future per-type static-field seam. |
+| Per-mount cache slots **and** per-component-type static fields | all static values route through the per-mount cache; per-type fields are intentionally not planned | the existing cache removes repeat render and host operations. A process-lifetime field saves only a managed allocation per mount while adding a generator field ABI, lifetime across unmount, and stale-value risk across hot-reload revisions. |
 | constant interpolations / constant `v-bind` values evaluated with `new Function` | not evaluated; `AnalyzeNode` bails on any non-text/comment/element content and on any binding | dynamic code generation is forbidden (AOT). In the opaque-expression model no interpolation or `v-bind` is ever constant, so a stringifiable cached subtree only ever holds static text, comments, and static attributes — the eval branches are unreachable. |
 | whole-children-array caching and text-call caching | omitted; each eligible static sibling caches individually | a fully static text run is a single `TextNode` folded into its element's cached subtree, so text-call caching is unreachable; skipping the array cache avoids reconstructing frozen immutable children arrays and leaves only one stringify path to maintain. |
 | `stringifyStatic` runs on every container (element, root, `v-for`/`v-if` bodies) | runs on a template root's children and a plain element's children | those are the two containers with clean immutable write-back; static descendants inside `v-if`/`v-for` bodies are still cached, just not stringified (a per-iteration run rarely reaches 20 nodes anyway). |
 | after merging, `context.cached` is spliced and trailing cache indices decremented | merged nodes' cache slots stay reserved-but-unused | `CacheExpression.Index` is immutable; leaving the slots reserved keeps the record immutable and the output deterministic, at the cost of a marginally larger `_cache`. |
-| `isKnownMathMLAttr` | MathML attributes are never stringifiable | the Viu shared DOM knowledge has no MathML known-attribute table; MathML static content still caches, it just does not fold into an innerHTML string. |
+| Unbounded MathML attribute acceptance | only the shared bounded MathML Core catalog stringifies | the proof must be closed and deterministic; an unknown or dynamic attribute bails out rather than relying on host-specific parsing. The same linked catalog is consumed by ServerRenderer and the template compiler. |
 
 ### Non-goals ([V01.01.05.07])
 
-- Per-component-type static fields (the pre-3.5 `_hoisted_N` module consts). All static optimization routes
-  through per-instance `_cache`; a static-field emission seam through the generator is deferred.
+- Per-component-type static fields. This is a final scope decision, not a deferred seam: per-mount cache
+  slots already remove rerender work, while cross-mount fields complicate hot-reload lifetime and the
+  generated-code ABI for negligible host-operation benefit.
 - Stringification of `v-for`/`v-if` body runs, and of runs interleaved with `TextCall` text (see above).
 - Constant-expression evaluation for stringifying constant interpolations / `:bind="1"` (needs an evaluator
   Viu deliberately does not have).

@@ -72,12 +72,19 @@
 
     <!-- LINK INJECTION master switch ([V01.01.12.12.01], #167): auto-inject the bundle's <link
          rel="stylesheet"> into the WASM host page (wwwroot/index.html) so a consuming app needs no
-         hand-authored link tag. Defaults ON wherever bundling is on. Set to false to keep bundling but author
-         the <link> by hand (the injector is idempotent, so a hand-authored link is also a working opt-out —
-         it simply suppresses injection). The Browser SDK owns ViuInjectCssBundleLink separately from the
-         host-neutral ViuBundleCss task and supplies $(ViuInjectCssBundleLinkTaskAssembly). -->
-    <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == '' and '$(ViuBundleSingleFileComponentCss)' == 'true'">true</ViuInjectSingleFileComponentCssLink>
+         hand-authored link tag. Defaults ON for Browser applications, including applications whose only
+         component CSS comes from referenced libraries. Set to false to author every link by hand (the
+         injector is idempotent, so an existing href suppresses only its matching generated link). The Browser
+         SDK owns ViuInjectCssBundleLink separately from the host-neutral ViuBundleCss task and supplies
+         $(ViuInjectCssBundleLinkTaskAssembly). -->
+    <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == '' and ('$(ViuBundleSingleFileComponentCss)' == 'true' or '$(_ViuBrowserSdk)' == 'true')">true</ViuInjectSingleFileComponentCssLink>
     <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == ''">false</ViuInjectSingleFileComponentCssLink>
+    <!-- A manifest-aware host can opt into the immutable application-bundle endpoint. The default remains
+         false because a standalone static publish carries the plain physical file and cannot resolve the
+         endpoint route without a manifest-aware server. An explicit LinkHref remains the highest-precedence
+         escape hatch for an application with its own route policy. -->
+    <ViuUseFingerprintedSingleFileComponentCssBundleLink Condition="'$(ViuUseFingerprintedSingleFileComponentCssBundleLink)' == ''">false</ViuUseFingerprintedSingleFileComponentCssBundleLink>
+
   </PropertyGroup>
 
   <!-- The task lives in sdks/Assimalign.Viu.Sdk/Tasks; it re-runs the shared Compiler.Css core
@@ -315,48 +322,135 @@
 
     WHY THIS RE-USES THE SDK REWRITE RATHER THAN RACES IT: when OverrideHtmlAssetPlaceholders is on, the
     injector DependsOn the SDK's rewrite target so it runs strictly AFTER it (reading the placeholder-resolved
-    page and adding the link on top); when it is off, the dependency is empty and the injector transforms the
-    discovered page directly. Either way the injector is the LAST host-page transform before compression.
+    page and adding the link on top); when it is off, the fallback dependency waits for the build/publish
+    static-web-asset inputs and the injector transforms that discovered page directly. Either way the injector
+    is the LAST host-page transform before compression.
 
-    WHY THE PLAIN ROUTE, NOT THE FINGERPRINTED ONE: the bundle registers with the '?' optional fingerprint
+    WHY THE PLAIN ROUTE IS THE DEFAULT: the bundle registers with the '?' optional fingerprint
     ([V01.01.12.12.03]), so a standalone `dotnet publish` ships only the plain physical file
     (<PackageId>.viu.css) — the fingerprinted route resolves to that same file ONLY through the endpoint
     manifest (a manifest-aware host: `dotnet run`, ASP.NET Core, a configured CDN). A statically hosted
     published WASM app has no such middleware, so a hashed href would 404. The plain route works everywhere
     and still revalidates via the endpoint's ETag/integrity; the fingerprinted endpoint remains registered for
-    hosted scenarios. See tooling/Assimalign.Viu.Compiler.Css/docs/DESIGN.md. Override the href with
-    $(ViuSingleFileComponentCssBundleLinkHref) for a manifest-aware deployment that wants the immutable URL.
+    hosted scenarios. Set $(ViuUseFingerprintedSingleFileComponentCssBundleLink)=true for a manifest-aware
+    deployment; the injector resolves the route from the endpoint labeled with the plain bundle name. An
+    explicitly assigned $(ViuSingleFileComponentCssBundleLinkHref) takes precedence over that opt-in.
   -->
 
   <Target Name="_ViuResolveSingleFileComponentCssLinkConfiguration"
           Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'"
           DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration">
     <PropertyGroup>
+      <_ViuCssBundleLinkHrefExplicitlySet Condition="'$(ViuSingleFileComponentCssBundleLinkHref)' != ''">true</_ViuCssBundleLinkHrefExplicitlySet>
       <!-- The href written into the host page. Defaults to the bundle's stable plain route (the file a static
-           host serves); a manifest-aware deployment can point it at the fingerprinted route for immutable
-           caching. -->
+           host serves). The fingerprint opt-in is resolved from the generated endpoint later, after static
+           web assets exist. -->
       <ViuSingleFileComponentCssBundleLinkHref Condition="'$(ViuSingleFileComponentCssBundleLinkHref)' == ''">$(ViuSingleFileComponentCssBundleName)</ViuSingleFileComponentCssBundleLinkHref>
       <!-- Intermediate roots for the injected host-page copies. The physical page under wwwroot/ is never
            edited in place — each build/publish copy is written here and re-registered from it. -->
       <_ViuCssLinkBuildContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\htmllink\build\'))</_ViuCssLinkBuildContentRoot>
       <_ViuCssLinkPublishContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\htmllink\publish\'))</_ViuCssLinkPublishContentRoot>
+      <_ViuCssLinkUtilityBuildContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\utilityhtmllink\build\'))</_ViuCssLinkUtilityBuildContentRoot>
       <!-- Order the injector strictly after the SDK's host-page rewrite when that rewrite is active, so the
-           link is added to the placeholder-resolved page (and never lost to a stale rewrite snapshot). Empty
-           when OverrideHtmlAssetPlaceholders is off, so the injector then transforms the discovered page. -->
+           link is added to the placeholder-resolved page (and never lost to a stale rewrite snapshot). The
+           fallback waits for the relevant static-web-asset graph before transforming the discovered page. -->
       <_ViuCssLinkBuildRewriteDependency Condition="'$(OverrideHtmlAssetPlaceholders)' == 'true'">ResolveHtmlAssetPlaceholdersBuildStaticWebAssets</_ViuCssLinkBuildRewriteDependency>
+      <_ViuCssLinkBuildRewriteDependency Condition="'$(_ViuCssLinkBuildRewriteDependency)' == ''">ResolveStaticWebAssetsInputs</_ViuCssLinkBuildRewriteDependency>
       <_ViuCssLinkPublishRewriteDependency Condition="'$(OverrideHtmlAssetPlaceholders)' == 'true'">ResolveHtmlAssetPlaceholdersPublishStaticWebAssets</_ViuCssLinkPublishRewriteDependency>
+      <_ViuCssLinkPublishRewriteDependency Condition="'$(_ViuCssLinkPublishRewriteDependency)' == ''">ResolvePublishStaticWebAssets</_ViuCssLinkPublishRewriteDependency>
     </PropertyGroup>
   </Target>
 
-  <!-- BUILD: inject into the build-kind host page before build compression enumerates assets. Mirrors the
-       SDK's ResolveHtmlAssetPlaceholdersBuildStaticWebAssets (AssetKind != Publish → recompute as Build). -->
+  <!-- Build one deterministic component-stylesheet set after static-web-asset inputs have materialized the
+       application bundle and the Browser SDK has flowed every referenced-library bundle. Libraries sort
+       ordinally within order 100; the application uses order 200 so its authored rules retain the final
+       cascade position. The task deduplicates by href and performs one host-page write. -->
+  <Target Name="_ViuCollectSingleFileComponentCssLinks"
+          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'">
+    <ItemGroup>
+      <_ViuCssStylesheetLink Remove="@(_ViuCssStylesheetLink)" />
+      <_ViuCssStylesheetLink Include="@(ViuComponentLibraryStyle)"
+                             Condition="'%(ViuComponentLibraryStyle.PackageId)' != ''">
+        <Href>_content/%(ViuComponentLibraryStyle.PackageId)/%(ViuComponentLibraryStyle.Filename)%(ViuComponentLibraryStyle.Extension)</Href>
+        <BundleFileName>%(ViuComponentLibraryStyle.Filename)%(ViuComponentLibraryStyle.Extension)</BundleFileName>
+        <Order>100</Order>
+      </_ViuCssStylesheetLink>
+      <_ViuCssStylesheetLink Include="$(_ViuCssBundlePath)"
+                             Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">
+        <Href>$(ViuSingleFileComponentCssBundleLinkHref)</Href>
+        <BundleFileName>$(ViuSingleFileComponentCssBundleName)</BundleFileName>
+        <Order>200</Order>
+        <FingerprintLabel Condition="'$(ViuUseFingerprintedSingleFileComponentCssBundleLink)' == 'true' and '$(_ViuCssBundleLinkHrefExplicitlySet)' != 'true'">$(ViuSingleFileComponentCssBundleName)</FingerprintLabel>
+      </_ViuCssStylesheetLink>
+    </ItemGroup>
+  </Target>
+
+  <!-- BUILD: inject into the non-publish host page before build compression enumerates assets. Retain
+       AssetKind=All so the injected page remains eligible for a later Publish when the SDK placeholder
+       rewriter is disabled; forcing Build here would remove the only publish host-page candidate. -->
   <Target Name="_ViuInjectSingleFileComponentCssLinkBuild"
           Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuInjectCssBundleLinkTaskAssembly)')"
-          BeforeTargets="ResolveBuildCompressedStaticWebAssetsConfiguration"
-          DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkBuildRewriteDependency)">
-    <ItemGroup Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">
-      <_ViuCssLinkHostPageBuild Include="@(StaticWebAsset)"
-                                Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Publish'" />
+           BeforeTargets="ResolveBuildCompressedStaticWebAssetsConfiguration"
+           DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkBuildRewriteDependency);_ViuCollectSingleFileComponentCssLinks">
+    <!-- Publish can execute this target in both its inner and outer project contexts. Clear every
+         target-private item before reconstructing the current graph so an earlier context cannot be
+         batched again. A Build-kind host owns build-time placeholder resolution; otherwise transform
+         the All-kind host. The complete eligible set is retained separately for endpoint retirement. -->
+    <ItemGroup>
+      <_ViuCssLinkHostPageBuildPreferred Remove="@(_ViuCssLinkHostPageBuildPreferred)" />
+      <_ViuCssLinkHostPageBuildKind Remove="@(_ViuCssLinkHostPageBuildKind)" />
+      <_ViuCssLinkHostPageBuildViuFallback Remove="@(_ViuCssLinkHostPageBuildViuFallback)" />
+      <_ViuCssLinkHostPageBuildFallback Remove="@(_ViuCssLinkHostPageBuildFallback)" />
+      <_ViuCssLinkHostPageBuildRetirementCandidate Remove="@(_ViuCssLinkHostPageBuildRetirementCandidate)" />
+      <_ViuCssLinkHostPageBuildPreferredDistinct Remove="@(_ViuCssLinkHostPageBuildPreferredDistinct)" />
+      <_ViuCssLinkHostPageBuildKindDistinct Remove="@(_ViuCssLinkHostPageBuildKindDistinct)" />
+      <_ViuCssLinkHostPageBuildViuFallbackDistinct Remove="@(_ViuCssLinkHostPageBuildViuFallbackDistinct)" />
+      <_ViuCssLinkHostPageBuildFallbackDistinct Remove="@(_ViuCssLinkHostPageBuildFallbackDistinct)" />
+      <_ViuCssLinkHostPageBuildRetirementDistinct Remove="@(_ViuCssLinkHostPageBuildRetirementDistinct)" />
+      <_ViuCssLinkHostPageBuild Remove="@(_ViuCssLinkHostPageBuild)" />
+      <_ViuCssLinkUpdatedHostPageBuildCandidate Remove="@(_ViuCssLinkUpdatedHostPageBuildCandidate)" />
+      <_ViuCssLinkUpdatedHostPageBuild Remove="@(_ViuCssLinkUpdatedHostPageBuild)" />
+      <_ViuCssLinkUpdatedHostPageBuildEndpoint Remove="@(_ViuCssLinkUpdatedHostPageBuildEndpoint)" />
+      <_ViuCssLinkOldHostPageBuildEndpoint Remove="@(_ViuCssLinkOldHostPageBuildEndpoint)" />
+    </ItemGroup>
+    <ItemGroup Condition="'@(_ViuCssStylesheetLink)' != ''">
+      <_ViuCssLinkHostPageBuildPreferred
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Build' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuCssBundleContentRoot)'))" />
+      <_ViuCssLinkHostPageBuildKind Include="@(StaticWebAsset)"
+                                    Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Build'" />
+      <_ViuCssLinkHostPageBuildViuFallback
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuCssBundleContentRoot)'))" />
+      <_ViuCssLinkHostPageBuildFallback Include="@(StaticWebAsset)"
+                                        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All'" />
+      <_ViuCssLinkHostPageBuildRetirementCandidate Include="@(StaticWebAsset)"
+                                                   Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Publish'" />
+    </ItemGroup>
+
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPageBuildPreferred)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPageBuildPreferredDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPageBuildKind)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPageBuildKindDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPageBuildViuFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPageBuildViuFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPageBuildFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPageBuildFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPageBuildRetirementCandidate)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPageBuildRetirementDistinct" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <_ViuCssLinkHostPageBuild Include="@(_ViuCssLinkHostPageBuildPreferredDistinct)" />
+      <_ViuCssLinkHostPageBuild Include="@(_ViuCssLinkHostPageBuildKindDistinct)"
+                                Condition="'@(_ViuCssLinkHostPageBuildPreferredDistinct)' == ''" />
+      <_ViuCssLinkHostPageBuild Include="@(_ViuCssLinkHostPageBuildViuFallbackDistinct)"
+                                Condition="'@(_ViuCssLinkHostPageBuildPreferredDistinct)' == '' and '@(_ViuCssLinkHostPageBuildKindDistinct)' == ''" />
+      <_ViuCssLinkHostPageBuild Include="@(_ViuCssLinkHostPageBuildFallbackDistinct)"
+                                Condition="'@(_ViuCssLinkHostPageBuildPreferredDistinct)' == '' and '@(_ViuCssLinkHostPageBuildKindDistinct)' == '' and '@(_ViuCssLinkHostPageBuildViuFallbackDistinct)' == ''" />
     </ItemGroup>
 
     <!-- Write the copy under the physical FILE NAME (index.html), NOT %(RelativePath): a fingerprinted asset's
@@ -367,7 +461,9 @@
                             HostPagePath="%(_ViuCssLinkHostPageBuild.FullPath)"
                             OutputPath="$(_ViuCssLinkBuildContentRoot)%(_ViuCssLinkHostPageBuild.FileName)%(_ViuCssLinkHostPageBuild.Extension)"
                             LinkHref="$(ViuSingleFileComponentCssBundleLinkHref)"
-                            BundleFileName="$(ViuSingleFileComponentCssBundleName)" />
+                            BundleFileName="$(ViuSingleFileComponentCssBundleName)"
+                            StylesheetLinks="@(_ViuCssStylesheetLink)"
+                            StaticWebAssetEndpoints="@(StaticWebAssetEndpoint)" />
 
     <ItemGroup Condition="'@(_ViuCssLinkHostPageBuild)' != ''">
       <!-- Re-point the candidates at the injected copies (identity = the written file) and drop the
@@ -385,7 +481,7 @@
     <DefineStaticWebAssets Condition="'@(_ViuCssLinkUpdatedHostPageBuildCandidate)' != ''"
                            CandidateAssets="@(_ViuCssLinkUpdatedHostPageBuildCandidate)"
                            SourceType="Computed"
-                           AssetKind="Build">
+                           AssetKind="All">
       <Output TaskParameter="Assets" ItemName="_ViuCssLinkUpdatedHostPageBuild" />
     </DefineStaticWebAssets>
 
@@ -396,15 +492,15 @@
       <Output TaskParameter="Endpoints" ItemName="_ViuCssLinkUpdatedHostPageBuildEndpoint" />
     </DefineStaticWebAssetEndpoints>
 
-    <FilterStaticWebAssetEndpoints Condition="'@(_ViuCssLinkHostPageBuild)' != ''"
+    <FilterStaticWebAssetEndpoints Condition="'@(_ViuCssLinkHostPageBuildRetirementDistinct)' != ''"
                                    Endpoints="@(StaticWebAssetEndpoint)"
-                                   Assets="@(_ViuCssLinkHostPageBuild)"
+                                   Assets="@(_ViuCssLinkHostPageBuildRetirementDistinct)"
                                    Filters="">
       <Output TaskParameter="FilteredEndpoints" ItemName="_ViuCssLinkOldHostPageBuildEndpoint" />
     </FilterStaticWebAssetEndpoints>
 
     <ItemGroup Condition="'@(_ViuCssLinkUpdatedHostPageBuild)' != ''">
-      <StaticWebAsset Remove="@(_ViuCssLinkHostPageBuild)" />
+      <StaticWebAsset Remove="@(_ViuCssLinkHostPageBuildRetirementDistinct)" />
       <StaticWebAsset Include="@(_ViuCssLinkUpdatedHostPageBuild)" />
       <StaticWebAssetEndpoint Remove="@(_ViuCssLinkOldHostPageBuildEndpoint)" />
       <StaticWebAssetEndpoint Include="@(_ViuCssLinkUpdatedHostPageBuildEndpoint)" />
@@ -416,11 +512,75 @@
        Publish). This is the path #167's acceptance criterion verifies against a published app. -->
   <Target Name="_ViuInjectSingleFileComponentCssLinkPublish"
           Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuInjectCssBundleLinkTaskAssembly)')"
-          BeforeTargets="ResolvePublishCompressedStaticWebAssetsConfiguration"
-          DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkPublishRewriteDependency)">
-    <ItemGroup Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">
-      <_ViuCssLinkHostPagePublish Include="@(StaticWebAsset)"
-                                  Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Build'" />
+           BeforeTargets="ResolvePublishCompressedStaticWebAssetsConfiguration"
+           DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkPublishRewriteDependency);_ViuCollectSingleFileComponentCssLinks">
+    <ItemGroup>
+      <_ViuCssLinkHostPagePublishPreferred Remove="@(_ViuCssLinkHostPagePublishPreferred)" />
+      <_ViuCssLinkHostPagePublishKind Remove="@(_ViuCssLinkHostPagePublishKind)" />
+      <_ViuCssLinkHostPagePublishViuFallback Remove="@(_ViuCssLinkHostPagePublishViuFallback)" />
+      <_ViuCssLinkHostPagePublishFallback Remove="@(_ViuCssLinkHostPagePublishFallback)" />
+      <_ViuCssLinkHostPagePublishRetirementCandidate Remove="@(_ViuCssLinkHostPagePublishRetirementCandidate)" />
+      <_ViuCssLinkHostPagePublishPreferredDistinct Remove="@(_ViuCssLinkHostPagePublishPreferredDistinct)" />
+      <_ViuCssLinkHostPagePublishKindDistinct Remove="@(_ViuCssLinkHostPagePublishKindDistinct)" />
+      <_ViuCssLinkHostPagePublishViuFallbackDistinct Remove="@(_ViuCssLinkHostPagePublishViuFallbackDistinct)" />
+      <_ViuCssLinkHostPagePublishFallbackDistinct Remove="@(_ViuCssLinkHostPagePublishFallbackDistinct)" />
+      <_ViuCssLinkHostPagePublishRetirementDistinct Remove="@(_ViuCssLinkHostPagePublishRetirementDistinct)" />
+      <_ViuCssLinkHostPagePublish Remove="@(_ViuCssLinkHostPagePublish)" />
+      <_ViuCssLinkObsoleteHostPagePublish Remove="@(_ViuCssLinkObsoleteHostPagePublish)" />
+      <_ViuCssLinkUpdatedHostPagePublishCandidate Remove="@(_ViuCssLinkUpdatedHostPagePublishCandidate)" />
+      <_ViuCssLinkUpdatedHostPagePublish Remove="@(_ViuCssLinkUpdatedHostPagePublish)" />
+      <_ViuCssLinkUpdatedHostPagePublishEndpoint Remove="@(_ViuCssLinkUpdatedHostPagePublishEndpoint)" />
+      <_ViuCssLinkOldHostPagePublishEndpoint Remove="@(_ViuCssLinkOldHostPagePublishEndpoint)" />
+    </ItemGroup>
+    <ItemGroup Condition="'@(_ViuCssStylesheetLink)' != ''">
+      <_ViuCssLinkHostPagePublishPreferred
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Publish' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuCssBundleContentRoot)'))" />
+      <_ViuCssLinkHostPagePublishKind Include="@(StaticWebAsset)"
+                                      Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'Publish'" />
+      <_ViuCssLinkHostPagePublishViuFallback
+        Include="@(StaticWebAsset)"
+        Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All' and $([System.String]::Copy('%(FullPath)').StartsWith('$(_ViuCssBundleContentRoot)'))" />
+      <_ViuCssLinkHostPagePublishFallback Include="@(StaticWebAsset)"
+                                          Condition="'%(Extension)' == '.html' and '%(AssetKind)' == 'All'" />
+      <_ViuCssLinkHostPagePublishRetirementCandidate Include="@(StaticWebAsset)"
+                                                     Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Build'" />
+    </ItemGroup>
+
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPagePublishPreferred)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPagePublishPreferredDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPagePublishKind)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPagePublishKindDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPagePublishViuFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPagePublishViuFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPagePublishFallback)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPagePublishFallbackDistinct" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ViuCssLinkHostPagePublishRetirementCandidate)">
+      <Output TaskParameter="Filtered" ItemName="_ViuCssLinkHostPagePublishRetirementDistinct" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <_ViuCssLinkHostPagePublish Include="@(_ViuCssLinkHostPagePublishPreferredDistinct)" />
+      <_ViuCssLinkHostPagePublish Include="@(_ViuCssLinkHostPagePublishKindDistinct)"
+                                  Condition="'@(_ViuCssLinkHostPagePublishPreferredDistinct)' == ''" />
+      <_ViuCssLinkHostPagePublish Include="@(_ViuCssLinkHostPagePublishViuFallbackDistinct)"
+                                  Condition="'@(_ViuCssLinkHostPagePublishPreferredDistinct)' == '' and '@(_ViuCssLinkHostPagePublishKindDistinct)' == ''" />
+      <_ViuCssLinkHostPagePublish Include="@(_ViuCssLinkHostPagePublishFallbackDistinct)"
+                                  Condition="'@(_ViuCssLinkHostPagePublishPreferredDistinct)' == '' and '@(_ViuCssLinkHostPagePublishKindDistinct)' == '' and '@(_ViuCssLinkHostPagePublishViuFallbackDistinct)' == ''" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'@(_ViuCssLinkHostPagePublish)' != ''">
+      <!-- A build-kind compression pass may already have produced alternatives for the AssetKind=All
+           injected page. Replacing that primary for Publish must retire those alternatives too, including
+           alternatives produced after utility CSS performed the final build transform. Only the two Viu
+           host-page roots are matched; compressed CSS and every unrelated asset remain in the graph. -->
+      <_ViuCssLinkObsoleteHostPagePublish Include="@(_ViuCssLinkHostPagePublishRetirementDistinct)" />
+      <_ViuCssLinkObsoleteHostPagePublish
+        Include="@(StaticWebAsset)"
+        Condition="'%(StaticWebAsset.AssetRole)' == 'Alternative' and '%(StaticWebAsset.RelatedAsset)' != '' and ($([System.String]::Copy('%(StaticWebAsset.RelatedAsset)').StartsWith('$(_ViuCssLinkBuildContentRoot)')) or $([System.String]::Copy('%(StaticWebAsset.RelatedAsset)').StartsWith('$(_ViuCssLinkUtilityBuildContentRoot)')))" />
     </ItemGroup>
 
     <!-- Physical FILE NAME, not %(RelativePath) — see the build target above for why the URL template is not a
@@ -429,7 +589,9 @@
                             HostPagePath="%(_ViuCssLinkHostPagePublish.FullPath)"
                             OutputPath="$(_ViuCssLinkPublishContentRoot)%(_ViuCssLinkHostPagePublish.FileName)%(_ViuCssLinkHostPagePublish.Extension)"
                             LinkHref="$(ViuSingleFileComponentCssBundleLinkHref)"
-                            BundleFileName="$(ViuSingleFileComponentCssBundleName)" />
+                            BundleFileName="$(ViuSingleFileComponentCssBundleName)"
+                            StylesheetLinks="@(_ViuCssStylesheetLink)"
+                            StaticWebAssetEndpoints="@(StaticWebAssetEndpoint)" />
 
     <ItemGroup Condition="'@(_ViuCssLinkHostPagePublish)' != ''">
       <!-- OriginalItemSpec reset to the injected file — see the build target above; it is the compression
@@ -454,15 +616,15 @@
       <Output TaskParameter="Endpoints" ItemName="_ViuCssLinkUpdatedHostPagePublishEndpoint" />
     </DefineStaticWebAssetEndpoints>
 
-    <FilterStaticWebAssetEndpoints Condition="'@(_ViuCssLinkHostPagePublish)' != ''"
+    <FilterStaticWebAssetEndpoints Condition="'@(_ViuCssLinkObsoleteHostPagePublish)' != ''"
                                    Endpoints="@(StaticWebAssetEndpoint)"
-                                   Assets="@(_ViuCssLinkHostPagePublish)"
+                                   Assets="@(_ViuCssLinkObsoleteHostPagePublish)"
                                    Filters="">
       <Output TaskParameter="FilteredEndpoints" ItemName="_ViuCssLinkOldHostPagePublishEndpoint" />
     </FilterStaticWebAssetEndpoints>
 
     <ItemGroup Condition="'@(_ViuCssLinkUpdatedHostPagePublish)' != ''">
-      <StaticWebAsset Remove="@(_ViuCssLinkHostPagePublish)" />
+      <StaticWebAsset Remove="@(_ViuCssLinkObsoleteHostPagePublish)" />
       <StaticWebAsset Include="@(_ViuCssLinkUpdatedHostPagePublish)" />
       <StaticWebAssetEndpoint Remove="@(_ViuCssLinkOldHostPagePublishEndpoint)" />
       <StaticWebAssetEndpoint Include="@(_ViuCssLinkUpdatedHostPagePublishEndpoint)" />

@@ -47,6 +47,8 @@ The Browser SDK imports and declares an exact-version dependency on the base SDK
 projects receive the same generators and can consume packed base-SDK component libraries. It adds
 the WebAssembly build, Browser framework, `viu-dom.js`, application CSS bundling/link injection,
 transitive component-library style flow, CSS hot reload, and publish-budget hooks.
+The complete route, ordering, fingerprint, and compression contract is documented in
+[Browser SDK CSS delivery](Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md).
 
 Pin the SDK selected by the project inline, for example
 `Sdk="Assimalign.Viu.Sdk.Browser/10.0.1-preview.2"`, or in `global.json`:
@@ -74,7 +76,7 @@ work in Visual Studio, Rider, and the dotnet CLI with no installer and no admini
 | `.viu` and tag-based `.vue` compilation | The base SDK owns the shared AdditionalFiles/CompilerVisibleProperty wiring in [Targets/Assimalign.Viu.Generators.Syntax.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props) and [.targets](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.targets). `.vue` scripts require explicit `lang="csharp"`; JavaScript is never executed |
 | Component-library styles | The base SDK extracts `.viu.css` during pack and carries it with generated `buildTransitive` registration in the library package; it never registers browser static assets or writes `wwwroot` itself |
 | WASM browser app model and Browser runtime | The Browser SDK chains `Microsoft.NET.Sdk.WebAssembly` and adds `Assimalign.Viu.App.Browser`; its targeting and runtime packs add `Assimalign.Viu.Browser` |
-| Application component CSS | The Browser SDK bundles the app's styles through `ViuBundleCss`, registers the result as a content-fingerprinted static web asset, and injects its link before WebAssembly compression ([V01.01.12.12.01], [V01.01.12.12.03]); packed component-library styles arrive through their `buildTransitive` registrations as additional static web assets |
+| Application and component-library CSS | The Browser SDK bundles the app's styles through `ViuBundleCss`, flows packed library styles to `_content/<PackageId>/`, and injects all links in deterministic library-before-application order before WebAssembly compression. Injection works with either value of `OverrideHtmlAssetPlaceholders`; the stable route is default and a labeled fingerprinted endpoint is opt-in ([V01.01.12.12.01], [V01.01.12.12.03], [V01.01.12.12.06]) |
 | Standalone utility CSS | The Browser SDK runs `ViuBundleUtilityCss` over `.viu`/`.vue` template regions and host `.html`/`.htm`, producing a separate `<PackageId>.utilities.css` asset with no Tailwind, Node, CLI, or PostCSS dependency |
 | CSS watch inputs and hot reload | The Browser SDK owns the project-scoped worker, watch graph, stable link replacement, and utility/component regeneration |
 | `viu-dom.js` interop bridge | The Browser SDK packs the asset and copies it to `wwwroot/_content/Assimalign.Viu.Browser/` at build |
@@ -135,6 +137,10 @@ Opt out / pin independently:
     <ViuBrowserAppFrameworkVersion>10.0.2</ViuBrowserAppFrameworkVersion>
     <!-- Keep component compilation but skip CSS bundling / disable component generation entirely. -->
     <ViuBundleSingleFileComponentCss>false</ViuBundleSingleFileComponentCss>
+    <!-- Browser SDK: author every component-bundle link in the host page. -->
+    <ViuInjectSingleFileComponentCssLink>false</ViuInjectSingleFileComponentCssLink>
+    <!-- Browser SDK: use the labeled immutable endpoint (manifest-aware hosts only). -->
+    <ViuUseFingerprintedSingleFileComponentCssBundleLink>true</ViuUseFingerprintedSingleFileComponentCssBundleLink>
     <EnableSingleFileComponentGeneration>false</EnableSingleFileComponentGeneration>
     <!-- Utility CSS is independent from both switches above. -->
     <ViuBundleUtilityCss>false</ViuBundleUtilityCss>

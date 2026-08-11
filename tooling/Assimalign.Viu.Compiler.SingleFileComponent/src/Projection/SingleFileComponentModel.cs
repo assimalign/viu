@@ -110,9 +110,9 @@ public readonly record struct SingleFileComponentModel(
     /// The attribute-declared component surface merged from every script block ([CMP-26], [CMP-30]):
     /// the <c>[Parameter]</c> properties and <c>[Event]</c> methods the scaffold turns into the
     /// partial's <c>ComponentContract.Parameters</c>/<c>Events</c>, the per-render argument
-    /// assignment, and the typed emit implementations. <see cref="ScriptDeclarations.None"/> for a
-    /// component that declares its surface imperatively or not at all — the form that keeps compiling
-    /// unchanged [CMP-31].
+    /// assignment, and the typed emit implementations. An imperative parameter declaration carries an
+    /// empty attributed list plus <see cref="ScriptDeclarations.DeclaresImperativeParameters"/>, keeping
+    /// identity resolvable while marking its arbitrary parameter surface unknown [CMP-31] [SFC-USE-5].
     /// </summary>
     public ScriptDeclarations Declarations { get; init; }
 

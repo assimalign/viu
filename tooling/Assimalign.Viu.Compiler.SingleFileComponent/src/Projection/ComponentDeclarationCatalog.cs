@@ -9,9 +9,9 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// Pascal-case spelling of that, so a template's <c>my-widget</c> finds a <c>MyWidget</c> component.
 /// Value-equatable, so it can join a cached per-file projection without defeating the cache.
 /// <para>
-/// A name that resolves to <b>more than one</b> declaration is deliberately dropped: two same-named
-/// components in different namespaces make the template's intent ambiguous, and validating against the
-/// wrong one would be a false positive ([SFC-USE-5]).
+/// A name that resolves to <b>more than one</b> declaration is retained as ambiguous: two same-named
+/// components in different namespaces make the template's intent undecidable, and the caller reports
+/// that ambiguity instead of selecting either declaration ([SFC-USE-5]).
 /// </para>
 /// </summary>
 public readonly struct ComponentDeclarationCatalog : IEquatable<ComponentDeclarationCatalog>
@@ -51,17 +51,24 @@ public readonly struct ComponentDeclarationCatalog : IEquatable<ComponentDeclara
 
     /// <summary>
     /// Resolves <paramref name="tag"/> through the [CMP-6] name ladder, returning false when the tag
-    /// names no statically readable component or names more than one.
+    /// names no statically readable component or names more than one. Use the internal resolution result
+    /// when the caller must distinguish those two diagnostic outcomes.
     /// </summary>
     /// <param name="tag">The component tag as authored in the template.</param>
     /// <param name="entry">The resolved declaration.</param>
     /// <returns>True when exactly one declaration answers to the tag.</returns>
     public bool TryResolve(string tag, out ComponentDeclarationEntry entry)
     {
+        return Resolve(tag, out entry) == ComponentDeclarationResolution.Resolved;
+    }
+
+    /// <summary>Resolves a tag while preserving missing and ambiguous outcomes.</summary>
+    internal ComponentDeclarationResolution Resolve(string tag, out ComponentDeclarationEntry entry)
+    {
         entry = default;
         if (_byName is null)
         {
-            return false;
+            return ComponentDeclarationResolution.Missing;
         }
 
         foreach (var candidate in NameLadder(tag))
@@ -73,14 +80,14 @@ public readonly struct ComponentDeclarationCatalog : IEquatable<ComponentDeclara
 
             if (resolved is not { } declaration)
             {
-                return false; // ambiguous: stay silent rather than pick one.
+                return ComponentDeclarationResolution.Ambiguous;
             }
 
             entry = declaration;
-            return true;
+            return ComponentDeclarationResolution.Resolved;
         }
 
-        return false;
+        return ComponentDeclarationResolution.Missing;
     }
 
     /// <inheritdoc />

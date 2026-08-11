@@ -101,6 +101,45 @@ public class ElementTests
         root.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>().ElementType.ShouldBe(ElementType.Component);
     }
 
+    [Theory]
+    [InlineData("Button", ElementType.Component)]
+    [InlineData("button", ElementType.Element)]
+    [InlineData("Input", ElementType.Component)]
+    [InlineData("input", ElementType.Element)]
+    [InlineData("Select", ElementType.Component)]
+    [InlineData("select", ElementType.Element)]
+    public void Parse_TagCase_PrioritizesPascalCaseComponentsAndPreservesLowercaseNativeTags(
+        string tag,
+        ElementType expectedType)
+    {
+        var source = tag == "input" ? "<input>" : $"<{tag}></{tag}>";
+        var element = TemplateParser.Parse(source, ParserOptions.CreateHtml())
+            .Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
+
+        element.Tag.ShouldBe(tag);
+        element.ElementType.ShouldBe(expectedType);
+    }
+
+    [Fact]
+    public void Parse_PascalCaseInput_CanContainChildrenAndCloseBeforeLowercaseVoidInput()
+    {
+        var root = TemplateParser.Parse(
+            "<Input>component content</Input><input>after",
+            ParserOptions.CreateHtml());
+
+        var component = root.Children[0].ShouldBeOfType<ElementNode>();
+        component.Tag.ShouldBe("Input");
+        component.ElementType.ShouldBe(ElementType.Component);
+        component.Children.ShouldHaveSingleItem().ShouldBeOfType<TextNode>()
+            .Content.ShouldBe("component content");
+
+        var native = root.Children[1].ShouldBeOfType<ElementNode>();
+        native.Tag.ShouldBe("input");
+        native.ElementType.ShouldBe(ElementType.Element);
+        native.Children.ShouldBeEmpty();
+        root.Children[2].ShouldBeOfType<TextNode>().Content.ShouldBe("after");
+    }
+
     [Fact]
     public void Parse_IsCasting_MakesElementComponent()
     {

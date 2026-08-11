@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -10,21 +11,22 @@ using Microsoft.Build.Utilities;
 namespace Assimalign.Viu.Sdk.Browser.Tasks;
 
 /// <summary>
-/// The MSBuild task that writes a copy of a WebAssembly app's host page (<c>wwwroot/index.html</c>) with a
-/// <c>&lt;link rel="stylesheet"&gt;</c> to the bundled <c>.viu</c> <c>&lt;style&gt;</c> stylesheet spliced into its
-/// <c>&lt;head&gt;</c> — so a consuming app needs no hand-authored link tag ([V01.01.12.12.01], #167). The
-/// paired targets in <c>build/Targets/Build.Css.Bundling.targets</c> re-register the written copy as a
+/// The MSBuild task that writes a copy of a WebAssembly app's host page (<c>wwwroot/index.html</c>) with
+/// deterministic <c>&lt;link rel="stylesheet"&gt;</c> references to the application's and its referenced
+/// component libraries' bundled <c>.viu</c> stylesheets spliced into its <c>&lt;head&gt;</c> — so a consuming
+/// app needs no hand-authored link tags ([V01.01.12.12.01], [V01.01.12.12.06]). The paired targets in
+/// <c>build/Targets/Build.Css.Bundling.targets</c> re-register the written copy as a
 /// <c>StaticWebAsset</c> (recomputing its integrity and endpoints) <b>before</b> the SDK's compression
 /// pipeline runs, so gzip/brotli variants are derived from the injected content and negotiation is never
 /// desynced — the failure mode that made an earlier in-place transformation drop compressed variants.
 /// <para>
 /// This task only <em>reads</em> the current host page and <em>writes</em> a transformed copy to an
-/// intermediate path; it never edits the source file in place. Splicing is idempotent: if the bundle is
-/// already referenced (a hand-authored link, or a previous run), the copy is written unchanged and
-/// <see cref="LinkInjected"/> is <see langword="false"/>, so an app that opts to keep its own link is never
-/// double-injected. The document's newline style and the closing tag's indentation are preserved. This is a
+/// intermediate path; it never edits the source file in place. Splicing is idempotent per stylesheet: an
+/// existing hand-authored reference suppresses only that reference, while every missing bundle is still
+/// injected. The document's newline style and the closing tag's indentation are preserved. This is a
 /// build-tooling text transform — it does not parse HTML — so it deliberately matches only the literal
-/// <c>&lt;/head&gt;</c> close tag.
+/// <c>&lt;/head&gt;</c> close tag. Referenced-library links sort ordinally before the application link; the
+/// application link therefore retains the final cascade position.
 /// </para>
 /// </summary>
 /// <remarks>Single-threaded, invoked once per host page per build; not designed for concurrent use.</remarks>
@@ -49,11 +51,10 @@ public sealed class ViuInjectCssBundleLink : Microsoft.Build.Utilities.Task, ICa
     public string OutputPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// The <c>href</c> to inject — the bundle's resolved static-web-asset route (the stable plain route
-    /// <c>&lt;PackageId&gt;.viu.css</c> a statically hosted WASM app serves; see the design doc for why the
-    /// fingerprinted route is not injected for standalone hosting).
+    /// The single <c>href</c> to inject when <see cref="StylesheetLinks"/> is empty. This compatibility input
+    /// keeps utility-style injection and existing task callers on the original single-link contract. Component
+    /// CSS callers provide the complete deterministic set through <see cref="StylesheetLinks"/> instead.
     /// </summary>
-    [Required]
     public string LinkHref { get; set; } = string.Empty;
 
     /// <summary>
@@ -62,6 +63,24 @@ public sealed class ViuInjectCssBundleLink : Microsoft.Build.Utilities.Task, ICa
     /// <see cref="LinkHref"/> match suppresses injection.
     /// </summary>
     public string BundleFileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the stylesheet links to inject in one read/transform/write pass. Each item uses its
+    /// <c>Href</c> metadata, falling back to its item specification; <c>BundleFileName</c> scopes the
+    /// idempotency check; and the integer <c>Order</c> metadata groups links before ordinal href ordering.
+    /// An optional <c>FingerprintLabel</c> requests resolution from <see cref="StaticWebAssetEndpoints"/>.
+    /// Specified by [V01.01.12.12.06].
+    /// </summary>
+    public ITaskItem[] StylesheetLinks { get; set; } = Array.Empty<ITaskItem>();
+
+    /// <summary>
+    /// Gets or sets the static-web-asset endpoints used to resolve a link whose
+    /// <c>FingerprintLabel</c> metadata is present. The matching endpoint must carry both a
+    /// <c>label</c> property equal to that value and a <c>fingerprint</c> property; its item specification is
+    /// the immutable route injected for a manifest-aware host.
+    /// Specified by [V01.01.12.12.04].
+    /// </summary>
+    public ITaskItem[] StaticWebAssetEndpoints { get; set; } = Array.Empty<ITaskItem>();
 
     /// <summary>The path actually written — always equal to <see cref="OutputPath"/> on success.</summary>
     [Output]
@@ -93,7 +112,22 @@ public sealed class ViuInjectCssBundleLink : Microsoft.Build.Utilities.Task, ICa
 
         _cancellation.Token.ThrowIfCancellationRequested();
 
-        var transformed = InjectStylesheetLink(html, LinkHref, BundleFileName, out var injected);
+        if (!TryResolveStylesheetLinks(out var links))
+        {
+            return false;
+        }
+
+        var transformed = html;
+        var injected = false;
+        foreach (var link in links)
+        {
+            transformed = CssBundleLinkInjector.InjectStylesheetLink(
+                transformed,
+                link.Href,
+                link.BundleFileName,
+                out var currentLinkInjected);
+            injected |= currentLinkInjected;
+        }
 
         try
         {
@@ -118,82 +152,151 @@ public sealed class ViuInjectCssBundleLink : Microsoft.Build.Utilities.Task, ICa
         Log.LogMessage(
             injected ? MessageImportance.Normal : MessageImportance.Low,
             injected
-                ? "ViuInjectCssBundleLink: injected <link href=\"{0}\"> into {1}."
-                : "ViuInjectCssBundleLink: bundle already referenced; {1} written unchanged.",
-            LinkHref,
+                ? "ViuInjectCssBundleLink: injected missing stylesheet links into {0}."
+                : "ViuInjectCssBundleLink: every stylesheet was already referenced, or the page has no </head>; {0} written unchanged.",
             OutputPath);
         return true;
     }
 
-    /// <summary>
-    /// Splices a <c>&lt;link rel="stylesheet" href="{href}"&gt;</c> immediately before the first
-    /// <c>&lt;/head&gt;</c> (case-insensitive), preserving the document's newline style and the close tag's
-    /// indentation. Returns the input unchanged (with <paramref name="injected"/> <see langword="false"/>) when
-    /// the bundle is already referenced or no <c>&lt;/head&gt;</c> is present.
-    /// </summary>
-    internal static string InjectStylesheetLink(string html, string href, string bundleFileName, out bool injected)
+    private bool TryResolveStylesheetLinks(out List<StylesheetLink> links)
     {
-        injected = false;
-        if (string.IsNullOrEmpty(html))
+        links = new List<StylesheetLink>();
+        if (StylesheetLinks.Length == 0)
         {
-            return html;
-        }
-
-        // Idempotent: only an existing <link> whose href references the bundle (hand-authored, or a prior
-        // injection) suppresses a second link. A bare mention in prose or a comment must NOT — a host page's
-        // own explanatory comment may name the file — so the reference is matched only inside an href="…"
-        // attribute value.
-        if (ReferencesInHref(html, bundleFileName) || ReferencesInHref(html, href))
-        {
-            return html;
-        }
-
-        var closeHead = Regex.Match(html, "</head\\s*>", RegexOptions.IgnoreCase);
-        if (!closeHead.Success)
-        {
-            // No head to inject into — leave the document untouched rather than guess a location.
-            return html;
-        }
-
-        var newline = html.IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
-        var indent = LeadingWhitespaceOfLine(html, closeHead.Index);
-        var link = "<link rel=\"stylesheet\" href=\"" + href + "\" />";
-
-        // Place the link on its own line at the close tag's indentation, then restore the close tag on the
-        // following line so </head> keeps its original position.
-        var insertion = link + newline + indent;
-        injected = true;
-        return html.Substring(0, closeHead.Index) + insertion + html.Substring(closeHead.Index);
-    }
-
-    /// <summary>
-    /// Whether <paramref name="name"/> appears inside an <c>href="…"</c> attribute value (case-insensitive) —
-    /// i.e. the bundle is actually linked, not merely mentioned in text.
-    /// </summary>
-    private static bool ReferencesInHref(string html, string name)
-    {
-        return !string.IsNullOrEmpty(name)
-            && Regex.IsMatch(html, "href\\s*=\\s*[\"'][^\"']*" + Regex.Escape(name), RegexOptions.IgnoreCase);
-    }
-
-    /// <summary>
-    /// The run of whitespace that begins the line containing <paramref name="index"/>, or the empty string when
-    /// the close tag is not the first non-whitespace on its line (so we never copy stray non-whitespace).
-    /// </summary>
-    private static string LeadingWhitespaceOfLine(string html, int index)
-    {
-        var lineStart = html.LastIndexOf('\n', index > 0 ? index - 1 : 0);
-        lineStart = lineStart < 0 ? 0 : lineStart + 1;
-        var run = index - lineStart;
-        for (var offset = 0; offset < run; offset++)
-        {
-            var character = html[lineStart + offset];
-            if (character != ' ' && character != '\t')
+            if (!string.IsNullOrEmpty(LinkHref))
             {
-                return string.Empty;
+                links.Add(new StylesheetLink(LinkHref, BundleFileName, 0));
+            }
+
+            return true;
+        }
+
+        var hrefs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in StylesheetLinks)
+        {
+            if (item is null)
+            {
+                continue;
+            }
+
+            var href = item.GetMetadata("Href");
+            if (string.IsNullOrEmpty(href))
+            {
+                href = item.ItemSpec;
+            }
+
+            var fingerprintLabel = item.GetMetadata("FingerprintLabel");
+            if (!string.IsNullOrEmpty(fingerprintLabel) &&
+                !TryResolveFingerprintedHref(
+                    StaticWebAssetEndpoints,
+                    fingerprintLabel,
+                    out href))
+            {
+                Log.LogError(
+                    "ViuInjectCssBundleLink: no fingerprinted static-web-asset endpoint is labeled '{0}'. " +
+                    "Enable static-web-asset fingerprinting, disable the fingerprinted CSS-link opt-in, " +
+                    "or set ViuSingleFileComponentCssBundleLinkHref explicitly.",
+                    fingerprintLabel);
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(href) || !hrefs.Add(href))
+            {
+                continue;
+            }
+
+            var bundleFileName = item.GetMetadata("BundleFileName");
+            var order = 0;
+            _ = int.TryParse(item.GetMetadata("Order"), out order);
+            links.Add(new StylesheetLink(href, bundleFileName, order));
+        }
+
+        links.Sort(StylesheetLinkComparer.Instance);
+        return true;
+    }
+
+    internal static bool TryResolveFingerprintedHref(
+        ITaskItem[] endpoints,
+        string label,
+        out string href)
+    {
+        href = string.Empty;
+        if (endpoints is null || string.IsNullOrEmpty(label))
+        {
+            return false;
+        }
+
+        foreach (var endpoint in endpoints)
+        {
+            if (endpoint is null)
+            {
+                continue;
+            }
+
+            var properties = endpoint.GetMetadata("EndpointProperties");
+            if (EndpointPropertyEquals(properties, "label", label) &&
+                EndpointPropertyExists(properties, "fingerprint"))
+            {
+                href = endpoint.ItemSpec;
+                return !string.IsNullOrEmpty(href);
             }
         }
 
-        return html.Substring(lineStart, run);
+        return false;
+    }
+
+    private static bool EndpointPropertyEquals(string properties, string name, string value)
+    {
+        if (string.IsNullOrEmpty(properties))
+        {
+            return false;
+        }
+
+        var pattern =
+            "\\{\\s*\"Name\"\\s*:\\s*\"" + Regex.Escape(name) +
+            "\"\\s*,\\s*\"Value\"\\s*:\\s*\"" + Regex.Escape(value) + "\"\\s*\\}";
+        return Regex.IsMatch(properties, pattern, RegexOptions.IgnoreCase);
+    }
+
+    private static bool EndpointPropertyExists(string properties, string name)
+    {
+        if (string.IsNullOrEmpty(properties))
+        {
+            return false;
+        }
+
+        var pattern =
+            "\\{\\s*\"Name\"\\s*:\\s*\"" + Regex.Escape(name) +
+            "\"\\s*,\\s*\"Value\"\\s*:\\s*\"[^\"]+\"\\s*\\}";
+        return Regex.IsMatch(properties, pattern, RegexOptions.IgnoreCase);
+    }
+
+    private readonly struct StylesheetLink
+    {
+        internal StylesheetLink(string href, string bundleFileName, int order)
+        {
+            Href = href;
+            BundleFileName = bundleFileName;
+            Order = order;
+        }
+
+        internal string Href { get; }
+
+        internal string BundleFileName { get; }
+
+        internal int Order { get; }
+    }
+
+    private sealed class StylesheetLinkComparer : IComparer<StylesheetLink>
+    {
+        internal static StylesheetLinkComparer Instance { get; } = new StylesheetLinkComparer();
+
+        public int Compare(StylesheetLink x, StylesheetLink y)
+        {
+            var order = x.Order.CompareTo(y.Order);
+            return order != 0
+                ? order
+                : string.Compare(x.Href, y.Href, StringComparison.Ordinal);
+        }
     }
 }

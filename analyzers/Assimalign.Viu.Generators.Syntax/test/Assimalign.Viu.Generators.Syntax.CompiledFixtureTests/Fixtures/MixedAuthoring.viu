@@ -1,8 +1,10 @@
 <template>
 <main class="mixed-authoring">
-  <CodeFirstChild />
+  <component :is="CodeFirstTarget"></component>
 </main>
 </template>
 
 @script {
+public object CodeFirstTarget =>
+    global::Assimalign.Viu.DynamicComponents.Named("CodeFirstChild");
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "./compatibility-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "compatibilityVersion": "4.3.3",
   "implementation": "Viu Utilities",
   "officialReferences": {
@@ -451,309 +451,3294 @@
   ],
   "documentedUtilityFamilies": {
     "Layout": [
-      "aspect-ratio",
-      "columns",
-      "break-after",
-      "break-before",
-      "break-inside",
-      "box-decoration-break",
-      "box-sizing",
-      "display",
-      "float",
-      "clear",
-      "isolation",
-      "object-fit",
-      "object-position",
-      "overflow",
-      "overscroll-behavior",
-      "position",
-      "top-right-bottom-left",
-      "visibility",
-      "z-index"
+      {
+        "name": "aspect-ratio",
+        "roots": [
+          "aspect"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "fraction",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/aspect-ratio",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "columns",
+        "roots": [
+          "columns"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/columns",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "break-after",
+        "roots": [
+          "break-after"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/break-after",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "break-before",
+        "roots": [
+          "break-before"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/break-before",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "break-inside",
+        "roots": [
+          "break-inside"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/break-inside",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "box-decoration-break",
+        "roots": [
+          "box-decoration-clone"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/box-decoration-break",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "box-sizing",
+        "roots": [
+          "box-border"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/box-sizing",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "display",
+        "roots": [
+          "block"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/display",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "float",
+        "roots": [
+          "float"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/float",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "clear",
+        "roots": [
+          "clear"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/clear",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "isolation",
+        "roots": [
+          "isolate"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/isolation",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "object-fit",
+        "roots": [
+          "object"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/object-fit",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "object-position",
+        "roots": [
+          "object"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/object-position",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "overflow",
+        "roots": [
+          "overflow"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/overflow",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "overscroll-behavior",
+        "roots": [
+          "overscroll"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/overscroll-behavior",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "position",
+        "roots": [
+          "absolute"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/position",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "top-right-bottom-left",
+        "roots": [
+          "top"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "fraction",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/top-right-bottom-left",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "visibility",
+        "roots": [
+          "visible"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/visibility",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "z-index",
+        "roots": [
+          "z"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/z-index",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "FlexboxAndGrid": [
-      "flex-basis",
-      "flex-direction",
-      "flex-wrap",
-      "flex",
-      "flex-grow",
-      "flex-shrink",
-      "order",
-      "grid-template-columns",
-      "grid-column",
-      "grid-template-rows",
-      "grid-row",
-      "grid-auto-flow",
-      "grid-auto-columns",
-      "grid-auto-rows",
-      "gap",
-      "justify-content",
-      "justify-items",
-      "justify-self",
-      "align-content",
-      "align-items",
-      "align-self",
-      "place-content",
-      "place-items",
-      "place-self"
+      {
+        "name": "flex-basis",
+        "roots": [
+          "basis"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "fraction",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/flex-basis",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "flex-direction",
+        "roots": [
+          "flex-row"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/flex-direction",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "flex-wrap",
+        "roots": [
+          "flex"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/flex-wrap",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "flex",
+        "roots": [
+          "flex"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/flex",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "flex-grow",
+        "roots": [
+          "grow"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/flex-grow",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "flex-shrink",
+        "roots": [
+          "shrink"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/flex-shrink",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "order",
+        "roots": [
+          "order"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/order",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grid-template-columns",
+        "roots": [
+          "grid-cols"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grid-template-columns",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grid-column",
+        "roots": [
+          "col"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grid-column",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grid-template-rows",
+        "roots": [
+          "grid-rows"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grid-template-rows",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grid-row",
+        "roots": [
+          "row"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grid-row",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grid-auto-flow",
+        "roots": [
+          "grid-flow"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grid-auto-flow",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grid-auto-columns",
+        "roots": [
+          "auto-cols"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grid-auto-columns",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grid-auto-rows",
+        "roots": [
+          "auto-rows"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grid-auto-rows",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "gap",
+        "roots": [
+          "gap"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/gap",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "justify-content",
+        "roots": [
+          "justify"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/justify-content",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "justify-items",
+        "roots": [
+          "justify-items"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/justify-items",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "justify-self",
+        "roots": [
+          "justify-self"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/justify-self",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "align-content",
+        "roots": [
+          "content"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/align-content",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "align-items",
+        "roots": [
+          "items"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/align-items",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "align-self",
+        "roots": [
+          "self"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/align-self",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "place-content",
+        "roots": [
+          "place-content"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/place-content",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "place-items",
+        "roots": [
+          "place-items"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/place-items",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "place-self",
+        "roots": [
+          "place-self"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/place-self",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Spacing": [
-      "padding",
-      "margin"
+      {
+        "name": "padding",
+        "roots": [
+          "p"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/padding",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "margin",
+        "roots": [
+          "m"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/margin",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Sizing": [
-      "width",
-      "min-width",
-      "max-width",
-      "height",
-      "min-height",
-      "max-height",
-      "inline-size",
-      "min-inline-size",
-      "max-inline-size",
-      "block-size",
-      "min-block-size",
-      "max-block-size"
+      {
+        "name": "width",
+        "roots": [
+          "w"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "fraction",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/width",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "min-width",
+        "roots": [
+          "min-w"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/min-width",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "max-width",
+        "roots": [
+          "max-w"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/max-width",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "height",
+        "roots": [
+          "h"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "fraction",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/height",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "min-height",
+        "roots": [
+          "min-h"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/min-height",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "max-height",
+        "roots": [
+          "max-h"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/max-height",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "inline-size",
+        "roots": [
+          "inline"
+        ],
+        "modes": [
+          "fraction",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/inline-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "min-inline-size",
+        "roots": [
+          "min-inline"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/min-inline-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "max-inline-size",
+        "roots": [
+          "max-inline"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/max-inline-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "block-size",
+        "roots": [
+          "block"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "fraction",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/block-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "min-block-size",
+        "roots": [
+          "min-block"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/min-block-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "max-block-size",
+        "roots": [
+          "max-block"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/max-block-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Typography": [
-      "font-family",
-      "font-size",
-      "font-smoothing",
-      "font-style",
-      "font-weight",
-      "font-stretch",
-      "font-variant-numeric",
-      "font-feature-settings",
-      "letter-spacing",
-      "line-clamp",
-      "line-height",
-      "list-style-image",
-      "list-style-position",
-      "list-style-type",
-      "text-align",
-      "color",
-      "text-decoration-line",
-      "text-decoration-color",
-      "text-decoration-style",
-      "text-decoration-thickness",
-      "text-underline-offset",
-      "text-transform",
-      "text-overflow",
-      "text-wrap",
-      "text-indent",
-      "tab-size",
-      "vertical-align",
-      "white-space",
-      "word-break",
-      "overflow-wrap",
-      "hyphens",
-      "content"
+      {
+        "name": "font-family",
+        "roots": [
+          "font"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-family",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "font-size",
+        "roots": [
+          "text"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "font-smoothing",
+        "roots": [
+          "antialiased"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-smoothing",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "font-style",
+        "roots": [
+          "italic"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-style",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "font-weight",
+        "roots": [
+          "font"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-weight",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "font-stretch",
+        "roots": [
+          "font-stretch"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-stretch",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "font-variant-numeric",
+        "roots": [
+          "tabular-nums"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-variant-numeric",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "font-feature-settings",
+        "roots": [
+          "font-features"
+        ],
+        "modes": [
+          "arbitrary-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/font-feature-settings",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "letter-spacing",
+        "roots": [
+          "tracking"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/letter-spacing",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "line-clamp",
+        "roots": [
+          "line-clamp"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/line-clamp",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "line-height",
+        "roots": [
+          "leading"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/line-height",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "list-style-image",
+        "roots": [
+          "list-image"
+        ],
+        "modes": [
+          "arbitrary-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/list-style-image",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "list-style-position",
+        "roots": [
+          "list"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/list-style-position",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "list-style-type",
+        "roots": [
+          "list"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/list-style-type",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-align",
+        "roots": [
+          "text"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-align",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "color",
+        "roots": [
+          "text"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-decoration-line",
+        "roots": [
+          "underline"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-decoration-line",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-decoration-color",
+        "roots": [
+          "decoration"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-decoration-color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-decoration-style",
+        "roots": [
+          "decoration"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-decoration-style",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-decoration-thickness",
+        "roots": [
+          "decoration"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-decoration-thickness",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-underline-offset",
+        "roots": [
+          "underline-offset"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-underline-offset",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-transform",
+        "roots": [
+          "uppercase"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-transform",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-overflow",
+        "roots": [
+          "truncate"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-overflow",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-wrap",
+        "roots": [
+          "text"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-wrap",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-indent",
+        "roots": [
+          "indent"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-indent",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "tab-size",
+        "roots": [
+          "tab"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/tab-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "vertical-align",
+        "roots": [
+          "align"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/vertical-align",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "white-space",
+        "roots": [
+          "whitespace"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/white-space",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "word-break",
+        "roots": [
+          "break-all"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/word-break",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "overflow-wrap",
+        "roots": [
+          "wrap"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/overflow-wrap",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "hyphens",
+        "roots": [
+          "hyphens"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/hyphens",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "content",
+        "roots": [
+          "content"
+        ],
+        "modes": [
+          "arbitrary-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/content",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Backgrounds": [
-      "background-attachment",
-      "background-clip",
-      "background-color",
-      "background-image",
-      "background-origin",
-      "background-position",
-      "background-repeat",
-      "background-size"
+      {
+        "name": "background-attachment",
+        "roots": [
+          "bg"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-attachment",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-clip",
+        "roots": [
+          "bg"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-clip",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-color",
+        "roots": [
+          "bg"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-image",
+        "roots": [
+          "bg"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-image",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-origin",
+        "roots": [
+          "bg"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-origin",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-position",
+        "roots": [
+          "bg-position"
+        ],
+        "modes": [
+          "arbitrary-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-position",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-repeat",
+        "roots": [
+          "bg"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-repeat",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-size",
+        "roots": [
+          "bg"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Borders": [
-      "border-radius",
-      "border-width",
-      "border-color",
-      "border-style",
-      "outline-width",
-      "outline-color",
-      "outline-style",
-      "outline-offset"
+      {
+        "name": "border-radius",
+        "roots": [
+          "rounded"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/border-radius",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "border-width",
+        "roots": [
+          "border"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/border-width",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "border-color",
+        "roots": [
+          "border"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/border-color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "border-style",
+        "roots": [
+          "border"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/border-style",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "outline-width",
+        "roots": [
+          "outline"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/outline-width",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "outline-color",
+        "roots": [
+          "outline"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/outline-color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "outline-style",
+        "roots": [
+          "outline"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/outline-style",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "outline-offset",
+        "roots": [
+          "outline-offset"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/outline-offset",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Effects": [
-      "box-shadow",
-      "text-shadow",
-      "opacity",
-      "mix-blend-mode",
-      "background-blend-mode",
-      "mask-clip",
-      "mask-composite",
-      "mask-image",
-      "mask-mode",
-      "mask-origin",
-      "mask-position",
-      "mask-repeat",
-      "mask-size",
-      "mask-type"
+      {
+        "name": "box-shadow",
+        "roots": [
+          "shadow"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/box-shadow",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "text-shadow",
+        "roots": [
+          "text-shadow"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/text-shadow",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "opacity",
+        "roots": [
+          "opacity"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/opacity",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mix-blend-mode",
+        "roots": [
+          "mix-blend"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mix-blend-mode",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "background-blend-mode",
+        "roots": [
+          "bg-blend"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/background-blend-mode",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-clip",
+        "roots": [
+          "mask-clip-border"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-clip",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-composite",
+        "roots": [
+          "mask-composite"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-composite",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-image",
+        "roots": [
+          "mask"
+        ],
+        "modes": [
+          "arbitrary-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-image",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-mode",
+        "roots": [
+          "mask-mode"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-mode",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-origin",
+        "roots": [
+          "mask-origin-border"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-origin",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-position",
+        "roots": [
+          "mask-position"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-position",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-repeat",
+        "roots": [
+          "mask-repeat"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-repeat",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-size",
+        "roots": [
+          "mask-size"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-size",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "mask-type",
+        "roots": [
+          "mask-type"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/mask-type",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Filters": [
-      "filter",
-      "blur",
-      "brightness",
-      "contrast",
-      "drop-shadow",
-      "grayscale",
-      "hue-rotate",
-      "invert",
-      "saturate",
-      "sepia",
-      "backdrop-filter",
-      "backdrop-blur",
-      "backdrop-brightness",
-      "backdrop-contrast",
-      "backdrop-grayscale",
-      "backdrop-hue-rotate",
-      "backdrop-invert",
-      "backdrop-opacity",
-      "backdrop-saturate",
-      "backdrop-sepia"
+      {
+        "name": "filter",
+        "roots": [
+          "filter"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/filter",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "blur",
+        "roots": [
+          "blur"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/blur",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "brightness",
+        "roots": [
+          "brightness"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/brightness",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "contrast",
+        "roots": [
+          "contrast"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/contrast",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "drop-shadow",
+        "roots": [
+          "drop-shadow"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/drop-shadow",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "grayscale",
+        "roots": [
+          "grayscale"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/grayscale",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "hue-rotate",
+        "roots": [
+          "hue-rotate"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/hue-rotate",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "invert",
+        "roots": [
+          "invert"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/invert",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "saturate",
+        "roots": [
+          "saturate"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/saturate",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "sepia",
+        "roots": [
+          "sepia"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/sepia",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-filter",
+        "roots": [
+          "backdrop-filter"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-filter",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-blur",
+        "roots": [
+          "backdrop-blur"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-blur",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-brightness",
+        "roots": [
+          "backdrop-brightness"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-brightness",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-contrast",
+        "roots": [
+          "backdrop-contrast"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-contrast",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-grayscale",
+        "roots": [
+          "backdrop-grayscale"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-grayscale",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-hue-rotate",
+        "roots": [
+          "backdrop-hue-rotate"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-hue-rotate",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-invert",
+        "roots": [
+          "backdrop-invert"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-invert",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-opacity",
+        "roots": [
+          "backdrop-opacity"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-opacity",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-saturate",
+        "roots": [
+          "backdrop-saturate"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-saturate",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "backdrop-sepia",
+        "roots": [
+          "backdrop-sepia"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backdrop-sepia",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Tables": [
-      "border-collapse",
-      "border-spacing",
-      "table-layout",
-      "caption-side"
+      {
+        "name": "border-collapse",
+        "roots": [
+          "border-collapse"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/border-collapse",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "border-spacing",
+        "roots": [
+          "border-spacing"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/border-spacing",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "table-layout",
+        "roots": [
+          "table"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/table-layout",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "caption-side",
+        "roots": [
+          "caption"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/caption-side",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "TransitionsAndAnimation": [
-      "transition-property",
-      "transition-behavior",
-      "transition-duration",
-      "transition-timing-function",
-      "transition-delay",
-      "animation"
+      {
+        "name": "transition-property",
+        "roots": [
+          "transition"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transition-property",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "transition-behavior",
+        "roots": [
+          "transition"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transition-behavior",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "transition-duration",
+        "roots": [
+          "duration"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transition-duration",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "transition-timing-function",
+        "roots": [
+          "ease"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transition-timing-function",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "transition-delay",
+        "roots": [
+          "delay"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transition-delay",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "animation",
+        "roots": [
+          "animate"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/animation",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Transforms": [
-      "backface-visibility",
-      "perspective",
-      "perspective-origin",
-      "rotate",
-      "scale",
-      "skew",
-      "transform",
-      "transform-origin",
-      "transform-style",
-      "translate",
-      "zoom"
+      {
+        "name": "backface-visibility",
+        "roots": [
+          "backface"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/backface-visibility",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "perspective",
+        "roots": [
+          "perspective"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/perspective",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "perspective-origin",
+        "roots": [
+          "perspective-origin"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/perspective-origin",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "rotate",
+        "roots": [
+          "rotate"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/rotate",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scale",
+        "roots": [
+          "scale"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scale",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "skew",
+        "roots": [
+          "skew"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/skew",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "transform",
+        "roots": [
+          "transform"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transform",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "transform-origin",
+        "roots": [
+          "origin"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transform-origin",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "transform-style",
+        "roots": [
+          "transform"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/transform-style",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "translate",
+        "roots": [
+          "translate"
+        ],
+        "modes": [
+          "fraction",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/translate",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "zoom",
+        "roots": [
+          "zoom"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/zoom",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Interactivity": [
-      "accent-color",
-      "appearance",
-      "caret-color",
-      "color-scheme",
-      "cursor",
-      "field-sizing",
-      "pointer-events",
-      "resize",
-      "scroll-behavior",
-      "scrollbar-color",
-      "scrollbar-width",
-      "scrollbar-gutter",
-      "scroll-margin",
-      "scroll-padding",
-      "scroll-snap-align",
-      "scroll-snap-stop",
-      "scroll-snap-type",
-      "touch-action",
-      "user-select",
-      "will-change"
+      {
+        "name": "accent-color",
+        "roots": [
+          "accent"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/accent-color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "appearance",
+        "roots": [
+          "appearance"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/appearance",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "caret-color",
+        "roots": [
+          "caret"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/caret-color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "color-scheme",
+        "roots": [
+          "scheme"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/color-scheme",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "cursor",
+        "roots": [
+          "cursor"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/cursor",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "field-sizing",
+        "roots": [
+          "field-sizing"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/field-sizing",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "pointer-events",
+        "roots": [
+          "pointer-events"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/pointer-events",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "resize",
+        "roots": [
+          "resize"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/resize",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scroll-behavior",
+        "roots": [
+          "scroll"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scroll-behavior",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scrollbar-color",
+        "roots": [
+          "scrollbar-thumb"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scrollbar-color",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scrollbar-width",
+        "roots": [
+          "scrollbar"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scrollbar-width",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scrollbar-gutter",
+        "roots": [
+          "scrollbar"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scrollbar-gutter",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scroll-margin",
+        "roots": [
+          "scroll-m"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "negative",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scroll-margin",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scroll-padding",
+        "roots": [
+          "scroll-p"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scroll-padding",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scroll-snap-align",
+        "roots": [
+          "snap"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scroll-snap-align",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scroll-snap-stop",
+        "roots": [
+          "snap"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scroll-snap-stop",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "scroll-snap-type",
+        "roots": [
+          "snap"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/scroll-snap-type",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "touch-action",
+        "roots": [
+          "touch"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/touch-action",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "user-select",
+        "roots": [
+          "select"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/user-select",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "will-change",
+        "roots": [
+          "will-change"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/will-change",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Svg": [
-      "fill",
-      "stroke",
-      "stroke-width"
+      {
+        "name": "fill",
+        "roots": [
+          "fill"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/fill",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "stroke",
+        "roots": [
+          "stroke"
+        ],
+        "modes": [
+          "named-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value",
+          "modifier",
+          "css-variable"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/stroke",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      },
+      {
+        "name": "stroke-width",
+        "roots": [
+          "stroke"
+        ],
+        "modes": [
+          "bare-value",
+          "important",
+          "compound-variant",
+          "prefix",
+          "arbitrary-value"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/stroke-width",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ],
     "Accessibility": [
-      "forced-color-adjust"
+      {
+        "name": "forced-color-adjust",
+        "roots": [
+          "forced-color-adjust-none"
+        ],
+        "modes": [
+          "static",
+          "important",
+          "compound-variant",
+          "prefix"
+        ],
+        "officialReference": "https://tailwindcss.com/docs/forced-color-adjust",
+        "sourceReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+      }
     ]
   },
   "variants": [
-    { "root": "*", "kind": "Static", "category": "Child" },
-    { "root": "**", "kind": "Static", "category": "Descendant" },
-    { "root": "2xl", "kind": "Static", "category": "Responsive" },
-    { "root": "@", "kind": "Functional", "category": "ContainerQuery" },
-    { "root": "@max", "kind": "Functional", "category": "ContainerQuery" },
-    { "root": "@min", "kind": "Functional", "category": "ContainerQuery" },
-    { "root": "active", "kind": "Static", "category": "State" },
-    { "root": "after", "kind": "Static", "category": "PseudoElement" },
-    { "root": "any-pointer-coarse", "kind": "Static", "category": "Environment" },
-    { "root": "any-pointer-fine", "kind": "Static", "category": "Environment" },
-    { "root": "any-pointer-none", "kind": "Static", "category": "Environment" },
-    { "root": "aria", "kind": "Functional", "category": "Attribute" },
-    { "root": "autofill", "kind": "Static", "category": "State" },
-    { "root": "backdrop", "kind": "Static", "category": "PseudoElement" },
-    { "root": "before", "kind": "Static", "category": "PseudoElement" },
-    { "root": "checked", "kind": "Static", "category": "State" },
-    { "root": "contrast-less", "kind": "Static", "category": "Environment" },
-    { "root": "contrast-more", "kind": "Static", "category": "Environment" },
-    { "root": "dark", "kind": "Static", "category": "Environment" },
-    { "root": "data", "kind": "Functional", "category": "Attribute" },
-    { "root": "default", "kind": "Static", "category": "State" },
-    { "root": "details-content", "kind": "Static", "category": "PseudoElement" },
-    { "root": "disabled", "kind": "Static", "category": "State" },
-    { "root": "empty", "kind": "Static", "category": "State" },
-    { "root": "enabled", "kind": "Static", "category": "State" },
-    { "root": "even", "kind": "Static", "category": "Structural" },
-    { "root": "file", "kind": "Static", "category": "PseudoElement" },
-    { "root": "first", "kind": "Static", "category": "Structural" },
-    { "root": "first-letter", "kind": "Static", "category": "PseudoElement" },
-    { "root": "first-line", "kind": "Static", "category": "PseudoElement" },
-    { "root": "first-of-type", "kind": "Static", "category": "Structural" },
-    { "root": "focus", "kind": "Static", "category": "State" },
-    { "root": "focus-visible", "kind": "Static", "category": "State" },
-    { "root": "focus-within", "kind": "Static", "category": "State" },
-    { "root": "forced-colors", "kind": "Static", "category": "Environment" },
-    { "root": "group", "kind": "Compound", "category": "Compound" },
-    { "root": "has", "kind": "Compound", "category": "Compound" },
-    { "root": "hover", "kind": "Static", "category": "State" },
-    { "root": "in", "kind": "Compound", "category": "Compound" },
-    { "root": "in-range", "kind": "Static", "category": "State" },
-    { "root": "indeterminate", "kind": "Static", "category": "State" },
-    { "root": "inert", "kind": "Static", "category": "State" },
-    { "root": "invalid", "kind": "Static", "category": "State" },
-    { "root": "inverted-colors", "kind": "Static", "category": "Environment" },
-    { "root": "landscape", "kind": "Static", "category": "Environment" },
-    { "root": "last", "kind": "Static", "category": "Structural" },
-    { "root": "last-of-type", "kind": "Static", "category": "Structural" },
-    { "root": "lg", "kind": "Static", "category": "Responsive" },
-    { "root": "ltr", "kind": "Static", "category": "Direction" },
-    { "root": "marker", "kind": "Static", "category": "PseudoElement" },
-    { "root": "max", "kind": "Functional", "category": "Responsive" },
-    { "root": "md", "kind": "Static", "category": "Responsive" },
-    { "root": "min", "kind": "Functional", "category": "Responsive" },
-    { "root": "motion-reduce", "kind": "Static", "category": "Environment" },
-    { "root": "motion-safe", "kind": "Static", "category": "Environment" },
-    { "root": "noscript", "kind": "Static", "category": "Environment" },
-    { "root": "not", "kind": "Compound", "category": "Compound" },
-    { "root": "nth", "kind": "Functional", "category": "Structural" },
-    { "root": "nth-last", "kind": "Functional", "category": "Structural" },
-    { "root": "nth-last-of-type", "kind": "Functional", "category": "Structural" },
-    { "root": "nth-of-type", "kind": "Functional", "category": "Structural" },
-    { "root": "odd", "kind": "Static", "category": "Structural" },
-    { "root": "only", "kind": "Static", "category": "Structural" },
-    { "root": "only-of-type", "kind": "Static", "category": "Structural" },
-    { "root": "open", "kind": "Static", "category": "State" },
-    { "root": "optional", "kind": "Static", "category": "State" },
-    { "root": "out-of-range", "kind": "Static", "category": "State" },
-    { "root": "peer", "kind": "Compound", "category": "Compound" },
-    { "root": "placeholder", "kind": "Static", "category": "PseudoElement" },
-    { "root": "placeholder-shown", "kind": "Static", "category": "State" },
-    { "root": "pointer-coarse", "kind": "Static", "category": "Environment" },
-    { "root": "pointer-fine", "kind": "Static", "category": "Environment" },
-    { "root": "pointer-none", "kind": "Static", "category": "Environment" },
-    { "root": "portrait", "kind": "Static", "category": "Environment" },
-    { "root": "print", "kind": "Static", "category": "Print" },
-    { "root": "read-only", "kind": "Static", "category": "State" },
-    { "root": "required", "kind": "Static", "category": "State" },
-    { "root": "rtl", "kind": "Static", "category": "Direction" },
-    { "root": "selection", "kind": "Static", "category": "PseudoElement" },
-    { "root": "sm", "kind": "Static", "category": "Responsive" },
-    { "root": "starting", "kind": "Static", "category": "Environment" },
-    { "root": "supports", "kind": "Functional", "category": "Supports" },
-    { "root": "target", "kind": "Static", "category": "State" },
-    { "root": "user-invalid", "kind": "Static", "category": "State" },
-    { "root": "user-valid", "kind": "Static", "category": "State" },
-    { "root": "valid", "kind": "Static", "category": "State" },
-    { "root": "visited", "kind": "Static", "category": "State" },
-    { "root": "xl", "kind": "Static", "category": "Responsive" }
+    {
+      "root": "*",
+      "kind": "Static",
+      "category": "Child"
+    },
+    {
+      "root": "**",
+      "kind": "Static",
+      "category": "Descendant"
+    },
+    {
+      "root": "2xl",
+      "kind": "Static",
+      "category": "Responsive"
+    },
+    {
+      "root": "@",
+      "kind": "Functional",
+      "category": "ContainerQuery"
+    },
+    {
+      "root": "@max",
+      "kind": "Functional",
+      "category": "ContainerQuery"
+    },
+    {
+      "root": "@min",
+      "kind": "Functional",
+      "category": "ContainerQuery"
+    },
+    {
+      "root": "active",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "after",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "any-pointer-coarse",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "any-pointer-fine",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "any-pointer-none",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "aria",
+      "kind": "Functional",
+      "category": "Attribute"
+    },
+    {
+      "root": "autofill",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "backdrop",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "before",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "checked",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "contrast-less",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "contrast-more",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "dark",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "data",
+      "kind": "Functional",
+      "category": "Attribute"
+    },
+    {
+      "root": "default",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "details-content",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "disabled",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "empty",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "enabled",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "even",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "file",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "first",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "first-letter",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "first-line",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "first-of-type",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "focus",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "focus-visible",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "focus-within",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "forced-colors",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "group",
+      "kind": "Compound",
+      "category": "Compound"
+    },
+    {
+      "root": "has",
+      "kind": "Compound",
+      "category": "Compound"
+    },
+    {
+      "root": "hover",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "in",
+      "kind": "Compound",
+      "category": "Compound"
+    },
+    {
+      "root": "in-range",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "indeterminate",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "inert",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "invalid",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "inverted-colors",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "landscape",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "last",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "last-of-type",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "lg",
+      "kind": "Static",
+      "category": "Responsive"
+    },
+    {
+      "root": "ltr",
+      "kind": "Static",
+      "category": "Direction"
+    },
+    {
+      "root": "marker",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "max",
+      "kind": "Functional",
+      "category": "Responsive"
+    },
+    {
+      "root": "md",
+      "kind": "Static",
+      "category": "Responsive"
+    },
+    {
+      "root": "min",
+      "kind": "Functional",
+      "category": "Responsive"
+    },
+    {
+      "root": "motion-reduce",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "motion-safe",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "noscript",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "not",
+      "kind": "Compound",
+      "category": "Compound"
+    },
+    {
+      "root": "nth",
+      "kind": "Functional",
+      "category": "Structural"
+    },
+    {
+      "root": "nth-last",
+      "kind": "Functional",
+      "category": "Structural"
+    },
+    {
+      "root": "nth-last-of-type",
+      "kind": "Functional",
+      "category": "Structural"
+    },
+    {
+      "root": "nth-of-type",
+      "kind": "Functional",
+      "category": "Structural"
+    },
+    {
+      "root": "odd",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "only",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "only-of-type",
+      "kind": "Static",
+      "category": "Structural"
+    },
+    {
+      "root": "open",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "optional",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "out-of-range",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "peer",
+      "kind": "Compound",
+      "category": "Compound"
+    },
+    {
+      "root": "placeholder",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "placeholder-shown",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "pointer-coarse",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "pointer-fine",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "pointer-none",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "portrait",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "print",
+      "kind": "Static",
+      "category": "Print"
+    },
+    {
+      "root": "read-only",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "required",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "rtl",
+      "kind": "Static",
+      "category": "Direction"
+    },
+    {
+      "root": "selection",
+      "kind": "Static",
+      "category": "PseudoElement"
+    },
+    {
+      "root": "sm",
+      "kind": "Static",
+      "category": "Responsive"
+    },
+    {
+      "root": "starting",
+      "kind": "Static",
+      "category": "Environment"
+    },
+    {
+      "root": "supports",
+      "kind": "Functional",
+      "category": "Supports"
+    },
+    {
+      "root": "target",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "user-invalid",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "user-valid",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "valid",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "visited",
+      "kind": "Static",
+      "category": "State"
+    },
+    {
+      "root": "xl",
+      "kind": "Static",
+      "category": "Responsive"
+    }
   ],
   "themeNamespaces": [
     "animate",

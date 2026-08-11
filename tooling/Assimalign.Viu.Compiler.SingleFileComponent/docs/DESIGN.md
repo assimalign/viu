@@ -49,6 +49,23 @@ Diagnostics are therefore **host-neutral by design**: the projection returns `Di
 each host materializes at its own edge. The 1:1 adapter coverage is pinned by
 `SingleFileComponentDiagnosticAdapterTests`.
 
+## Static component identity ([V01.01.05.11], issue #329)
+
+The projection collects authored static component tags before transforming the AST, then the generator
+validates those usages against a compilation-wide declaration catalog. Tag case is semantic at this
+boundary: PascalCase `Button`/`Input` are component identities even when a case-insensitive HTML lookup
+recognizes `button`/`input`; lowercase spellings remain native. The catalog includes generated
+parameterless components because resolving identity is independent of parameter validation.
+
+Resolution has three outcomes and none is conflated with an argument-analysis bailout: exactly one
+declaration proceeds to parameter checks, no declaration reports `VIU1404`, and multiple declarations
+report `VIU1405`. The diagnostic tells the author to add/reference or disambiguate a declaration, or to
+use `<component :is="...">` when selection is intentionally deferred to the runtime. Argument-less spreads
+and dynamic arguments suppress only the parameter facts they make unknowable; they do not hide a missing
+or ambiguous tag. The generic `component` tag, Core built-ins, and every component recognized by the
+configured compiler built-in resolver are excluded because their identity is supplied by compiler/runtime
+lowering rather than the application declaration catalog (`[SFC-CG-8]`, `[SFC-USE-5]`).
+
 ## The `DocumentationMode` seam
 
 The one deliberate per-consumer divergence: the **split arithmetic is shared, the parse options are

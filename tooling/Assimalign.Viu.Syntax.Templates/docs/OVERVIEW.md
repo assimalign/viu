@@ -12,6 +12,12 @@ there is no runtime compilation (`[SFC-1]`, and see
 The rationale, the code-generation decisions C# forces, and the runtime-helper contract are
 detailed in [DESIGN.md](DESIGN.md); this page is the surface map.
 
+The current compiler includes per-mount static caching, bounded HTML/SVG/MathML static-fragment
+stringification, and ordinary plus keyed-list `v-memo` emission. It intentionally accepts only simple C#
+identifiers for `v-for` aliases and slot scopes; generalized destructuring is diagnosed before emission.
+Per-component-type static fields and inferred generalized handler caching are explicit non-goals because
+they add lifetime or delegate-semantic risk without reducing host operations ([V01.01.05.10], issue #321).
+
 ## Public surface
 
 - **Parsing** (`Parsing/`) — `TemplateParser.Parse` (the authoritative entry point),

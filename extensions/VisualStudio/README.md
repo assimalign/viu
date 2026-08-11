@@ -210,7 +210,11 @@ In Visual Studio the language client activates on the `viu` content type alone: 
 buffer starts the server, canonical and loose files alike, with no solution scan and no project
 discovery. `.vue` is deliberately out of scope for this host — Visual Studio's Web Tools claims that
 file extension explicitly, so a `.vue` buffer never carries a Viu content type and neither the Viu
-colors nor the language client attach to one.
+colors nor the language client attach to one. The packaged-consumer gate for [V01.01.06.09.01]
+(issue #253) therefore proves `.vue` compilation, diagnostics, assets, and Browser `dotnet watch`
+behavior through the installed SDKs; it does not claim an unreachable full-Visual-Studio activation
+path. That host constraint remains a recorded product boundary until an activation mechanism can
+coexist with Web Tools.
 
 The language server's own `.vue` admission rules are unchanged and remain live for the hosts that can
 reach them: it accepts a `.vue` file only when its nearest owning project uses

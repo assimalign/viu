@@ -1,1 +1,4 @@
-
+Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StaticWebAssetEndpoints.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StaticWebAssetEndpoints.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StylesheetLinks.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StylesheetLinks.set -> void

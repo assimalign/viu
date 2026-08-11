@@ -66,7 +66,7 @@ severity tier its own stable ID.
 | script generated-member and compatibility contract | `VIU1204`–`VIU1206` | — | — |
 | attribute-declared component surface | `VIU1207`–`VIU1209` | — | — |
 | dispatched style CSS parse | `VIU1301` | `VIU1302` | `VIU1303` |
-| component-usage validation | `VIU1402`–`VIU1403` | `VIU1401` | — |
+| component-usage validation | `VIU1402`–`VIU1405` | `VIU1401` | — |
 
 ### VIU1001
 
@@ -235,14 +235,30 @@ parameter's type (`[SFC-USE-4]`). Only the two decidable directions are reported
 Both are errors because neither can work at run time: `IComponentArguments.Get<T>` yields the
 parameter type's default when the supplied value is not of the declared type (`[CMP-29]`).
 
+### VIU1404
+
+Component declaration is missing — an authored static component tag has no generated or referenced
+declaration (`[SFC-CG-8]`, `[SFC-USE-5]`, [V01.01.05.11]). Add the component source to the compilation,
+reference the assembly that declares it, or use `<component :is="...">` when runtime-selected identity is
+intentional. Parameterless tags and usages with spreads still participate: neither changes which component
+the tag names. Compiler/runtime built-ins are excluded.
+
+### VIU1405
+
+Component declaration is ambiguous — an authored static component tag matches more than one in-scope
+declaration (`[SFC-USE-5]`, [V01.01.05.11]). Rename or remove the conflicting declaration so the tag has
+exactly one target. This is distinct from `VIU1404`, allowing tooling and authors to act on the actual
+resolution failure.
+
 ## What component-usage validation deliberately does not see
 
 `VIU1401`–`VIU1403` require a component's parameter surface to be **statically readable**, which
 means attribute-declared (`[CMP-26]`). A component that builds its `Parameters` collection
-imperatively carries nothing a compiler can read — the collection is arbitrary C# — so its usages are
-never validated. That is not a gap to be closed later; it is the reason the attribute form exists.
+imperatively carries nothing a compiler can read — the collection is arbitrary C# — so only its
+parameter checks are skipped. Static identity is still required and can report `VIU1404`/`VIU1405`.
 
-Validation is likewise skipped, in full, for a tag that resolves to more than one declaration, a
-usage carrying an argument-less `v-bind="…"` spread or a dynamic `:[name]` argument, a bound
-expression that is not a C# literal, and a hyphenated attribute name. A false positive is worse than
-a false negative here, so every undecidable input produces silence (`[SFC-USE-5]`).
+After identity resolves, an argument-less `v-bind="…"` spread or dynamic `:[name]` argument, a bound
+expression that is not a C# literal, and a hyphenated attribute name suppress only checks requiring
+that unknown fact. Runtime-selected `<component :is="...">` and compiler/runtime built-ins do not enter
+the application declaration lookup at all. This keeps undecidable arguments silent without hiding an
+actionable identity failure (`[SFC-USE-5]`).

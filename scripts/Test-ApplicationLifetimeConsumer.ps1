@@ -179,6 +179,258 @@ if (-not $temporaryRootPath.StartsWith(
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+function Read-CompressedUtf8Text {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path
+    )
+
+    $fileStream = [System.IO.File]::OpenRead($Path)
+    try {
+        if ($Path.EndsWith('.gz', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $compressionStream = [System.IO.Compression.GZipStream]::new(
+                $fileStream,
+                [System.IO.Compression.CompressionMode]::Decompress,
+                $true)
+        }
+        elseif ($Path.EndsWith('.br', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $compressionStream = [System.IO.Compression.BrotliStream]::new(
+                $fileStream,
+                [System.IO.Compression.CompressionMode]::Decompress,
+                $true)
+        }
+        else {
+            throw "Unsupported compressed-file extension: $Path"
+        }
+
+        try {
+            $reader = [System.IO.StreamReader]::new(
+                $compressionStream,
+                [System.Text.UTF8Encoding]::new($false, $true))
+            try {
+                return $reader.ReadToEnd()
+            }
+            finally {
+                $reader.Dispose()
+            }
+        }
+        finally {
+            $compressionStream.Dispose()
+        }
+    }
+    finally {
+        $fileStream.Dispose()
+    }
+}
+
+function Assert-CompressedVariantsMatch {
+    param(
+        [Parameter(Mandatory)]
+        [string] $IdentityPath
+    )
+
+    if (-not [System.IO.File]::Exists($IdentityPath)) {
+        throw "The identity asset does not exist: $IdentityPath"
+    }
+
+    $identityText = [System.IO.File]::ReadAllText($IdentityPath)
+    foreach ($suffix in @('.gz', '.br')) {
+        $compressedPath = "$IdentityPath$suffix"
+        if (-not [System.IO.File]::Exists($compressedPath)) {
+            throw "The compressed asset variant does not exist: $compressedPath"
+        }
+
+        $compressedText = Read-CompressedUtf8Text -Path $compressedPath
+        if (-not [string]::Equals(
+                $identityText,
+                $compressedText,
+                [System.StringComparison]::Ordinal)) {
+            throw "The compressed asset does not contain the identity asset's bytes: $compressedPath"
+        }
+    }
+}
+
+function Assert-ComponentStylesheetLinks {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Html,
+        [Parameter(Mandatory)]
+        [string] $ApplicationHref,
+        [Parameter(Mandatory)]
+        [string] $Context
+    )
+
+    $libraryHref =
+        '_content/ComponentLibraryConsumer/ComponentLibraryConsumer.viu.css'
+    foreach ($href in @($libraryHref, $ApplicationHref)) {
+        $pattern =
+            'href\s*=\s*["'']' +
+            [System.Text.RegularExpressions.Regex]::Escape($href) +
+            '["'']'
+        $matches = [System.Text.RegularExpressions.Regex]::Matches(
+            $Html,
+            $pattern,
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($matches.Count -ne 1) {
+            throw "$Context must contain exactly one stylesheet href '$href'; found $($matches.Count)."
+        }
+    }
+
+    $libraryPosition = $Html.IndexOf(
+        $libraryHref,
+        [System.StringComparison]::Ordinal)
+    $applicationPosition = $Html.IndexOf(
+        $ApplicationHref,
+        [System.StringComparison]::Ordinal)
+    if ($libraryPosition -lt 0 -or
+        $applicationPosition -lt 0 -or
+        $libraryPosition -ge $applicationPosition) {
+        throw "$Context must order referenced-library CSS before application CSS."
+    }
+}
+
+function Assert-LibraryOnlyComponentStylesheetLink {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Html,
+        [Parameter(Mandatory)]
+        [string] $Context
+    )
+
+    $libraryHref =
+        '_content/ComponentLibraryConsumer/ComponentLibraryConsumer.viu.css'
+    $libraryPattern =
+        'href\s*=\s*["'']' +
+        [System.Text.RegularExpressions.Regex]::Escape($libraryHref) +
+        '["'']'
+    $libraryMatches = [System.Text.RegularExpressions.Regex]::Matches(
+        $Html,
+        $libraryPattern,
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if ($libraryMatches.Count -ne 1) {
+        throw "$Context must contain exactly one referenced-library stylesheet href; found $($libraryMatches.Count)."
+    }
+
+    $applicationPattern =
+        'href\s*=\s*["''][^"'']*ApplicationLifetimeConsumer(?:\.[^"'']+)?\.viu\.css["'']'
+    if ([System.Text.RegularExpressions.Regex]::IsMatch(
+            $Html,
+            $applicationPattern,
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+        throw "$Context must not link an application component bundle when application bundling is disabled."
+    }
+}
+
+function Get-BuildInjectedHostPagePath {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectDirectory
+    )
+
+    $intermediateDirectory = Join-Path $ProjectDirectory 'obj'
+    $candidates = @(
+        Get-ChildItem `
+            -LiteralPath $intermediateDirectory `
+            -Filter 'index.html' `
+            -File `
+            -Recurse |
+            Where-Object {
+                $_.FullName -match '[\\/]viu[\\/]htmllink[\\/]build[\\/]'
+            } |
+            Sort-Object LastWriteTimeUtc -Descending)
+    if ($candidates.Count -eq 0) {
+        throw "No build-kind injected host page was produced below $intermediateDirectory."
+    }
+
+    return $candidates[0].FullName
+}
+
+function Get-FingerprintedApplicationStylesheetRoute {
+    param(
+        [Parameter(Mandatory)]
+        [string] $PublishDirectory
+    )
+
+    $endpointFiles = @(
+        Get-ChildItem `
+            -LiteralPath $PublishDirectory `
+            -Filter '*.staticwebassets.endpoints.json' `
+            -File `
+            -Recurse)
+    if ($endpointFiles.Count -ne 1) {
+        throw "Expected one static-web-asset endpoint manifest below $PublishDirectory; found $($endpointFiles.Count)."
+    }
+
+    $manifest = [System.IO.File]::ReadAllText($endpointFiles[0].FullName) |
+        ConvertFrom-Json
+    $routes = @(
+        $manifest.Endpoints |
+            Where-Object {
+                $properties = @($_.EndpointProperties)
+                $label = @(
+                    $properties |
+                        Where-Object Name -eq 'label' |
+                        ForEach-Object Value)
+                $fingerprint = @(
+                    $properties |
+                        Where-Object Name -eq 'fingerprint' |
+                        ForEach-Object Value)
+                $label -contains 'ApplicationLifetimeConsumer.viu.css' -and
+                    $fingerprint.Count -gt 0 -and
+                    @($_.Selectors).Count -eq 0 -and
+                    -not $_.Route.EndsWith(
+                        '.gz',
+                        [System.StringComparison]::OrdinalIgnoreCase) -and
+                    -not $_.Route.EndsWith(
+                        '.br',
+                        [System.StringComparison]::OrdinalIgnoreCase)
+            } |
+            ForEach-Object Route |
+            Sort-Object -Unique)
+    if ($routes.Count -ne 1) {
+        throw "Expected one uncompressed fingerprinted application stylesheet route; found $($routes.Count)."
+    }
+
+    return $routes[0]
+}
+
+function Assert-CssCompressionNegotiation {
+    param(
+        [Parameter(Mandatory)]
+        [string] $PublishDirectory,
+        [Parameter(Mandatory)]
+        [string] $Route
+    )
+
+    $endpointFiles = @(
+        Get-ChildItem `
+            -LiteralPath $PublishDirectory `
+            -Filter '*.staticwebassets.endpoints.json' `
+            -File `
+            -Recurse)
+    if ($endpointFiles.Count -ne 1) {
+        throw "Expected one static-web-asset endpoint manifest below $PublishDirectory; found $($endpointFiles.Count)."
+    }
+
+    $manifest = [System.IO.File]::ReadAllText($endpointFiles[0].FullName) |
+        ConvertFrom-Json
+    $routeEndpoints = @($manifest.Endpoints | Where-Object Route -eq $Route)
+    if (@($routeEndpoints | Where-Object { @($_.Selectors).Count -eq 0 }).Count -eq 0) {
+        throw "CSS route '$Route' is missing its identity endpoint."
+    }
+
+    $contentEncodings = @(
+        $routeEndpoints.Selectors |
+            Where-Object Name -eq 'Content-Encoding' |
+            ForEach-Object Value |
+            Sort-Object -Unique)
+    foreach ($expectedEncoding in @('gzip', 'br')) {
+        if ($contentEncodings -notcontains $expectedEncoding) {
+            throw "CSS route '$Route' is missing $expectedEncoding compression negotiation."
+        }
+    }
+}
+
 try {
     $null = New-Item -ItemType Directory -Path $temporaryRootPath
     $componentProjectDirectory = Join-Path `
@@ -187,12 +439,20 @@ try {
     $applicationProjectDirectory = Join-Path `
         $temporaryRootPath `
         'ApplicationLifetimeConsumer'
+    $libraryOnlyApplicationProjectDirectory = Join-Path `
+        $temporaryRootPath `
+        'ApplicationLifetimeConsumerLibraryOnly'
+    $overrideOnApplicationProjectDirectory = Join-Path `
+        $temporaryRootPath `
+        'ApplicationLifetimeConsumerOverrideOn'
     $componentPackageDirectory = Join-Path `
         $temporaryRootPath `
         'component-packages'
     foreach ($directory in @(
             $componentProjectDirectory,
             $applicationProjectDirectory,
+            $libraryOnlyApplicationProjectDirectory,
+            $overrideOnApplicationProjectDirectory,
             $componentPackageDirectory)) {
         $null = New-Item -ItemType Directory -Path $directory
     }
@@ -203,11 +463,16 @@ try {
             -Destination $componentProjectDirectory `
             -Recurse
     }
-    Get-ChildItem -LiteralPath $applicationFixtureDirectory -Force | ForEach-Object {
-        Copy-Item `
-            -LiteralPath $_.FullName `
-            -Destination $applicationProjectDirectory `
-            -Recurse
+    foreach ($applicationDirectory in @(
+            $applicationProjectDirectory,
+            $libraryOnlyApplicationProjectDirectory,
+            $overrideOnApplicationProjectDirectory)) {
+        Get-ChildItem -LiteralPath $applicationFixtureDirectory -Force | ForEach-Object {
+            Copy-Item `
+                -LiteralPath $_.FullName `
+                -Destination $applicationDirectory `
+                -Recurse
+        }
     }
 
     # Stop MSBuild's upward Directory.Build.* search at the fixture boundary.
@@ -419,25 +684,70 @@ try {
     $project = Join-Path `
         $applicationProjectDirectory `
         'ApplicationLifetimeConsumer.csproj'
+    $libraryOnlyProject = Join-Path `
+        $libraryOnlyApplicationProjectDirectory `
+        'ApplicationLifetimeConsumer.csproj'
+    $overrideOnProject = Join-Path `
+        $overrideOnApplicationProjectDirectory `
+        'ApplicationLifetimeConsumer.csproj'
     $applicationBuildProperties = @(
         "-p:ViuConsumerVersion=$Version",
         "-p:ComponentLibraryConsumerVersion=$componentLibraryConsumerVersion",
         '-p:NuGetAudit=false',
         '-p:AllowMissingPrunePackageData=true'
     )
-    & dotnet restore $project @applicationBuildProperties
-    if ($LASTEXITCODE -ne 0) {
-        throw "Restoring the application-lifetime package consumer failed with exit code $LASTEXITCODE."
+    foreach ($applicationProject in @(
+            $project,
+            $libraryOnlyProject,
+            $overrideOnProject)) {
+        & dotnet restore $applicationProject @applicationBuildProperties
+        if ($LASTEXITCODE -ne 0) {
+            throw "Restoring application project '$applicationProject' failed with exit code $LASTEXITCODE."
+        }
     }
 
     & dotnet build `
-        $project `
+        $libraryOnlyProject `
         --configuration Release `
         --no-restore `
         -warnaserror `
-        @applicationBuildProperties
+        @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=false `
+        -p:ViuBundleSingleFileComponentCss=false
     if ($LASTEXITCODE -ne 0) {
-        throw "Building the application-lifetime package consumer failed with exit code $LASTEXITCODE."
+        throw "Building the referenced-library-only CSS canary failed with exit code $LASTEXITCODE."
+    }
+    $libraryOnlyBuildHostPagePath = Get-BuildInjectedHostPagePath `
+        -ProjectDirectory $libraryOnlyApplicationProjectDirectory
+    Assert-LibraryOnlyComponentStylesheetLink `
+        -Html ([System.IO.File]::ReadAllText($libraryOnlyBuildHostPagePath)) `
+        -Context 'Referenced-library-only Build host page'
+
+    foreach ($overrideHtmlAssetPlaceholders in @('false', 'true')) {
+        $matrixProject = $project
+        $matrixProjectDirectory = $applicationProjectDirectory
+        if ($overrideHtmlAssetPlaceholders -eq 'true') {
+            $matrixProject = $overrideOnProject
+            $matrixProjectDirectory = $overrideOnApplicationProjectDirectory
+        }
+
+        & dotnet build `
+            $matrixProject `
+            --configuration Release `
+            --no-restore `
+            -warnaserror `
+            @applicationBuildProperties `
+            "-p:OverrideHtmlAssetPlaceholders=$overrideHtmlAssetPlaceholders"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Building the application-lifetime package consumer with OverrideHtmlAssetPlaceholders=$overrideHtmlAssetPlaceholders failed with exit code $LASTEXITCODE."
+        }
+
+        $buildHostPagePath = Get-BuildInjectedHostPagePath `
+            -ProjectDirectory $matrixProjectDirectory
+        Assert-ComponentStylesheetLinks `
+            -Html ([System.IO.File]::ReadAllText($buildHostPagePath)) `
+            -ApplicationHref 'ApplicationLifetimeConsumer.viu.css' `
+            -Context "Build host page (OverrideHtmlAssetPlaceholders=$overrideHtmlAssetPlaceholders)"
     }
 
     # [PKG-2] — the fixture deliberately references every standalone package
@@ -487,6 +797,35 @@ try {
         }
     }
 
+    $libraryOnlyOutput = Join-Path $temporaryRootPath 'publish-library-only'
+    & dotnet publish `
+        $libraryOnlyProject `
+        --configuration Release `
+        --no-restore `
+        -warnaserror `
+        --output $libraryOnlyOutput `
+        @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=false `
+        -p:ViuBundleSingleFileComponentCss=false `
+        -p:PublishTrimmed=false `
+        -p:RunAOTCompilation=false
+    if ($LASTEXITCODE -ne 0) {
+        throw "Publishing the referenced-library-only CSS canary failed with exit code $LASTEXITCODE."
+    }
+    $libraryOnlyHostPagePath = Join-Path $libraryOnlyOutput 'wwwroot/index.html'
+    Assert-LibraryOnlyComponentStylesheetLink `
+        -Html ([System.IO.File]::ReadAllText($libraryOnlyHostPagePath)) `
+        -Context 'Referenced-library-only Publish host page'
+    $libraryOnlyStylePath = Join-Path `
+        $libraryOnlyOutput `
+        'wwwroot/_content/ComponentLibraryConsumer/ComponentLibraryConsumer.viu.css'
+    foreach ($assetPath in @($libraryOnlyHostPagePath, $libraryOnlyStylePath)) {
+        Assert-CompressedVariantsMatch -IdentityPath $assetPath
+    }
+    Assert-CssCompressionNegotiation `
+        -PublishDirectory $libraryOnlyOutput `
+        -Route '_content/ComponentLibraryConsumer/ComponentLibraryConsumer.viu.css'
+
     $trimmedOutput = Join-Path $temporaryRootPath 'publish-trimmed'
     & dotnet publish `
         $project `
@@ -495,6 +834,7 @@ try {
         -warnaserror `
         --output $trimmedOutput `
         @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=false `
         -p:PublishTrimmed=true `
         -p:TrimMode=full `
         -p:RunAOTCompilation=false
@@ -512,6 +852,33 @@ try {
         throw "PublishTrimmed emitted an empty packed component library stylesheet: $publishedComponentStylePath"
     }
 
+    $publishedApplicationStylePath = Join-Path `
+        $trimmedOutput `
+        'wwwroot/ApplicationLifetimeConsumer.viu.css'
+    if (-not [System.IO.File]::Exists($publishedApplicationStylePath) -or
+        (Get-Item -LiteralPath $publishedApplicationStylePath).Length -eq 0) {
+        throw "PublishTrimmed did not emit a non-empty application stylesheet: $publishedApplicationStylePath"
+    }
+
+    $publishedHostPagePath = Join-Path $trimmedOutput 'wwwroot/index.html'
+    $publishedHostPage = [System.IO.File]::ReadAllText($publishedHostPagePath)
+    Assert-ComponentStylesheetLinks `
+        -Html $publishedHostPage `
+        -ApplicationHref 'ApplicationLifetimeConsumer.viu.css' `
+        -Context 'Publish host page (OverrideHtmlAssetPlaceholders=false)'
+    foreach ($assetPath in @(
+            $publishedHostPagePath,
+            $publishedComponentStylePath,
+            $publishedApplicationStylePath)) {
+        Assert-CompressedVariantsMatch -IdentityPath $assetPath
+    }
+    Assert-CssCompressionNegotiation `
+        -PublishDirectory $trimmedOutput `
+        -Route 'ApplicationLifetimeConsumer.viu.css'
+    Assert-CssCompressionNegotiation `
+        -PublishDirectory $trimmedOutput `
+        -Route '_content/ComponentLibraryConsumer/ComponentLibraryConsumer.viu.css'
+
     $publishedBrowserAssetPath = Join-Path `
         $trimmedOutput `
         'wwwroot/_content/Assimalign.Viu.Browser/viu-dom.js'
@@ -523,7 +890,7 @@ try {
     }
 
     & dotnet restore `
-        $project `
+        $overrideOnProject `
         @applicationBuildProperties `
         -p:RunAOTCompilation=true
     if ($LASTEXITCODE -ne 0) {
@@ -532,18 +899,64 @@ try {
 
     $aotOutput = Join-Path $temporaryRootPath 'publish-aot'
     & dotnet publish `
-        $project `
+        $overrideOnProject `
         --configuration Release `
         --no-restore `
         -warnaserror `
         --output $aotOutput `
         @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=true `
+        -p:ViuUseFingerprintedSingleFileComponentCssBundleLink=true `
         -p:PublishTrimmed=true `
         -p:TrimMode=full `
         -p:RunAOTCompilation=true
     if ($LASTEXITCODE -ne 0) {
         throw "PublishAot failed for the application-lifetime package consumer with exit code $LASTEXITCODE."
     }
+
+
+    $fingerprintedApplicationStyleRoute =
+        Get-FingerprintedApplicationStylesheetRoute -PublishDirectory $aotOutput
+    $aotHostPagePath = Join-Path $aotOutput 'wwwroot/index.html'
+    $aotHostPage = [System.IO.File]::ReadAllText($aotHostPagePath)
+    Assert-ComponentStylesheetLinks `
+        -Html $aotHostPage `
+        -ApplicationHref $fingerprintedApplicationStyleRoute `
+        -Context 'PublishAot host page (OverrideHtmlAssetPlaceholders=true, fingerprint opt-in)'
+    foreach ($assetPath in @(
+            $aotHostPagePath,
+            (Join-Path $aotOutput 'wwwroot/ApplicationLifetimeConsumer.viu.css'),
+            (Join-Path $aotOutput 'wwwroot/_content/ComponentLibraryConsumer/ComponentLibraryConsumer.viu.css'))) {
+        Assert-CompressedVariantsMatch -IdentityPath $assetPath
+    }
+    Assert-CssCompressionNegotiation `
+        -PublishDirectory $aotOutput `
+        -Route $fingerprintedApplicationStyleRoute
+    Assert-CssCompressionNegotiation `
+        -PublishDirectory $aotOutput `
+        -Route '_content/ComponentLibraryConsumer/ComponentLibraryConsumer.viu.css'
+
+    # An explicit href remains the highest-precedence route policy even when the
+    # fingerprint opt-in is enabled. Run this after the fingerprinted Publish so
+    # the canary cannot alter that publish's isolated build graph.
+    & dotnet build `
+        $overrideOnProject `
+        --configuration Release `
+        --no-restore `
+        -warnaserror `
+        @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=true `
+        -p:ViuUseFingerprintedSingleFileComponentCssBundleLink=true `
+        -p:ViuSingleFileComponentCssBundleLinkHref=ApplicationLifetimeConsumer.viu.css
+    if ($LASTEXITCODE -ne 0) {
+        throw "Building the explicit CSS-link-precedence canary failed with exit code $LASTEXITCODE."
+    }
+    $explicitHrefHostPagePath = Get-BuildInjectedHostPagePath `
+        -ProjectDirectory $overrideOnApplicationProjectDirectory
+    Assert-ComponentStylesheetLinks `
+        -Html ([System.IO.File]::ReadAllText($explicitHrefHostPagePath)) `
+        -ApplicationHref 'ApplicationLifetimeConsumer.viu.css' `
+        -Context 'Build host page with explicit LinkHref precedence'
 }
 finally {
     if ([System.IO.Directory]::Exists($temporaryRootPath)) {

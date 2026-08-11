@@ -1,0 +1,15 @@
+<template>
+<button @click="Raise">{{ Value }}</button>
+</template>
+
+@script {
+using Assimalign.Viu.Components;
+
+[Parameter(IsRequired = true)]
+public string Value { get; set; } = "input";
+
+[Event]
+public partial void Changed(string value);
+
+private void Raise() => Changed(Value);
+}

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
+using Microsoft.CodeAnalysis.CSharp;
+
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
@@ -29,6 +31,14 @@ internal static class VSlotTransform
             // Register the slot props so the slot children's expressions treat them as template-locals
             // rather than component bindings.
             var slotProperties = slotDirective.Expression;
+            if (slotProperties is not null && !IsSupportedSlotScope(slotProperties))
+            {
+                context.ReportError(CompilerErrorFactory.Create(
+                    CompilerErrorCode.XViuUnsupportedSlotScopeExpression,
+                    slotProperties.Location));
+                slotProperties = null;
+            }
+
             if (context.PrefixIdentifiers && slotProperties is not null)
             {
                 context.AddIdentifiers(slotProperties);
@@ -37,21 +47,24 @@ internal static class VSlotTransform
             // A dynamic slot's v-for aliases are registered here too: the structural-directive factory
             // deliberately skips template-with-v-slot nodes, so no other transform ever sees this v-for.
             ForParseResult? forAliases = null;
-            if (context.PrefixIdentifiers &&
-                element.ElementType == ElementType.Template &&
+            if (element.ElementType == ElementType.Template &&
                 TransformUtilities.FindDirective(element, "for") is { Expression: SimpleExpressionNode forExpression })
             {
-                forAliases = ForExpressionParser.Parse(forExpression);
-                if (forAliases is not null)
+                var parsedAliases = ForExpressionParser.Parse(forExpression);
+                if (parsedAliases is not null && VForTransform.ValidateAliases(parsedAliases, context))
                 {
-                    AddForAliasIdentifiers(forAliases, context);
+                    forAliases = parsedAliases;
+                    if (context.PrefixIdentifiers)
+                    {
+                        AddForAliasIdentifiers(forAliases, context);
+                    }
                 }
             }
 
             context.ScopeVSlot++;
             return () =>
             {
-                if (forAliases is not null)
+                if (context.PrefixIdentifiers && forAliases is not null)
                 {
                     RemoveForAliasIdentifiers(forAliases, context);
                 }
@@ -131,7 +144,7 @@ internal static class VSlotTransform
 
             slotsProperties.Add(Ir.ObjectProperty(
                 argument ?? Ir.SimpleExpression("default", true),
-                BuildSlotFunction(onComponentSlot.Expression, children, element.Location)));
+                BuildSlotFunction(SupportedSlotScope(onComponentSlot.Expression), children, element.Location)));
         }
 
         // 2. Template slots: <template v-slot:foo="{ prop }">.
@@ -170,7 +183,7 @@ internal static class VSlotTransform
             hasTemplateSlots = true;
             var slotChildren = context.WorkingChildrenOf(slotTemplate, slotTemplate.Children);
             var slotName = slotDirective.Argument ?? Ir.SimpleExpression("default", true);
-            var slotProps = slotDirective.Expression;
+            var slotProps = SupportedSlotScope(slotDirective.Expression);
 
             string? staticSlotName = null;
             if (TransformUtilities.IsStaticExpression(slotName))
@@ -231,7 +244,7 @@ internal static class VSlotTransform
                 var parseResult = slotForDirective.Expression is SimpleExpressionNode forExpression
                     ? ForExpressionParser.Parse(forExpression)
                     : null;
-                if (parseResult is not null)
+                if (parseResult is not null && VForTransform.HasSupportedAliases(parseResult))
                 {
                     if (context.PrefixIdentifiers && parseResult.Source is SimpleExpressionNode sourceExpression)
                     {
@@ -251,7 +264,7 @@ internal static class VSlotTransform
                                 newline: true),
                         }));
                 }
-                else
+                else if (parseResult is null)
                 {
                     context.ReportError(CompilerErrorFactory.Create(CompilerErrorCode.XVForMalformedExpression, slotForDirective.Location));
                 }
@@ -324,6 +337,13 @@ internal static class VSlotTransform
             newline: false,
             isSlot: true,
             children.Count > 0 ? children[0].Location : loc);
+
+    private static ExpressionNode? SupportedSlotScope(ExpressionNode? expression)
+        => expression is null || IsSupportedSlotScope(expression) ? expression : null;
+
+    private static bool IsSupportedSlotScope(ExpressionNode expression)
+        => expression is SimpleExpressionNode simple
+           && SyntaxFacts.IsValidIdentifier(simple.Content);
 
     private static ObjectExpression BuildDynamicSlot(ExpressionNode name, FunctionExpression fn, int? index)
     {

@@ -10,10 +10,10 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// <c>&lt;FeatureCard unknown="y"&gt;</c> can be reported where the template is compiled rather than
 /// discovered as a silently ignored argument at run time.
 /// <para>
-/// The governing rule is that a <b>false positive is worse than a false negative</b>. Every input that
-/// cannot be decided statically — a component the catalog does not resolve, an argument-spreading
-/// <c>v-bind</c>, a non-literal bound expression, a hyphenated attribute name — makes the checker stay
-/// silent rather than guess ([SFC-USE-5]).
+/// Static component identity is required: a missing declaration and an ambiguous declaration are
+/// actionable errors. Once identity is resolved, argument-spreading <c>v-bind</c>, non-literal bound
+/// expressions, and hyphenated attribute names remain conservative parameter-checking bailouts
+/// ([SFC-USE-5]).
 /// </para>
 /// </summary>
 public static class ComponentUsageValidator
@@ -30,14 +30,36 @@ public static class ComponentUsageValidator
         ComponentDeclarationCatalog catalog,
         List<DiagnosticInfo> diagnostics)
     {
-        if (usages.Count == 0 || catalog.IsEmpty)
+        if (usages.Count == 0)
         {
             return;
         }
 
         foreach (var usage in usages)
         {
-            if (usage.SuppliesUnknownArguments || !catalog.TryResolve(usage.Tag, out var entry))
+            var resolution = catalog.Resolve(usage.Tag, out var entry);
+            if (resolution == ComponentDeclarationResolution.Missing)
+            {
+                diagnostics.Add(new DiagnosticInfo(
+                    SingleFileComponentDiagnostics.UnresolvedComponent,
+                    usage.Location,
+                    $"Component '{usage.Tag}' has no generated or in-scope declaration. Add the "
+                    + "component declaration to this compilation, reference its assembly, or use "
+                    + "'<component :is=\"...\">' for a runtime-selected component."));
+                continue;
+            }
+
+            if (resolution == ComponentDeclarationResolution.Ambiguous)
+            {
+                diagnostics.Add(new DiagnosticInfo(
+                    SingleFileComponentDiagnostics.AmbiguousComponent,
+                    usage.Location,
+                    $"Component '{usage.Tag}' matches more than one in-scope declaration. Rename or "
+                    + "remove a conflicting declaration so the template has exactly one target."));
+                continue;
+            }
+
+            if (!entry.IsParameterSurfaceKnown || usage.SuppliesUnknownArguments)
             {
                 continue;
             }

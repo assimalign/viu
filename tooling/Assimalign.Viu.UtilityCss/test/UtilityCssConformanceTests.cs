@@ -13,6 +13,8 @@ namespace Assimalign.Viu.UtilityCss.Tests;
 public sealed class UtilityCssConformanceTests
 {
     private const string CompatibilityVersion = "4.3.3";
+    private const string UtilitySourceReference =
+        "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts";
 
     [Fact]
     public void Manifest_V433Surface_ExactlyMatchesExecutableRegistriesAndDocumentedCatalog()
@@ -21,7 +23,7 @@ public sealed class UtilityCssConformanceTests
             "compatibility-v4.3.3.json");
         var manifest = document.RootElement;
 
-        manifest.GetProperty("schemaVersion").GetInt32().ShouldBe(1);
+        manifest.GetProperty("schemaVersion").GetInt32().ShouldBe(3);
         manifest.GetProperty("compatibilityVersion").GetString()
             .ShouldBe(CompatibilityVersion);
         manifest.GetProperty("layerOrder").GetString()
@@ -160,7 +162,11 @@ public sealed class UtilityCssConformanceTests
                 });
         var documentedFamilyNames = documentedFamilies
             .EnumerateObject()
-            .SelectMany(area => ReadStringArray(area.Value))
+            .SelectMany(
+                area => area.Value
+                    .EnumerateArray()
+                    .Select(
+                        family => family.GetProperty("name").GetString()!))
             .ToArray();
         documentedFamilyNames.Length.ShouldBe(184);
         documentedFamilyNames
@@ -218,6 +224,8 @@ public sealed class UtilityCssConformanceTests
     [Fact]
     public void GoldenVectors_CoverEveryManifestPromise_AndExecuteWithoutTailwind()
     {
+        // [V01.01.12.16.02] pins independently authored emitted-CSS coverage
+        // for every documented v4.3.3 utility family and its declared modes.
         using var manifestDocument = LoadJsonDocument(
             "compatibility-v4.3.3.json");
         using var vectorsDocument = LoadJsonDocument(
@@ -227,7 +235,7 @@ public sealed class UtilityCssConformanceTests
         var manifest = manifestDocument.RootElement;
         var vectorRoot = vectorsDocument.RootElement;
 
-        vectorRoot.GetProperty("schemaVersion").GetInt32().ShouldBe(1);
+        vectorRoot.GetProperty("schemaVersion").GetInt32().ShouldBe(3);
         vectorRoot.GetProperty("compatibilityVersion").GetString()
             .ShouldBe(CompatibilityVersion);
         var vectors = vectorRoot.GetProperty("vectors")
@@ -247,6 +255,11 @@ public sealed class UtilityCssConformanceTests
                     .StartsWith(
                         "https://",
                         StringComparison.Ordinal));
+
+        var familyVectors = vectorRoot.GetProperty("familyVectors")
+            .EnumerateArray()
+            .ToArray();
+        AssertFamilyVectors(manifest, familyVectors);
 
         var coveredModes = vectors
             .Where(vector => vector.TryGetProperty("modes", out _))
@@ -355,6 +368,468 @@ public sealed class UtilityCssConformanceTests
                     $"Golden vector '{identifier}' has an unknown kind.");
         }
     }
+
+    private static void AssertFamilyVectors(
+        JsonElement manifest,
+        JsonElement[] familyVectors)
+    {
+        var familyContracts = manifest
+            .GetProperty("documentedUtilityFamilies")
+            .EnumerateObject()
+            .SelectMany(
+                area => area.Value
+                    .EnumerateArray()
+                    .Select(
+                        family => new
+                        {
+                            Location = area.Name + "|" +
+                                family.GetProperty("name").GetString(),
+                            Contract = family,
+                        }))
+            .ToArray();
+        var expectedLocations = familyContracts
+            .Select(contract => contract.Location)
+            .ToArray();
+        var actualLocations = familyVectors
+            .Select(
+                vector =>
+                    vector.GetProperty("area").GetString() + "|" +
+                    vector.GetProperty("family").GetString())
+            .ToArray();
+        actualLocations.ShouldBe(expectedLocations);
+        actualLocations.Distinct(StringComparer.Ordinal).Count()
+            .ShouldBe(actualLocations.Length);
+
+        var identifiers = familyVectors
+            .Select(vector => vector.GetProperty("id").GetString()!)
+            .ToArray();
+        identifiers.ShouldAllBe(identifier => !string.IsNullOrWhiteSpace(identifier));
+        identifiers.Distinct(StringComparer.Ordinal).Count()
+            .ShouldBe(identifiers.Length);
+
+        HashSet<string> promisedModes = new(
+            ReadStringArray(manifest.GetProperty("promisedModes")),
+            StringComparer.Ordinal);
+        var prefixedTheme = UtilityThemeParser.Parse(
+            string.Empty,
+            new UtilityThemeParseOptions { Prefix = "vu" },
+            CancellationToken.None);
+        prefixedTheme.Diagnostics.ShouldBeEmpty();
+        List<string> executionFailures = new();
+
+        foreach (var familyVector in familyVectors)
+        {
+            var identifier = familyVector.GetProperty("id").GetString()!;
+            var area = familyVector.GetProperty("area").GetString()!;
+            var family = familyVector.GetProperty("family").GetString()!;
+            var familyContract = familyContracts
+                .Single(contract => contract.Location == area + "|" + family)
+                .Contract;
+            var officialReference = familyContract
+                .GetProperty("officialReference")
+                .GetString();
+            officialReference.ShouldBe(
+                "https://tailwindcss.com/docs/" + family,
+                $"Family contract '{identifier}' must cite the narrowest official family reference.");
+            familyVector.GetProperty("officialReference")
+                .GetString()
+                .ShouldBe(
+                    officialReference,
+                    $"Family vector '{identifier}' must cite its manifest contract.");
+            familyContract.GetProperty("sourceReference")
+                .GetString()
+                .ShouldBe(UtilitySourceReference);
+            familyVector.GetProperty("sourceReference")
+                .GetString()
+                .ShouldBe(
+                    UtilitySourceReference,
+                    $"Family vector '{identifier}' must pin the official v4.3.3 utility registrations.");
+
+            var roots = ReadStringArray(familyVector.GetProperty("roots"));
+            roots.ShouldBe(ReadStringArray(familyContract.GetProperty("roots")));
+
+            var supportsNegativeValues = false;
+            foreach (var root in roots)
+            {
+                UtilityCssRegistry.BuiltIn.TryGetDefinition(
+                        root,
+                        out UtilityDefinition? definition)
+                    .ShouldBeTrue(
+                        $"Family vector '{identifier}' names unregistered root '{root}'.");
+                definition.ShouldNotBeNull();
+                supportsNegativeValues |= definition.SupportsNegativeValues;
+            }
+
+            var cases = familyVector.GetProperty("cases")
+                .EnumerateArray()
+                .ToArray();
+            cases.ShouldNotBeEmpty(
+                $"Family vector '{identifier}' must assert emitted CSS.");
+            var modes = cases
+                .Select(@case => @case.GetProperty("mode").GetString()!)
+                .ToArray();
+            modes.ShouldBe(
+                ReadStringArray(familyContract.GetProperty("modes")),
+                $"Family vector '{identifier}' must cover every mode its manifest contract declares.");
+            modes.Distinct(StringComparer.Ordinal).Count()
+                .ShouldBe(
+                    modes.Length,
+                    $"Family vector '{identifier}' repeats a mode instead of adding a distinct case.");
+            modes.ShouldAllBe(
+                mode => promisedModes.Contains(mode),
+                $"Family vector '{identifier}' declares a mode outside the v4.3.3 contract.");
+            modes.ShouldContain("important");
+            modes.ShouldContain("compound-variant");
+            modes.ShouldContain("prefix");
+            modes.Any(
+                    mode => mode == "static"
+                        || mode == "named-value"
+                        || mode == "bare-value"
+                        || mode == "fraction"
+                        || mode == "arbitrary-value")
+                .ShouldBeTrue(
+                    $"Family vector '{identifier}' has no value-emission case.");
+            if (supportsNegativeValues)
+            {
+                modes.ShouldContain(
+                    "negative",
+                    $"Family vector '{identifier}' omits its registered negative mode.");
+            }
+
+            var declarationContracts = familyVector
+                .GetProperty("declarationContracts")
+                .EnumerateObject()
+                .ToDictionary(
+                    property => property.Name,
+                    property => property.Value,
+                    StringComparer.Ordinal);
+            declarationContracts.ShouldNotBeEmpty(
+                $"Family vector '{identifier}' must pin complete declarations.");
+            foreach (var declarationContract in declarationContracts)
+            {
+                var declarations = ReadDeclarationContract(
+                    declarationContract.Value);
+                declarations.ShouldNotBeEmpty(
+                    $"Family vector '{identifier}' declaration contract '{declarationContract.Key}' is empty.");
+                declarations.ShouldAllBe(
+                    declaration => declaration.Value.Length != 0,
+                    $"Family vector '{identifier}' declaration contract '{declarationContract.Key}' contains an empty value.");
+                declarations
+                    .Select(declaration => declaration.Property)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count()
+                    .ShouldBe(
+                        declarations.Length,
+                        $"Family vector '{identifier}' declaration contract '{declarationContract.Key}' repeats a property.");
+            }
+
+            var canonicalMode = cases[0].GetProperty("mode").GetString()!;
+            canonicalMode.ShouldNotBe("important");
+            canonicalMode.ShouldNotBe("compound-variant");
+            canonicalMode.ShouldNotBe("prefix");
+            var usedDeclarationContracts = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var familyCase in cases)
+            {
+                familyCase.TryGetProperty("expectedCssFragments", out _)
+                    .ShouldBeFalse(
+                        $"Family vector '{identifier}' must not use subset CSS fragments.");
+                var mode = familyCase.GetProperty("mode").GetString()!;
+                familyCase.GetProperty("important")
+                    .GetBoolean()
+                    .ShouldBe(
+                        mode == "important",
+                        $"Family vector '{identifier}' mode '{mode}' must declare importance exactly.");
+                var rulePaths = familyCase.GetProperty("expectedRulePaths")
+                    .EnumerateArray()
+                    .ToArray();
+                rulePaths.ShouldNotBeEmpty();
+                foreach (var rulePath in rulePaths)
+                {
+                    var declarationContract = rulePath
+                        .GetProperty("declarationContract")
+                        .GetString()!;
+                    declarationContracts.ContainsKey(declarationContract)
+                        .ShouldBeTrue(
+                            $"Family vector '{identifier}' mode '{mode}' names missing declaration contract '{declarationContract}'.");
+                    usedDeclarationContracts.Add(declarationContract);
+                }
+
+                var caseContract = rulePaths[0]
+                    .GetProperty("declarationContract")
+                    .GetString()!;
+                rulePaths.ShouldAllBe(
+                    rulePath => rulePath.GetProperty("declarationContract").GetString() == caseContract,
+                    $"Family vector '{identifier}' mode '{mode}' must use one complete declaration contract for every emitted rule path.");
+                if (mode is "important" or "compound-variant")
+                {
+                    caseContract.ShouldBe(
+                        canonicalMode,
+                        $"Family vector '{identifier}' mode '{mode}' must reuse its canonical declarations.");
+                }
+                else if (mode == "prefix")
+                {
+                    (caseContract == canonicalMode || caseContract == "prefix")
+                        .ShouldBeTrue(
+                            $"Family vector '{identifier}' prefix mode must use canonical declarations or an exact prefixed contract.");
+                }
+                else
+                {
+                    caseContract.ShouldBe(
+                        mode,
+                        $"Family vector '{identifier}' mode '{mode}' needs its own exact declaration contract.");
+                }
+            }
+
+            usedDeclarationContracts
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ShouldBe(
+                    declarationContracts.Keys.OrderBy(value => value, StringComparer.Ordinal),
+                    $"Family vector '{identifier}' contains an unexercised declaration contract.");
+
+            foreach (var familyCase in cases)
+            {
+                try
+                {
+                    ExecuteFamilyVectorCase(
+                        identifier,
+                        familyCase,
+                        declarationContracts,
+                        prefixedTheme.Theme);
+                }
+                catch (ShouldAssertException exception)
+                {
+                    executionFailures.Add(identifier + ": " + exception.Message);
+                }
+            }
+        }
+
+        executionFailures.ShouldBeEmpty(
+            "Every independently authored family vector must compile and match its CSS contract.");
+    }
+
+    private static void ExecuteFamilyVectorCase(
+        string identifier,
+        JsonElement familyCase,
+        IReadOnlyDictionary<string, JsonElement> declarationContracts,
+        UtilityTheme prefixedTheme)
+    {
+        var mode = familyCase.GetProperty("mode").GetString()!;
+        var candidate = familyCase.GetProperty("candidate").GetString()!;
+        switch (mode)
+        {
+            case "important":
+                candidate.ShouldEndWith("!");
+                break;
+            case "compound-variant":
+                candidate.ShouldStartWith("group-hover:");
+                break;
+            case "prefix":
+                candidate.ShouldStartWith("vu:");
+                break;
+            case "negative":
+                candidate.ShouldStartWith("-");
+                break;
+            case "fraction":
+            case "modifier":
+                candidate.ShouldContain("/");
+                break;
+            case "arbitrary-value":
+                candidate.ShouldContain("[");
+                break;
+            case "css-variable":
+                candidate.ShouldContain("--viu-family-value");
+                break;
+        }
+
+        UtilityTheme theme = mode == "prefix"
+            ? prefixedTheme
+            : UtilityTheme.Default;
+        var first = UtilityCssCompiler.Compile(
+            new[] { candidate },
+            UtilityCssRegistry.BuiltIn,
+            theme,
+            CancellationToken.None);
+        first.Diagnostics.ShouldBeEmpty(
+            $"Family vector '{identifier}' mode '{mode}' rejected '{candidate}'.");
+        var emittedRule = first.Rules.ShouldHaveSingleItem(
+            $"Family vector '{identifier}' mode '{mode}' must emit exactly one metadata rule for '{candidate}'.");
+        var actualSemanticRules = ParseSemanticRules(
+            emittedRule.Css,
+            identifier,
+            mode);
+        var isImportant = familyCase.GetProperty("important").GetBoolean();
+        var expectedSemanticRules = familyCase
+            .GetProperty("expectedRulePaths")
+            .EnumerateArray()
+            .Select(
+                rulePath => DescribeSemanticRule(
+                    ReadStringArray(rulePath.GetProperty("wrappers")),
+                    rulePath.GetProperty("selector").GetString()!,
+                    ReadDeclarationContract(
+                        declarationContracts[
+                            rulePath.GetProperty("declarationContract").GetString()!]),
+                    isImportant))
+            .ToArray();
+        actualSemanticRules.ShouldBe(
+            expectedSemanticRules,
+            $"Family vector '{identifier}' mode '{mode}' changed its complete selector/declaration semantics.");
+
+        var second = UtilityCssCompiler.Compile(
+            new[] { candidate },
+            UtilityCssRegistry.BuiltIn,
+            theme,
+            CancellationToken.None);
+        second.Css.ShouldBe(
+            first.Css,
+            $"Family vector '{identifier}' mode '{mode}' is not byte deterministic.");
+    }
+
+    private static DeclarationContract[] ReadDeclarationContract(
+        JsonElement declarationContract) =>
+        declarationContract
+            .EnumerateArray()
+            .Select(
+                declaration => new DeclarationContract(
+                    declaration.GetProperty("property").GetString()!,
+                    declaration.GetProperty("value").GetString()!))
+            .ToArray();
+
+    private static string[] ParseSemanticRules(
+        string css,
+        string identifier,
+        string mode)
+    {
+        var wrappers = new List<string>();
+        var rules = new List<string>();
+        string? selector = null;
+        List<DeclarationContract>? declarations = null;
+        List<bool>? importance = null;
+
+        foreach (var rawLine in NormalizeLineEndings(css).Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (selector is null)
+            {
+                if (line == "}")
+                {
+                    if (wrappers.Count == 0)
+                    {
+                        throw InvalidSemanticCss(identifier, mode, line);
+                    }
+
+                    wrappers.RemoveAt(wrappers.Count - 1);
+                    continue;
+                }
+
+                if (!line.EndsWith(" {", StringComparison.Ordinal))
+                {
+                    throw InvalidSemanticCss(identifier, mode, line);
+                }
+
+                var header = line.Substring(0, line.Length - 2);
+                if (header.StartsWith("@", StringComparison.Ordinal))
+                {
+                    wrappers.Add(header);
+                    continue;
+                }
+
+                selector = header;
+                declarations = new List<DeclarationContract>();
+                importance = new List<bool>();
+                continue;
+            }
+
+            if (line == "}")
+            {
+                rules.Add(
+                    DescribeSemanticRule(
+                        wrappers,
+                        selector,
+                        declarations!,
+                        importance!));
+                selector = null;
+                declarations = null;
+                importance = null;
+                continue;
+            }
+
+            if (!line.EndsWith(";", StringComparison.Ordinal))
+            {
+                throw InvalidSemanticCss(identifier, mode, line);
+            }
+
+            var separator = line.IndexOf(':');
+            if (separator <= 0)
+            {
+                throw InvalidSemanticCss(identifier, mode, line);
+            }
+
+            var property = line.Substring(0, separator);
+            var value = line.Substring(separator + 1, line.Length - separator - 2).TrimStart();
+            var isImportant = value.EndsWith(
+                " !important",
+                StringComparison.Ordinal);
+            if (isImportant)
+            {
+                value = value.Substring(0, value.Length - " !important".Length);
+            }
+
+            declarations!.Add(new DeclarationContract(property, value));
+            importance!.Add(isImportant);
+        }
+
+        if (selector is not null || wrappers.Count != 0)
+        {
+            throw InvalidSemanticCss(identifier, mode, "end of CSS");
+        }
+
+        return rules.ToArray();
+    }
+
+    private static InvalidOperationException InvalidSemanticCss(
+        string identifier,
+        string mode,
+        string line) =>
+        new(
+            $"Family vector '{identifier}' mode '{mode}' emitted CSS outside the conformance rule grammar at '{line}'.");
+
+    private static string DescribeSemanticRule(
+        IReadOnlyList<string> wrappers,
+        string selector,
+        IReadOnlyList<DeclarationContract> declarations,
+        bool isImportant) =>
+        DescribeSemanticRule(
+            wrappers,
+            selector,
+            declarations,
+            Enumerable.Repeat(isImportant, declarations.Count).ToArray());
+
+    private static string DescribeSemanticRule(
+        IReadOnlyList<string> wrappers,
+        string selector,
+        IReadOnlyList<DeclarationContract> declarations,
+        IReadOnlyList<bool> importance)
+    {
+        declarations.Count.ShouldBe(importance.Count);
+        return string.Join("\u001f", wrappers) +
+            "\u001e" + selector +
+            "\u001e" + string.Join(
+                "\u001f",
+                declarations.Select(
+                    (declaration, index) =>
+                        declaration.Property + "\u001d" +
+                        declaration.Value + "\u001d" +
+                        importance[index]));
+    }
+
+    private sealed record DeclarationContract(
+        string Property,
+        string Value);
 
     private static void ExecuteCompilerVector(
         string identifier,

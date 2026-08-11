@@ -153,6 +153,18 @@ public class DomKnowledgeTests
     public void IsKnownSvgAttribute_RejectsUnknownNames()
         => DomKnowledge.IsKnownSvgAttribute("not-an-svg-attr").ShouldBeFalse();
 
+    [Theory]
+    [InlineData("mathcolor")]
+    [InlineData("linethickness")]
+    [InlineData("columnspan")]
+    [InlineData("intent")]
+    public void IsKnownMathMlAttribute_KnowsBoundedCoreMembers(string attribute)
+        => DomKnowledge.IsKnownMathMlAttribute(attribute).ShouldBeTrue();
+
+    [Fact]
+    public void IsKnownMathMlAttribute_RejectsUnknownNames()
+        => DomKnowledge.IsKnownMathMlAttribute("future-math-attribute").ShouldBeFalse();
+
     // --- span alternate lookups: allocation-free membership for compiler tokenization -------
 
     [Fact]
@@ -170,6 +182,7 @@ public class DomKnowledgeTests
         DomKnowledge.IsBooleanAttribute("checked".AsSpan()).ShouldBeTrue();
         DomKnowledge.IsKnownHtmlAttribute("tabindex".AsSpan()).ShouldBeTrue();
         DomKnowledge.IsKnownSvgAttribute("viewBox".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsKnownMathMlAttribute("mathcolor".AsSpan()).ShouldBeTrue();
     }
 
     [Fact]

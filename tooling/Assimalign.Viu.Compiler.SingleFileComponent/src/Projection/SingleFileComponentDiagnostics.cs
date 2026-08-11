@@ -201,6 +201,20 @@ public static class SingleFileComponentDiagnostics
         DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
         HelpLink: HelpLink("VIU1403"));
 
+    /// <summary>A static component tag has no generated or in-scope declaration ([SFC-USE-5]).</summary>
+    public static readonly SingleFileComponentDiagnosticDescriptor UnresolvedComponent = new(
+        Id: "VIU1404",
+        Title: "Component cannot be resolved",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1404"));
+
+    /// <summary>A static component tag matches more than one in-scope declaration ([SFC-USE-5]).</summary>
+    public static readonly SingleFileComponentDiagnosticDescriptor AmbiguousComponent = new(
+        Id: "VIU1405",
+        Title: "Component name is ambiguous",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1405"));
+
     /// <summary>
     /// Every entry of the neutral catalog, in id order. Each host's materialization must cover this list
     /// 1:1 — the generator's adapter-coverage test enumerates it so a new catalog entry without an
@@ -230,6 +244,8 @@ public static class SingleFileComponentDiagnostics
         UnknownComponentParameter,
         MissingRequiredComponentParameter,
         IncompatibleComponentArgument,
+        UnresolvedComponent,
+        AmbiguousComponent,
     };
 
     /// <summary>

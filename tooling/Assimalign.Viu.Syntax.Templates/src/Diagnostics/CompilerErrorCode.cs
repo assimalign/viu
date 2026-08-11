@@ -258,4 +258,16 @@ public enum CompilerErrorCode
     /// reported on the exact template coordinate rather than failing at runtime (<c>[STY-4]</c>).
     /// </summary>
     XViuUnknownCssModuleMember = 1001,
+
+    /// <summary>
+    /// A <c>v-for</c> alias used generalized destructuring instead of one C# identifier per alias
+    /// position ([V01.01.05.10]).
+    /// </summary>
+    XViuUnsupportedForAlias = 1002,
+
+    /// <summary>
+    /// A <c>v-slot</c> scope expression used generalized destructuring instead of one C# identifier
+    /// ([V01.01.05.10]).
+    /// </summary>
+    XViuUnsupportedSlotScopeExpression = 1003,
 }

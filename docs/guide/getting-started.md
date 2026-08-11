@@ -164,8 +164,7 @@ pattern):
         <TargetFramework>net10.0</TargetFramework>
         <!-- Let the WebAssembly SDK resolve the index.html boot placeholders
              (the importmap and the main#[.{fingerprint}].js reference) at build
-             and publish. The .viu CSS-bundle <link> injection rides the same
-             host-page rewrite. -->
+             and publish. Viu CSS-link injection is independent of this switch. -->
         <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     </PropertyGroup>
 
@@ -178,9 +177,9 @@ pattern):
 
 > **Why `OverrideHtmlAssetPlaceholders`?** It tells the WebAssembly SDK to statically resolve the
 > boot placeholders in `index.html` (the import map and the fingerprinted `main.js` reference) at
-> build and publish. The automatic `.viu` stylesheet `<link>` injection rides that same host-page
-> rewrite, so today the property is required for both to work. Making the SDK default it is tracked in
-> [#215](https://github.com/assimalign/viu/issues/215); until then, set it explicitly.
+> build and publish. The automatic `.viu` stylesheet `<link>` injection works whether this property is
+> `true` or `false`: when enabled, Viu injects after the boot rewrite; otherwise it transforms the resolved
+> host-page asset directly. Keep this property only when the page uses the WebAssembly boot placeholders.
 
 **`wwwroot/index.html`** — the host page. It has a mount target (`#app`), the WebAssembly boot
 placeholders, and — importantly — **no manual stylesheet `<link>`**: the build injects the `.viu` CSS
@@ -495,7 +494,8 @@ At build the SDK extracts every `<style>` block, bundles it into a **content-fin
 asset (`<AssemblyName>.viu.css`), and **injects the `<link rel="stylesheet">` into `index.html`
 automatically** — before the SDK's gzip/brotli compression pipeline, so compression negotiation stays
 intact. You write no manual link tag. This is why `index.html` above has none; the details are in
-[`sdks/README.md`](../../sdks/README.md) and the injection mechanism is
+the [Browser SDK CSS delivery contract](../../sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md),
+and the injection mechanism is
 [V01.01.12.12.01](https://github.com/assimalign/viu/issues/167).
 
 > **`.viu` `<template>`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**

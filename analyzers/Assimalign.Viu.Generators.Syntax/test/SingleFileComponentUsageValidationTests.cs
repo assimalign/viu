@@ -144,30 +144,17 @@ public sealed class SingleFileComponentUsageValidationTests
     }
 
     [Fact]
-    public void ImperativeComponent_IsNeverValidated()
+    public void ParameterlessGeneratedComponent_IsStillResolvable()
     {
-        // [SFC-USE-5] The honest limit. A `Parameters` collection is arbitrary C# that no compiler can
-        // read, so a component declaring its surface imperatively is absent from the catalog and every
-        // usage of it — even an obviously wrong one — is silent. This is the gap the attribute form
-        // exists to close, not a bug.
         var outcome = GeneratorTestHarness.RunAll(
             [
-                ($"{ProjectDirectory}/LegacyCard.viu",
+                ($"{ProjectDirectory}/EmptyCard.viu",
                     "<template>\n" +
                     "    <article></article>\n" +
-                    "</template>\n" +
-                    "@script {\n" +
-                    "    using System.Collections.Generic;\n" +
-                    "    using Assimalign.Viu.Components;\n" +
-                    "\n" +
-                    "    public IReadOnlyList<IComponentParameter> Parameters { get; } =\n" +
-                    "    [\n" +
-                    "        new ComponentParameter(\"title\", isRequired: true),\n" +
-                    "    ];\n" +
-                    "}\n"),
+                    "</template>\n"),
                 ($"{ProjectDirectory}/Consumer.viu",
                     "<template>\n" +
-                    "    <LegacyCard unknown=\"y\" />\n" +
+                    "    <EmptyCard />\n" +
                     "</template>\n"),
             ],
             RootNamespace,
@@ -177,15 +164,58 @@ public sealed class SingleFileComponentUsageValidationTests
     }
 
     [Fact]
-    public void UnresolvedComponent_IsSilent()
+    public void UnresolvedStaticComponent_IsAnActionableError()
     {
-        // A component the catalog does not know at all — a third-party registration, a name the app maps
-        // by hand — is never reported. Resolution failure means "no information", never "wrong".
         var outcome = GeneratorTestHarness.RunAll(
             [
                 ($"{ProjectDirectory}/Consumer.viu",
                     "<template>\n" +
-                    "    <SomeoneElsesWidget whatever=\"y\" />\n" +
+                    "    <SomeoneElsesWidget v-bind=\"Arguments\" />\n" +
+                    "</template>\n" +
+                    "@script {\n" +
+                    "    public object Arguments = new object();\n" +
+                    "}\n"),
+            ],
+            RootNamespace,
+            ProjectDirectory);
+
+        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VIU1404");
+        diagnostic.Severity.ShouldBe(RoslynDiagnosticSeverity.Error);
+        diagnostic.GetMessage().ShouldContain("generated or in-scope declaration");
+        diagnostic.GetMessage().ShouldContain("<component :is=");
+    }
+
+    [Theory]
+    [InlineData("component")]
+    [InlineData("Component")]
+    public void RuntimeSelectedComponent_BothGenericTagSpellings_AreNotStaticallyResolved(
+        string tag)
+    {
+        var outcome = GeneratorTestHarness.RunAll(
+            [
+                ($"{ProjectDirectory}/Consumer.viu",
+                    "<template>\n" +
+                    "    <" + tag + " :is=\"Target\" />\n" +
+                    "</template>\n"),
+            ],
+            RootNamespace,
+            ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("viu")]
+    [InlineData("vue")]
+    public void VueIsCast_BothContainerFormats_AreNotStaticallyResolved(
+        string extension)
+    {
+        var outcome = GeneratorTestHarness.RunAll(
+            [
+                ($"{ProjectDirectory}/Consumer.{extension}",
+                    "<template>\n" +
+                    "    <div is=\"vue:runtime-widget\"></div>\n" +
                     "</template>\n"),
             ],
             RootNamespace,
@@ -195,7 +225,32 @@ public sealed class SingleFileComponentUsageValidationTests
     }
 
     [Fact]
-    public void AmbiguousComponentName_IsSilent()
+    public void ImperativeParameterSurface_ResolvesIdentityButSkipsParameterChecks()
+    {
+        const string imperativeCard =
+            "<template>\n" +
+            "    <article></article>\n" +
+            "</template>\n" +
+            "@script {\n" +
+            "    public object Parameters { get; } = new object();\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.RunAll(
+            [
+                ($"{ProjectDirectory}/ImperativeCard.viu", imperativeCard),
+                ($"{ProjectDirectory}/Consumer.viu",
+                    "<template>\n" +
+                    "    <ImperativeCard unknown=\"y\" />\n" +
+                    "</template>\n"),
+            ],
+            RootNamespace,
+            ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AmbiguousComponentName_IsAnActionableError()
     {
         // [SFC-USE-5] Two components answer to `Card`; the template's intent is undecidable and
         // validating against the wrong one would be a false positive, so neither is used.
@@ -221,7 +276,11 @@ public sealed class SingleFileComponentUsageValidationTests
             RootNamespace,
             ProjectDirectory);
 
-        outcome.Diagnostics.ShouldBeEmpty();
+        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VIU1405");
+        diagnostic.Severity.ShouldBe(RoslynDiagnosticSeverity.Error);
+        diagnostic.GetMessage().ShouldContain("more than one in-scope declaration");
+        diagnostic.GetMessage().ShouldContain("exactly one target");
     }
 
     [Fact]
@@ -258,6 +317,28 @@ public sealed class SingleFileComponentUsageValidationTests
                 ($"{ProjectDirectory}/Consumer.viu",
                     "<template>\n" +
                     "    <PackagedCard title=\"From metadata\" :rating=\"5\" />\n" +
+                    "</template>\n"),
+            ],
+            RootNamespace,
+            ProjectDirectory,
+            reference);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("<EmptyPackagedCard />")]
+    [InlineData("<PackagedImperative unknown=\"y\" />")]
+    public void ReferencedParameterlessOrImperativeComponent_ResolvesWithoutFalseParameterDiagnostics(
+        string usage)
+    {
+        var reference = CompilePackagedComponent();
+
+        var outcome = GeneratorTestHarness.RunAll(
+            [
+                ($"{ProjectDirectory}/Consumer.viu",
+                    "<template>\n" +
+                    "    " + usage + "\n" +
                     "</template>\n"),
             ],
             RootNamespace,
@@ -345,6 +426,32 @@ public sealed class SingleFileComponentUsageValidationTests
 
                     [Assimalign.Viu.Components.Parameter]
                     public int Rating { get; set; }
+                }
+
+                public sealed class EmptyPackagedCard :
+                    Assimalign.Viu.Components.ComponentBase,
+                    Assimalign.Viu.Components.IComponent
+                {
+                    public Assimalign.Viu.Components.ComponentRenderer Setup(
+                        Assimalign.Viu.Components.ComponentContext context)
+                    {
+                        Context = context;
+                        return frame => null;
+                    }
+                }
+
+                public sealed class PackagedImperative :
+                    Assimalign.Viu.Components.ComponentBase,
+                    Assimalign.Viu.Components.IComponent
+                {
+                    public object Parameters { get; } = new object();
+
+                    public Assimalign.Viu.Components.ComponentRenderer Setup(
+                        Assimalign.Viu.Components.ComponentContext context)
+                    {
+                        Context = context;
+                        return frame => null;
+                    }
                 }
             }
             """,

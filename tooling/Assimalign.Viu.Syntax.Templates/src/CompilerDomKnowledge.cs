@@ -21,6 +21,8 @@ public static class CompilerDomKnowledge
     private static readonly HashSet<string> VoidTagSet = Build(DomKnowledgeData.VoidTags, StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> KnownHtmlAttributeSet = Build(DomKnowledgeData.KnownHtmlAttributes, StringComparer.Ordinal);
     private static readonly HashSet<string> KnownSvgAttributeSet = Build(DomKnowledgeData.KnownSvgAttributes, StringComparer.Ordinal);
+    private static readonly HashSet<string> KnownMathMlAttributeSet =
+        Build(DomKnowledgeData.KnownMathMlAttributes, StringComparer.Ordinal);
 
     /// <summary>Whether <paramref name="tag"/> is a known HTML element.</summary>
     /// <param name="tag">The tag name (matched case-insensitively).</param>
@@ -49,6 +51,21 @@ public static class CompilerDomKnowledge
     /// <summary>Whether <paramref name="attributeName"/> is a known SVG attribute.</summary>
     /// <param name="attributeName">The attribute name (matched case-sensitively).</param>
     public static bool IsKnownSvgAttribute(string attributeName) => KnownSvgAttributeSet.Contains(attributeName);
+
+    /// <summary>
+    /// Returns whether <paramref name="attributeName"/> belongs to Viu's bounded MathML Core attribute table.
+    /// </summary>
+    /// <param name="attributeName">The attribute name, matched case-sensitively.</param>
+    /// <returns>
+    /// <see langword="true"/> only for an exact entry in the shared table; otherwise
+    /// <see langword="false"/>.
+    /// </returns>
+    /// <remarks>
+    /// The bounded predicate lets static stringification accept only names whose serialization is known;
+    /// an unknown name remains dynamic instead of being guessed. Specified by <c>[SFC-OPT-4]</c> and
+    /// [V01.01.05.10].
+    /// </remarks>
+    public static bool IsKnownMathMlAttribute(string attributeName) => KnownMathMlAttributeSet.Contains(attributeName);
 
     private static HashSet<string> Build(string list, StringComparer comparer)
     {

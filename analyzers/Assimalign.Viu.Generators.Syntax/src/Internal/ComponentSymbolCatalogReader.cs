@@ -13,9 +13,9 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// <c>IComponent</c> types in this compilation, and every component in a <b>referenced
 /// assembly</b> ([SFC-USE-1]). The metadata half is what the [CMP-26] attribute form buys: a
 /// <c>[Parameter]</c> survives into the assembly, so a package's component surface is readable by the
-/// consumer's template compiler. A component that declares its parameters imperatively carries nothing
-/// readable in metadata — its <c>Parameters</c> collection is arbitrary C# — so it is simply absent
-/// here, and its usages are never validated ([SFC-USE-5]).
+/// consumer's template compiler. A parameterless component still contributes its identity. A component
+/// that declares parameters imperatively also contributes identity, but its arbitrary <c>Parameters</c>
+/// collection marks the surface unknown and suppresses parameter checks ([SFC-USE-5]).
 /// <para>
 /// The scan is bounded on purpose. It returns immediately when the compilation does not reference
 /// <c>Assimalign.Viu.Components</c> at all, and it walks only assemblies that reference that library, so
@@ -119,27 +119,33 @@ internal static class ComponentSymbolCatalogReader
         }
 
         List<ComponentParameterDeclaration>? parameters = null;
+        var declaresImperativeParameters = false;
         foreach (var member in type.GetMembers())
         {
-            if (member is not IPropertySymbol property || property.IsStatic || property.SetMethod is null)
+            if (member is not IPropertySymbol property || property.IsStatic)
             {
                 continue;
             }
 
-            if (ReadParameter(property, context.ParameterAttribute) is { } declaration)
+            if (property.SetMethod is not null &&
+                ReadParameter(property, context.ParameterAttribute) is { } declaration)
             {
                 (parameters ??= new List<ComponentParameterDeclaration>()).Add(declaration);
             }
-        }
-
-        if (parameters is null)
-        {
-            return;
+            else if (string.Equals(property.Name, "Parameters", StringComparison.Ordinal))
+            {
+                declaresImperativeParameters = true;
+            }
         }
 
         context.Entries.Add(new ComponentDeclarationEntry(
             type.Name,
-            new EquatableArray<ComponentParameterDeclaration>(parameters.ToArray())));
+            parameters is null
+                ? EquatableArray<ComponentParameterDeclaration>.Empty
+                : new EquatableArray<ComponentParameterDeclaration>(parameters.ToArray()))
+        {
+            IsParameterSurfaceKnown = !declaresImperativeParameters,
+        });
     }
 
     private static ComponentParameterDeclaration? ReadParameter(

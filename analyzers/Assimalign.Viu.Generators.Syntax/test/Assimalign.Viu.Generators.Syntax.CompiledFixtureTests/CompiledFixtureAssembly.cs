@@ -92,6 +92,10 @@ internal sealed class CompiledFixtureAssembly
         [
             // Verbatim physical copies of the shipping compiled-component source constants.
             "AttributedCard.viu",
+            "Button.viu",
+            "Input.viu",
+            "NativeCollisionHost.viu",
+            "MathStaticProbe.viu",
             "Rating.viu",
             "PatchProbe.viu",
             "TargetedTextProbe.viu",
@@ -106,6 +110,7 @@ internal sealed class CompiledFixtureAssembly
             "RouterAliasedSlotHost.viu",
             "RouterRepeatedStaticView.viu",
             "VueProbe.vue",
+            "VueRuntimeCastProbe.vue",
         ];
         var additionalFiles = ImmutableArray.CreateBuilder<AdditionalText>(fixtureNames.Length);
         foreach (string fixtureName in fixtureNames)

@@ -7,6 +7,9 @@
     <li v-for="item in Items" :key="item">{{ item }}</li>
   </ol>
   <em v-memo="[MemoKey]">{{ MemoMessage }}</em>
+  <ul>
+    <li v-for="item in MemoItems" v-memo="[item.Value.Length]" :key="item.Key">{{ item.Value }}</li>
+  </ul>
 </section>
 </template>
 
@@ -20,4 +23,7 @@ public Reference<IReadOnlyList<string>> Items =
     Reactive.Reference<IReadOnlyList<string>>(new[] { "alpha", "beta" });
 public Reference<int> MemoKey = Reactive.Reference(1);
 public Reference<string> MemoMessage = Reactive.Reference("memo-first");
+public Reference<IReadOnlyList<KeyValuePair<int, string>>> MemoItems =
+    Reactive.Reference<IReadOnlyList<KeyValuePair<int, string>>>(
+        new[] { new KeyValuePair<int, string>(1, "memo-row-first") });
 }
