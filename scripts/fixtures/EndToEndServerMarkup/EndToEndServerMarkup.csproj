@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EndToEndServerMarkup</RootNamespace>
+    <AssemblyName>EndToEndServerMarkup</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <DefineConstants>$(DefineConstants);SERVER_MARKUP</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Package-only SSR host: it exercises the artifacts installed by the orchestration script. -->
+    <PackageReference Include="Assimalign.Viu.Components" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Reactivity" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Core" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.ServerRenderer" Version="$(ViuConsumerVersion)" />
+    <Compile Include="..\EndToEndHydrationShared\HydrationFixture.cs"
+             Link="HydrationFixture.cs" />
+  </ItemGroup>
+</Project>

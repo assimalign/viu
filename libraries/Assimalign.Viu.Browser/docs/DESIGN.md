@@ -27,6 +27,9 @@ Managed and JavaScript registries release handles and listeners on both sides (`
 Events use a stable per-element invoker. Updating a handler swaps the managed delegate without
 removing and re-adding the host listener. Static content uses Core's optional bulk-insertion
 operation. These paths protect the interop budget in `[RND-IO-2]`, `[RND-IO-3]`, and `[RND-IO-5]`.
+The invoker explicitly dispatches `IElementEvent` delegates before concrete `BrowserEvent`
+delegates, preserving contravariant delegate ordering and exact payload identity without reflection
+(`[V01.01.11.06]`).
 
 ## Application lifetime
 

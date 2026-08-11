@@ -141,6 +141,16 @@
         <_ViuPackage Include="BenchmarkDotNet" Version="0.15.8" />
     </ItemGroup>
 
+    <!-- Real-browser Test Dependencies -->
+    <ItemGroup>
+        <!--
+            The on-demand/nightly end-to-end harness ([V01.01.11.03], #87) drives only published,
+            trimmed package consumers. Keep the browser automation dependency centralized even
+            though the harness is test-only and never packed.
+        -->
+        <_ViuPackage Include="Microsoft.Playwright" Version="1.59.0" />
+    </ItemGroup>
+
     <!-- XUnit Test Dependencies-->
     <ItemGroup>
         <_ViuPackage Include="Shouldly" Version="4.3.0" />

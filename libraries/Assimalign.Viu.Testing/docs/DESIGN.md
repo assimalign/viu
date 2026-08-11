@@ -27,11 +27,35 @@ and root and descendant event histories remain separate (component-model seams S
 
 ## Deterministic scheduling
 
-`TestSchedulerPump` installs `Scheduler.UseFlushDispatcher` and owns the returned restoration lease.
-`ComponentTest` resets ambient scheduler state before a mount and after disposal. Wrapper interactions
-await event handlers, capture `Scheduler.NextTickAsync`, drain every queued continuation, and then await
-the tick. Tests observe post-flush state without wall-clock delays or a test-framework
-`SynchronizationContext` (component-model seam S2, `[SCH-9]`).
+`TestSynchronizationContext` owns one first-in, first-out continuation queue. `Post` never invokes a
+callback reentrantly; work posted during a drain joins the tail. `Pump` runs only queued work and
+fails actionably when an incomplete operation cannot progress, while callback exceptions propagate
+to the drain caller. Disposing an installed context restores its predecessor before reporting any
+forgotten continuation or asynchronous-void operation (`[V01.01.11.05]`).
+
+Every `TestRenderer` owns a detached context and installs it only around renderer calls or explicit
+`Drain`/`Pump`/`Run` operations. That scoped shape lets an async xUnit flow move between physical
+threads while every individual continuation batch remains single-threaded. Disposing the renderer
+is mandatory for pending-work diagnostics. `ComponentTest` transfers that ownership to the root
+`ComponentWrapper`; descendant wrappers borrow it.
+
+`TestSchedulerPump` installs `Scheduler.UseFlushDispatcher` and can enqueue scheduler flush actions
+onto the renderer's same context. `ComponentTest` resets ambient scheduler state before a mount and
+after disposal. Wrapper interactions start the listener inside the context, pump awaited handler
+continuations, drain the scheduler, and observe the captured `Scheduler.NextTickAsync` boundary.
+Tests therefore observe post-flush state without a wall-clock wait (component-model seam S2,
+`[SCH-9]`, `[V01.01.11.05]`).
+
+## Portable event payloads
+
+`TestElementEvent` carries the read-only `IElementEvent` fields shared with Browser. Generic
+`TriggerAsync<TEvent>` overloads preserve the supplied concrete instance, which also lets a DOM-free
+test execute a concrete Browser modifier or key-guard delegate when the test project deliberately
+references Browser. `SetValueAsync` synthesizes a `TestElementEvent` for portable handlers while
+retaining the raw-value channel for older `Action<object?>` handlers. Event names parse
+`Once`/`Capture`/`Passive` suffixes with the Browser spelling; the in-memory host enforces `Once`
+and accepts capture/passive registration spelling without simulating propagation or browser-default
+behavior (`[V01.01.11.06]`).
 
 ## Hydration fidelity
 

@@ -16,7 +16,7 @@ public sealed class TestRendererTests
     public void Render_InitialTree_CommitsExactlyOnce()
     {
         Scheduler.Reset();
-        TestRenderer renderer = new();
+        using TestRenderer renderer = new();
         TestElement container = renderer.CreateContainer();
         ElementNode tree = Element("root", new TextNode("hello"));
 
@@ -31,7 +31,7 @@ public sealed class TestRendererTests
     public void Render_TextPatch_ChangesOnlyTextAndCommitsOnce()
     {
         Scheduler.Reset();
-        TestRenderer renderer = new();
+        using TestRenderer renderer = new();
         TestElement container = renderer.CreateContainer();
         renderer.Render(Element("root", new TextNode("before")), container);
         renderer.OperationLog.Reset();
@@ -64,7 +64,7 @@ public sealed class TestRendererTests
                 RootComponent = root,
                 Components = factory,
             });
-        TestRenderer renderer = new();
+        using TestRenderer renderer = new();
         TestElement container = renderer.CreateContainer();
         renderer.Render(root, container, application);
         pump.RunUntilIdle();
@@ -88,7 +88,7 @@ public sealed class TestRendererTests
         Scheduler.Reset();
         TestElement container = TestServerMarkup.Parse("<main data-id=server>hello</main>");
         TestElement serverElement = (TestElement)container.Children.ShouldHaveSingleItem();
-        TestRenderer renderer = new(
+        using TestRenderer renderer = new(
             new TestRendererOptions
             {
                 SnapshotSemantics = true,

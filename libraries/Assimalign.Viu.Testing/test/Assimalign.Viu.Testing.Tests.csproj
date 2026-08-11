@@ -10,6 +10,7 @@
     <ViuPackageReference Include="Shouldly" />
   </ItemGroup>
   <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
     <ViuProjectReference Include="Assimalign.Viu.Components" />
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>

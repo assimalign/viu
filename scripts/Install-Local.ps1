@@ -43,6 +43,16 @@
 
 .PARAMETER Configuration
     Build configuration (default Release).
+
+.PARAMETER RestoreConfigurationFile
+    Optional explicit NuGet configuration passed to every pack restore. When supplied,
+    Install-Local performs that restore first and then packs with --no-restore so the pack step
+    consumes the prepared restore graph.
+
+.PARAMETER SkipRestore
+    Packs with --no-restore after verifying that every project has an existing
+    obj/project.assets.json. This is a narrow fallback for restricted local gates; CI and normal
+    package installation should restore.
 #>
 [CmdletBinding()]
 param(
@@ -53,12 +63,18 @@ param(
     [string[]] $ConsumerRoot = @(),
     [switch] $SkipCachePrune,
     [switch] $BaseOnly,
-    [string] $Configuration = 'Release'
+    [string] $Configuration = 'Release',
+    [string] $RestoreConfigurationFile,
+    [switch] $SkipRestore
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $feed = Join-Path $repoRoot '_out\packages'
+
+if ($SkipRestore -and -not [string]::IsNullOrWhiteSpace($RestoreConfigurationFile)) {
+    throw '-SkipRestore cannot be combined with -RestoreConfigurationFile.'
+}
 
 Import-Module (Join-Path $PSScriptRoot 'modules\ViuPackaging.psm1') -Force
 
@@ -98,9 +114,34 @@ function Invoke-ViuPack {
         [string[]] $AdditionalArguments = @()
     )
 
+    $packRestoreArguments = @()
+    if ($SkipRestore) {
+        $projectAssetsPath = Join-Path `
+            (Split-Path $Project -Parent) `
+            'obj/project.assets.json'
+        if (-not [System.IO.File]::Exists($projectAssetsPath)) {
+            throw "-SkipRestore requires prepared restore assets: $projectAssetsPath"
+        }
+
+        $packRestoreArguments = @('--no-restore')
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($RestoreConfigurationFile)) {
+        dotnet restore $Project `
+            --configfile $RestoreConfigurationFile `
+            --ignore-failed-sources `
+            -p:NuGetAudit=false `
+            @AdditionalArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "Restoring $Project failed with exit code $LASTEXITCODE."
+        }
+
+        $packRestoreArguments = @('--no-restore')
+    }
+
     dotnet pack $Project `
         --configuration $Configuration `
         -p:PackageOutputPath=$feed `
+        @packRestoreArguments `
         @AdditionalArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Packing $Project failed with exit code $LASTEXITCODE."
@@ -146,9 +187,17 @@ if (-not $SkipFramework) {
     if (-not $BaseOnly) {
         foreach ($rid in $Rids) {
             Write-Host "[framework] Packing Assimalign.Viu.App.Browser.Runtime.$rid" -ForegroundColor Green
+            $runtimePackArguments = @("-p:RuntimeIdentifier=$rid")
+            if ($SkipRestore) {
+                # The prepared generic assets do not carry an RID target. Runtime-pack inputs were
+                # already rebuilt by the fresh library packs, so consume those verified outputs.
+                $runtimePackArguments += @(
+                    '-p:SkipResolvePackageAssets=true',
+                    '-p:BuildProjectReferences=false')
+            }
             Invoke-ViuPack `
                 -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Browser.Runtime\src\Assimalign.Viu.App.Browser.Runtime.csproj') `
-                -AdditionalArguments @("-p:RuntimeIdentifier=$rid")
+                -AdditionalArguments $runtimePackArguments
         }
     }
 

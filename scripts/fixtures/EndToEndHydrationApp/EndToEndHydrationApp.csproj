@@ -1,0 +1,23 @@
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EndToEndHydrationApp</RootNamespace>
+    <AssemblyName>EndToEndHydrationApp</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
+    <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
+    <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <StaticWebAssetFingerprintPattern Include="JS"
+                                      Pattern="*.js"
+                                      Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\EndToEndHydrationShared\HydrationFixture.cs"
+             Link="HydrationFixture.cs" />
+  </ItemGroup>
+</Project>

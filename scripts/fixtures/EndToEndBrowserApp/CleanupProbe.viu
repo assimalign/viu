@@ -1,0 +1,20 @@
+<template>
+    <button
+        id="cleanup-probe"
+        type="button"
+        data-testid="cleanup-probe"
+        @click="HandleClick">
+        Mounted child: <span data-testid="cleanup-probe-count">{{ ClickCount }}</span>
+    </button>
+</template>
+
+@script {
+    using Assimalign.Viu;
+    using Assimalign.Viu.Reactivity;
+
+    private readonly Reference<int> ClickCountReference = Reactive.Reference(0);
+
+    public int ClickCount => ClickCountReference.Value;
+
+    private void HandleClick() => ClickCountReference.Value++;
+}

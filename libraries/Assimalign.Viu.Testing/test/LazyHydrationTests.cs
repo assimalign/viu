@@ -43,7 +43,7 @@ public sealed class LazyHydrationTests
     {
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
-        Scenario scenario = CreateScenario(
+        using Scenario scenario = CreateScenario(
             HydrationStrategy.OnInteraction("click", "keydown"),
             triggers);
 
@@ -70,7 +70,7 @@ public sealed class LazyHydrationTests
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
         List<object?> referenceValues = [];
-        Scenario scenario = CreateScenario(
+        using Scenario scenario = CreateScenario(
             HydrationStrategy.OnIdle(),
             triggers,
             referenceValues.Add);
@@ -95,7 +95,7 @@ public sealed class LazyHydrationTests
         Scheduler.Reset();
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
-        Scenario scenario = CreateScenario(HydrationStrategy.OnIdle(), triggers);
+        using Scenario scenario = CreateScenario(HydrationStrategy.OnIdle(), triggers);
         scenario.Renderer.Hydrate(
             scenario.Root,
             scenario.Container,
@@ -116,7 +116,7 @@ public sealed class LazyHydrationTests
         Scheduler.Reset();
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
-        Scenario scenario = CreateScenario(
+        using Scenario scenario = CreateScenario(
             HydrationStrategy.OnMediaQuery("(width < 40rem)"),
             triggers);
         scenario.Renderer.Hydrate(
@@ -146,7 +146,7 @@ public sealed class LazyHydrationTests
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
         List<object?> values = [];
-        Scenario scenario = CreateScenario(
+        using Scenario scenario = CreateScenario(
             HydrationStrategy.OnVisible(),
             triggers,
             values.Add);
@@ -191,7 +191,7 @@ public sealed class LazyHydrationTests
                 _ => target));
         ComponentNode root = definition.CreateComponent();
         ApplicationContext application = CreateApplication(root, components);
-        TestRenderer renderer = CreateRenderer(triggers);
+        using TestRenderer renderer = CreateRenderer(triggers);
         TestElement container = TestServerMarkup.Parse(
             Marker(HydrationStrategyKind.Idle)
                 + "<button>ready</button>"
@@ -252,7 +252,7 @@ public sealed class LazyHydrationTests
                 Components = components,
                 ErrorHandler = (error, _, _) => routed.TrySetResult(error),
             });
-        TestRenderer renderer = CreateRenderer(triggers);
+        using TestRenderer renderer = CreateRenderer(triggers);
         TestElement container = TestServerMarkup.Parse(
             Marker(HydrationStrategyKind.Idle)
                 + "<p>server</p>"
@@ -294,7 +294,7 @@ public sealed class LazyHydrationTests
         Scheduler.Reset();
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
-        TestRenderer renderer = CreateRenderer(triggers);
+        using TestRenderer renderer = CreateRenderer(triggers);
         CountingComponent inner = new(
             () => new ElementNode(
                 new QualifiedName("span"),
@@ -344,7 +344,7 @@ public sealed class LazyHydrationTests
         Scheduler.Reset();
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
-        TestRenderer renderer = CreateRenderer(triggers);
+        using TestRenderer renderer = CreateRenderer(triggers);
         CountingComponent child = new(
             () => new ElementNode(
                 new QualifiedName("strong"),
@@ -382,7 +382,7 @@ public sealed class LazyHydrationTests
         Scheduler.Reset();
         TestHydrationTriggers triggers = new();
         using TestSchedulerPump pump = TestSchedulerPump.Install();
-        Scenario scenario = CreateScenario(strategy, triggers);
+        using Scenario scenario = CreateScenario(strategy, triggers);
         TestNode adopted = scenario.Container.Children[1];
 
         scenario.Renderer.Hydrate(
@@ -473,7 +473,10 @@ public sealed class LazyHydrationTests
         TestElement Container,
         ComponentNode Root,
         ApplicationContext Application,
-        CountingComponent Component);
+        CountingComponent Component) : IDisposable
+    {
+        public void Dispose() => Renderer.Dispose();
+    }
 
     private sealed class CountingComponent : IComponent
     {

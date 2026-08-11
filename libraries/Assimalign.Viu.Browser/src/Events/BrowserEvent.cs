@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 
+using Assimalign.Viu.Components;
+
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
@@ -8,11 +10,13 @@ namespace Assimalign.Viu.Browser;
 /// </summary>
 /// <remarks>
 /// The Browser host extracts this closed field set before crossing the JavaScript interop boundary.
+/// The same instance implements <see cref="IElementEvent"/> for portable authored handlers; no
+/// test or host adapter converts it to another payload.
 /// <see cref="StopPropagation"/> and <see cref="PreventDefault"/> record response intents that the
 /// host applies to the live event after synchronous dispatch. Specified by <c>[SFC-CG-2]</c> and
-/// <c>[V01.01.04.03]</c>.
+/// <c>[V01.01.04.03]</c> and <c>[V01.01.11.06]</c>.
 /// </remarks>
-public sealed class BrowserEvent
+public sealed class BrowserEvent : IElementEvent
 {
     private readonly bool _defaultPreventedOnArrival;
     private bool _preventDefaultRequested;

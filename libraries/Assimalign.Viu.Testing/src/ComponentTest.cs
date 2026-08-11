@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Components;
@@ -8,31 +9,42 @@ namespace Assimalign.Viu.Testing;
 
 /// <summary>Provides DOM-free component and virtual-tree mount entry points.</summary>
 /// <remarks>
-/// Mounts own a deterministic scheduler lease and use only public application, renderer, mounted
-/// view, and event-observer seams. Specified by <c>[APP-2]</c>, <c>[RND-6]</c>, seam S2, seam S3,
-/// seam S5, and <c>[CONF-3]</c>.
+/// Mounts own a deterministic synchronization context and scheduler lease, and use only public
+/// application, renderer, mounted-view, and event-observer seams. Specified by <c>[APP-2]</c>,
+/// <c>[RND-6]</c>, seam S2, seam S3, seam S5, <c>[CONF-3]</c>, and
+/// <c>[V01.01.11.05]</c>.
 /// </remarks>
 public static class ComponentTest
 {
-    /// <summary>Mounts an immutable virtual tree.</summary>
+    /// <summary>Mounts an immutable virtual tree with default application composition.</summary>
     /// <param name="node">The root tree.</param>
-    /// <param name="options">Optional application composition.</param>
+    /// <returns>The owning query wrapper.</returns>
+    public static ComponentWrapper Mount(VirtualNode node) => Mount(node, options: null);
+
+    /// <summary>Mounts an immutable virtual tree with explicit application composition.</summary>
+    /// <param name="node">The root tree.</param>
+    /// <param name="options">Application composition, or null for defaults.</param>
     /// <returns>The owning query wrapper.</returns>
     public static ComponentWrapper Mount(
         VirtualNode node,
-        ComponentMountOptions? options = null)
+        ComponentMountOptions? options)
     {
         ArgumentNullException.ThrowIfNull(node);
         return MountCore(node, rootRegistration: null, options);
     }
 
-    /// <summary>Mounts the exact supplied authored component instance once.</summary>
+    /// <summary>Mounts the exact supplied authored component instance once with default composition.</summary>
     /// <param name="component">The caller-supplied root instance.</param>
-    /// <param name="options">Optional invocation and application composition.</param>
+    /// <returns>The owning query wrapper.</returns>
+    public static ComponentWrapper Mount(IComponent component) => Mount(component, options: null);
+
+    /// <summary>Mounts the exact supplied authored component instance once with explicit composition.</summary>
+    /// <param name="component">The caller-supplied root instance.</param>
+    /// <param name="options">Invocation and application composition, or null for defaults.</param>
     /// <returns>The owning query wrapper.</returns>
     public static ComponentWrapper Mount(
         IComponent component,
-        ComponentMountOptions? options = null)
+        ComponentMountOptions? options)
     {
         ArgumentNullException.ThrowIfNull(component);
         options ??= new ComponentMountOptions();
@@ -45,13 +57,19 @@ public static class ComponentTest
         return MountRegistration(registration, options);
     }
 
-    /// <summary>Mounts a root through its explicit reflection-free registration.</summary>
+    /// <summary>Mounts a root through its reflection-free registration with default composition.</summary>
     /// <param name="registration">The root reference, contract, and activator.</param>
-    /// <param name="options">Optional invocation and application composition.</param>
+    /// <returns>The owning query wrapper.</returns>
+    public static ComponentWrapper Mount(ComponentRegistration registration) =>
+        Mount(registration, options: null);
+
+    /// <summary>Mounts a root through its reflection-free registration with explicit composition.</summary>
+    /// <param name="registration">The root reference, contract, and activator.</param>
+    /// <param name="options">Invocation and application composition, or null for defaults.</param>
     /// <returns>The owning query wrapper.</returns>
     public static ComponentWrapper Mount(
         ComponentRegistration registration,
-        ComponentMountOptions? options = null)
+        ComponentMountOptions? options)
     {
         ArgumentNullException.ThrowIfNull(registration);
         options ??= new ComponentMountOptions();
@@ -113,10 +131,12 @@ public static class ComponentTest
         ApplicationContext application = new(applicationOptions);
 
         Scheduler.Reset();
-        ScheduledFlush flush = new(TestSchedulerPump.Install());
+        TestRenderer testRenderer = new();
+        ScheduledFlush flush = new(
+            TestSchedulerPump.Install(testRenderer.SynchronizationContext),
+            testRenderer);
         try
         {
-            TestRenderer testRenderer = new();
             TestElement container = testRenderer.CreateContainer();
             testRenderer.Render(root, container, application);
             MountedComponentView<TestNode>? mountedView =
@@ -132,14 +152,23 @@ public static class ComponentTest
                 mountedView,
                 emitted,
                 flush,
-                testRenderer.Renderer,
+                testRenderer,
                 container,
                 ownsMount: true);
         }
-        catch
+        catch (Exception exception)
         {
             Scheduler.Reset();
-            flush.Dispose();
+            try
+            {
+                flush.Dispose();
+            }
+            catch
+            {
+                // Preserve the mount failure; the renderer never escapes to own pending work.
+            }
+
+            ExceptionDispatchInfo.Capture(exception).Throw();
             throw;
         }
     }

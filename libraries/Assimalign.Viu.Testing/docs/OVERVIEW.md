@@ -15,15 +15,23 @@ plain CoreCLR test host with no DOM, browser, WASM toolchain, or JavaScript inte
   descendants, dispatch host events, capture per-context emitted events, drain scheduled work, and
   own root unmounting.
 - `TestRenderer` pairs Core's production `Renderer<TestNode>` with `TestNodeOperations` and a
-  `TestNodeOperationLog`. A `Commit` record makes the renderer's batch seam directly assertable.
+  `TestNodeOperationLog`. It owns a `TestSynchronizationContext`, scopes that context around render
+  and hydrate calls, exposes `Drain`, `Pump`, and `Run`, and reports queued work when disposed. A
+  `Commit` record makes the renderer's batch seam directly assertable (`[V01.01.11.05]`).
 - `TestNode`, `TestElement`, `TestText`, and `TestComment` form the in-memory host tree.
-  `TestNodeSerializer` produces assertion markup and `TestEventDispatcher` invokes supported
-  delegate shapes without reflection.
+  `TestNodeSerializer` produces assertion markup. `TestElementEvent` implements the portable
+  Components `IElementEvent` payload; `TestEventDispatcher` invokes object, portable-interface,
+  and exact generic payload delegates without reflection. Listener option suffixes normalize to
+  their event name, and `Once` removes the listener before its first invocation
+  (`[V01.01.11.06]`).
 - `TestServerMarkup` parses ServerRenderer fragments using Core's `HydrationMarkers` vocabulary.
   `TestHydrationReader` reads the live tree; `FrozenTestHydrationReader` captures an immutable
   pre-walk matching a one-read browser snapshot.
-- `TestSchedulerPump` installs through `Scheduler.UseFlushDispatcher` and restores through its
-  returned lease. `ComponentTest` also uses `Scheduler.Reset` at mount boundaries.
+- `TestSynchronizationContext.Install` saves and restores the preceding ambient context. Queued
+  continuations run first-in, first-out on explicit `Drain`, while `Pump` and `Run` fail immediately
+  when an incomplete operation has no runnable continuation. `TestSchedulerPump` can share that
+  same queue through `Scheduler.UseFlushDispatcher`; `ComponentTest` uses the renderer-owned context
+  and resets Scheduler state at mount boundaries (`[V01.01.11.05]`).
 - `TestHydrationTriggers` is the deterministic host seam for idle, visible, media-query, and
   interaction activation. Trigger methods enter Core's ordinary post-flush path; counters expose
   completion and interaction replay without a DOM or wall clock (`[HYD-LAZY-3]` through

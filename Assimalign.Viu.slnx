@@ -57,7 +57,7 @@
 	<Folder Name="/viu/.github/workflows/">
 		<File Path=".github/workflows/analyzers.yml" />
 		<File Path=".github/workflows/benchmarks.yml" />
-		<File Path=".github/workflows-disabled/budget-gates.yml" />
+		<File Path=".github/workflows/budget-gates.yml" />
 		<File Path=".github/workflows/libraries.yml" />
 		<File Path=".github/workflows/packaging.yml" />
 		<File Path=".github/workflows/release.yml" />
@@ -208,6 +208,13 @@
 	</Folder>
 	<Folder Name="/viu/tooling/Assimalign.Viu.LanguageServer/test/">
 		<Project Path="tooling/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj" />
+	</Folder>
+	<Folder Name="/viu/tooling/Assimalign.Viu.Testing.EndToEnd/" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Testing.EndToEnd/docs/">
+		<File Path="tooling/Assimalign.Viu.Testing.EndToEnd/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/tooling/Assimalign.Viu.Testing.EndToEnd/src/">
+		<Project Path="tooling/Assimalign.Viu.Testing.EndToEnd/src/Assimalign.Viu.Testing.EndToEnd.csproj" />
 	</Folder>
 	<Folder Name="/viu/tooling/Assimalign.Viu.Compiler.Css/" />
 	<Folder Name="/viu/tooling/Assimalign.Viu.Compiler.Css/docs/">
