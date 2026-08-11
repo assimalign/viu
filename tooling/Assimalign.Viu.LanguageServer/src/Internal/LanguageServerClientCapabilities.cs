@@ -13,11 +13,16 @@ namespace Assimalign.Viu.LanguageServer;
 /// <param name="CompletionDocumentationSupportsMarkdown">Whether <c>textDocument.completion.completionItem.documentationFormat</c> includes <c>markdown</c>.</param>
 /// <param name="SupportsHierarchicalDocumentSymbols">Whether <c>textDocument.documentSymbol.hierarchicalDocumentSymbolSupport</c> is <see langword="true"/>.</param>
 /// <param name="SupportsCodeActionLiterals">Whether <c>textDocument.codeAction.codeActionLiteralSupport</c> is present.</param>
+/// <param name="SupportsViuSemanticClassificationNotifications">
+/// Whether the Viu client opted into exact C# classification-name publications through
+/// <c>initializationOptions.semanticClassificationNotifications</c>.
+/// </param>
 internal sealed record LanguageServerClientCapabilities(
     bool HoverSupportsMarkdown,
     bool CompletionDocumentationSupportsMarkdown,
     bool SupportsHierarchicalDocumentSymbols,
-    bool SupportsCodeActionLiterals)
+    bool SupportsCodeActionLiterals,
+    bool SupportsViuSemanticClassificationNotifications)
 {
     /// <summary>Gets the plaintext-only default used before (or without) an <c>initialize</c> request.</summary>
     internal static LanguageServerClientCapabilities Default { get; } =
@@ -25,17 +30,29 @@ internal sealed record LanguageServerClientCapabilities(
             HoverSupportsMarkdown: false,
             CompletionDocumentationSupportsMarkdown: false,
             SupportsHierarchicalDocumentSymbols: false,
-            SupportsCodeActionLiterals: false);
+            SupportsCodeActionLiterals: false,
+            SupportsViuSemanticClassificationNotifications: false);
 
     /// <summary>Reads the honored capabilities from the <c>initialize</c> request parameters.</summary>
     /// <param name="initializeParameters">The <c>initialize</c> request's <c>params</c> element.</param>
     /// <returns>The captured capabilities; missing properties at any level read as unsupported.</returns>
     internal static LanguageServerClientCapabilities Read(JsonElement initializeParameters)
     {
+        var supportsViuSemanticClassificationNotifications =
+            TryGetObject(initializeParameters, "initializationOptions", out var initializationOptions) &&
+            initializationOptions.TryGetProperty(
+                "semanticClassificationNotifications",
+                out var semanticClassificationNotifications) &&
+            semanticClassificationNotifications.ValueKind == JsonValueKind.True;
+
         if (!TryGetObject(initializeParameters, "capabilities", out var capabilities) ||
             !TryGetObject(capabilities, "textDocument", out var textDocument))
         {
-            return Default;
+            return Default with
+            {
+                SupportsViuSemanticClassificationNotifications =
+                    supportsViuSemanticClassificationNotifications,
+            };
         }
 
         var hoverSupportsMarkdown =
@@ -59,7 +76,8 @@ internal sealed record LanguageServerClientCapabilities(
             hoverSupportsMarkdown,
             completionDocumentationSupportsMarkdown,
             supportsHierarchicalDocumentSymbols,
-            supportsCodeActionLiterals);
+            supportsCodeActionLiterals,
+            supportsViuSemanticClassificationNotifications);
     }
 
     private static bool TryGetObject(

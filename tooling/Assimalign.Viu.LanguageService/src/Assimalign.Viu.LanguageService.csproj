@@ -14,6 +14,10 @@
          exact scope id the build's source generator derives, so the editor-built generated document
          is identical to the generator's by construction. -->
     <ViuProjectReference Include="Assimalign.Viu.Compiler.Css" />
+    <!-- Component style-class completion ([V01.01.12.07.13], #334) reads selectors from the same
+         recoverable CSS tree the compiler scopes and emits. Already in the closure transitively;
+         declared here because this project now compiles directly against its syntax types. -->
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.Css" />
     <!-- Template element folding ([V01.01.12.07.07]) parses the template block's markup with the same
          recoverable template parser the build compiles templates with, so the elements the editor folds
          are exactly the elements the build sees. Already in the closure transitively; declared here

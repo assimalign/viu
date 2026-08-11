@@ -13,6 +13,9 @@ namespace Assimalign.Viu.LanguageServer;
 
 internal sealed class LanguageServerHost
 {
+    private static readonly TimeSpan DocumentPublicationDebounceDelay =
+        TimeSpan.FromMilliseconds(75);
+
     private const int ParseErrorCode = -32700;
     private const int InvalidRequestCode = -32600;
     private const int MethodNotFoundCode = -32601;
@@ -36,11 +39,20 @@ internal sealed class LanguageServerHost
     // Keyed by the request identifier's raw JSON text (JsonElement.GetRawText()), so the numeric
     // identifier 1 and the string identifier "1" stay distinct per JSON-RPC. The loop thread adds
     // entries; request tasks remove their own entry from pool threads.
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> pendingRequestCancellations =
+    private readonly ConcurrentDictionary<string, LanguageServerPendingRequestCancellation>
+        pendingRequestCancellations =
         new(StringComparer.Ordinal);
     // Loop-thread only: the dispatched request tasks. Completed tasks are pruned each iteration,
     // and the list is drained before the shutdown reply and before RunAsync returns.
     private readonly List<Task> inFlightRequests = new();
+    // Loop-thread only: every scheduled publication remains tracked even after a newer edit cancels
+    // it, so shutdown and stream teardown never leave a task writing to a disposed output stream.
+    private readonly List<Task> inFlightPublications = new();
+    // State objects survive close/reopen so an older canceled task and a newer inline close/open
+    // publication share the same write gate and can never reverse their notification order.
+    private readonly Dictionary<string, LanguageServerDocumentPublicationState> documentPublications =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<CancellationToken, Task> documentPublicationDelay;
     private LanguageServerClientCapabilities clientCapabilities =
         LanguageServerClientCapabilities.Default;
     private bool shutdownRequested;
@@ -51,7 +63,20 @@ internal sealed class LanguageServerHost
     }
 
     internal LanguageServerHost(ILanguageService languageService)
-        => this.languageService = languageService ?? throw new ArgumentNullException(nameof(languageService));
+        : this(
+            languageService,
+            cancellationToken => Task.Delay(DocumentPublicationDebounceDelay, cancellationToken))
+    {
+    }
+
+    internal LanguageServerHost(
+        ILanguageService languageService,
+        Func<CancellationToken, Task> documentPublicationDelay)
+    {
+        this.languageService = languageService ?? throw new ArgumentNullException(nameof(languageService));
+        this.documentPublicationDelay = documentPublicationDelay ??
+            throw new ArgumentNullException(nameof(documentPublicationDelay));
+    }
 
     /// <summary>
     /// Runs the JSON-RPC message loop. Notifications and lifecycle messages apply inline in
@@ -75,6 +100,7 @@ internal sealed class LanguageServerHost
         while (!cancellationToken.IsCancellationRequested)
         {
             inFlightRequests.RemoveAll(task => task.IsCompleted);
+            inFlightPublications.RemoveAll(task => task.IsCompleted);
 
             JsonDocument? document;
             try
@@ -108,7 +134,7 @@ internal sealed class LanguageServerHost
             {
                 // End of input without an exit message: drain so no request task is left writing
                 // to an output stream the caller disposes right after RunAsync returns.
-                await DrainInFlightRequestsAsync().ConfigureAwait(false);
+                await DrainInFlightOperationsAsync().ConfigureAwait(false);
                 return 0;
             }
 
@@ -181,7 +207,7 @@ internal sealed class LanguageServerHost
                     shutdownRequested = true;
                     // Draining before the reply preserves the contract that every response
                     // precedes the shutdown reply.
-                    await DrainInFlightRequestsAsync().ConfigureAwait(false);
+                    await DrainInFlightOperationsAsync().ConfigureAwait(false);
                     await WriteResultAsync(
                             writer,
                             RequireIdentifier(hasIdentifier, identifier),
@@ -191,11 +217,10 @@ internal sealed class LanguageServerHost
                     return false;
 
                 case "exit":
-                    // Deliberate deviation from the protocol's "exit immediately": every compute
-                    // is bounded synchronous CPU work, and draining without cancelling keeps
-                    // in-flight responses off an output stream the caller disposes right after
-                    // RunAsync returns.
-                    await DrainInFlightRequestsAsync().ConfigureAwait(false);
+                    // Deliberate deviation from the protocol's "exit immediately": publications
+                    // are canceled, while already-dispatched feature requests drain so no response
+                    // writes to an output stream the caller disposes right after RunAsync returns.
+                    await DrainInFlightOperationsAsync().ConfigureAwait(false);
                     return true;
 
                 case "textDocument/didOpen":
@@ -215,6 +240,7 @@ internal sealed class LanguageServerHost
                 case "completionItem/resolve":
                 case "textDocument/documentSymbol":
                 case "textDocument/foldingRange":
+                case "textDocument/semanticTokens/full":
                 case "textDocument/codeAction":
                     await DispatchFeatureRequestAsync(
                             method,
@@ -282,18 +308,25 @@ internal sealed class LanguageServerHost
 
         // An unknown identifier is silently ignored: the request either never dispatched or has
         // already answered, and cancellation of a finished request is a no-op per the protocol.
-        if (pendingRequestCancellations.TryGetValue(identifier.GetRawText(), out var requestCancellation))
+        if (pendingRequestCancellations.TryGetValue(identifier.GetRawText(), out var pendingCancellation))
         {
-            try
-            {
-                requestCancellation.Cancel();
-            }
-            catch (ObjectDisposedException)
-            {
-                // Benign race: the request completed and disposed its source between the lookup
-                // and the cancel.
-            }
+            CancelRequest(pendingCancellation.Source);
         }
+    }
+
+    private async ValueTask DrainInFlightOperationsAsync()
+    {
+        CancelAllDocumentPublications();
+        await DrainInFlightRequestsAsync().ConfigureAwait(false);
+        if (inFlightPublications.Count == 0)
+        {
+            return;
+        }
+
+        // Publication tasks translate cancellation and compute failures into an omitted stale
+        // round, so the tracked task list has the same never-fault contract as feature requests.
+        await Task.WhenAll(inFlightPublications).ConfigureAwait(false);
+        inFlightPublications.Clear();
     }
 
     private async ValueTask DrainInFlightRequestsAsync()
@@ -329,7 +362,10 @@ internal sealed class LanguageServerHost
         }
 
         var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        if (!pendingRequestCancellations.TryAdd(pending.IdentifierKey, requestCancellation))
+        var pendingCancellation = new LanguageServerPendingRequestCancellation(
+            pending.DocumentUri,
+            requestCancellation);
+        if (!pendingRequestCancellations.TryAdd(pending.IdentifierKey, pendingCancellation))
         {
             // A duplicate in-flight identifier would make $/cancelRequest ambiguous, so the
             // protocol-violating request is rejected instead of orphaning a cancellation source.
@@ -344,7 +380,45 @@ internal sealed class LanguageServerHost
             return;
         }
 
-        inFlightRequests.Add(RunRequestAsync(pending, requestCancellation, writer, cancellationToken));
+        LanguageServerDocumentPublicationState? publicationState = null;
+        var replacePublication = false;
+        if (IsSemanticFeatureRequest(pending.Method))
+        {
+            // Semantic feature requests are latency-sensitive. Invalidate the current background
+            // round before the request can enter the language service, then keep its replacement
+            // behind the per-document feature barrier until the response has been written.
+            publicationState = GetDocumentPublicationState(pending.DocumentUri);
+            replacePublication = publicationState.BeginFeatureRequest();
+        }
+
+        var requestTask = RunRequestAsync(
+            pending,
+            requestCancellation,
+            publicationState,
+            writer,
+            cancellationToken);
+        inFlightRequests.Add(
+            publicationState is null
+                ? requestTask
+                : CompleteFeatureRequestAsync(requestTask, publicationState));
+        if (replacePublication)
+        {
+            ScheduleDocumentPublication(writer, pending.DocumentUri, cancellationToken);
+        }
+    }
+
+    private static async Task CompleteFeatureRequestAsync(
+        Task requestTask,
+        LanguageServerDocumentPublicationState publicationState)
+    {
+        try
+        {
+            await requestTask.ConfigureAwait(false);
+        }
+        finally
+        {
+            publicationState.EndFeatureRequest();
+        }
     }
 
     private LanguageServerPendingRequest? CreatePendingRequest(
@@ -423,12 +497,15 @@ internal sealed class LanguageServerHost
 
             case "textDocument/documentSymbol":
             case "textDocument/foldingRange":
+            case "textDocument/semanticTokens/full":
             {
                 var textDocument = GetRequiredObject(parameters, "textDocument");
                 var documentUri = GetRequiredString(textDocument, "uri");
                 if (!IsOpenAndSupported(documentUri))
                 {
-                    inlineResult = new JsonArray();
+                    inlineResult = method == "textDocument/semanticTokens/full"
+                        ? LanguageServerSemanticTokens.CreateResult([])
+                        : new JsonArray();
                     return null;
                 }
 
@@ -475,6 +552,7 @@ internal sealed class LanguageServerHost
     private async Task RunRequestAsync(
         LanguageServerPendingRequest request,
         CancellationTokenSource requestCancellation,
+        LanguageServerDocumentPublicationState? documentState,
         LanguageServerProtocolMessageWriter writer,
         CancellationToken hostCancellation)
     {
@@ -494,10 +572,16 @@ internal sealed class LanguageServerHost
                         // the reply.
                         if (IsSemanticFeatureRequest(request.Method))
                         {
-                            statusNotification = ConfigureProjectContext(request.DocumentUri);
+                            statusNotification = ConfigureProjectContext(
+                                request.DocumentUri,
+                                documentState!,
+                                requestCancellation.Token);
                         }
 
-                        return ComputeRequestResult(request, requestCancellation.Token);
+                        return ComputeRequestResult(
+                            request,
+                            documentState,
+                            requestCancellation.Token);
                     },
                     requestCancellation.Token)
                 .ConfigureAwait(false);
@@ -582,14 +666,25 @@ internal sealed class LanguageServerHost
 
     private JsonNode? ComputeRequestResult(
         LanguageServerPendingRequest request,
+        LanguageServerDocumentPublicationState? documentState,
         CancellationToken cancellationToken)
         => request.Method switch
         {
-            "textDocument/completion" => ComputeCompletionResult(request, cancellationToken),
-            "textDocument/hover" => ComputeHoverResult(request, cancellationToken),
-            "completionItem/resolve" => ComputeCompletionItemResolveResult(request, cancellationToken),
+            "textDocument/completion" => ComputeCompletionResult(
+                request,
+                documentState!,
+                cancellationToken),
+            "textDocument/hover" => ComputeHoverResult(
+                request,
+                documentState!,
+                cancellationToken),
+            "completionItem/resolve" => ComputeCompletionItemResolveResult(
+                request,
+                documentState!,
+                cancellationToken),
             "textDocument/documentSymbol" => ComputeDocumentSymbolResult(request, cancellationToken),
             "textDocument/foldingRange" => ComputeFoldingRangeResult(request, cancellationToken),
+            "textDocument/semanticTokens/full" => ComputeSemanticTokenResult(request, cancellationToken),
             _ => ComputeCodeActionResult(request, cancellationToken),
         };
 
@@ -604,29 +699,28 @@ internal sealed class LanguageServerHost
         var version = GetOptionalInteger(textDocument, "version");
 
         JsonObject? statusNotification = null;
-        if (ViuDocumentSupport.IsSupported(documentUri))
+        var isSupported = ViuDocumentSupport.IsSupported(documentUri);
+        if (isSupported)
         {
             openSupportedDocuments.Add(documentUri);
-            ConfigureUtilityStylesheet(documentUri);
-            statusNotification = ConfigureProjectContext(documentUri);
+            ConfigureUtilityStylesheet(documentUri, cancellationToken);
+            statusNotification = ConfigureProjectContext(documentUri, cancellationToken);
             languageService.OpenDocument(documentUri, text, version);
         }
         else if (openSupportedDocuments.Remove(documentUri))
         {
-            languageService.CloseDocument(documentUri);
+            CancelDocumentRequests(documentUri);
+            CloseLanguageDocument(documentUri);
         }
 
-        if (statusNotification is not null)
-        {
-            await WriteNotificationAsync(
-                    writer,
-                    "window/logMessage",
-                    statusNotification,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        await PublishDiagnosticsAsync(writer, documentUri, cancellationToken).ConfigureAwait(false);
+        CancelDocumentPublication(documentUri);
+        await PublishSynchronizedDocumentAsync(
+                writer,
+                documentUri,
+                isClosed: !isSupported,
+                statusNotification,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async ValueTask HandleDidChangeAsync(
@@ -640,7 +734,14 @@ internal sealed class LanguageServerHost
 
         if (!IsOpenAndSupported(documentUri))
         {
-            await PublishDiagnosticsAsync(writer, documentUri, cancellationToken).ConfigureAwait(false);
+            CancelDocumentPublication(documentUri);
+            await PublishSynchronizedDocumentAsync(
+                    writer,
+                    documentUri,
+                    isClosed: true,
+                    statusNotification: null,
+                    cancellationToken)
+                .ConfigureAwait(false);
             return;
         }
 
@@ -665,8 +766,11 @@ internal sealed class LanguageServerHost
             changes.Add(new LanguageDocumentChange(range, text));
         }
 
+        // The next edit invalidates the current round before it mutates the live document. Project
+        // context resolution is part of the replacement task after its debounce, never this loop.
+        CancelDocumentPublication(documentUri);
         languageService.ChangeDocument(documentUri, version, changes);
-        await PublishDiagnosticsAsync(writer, documentUri, cancellationToken).ConfigureAwait(false);
+        ScheduleDocumentPublication(writer, documentUri, cancellationToken);
     }
 
     private async ValueTask HandleDidCloseAsync(
@@ -677,30 +781,33 @@ internal sealed class LanguageServerHost
         var textDocument = GetRequiredObject(parameters, "textDocument");
         var documentUri = GetRequiredString(textDocument, "uri");
 
+        CancelDocumentRequests(documentUri);
+        CancelDocumentPublication(documentUri);
         if (openSupportedDocuments.Remove(documentUri))
         {
-            languageService.CloseDocument(documentUri);
+            CloseLanguageDocument(documentUri);
         }
 
-        await WriteNotificationAsync(
+        await PublishSynchronizedDocumentAsync(
                 writer,
-                "textDocument/publishDiagnostics",
-                new JsonObject
-                {
-                    ["uri"] = documentUri,
-                    ["diagnostics"] = new JsonArray(),
-                },
+                documentUri,
+                isClosed: true,
+                statusNotification: null,
                 cancellationToken)
             .ConfigureAwait(false);
     }
 
     private JsonObject ComputeCompletionResult(
         LanguageServerPendingRequest request,
+        LanguageServerDocumentPublicationState documentState,
         CancellationToken cancellationToken)
     {
         // The stylesheet configuration (disk probing included) runs on the request task, mirroring
         // the previous per-request configure-then-compute order without blocking the loop thread.
-        ConfigureUtilityStylesheet(request.DocumentUri);
+        ConfigureUtilityStylesheet(
+            request.DocumentUri,
+            documentState,
+            cancellationToken);
         var completions = languageService.GetCompletions(
             request.DocumentUri,
             request.Position,
@@ -725,6 +832,14 @@ internal sealed class LanguageServerHost
                     ["label"] = completion.Label,
                 },
             };
+
+            if (completion.ColorValue is not null)
+            {
+                // CompletionItem.data is an opaque extension payload retained for a Viu-aware
+                // adapter. The standard Color kind selects stock client presentation; the computed
+                // value remains available without requiring an adapter to parse utility CSS.
+                ((JsonObject)item["data"]!)["colorValue"] = completion.ColorValue;
+            }
 
             // Deferred documentation (utility items) is omitted entirely and computed by
             // completionItem/resolve; inline one-liners keep shipping with the item.
@@ -761,9 +876,13 @@ internal sealed class LanguageServerHost
 
     private JsonNode? ComputeHoverResult(
         LanguageServerPendingRequest request,
+        LanguageServerDocumentPublicationState documentState,
         CancellationToken cancellationToken)
     {
-        ConfigureUtilityStylesheet(request.DocumentUri);
+        ConfigureUtilityStylesheet(
+            request.DocumentUri,
+            documentState,
+            cancellationToken);
         var hover = languageService.GetHover(
             request.DocumentUri,
             request.Position,
@@ -784,9 +903,13 @@ internal sealed class LanguageServerHost
 
     private JsonNode ComputeCompletionItemResolveResult(
         LanguageServerPendingRequest request,
+        LanguageServerDocumentPublicationState documentState,
         CancellationToken cancellationToken)
     {
-        ConfigureUtilityStylesheet(request.DocumentUri);
+        ConfigureUtilityStylesheet(
+            request.DocumentUri,
+            documentState,
+            cancellationToken);
         var documentation = languageService.ResolveCompletionDocumentation(
             request.DocumentUri,
             request.CompletionLabel!,
@@ -848,6 +971,12 @@ internal sealed class LanguageServerHost
 
         return results;
     }
+
+    private JsonObject ComputeSemanticTokenResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
+        => LanguageServerSemanticTokens.CreateResult(
+            languageService.GetClassifications(request.DocumentUri, cancellationToken));
 
     private JsonArray ComputeCodeActionResult(
         LanguageServerPendingRequest request,
@@ -942,18 +1071,179 @@ internal sealed class LanguageServerHost
         }
     }
 
-    private async ValueTask PublishDiagnosticsAsync(
+    private void ScheduleDocumentPublication(
         LanguageServerProtocolMessageWriter writer,
         string documentUri,
+        CancellationToken hostCancellation)
+    {
+        var state = GetDocumentPublicationState(documentUri);
+        var (generation, publicationCancellation) = state.Begin(hostCancellation);
+        var includeClassifications =
+            clientCapabilities.SupportsViuSemanticClassificationNotifications;
+        var task = Task.Run(
+            () => RunDocumentPublicationAsync(
+                writer,
+                documentUri,
+                state,
+                generation,
+                publicationCancellation,
+                includeClassifications,
+                hostCancellation));
+        inFlightPublications.Add(task);
+    }
+
+    private async Task RunDocumentPublicationAsync(
+        LanguageServerProtocolMessageWriter writer,
+        string documentUri,
+        LanguageServerDocumentPublicationState state,
+        long generation,
+        CancellationTokenSource publicationCancellation,
+        bool includeClassifications,
+        CancellationToken hostCancellation)
+    {
+        try
+        {
+            await documentPublicationDelay(publicationCancellation.Token).ConfigureAwait(false);
+            await state.WaitForFeatureRequestsAsync(publicationCancellation.Token)
+                .ConfigureAwait(false);
+
+            var (isCurrent, projectContextStatus) = ConfigureCurrentProjectContext(
+                documentUri,
+                state,
+                generation,
+                publicationCancellation,
+                publicationCancellation.Token);
+            if (!isCurrent)
+            {
+                return;
+            }
+
+            // This synchronous Roslyn work is intentionally reached from Task.Run, never from the
+            // protocol loop. One service call captures one document and shares its semantic fork.
+            var publication = languageService.GetDocumentPublication(
+                documentUri,
+                includeClassifications,
+                publicationCancellation.Token);
+            publicationCancellation.Token.ThrowIfCancellationRequested();
+
+            await state.WriteGate.WaitAsync(publicationCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                if (!state.IsCurrent(generation, publicationCancellation))
+                {
+                    return;
+                }
+
+                // Output uses only the host token. Canceling a per-document source after a header
+                // write must never interrupt its payload and corrupt later JSON-RPC framing.
+                var statusNotification = projectContextStatus is null
+                    ? null
+                    : CreateProjectContextStatusNotification(projectContextStatus);
+                await WriteDocumentPublicationAsync(
+                        writer,
+                        documentUri,
+                        publication,
+                        includeClassifications,
+                        isClosed: false,
+                        statusNotification,
+                        hostCancellation)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                state.WriteGate.Release();
+            }
+        }
+        catch (Exception exception) when (
+            exception is OperationCanceledException or IOException or ObjectDisposedException)
+        {
+            // A superseding edit or host teardown omits this round. No partial publication state
+            // was committed before the document write gate/current-generation check.
+        }
+        catch
+        {
+            // Publication is additive; a semantic-engine miss must not fault the protocol loop.
+        }
+        finally
+        {
+            state.Complete(generation, publicationCancellation);
+            publicationCancellation.Dispose();
+        }
+    }
+
+    private async ValueTask PublishSynchronizedDocumentAsync(
+        LanguageServerProtocolMessageWriter writer,
+        string documentUri,
+        bool isClosed,
+        JsonObject? statusNotification,
         CancellationToken cancellationToken)
     {
-        var diagnostics = new JsonArray();
-        if (IsOpenAndSupported(documentUri))
+        var state = GetDocumentPublicationState(documentUri);
+        await state.WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            foreach (var diagnostic in languageService.GetDiagnostics(documentUri))
-            {
-                diagnostics.Add((JsonNode)ToJsonDiagnostic(diagnostic));
-            }
+            var includeClassifications =
+                clientCapabilities.SupportsViuSemanticClassificationNotifications;
+            var publication = isClosed
+                ? new LanguageDocumentPublication(
+                    ClassificationSnapshot: null,
+                    Diagnostics: Array.Empty<LanguageDiagnostic>())
+                : languageService.GetDocumentPublication(
+                    documentUri,
+                    includeClassifications,
+                    cancellationToken);
+            await WriteDocumentPublicationAsync(
+                    writer,
+                    documentUri,
+                    publication,
+                    includeClassifications,
+                    isClosed,
+                    statusNotification,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            state.WriteGate.Release();
+        }
+    }
+
+    private static async ValueTask WriteDocumentPublicationAsync(
+        LanguageServerProtocolMessageWriter writer,
+        string documentUri,
+        LanguageDocumentPublication publication,
+        bool includeClassifications,
+        bool isClosed,
+        JsonObject? statusNotification,
+        CancellationToken cancellationToken)
+    {
+        if (includeClassifications)
+        {
+            await WriteNotificationAsync(
+                    writer,
+                    LanguageServerSemanticClassificationPublication.MethodName,
+                    LanguageServerSemanticClassificationPublication.Create(
+                        documentUri,
+                        isClosed ? null : publication.ClassificationSnapshot,
+                        isClosed),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (statusNotification is not null)
+        {
+            await WriteNotificationAsync(
+                    writer,
+                    "window/logMessage",
+                    statusNotification,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var diagnostics = new JsonArray();
+        foreach (var diagnostic in publication.Diagnostics)
+        {
+            diagnostics.Add((JsonNode)ToJsonDiagnostic(diagnostic));
         }
 
         await WriteNotificationAsync(
@@ -966,6 +1256,61 @@ internal sealed class LanguageServerHost
                 },
                 cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private void CancelDocumentPublication(string documentUri)
+        => GetDocumentPublicationState(documentUri).CancelCurrent();
+
+    private void CloseLanguageDocument(string documentUri)
+        => GetDocumentPublicationState(documentUri).ApplyDocumentClose(
+            () => languageService.CloseDocument(documentUri));
+
+    private void CancelDocumentRequests(string documentUri)
+    {
+        foreach (var pendingCancellation in pendingRequestCancellations.Values)
+        {
+            if (string.Equals(
+                    pendingCancellation.DocumentUri,
+                    documentUri,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                CancelRequest(pendingCancellation.Source);
+            }
+        }
+    }
+
+    private static void CancelRequest(CancellationTokenSource requestCancellation)
+    {
+        try
+        {
+            requestCancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Benign race: the request completed and disposed its source between the lookup
+            // and cancellation.
+        }
+    }
+
+    private void CancelAllDocumentPublications()
+    {
+        foreach (var state in documentPublications.Values)
+        {
+            state.CancelCurrent();
+        }
+    }
+
+    // Loop-thread only: background tasks receive the resolved state object and never access this
+    // dictionary, so no concurrent collection or lock is required.
+    private LanguageServerDocumentPublicationState GetDocumentPublicationState(string documentUri)
+    {
+        if (!documentPublications.TryGetValue(documentUri, out var state))
+        {
+            state = new LanguageServerDocumentPublicationState();
+            documentPublications.Add(documentUri, state);
+        }
+
+        return state;
     }
 
     // Loop-thread only: reads and mutates openSupportedDocuments, so a dispatched request task
@@ -983,7 +1328,8 @@ internal sealed class LanguageServerHost
         }
 
         openSupportedDocuments.Remove(documentUri);
-        languageService.CloseDocument(documentUri);
+        CancelDocumentRequests(documentUri);
+        CloseLanguageDocument(documentUri);
         return false;
     }
 
@@ -1030,6 +1376,8 @@ internal sealed class LanguageServerHost
                 ["hoverProvider"] = true,
                 ["documentSymbolProvider"] = true,
                 ["foldingRangeProvider"] = true,
+                ["semanticTokensProvider"] =
+                    LanguageServerSemanticTokens.CreateProviderCapability(),
                 ["codeActionProvider"] = new JsonObject
                 {
                     ["codeActionKinds"] = new JsonArray("quickfix"),
@@ -1042,11 +1390,15 @@ internal sealed class LanguageServerHost
             },
         };
 
-    // Semantic script features consume the project context, so the probe runs exactly where the
-    // utility stylesheet configures: document open plus the completion, hover, and resolve
-    // requests ([V01.01.12.23], #259).
+    // Semantic script features consume the project context, so the probe runs on document open,
+    // inside each debounced publication, and on the completion, hover, resolve, and semantic-token
+    // request tasks ([V01.01.12.23], #259).
     private static bool IsSemanticFeatureRequest(string method)
-        => method is "textDocument/completion" or "textDocument/hover" or "completionItem/resolve";
+        => method is
+            "textDocument/completion" or
+            "textDocument/hover" or
+            "completionItem/resolve" or
+            "textDocument/semanticTokens/full";
 
     /// <summary>
     /// Probes the document's project context, feeds it to the language service, and composes the
@@ -1054,15 +1406,68 @@ internal sealed class LanguageServerHost
     /// <see langword="null"/> when the status is silent or unchanged since the project's last
     /// reported state.
     /// </summary>
-    private JsonObject? ConfigureProjectContext(string documentUri)
+    private JsonObject? ConfigureProjectContext(
+        string documentUri,
+        CancellationToken cancellationToken = default)
     {
         if (languageService is not IScriptSemanticLanguageService scriptSemanticLanguageService)
         {
             return null;
         }
 
-        var (context, status) = projectContextReader.Read(documentUri);
+        var (context, status) = projectContextReader.Read(documentUri, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         scriptSemanticLanguageService.ConfigureProjectContext(documentUri, context);
+        return CreateProjectContextStatusNotification(status);
+    }
+
+    private JsonObject? ConfigureProjectContext(
+        string documentUri,
+        LanguageServerDocumentPublicationState documentState,
+        CancellationToken cancellationToken)
+    {
+        if (languageService is not IScriptSemanticLanguageService scriptSemanticLanguageService)
+        {
+            return null;
+        }
+
+        var (context, status) = projectContextReader.Read(documentUri, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!documentState.TryApplyFeatureRequest(
+                cancellationToken,
+                () => scriptSemanticLanguageService.ConfigureProjectContext(documentUri, context)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return CreateProjectContextStatusNotification(status);
+    }
+
+    private (bool IsCurrent, ViuProjectContextStatus? Status) ConfigureCurrentProjectContext(
+        string documentUri,
+        LanguageServerDocumentPublicationState state,
+        long generation,
+        CancellationTokenSource publicationCancellation,
+        CancellationToken cancellationToken)
+    {
+        if (languageService is not IScriptSemanticLanguageService scriptSemanticLanguageService)
+        {
+            return (state.IsCurrent(generation, publicationCancellation), null);
+        }
+
+        var (context, status) = projectContextReader.Read(documentUri, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var isCurrent = state.TryApplyCurrent(
+            generation,
+            publicationCancellation,
+            () => scriptSemanticLanguageService.ConfigureProjectContext(documentUri, context));
+        return (isCurrent, isCurrent ? status : null);
+    }
+
+    private JsonObject? CreateProjectContextStatusNotification(ViuProjectContextStatus status)
+    {
         if (!status.TryCreateLogMessage(out var messageType, out var message) ||
             !TryRecordStatusTransition(status))
         {
@@ -1110,26 +1515,65 @@ internal sealed class LanguageServerHost
         }
     }
 
-    private void ConfigureUtilityStylesheet(string documentUri)
+    private void ConfigureUtilityStylesheet(
+        string documentUri,
+        CancellationToken cancellationToken)
     {
         if (languageService is IUtilityCssLanguageService utilityCssLanguageService)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var configuration =
                 ViuUtilityStylesheetContext.ReadForDocument(documentUri);
-            if (configuration is null)
-            {
-                utilityCssLanguageService.ConfigureUtilityStylesheet(
+            cancellationToken.ThrowIfCancellationRequested();
+            ApplyUtilityStylesheetConfiguration(
+                utilityCssLanguageService,
+                documentUri,
+                configuration);
+        }
+    }
+
+    private void ConfigureUtilityStylesheet(
+        string documentUri,
+        LanguageServerDocumentPublicationState documentState,
+        CancellationToken cancellationToken)
+    {
+        if (languageService is not IUtilityCssLanguageService utilityCssLanguageService)
+        {
+            return;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var configuration = ViuUtilityStylesheetContext.ReadForDocument(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!documentState.TryApplyFeatureRequest(
+                cancellationToken,
+                () => ApplyUtilityStylesheetConfiguration(
+                    utilityCssLanguageService,
                     documentUri,
-                    null);
-            }
-            else
-            {
-                utilityCssLanguageService.ConfigureUtilityStylesheet(
-                    documentUri,
-                    configuration.StylesheetText,
-                    configuration.StylesheetIdentity,
-                    configuration.ReferenceGraph);
-            }
+                    configuration)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+    }
+
+    private static void ApplyUtilityStylesheetConfiguration(
+        IUtilityCssLanguageService utilityCssLanguageService,
+        string documentUri,
+        ViuUtilityStylesheetConfiguration? configuration)
+    {
+        if (configuration is null)
+        {
+            utilityCssLanguageService.ConfigureUtilityStylesheet(
+                documentUri,
+                null);
+        }
+        else
+        {
+            utilityCssLanguageService.ConfigureUtilityStylesheet(
+                documentUri,
+                configuration.StylesheetText,
+                configuration.StylesheetIdentity,
+                configuration.ReferenceGraph);
         }
     }
 

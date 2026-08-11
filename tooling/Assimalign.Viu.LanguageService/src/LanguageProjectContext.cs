@@ -32,9 +32,9 @@ namespace Assimalign.Viu.LanguageService;
 /// editor compilation exactly as the build sees them.
 /// </param>
 /// <param name="CacheStamp">
-/// An opaque fingerprint of the restore artifacts and source cone. Two contexts with equal stamps
-/// are interchangeable, so the service can reuse any state derived from an earlier equal-stamped
-/// context.
+/// The host's opaque reuse hint for the restore artifacts and source cone. The service also compares
+/// sibling text and each reference assembly's path, length, and write time, so an output replaced in
+/// place invalidates derived state even when the host has not yet published a new stamp.
 /// </param>
 public sealed record LanguageProjectContext(
     string ProjectFilePath,

@@ -32,10 +32,21 @@ internal static class ScriptSemanticFixture
         string cacheStamp,
         IReadOnlyList<string> preprocessorSymbols,
         params LanguageProjectSourceDocument[] sourceDocuments)
+        => CreateContext(
+            cacheStamp,
+            RootNamespace,
+            preprocessorSymbols,
+            sourceDocuments);
+
+    internal static LanguageProjectContext CreateContext(
+        string cacheStamp,
+        string rootNamespace,
+        IReadOnlyList<string> preprocessorSymbols,
+        params LanguageProjectSourceDocument[] sourceDocuments)
         => new(
             ProjectFilePath,
             ProjectDirectory,
-            RootNamespace,
+            rootNamespace,
             ReferenceAssemblyPaths(),
             sourceDocuments,
             preprocessorSymbols,

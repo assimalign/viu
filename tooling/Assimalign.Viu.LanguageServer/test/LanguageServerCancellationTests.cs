@@ -97,6 +97,93 @@ public class LanguageServerCancellationTests
     }
 
     [Fact]
+    public async Task RunAsync_DidCloseCancelsInFlightCompletionBeforeCachePopulationAndReopenSucceeds()
+    {
+        var languageService = new CloseRacingCompletionLanguageService();
+        await using var session = new LanguageServerHostSession(
+            new LanguageServerHost(languageService));
+
+        await session.SendAsync(OpenMessage());
+        await session.SendAsync(
+            """
+            {"jsonrpc":"2.0","id":"before-close","method":"textDocument/completion","params":{"textDocument":{"uri":"file:///Counter.viu"},"position":{"line":0,"character":0}}}
+            """);
+        await languageService.FirstCompletionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            await session.SendAsync(CloseMessage());
+            await languageService.FirstCompletionCanceled.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            await languageService.CloseObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            languageService.ReleaseFirstCompletion.Set();
+        }
+
+        using (JsonDocument canceled = await session.ReadResponseAsync("before-close"))
+        {
+            canceled.RootElement.TryGetProperty("result", out _).ShouldBeFalse();
+            canceled.RootElement
+                .GetProperty("error")
+                .GetProperty("code")
+                .GetInt32()
+                .ShouldBe(-32800);
+        }
+
+        languageService.CachePopulationCount.ShouldBe(0);
+
+        await session.SendAsync(OpenMessage());
+        await session.SendAsync(
+            """
+            {"jsonrpc":"2.0","id":"after-reopen","method":"textDocument/completion","params":{"textDocument":{"uri":"file:///Counter.viu"},"position":{"line":0,"character":0}}}
+            """);
+        using (JsonDocument reopened = await session.ReadResponseAsync("after-reopen"))
+        {
+            var items = reopened.RootElement.GetProperty("result").GetProperty("items");
+            items.GetArrayLength().ShouldBe(1);
+            items[0].GetProperty("label").GetString().ShouldBe("cache-population:1");
+        }
+
+        languageService.CachePopulationCount.ShouldBe(1);
+
+        await session.SendAsync(
+            """
+            {"jsonrpc":"2.0","id":"shutdown","method":"shutdown","params":null}
+            """);
+        using (JsonDocument shutdown = await session.ReadResponseAsync("shutdown"))
+        {
+            shutdown.RootElement.TryGetProperty("result", out _).ShouldBeTrue();
+        }
+
+        await session.SendAsync(
+            """
+            {"jsonrpc":"2.0","method":"exit"}
+            """);
+        (await session.CompleteAsync()).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_DiagnosticPublication_PassesHostCancellationToken()
+    {
+        var inputBytes = Encoding.UTF8.GetBytes(
+            Frame(OpenMessage()) +
+            Frame(
+                """
+                {"jsonrpc":"2.0","method":"exit"}
+                """));
+        await using var input = new MemoryStream(inputBytes);
+        await using var output = new MemoryStream();
+        using var cancellationSource = new CancellationTokenSource();
+        var languageService = new ChangeCountingLanguageService();
+        var host = new LanguageServerHost(languageService);
+
+        await host.RunAsync(input, output, cancellationSource.Token);
+
+        languageService.DiagnosticsCancellationCanBeCanceled.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task RunAsync_DidChangeBeforeCompletionRequest_ObservesAppliedChange()
     {
         var inputBytes = Encoding.UTF8.GetBytes(
@@ -180,6 +267,11 @@ public class LanguageServerCancellationTests
     private static string OpenMessage()
         => """
            {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Counter.viu","languageId":"viu","version":1,"text":"@script\n"}}}
+           """;
+
+    private static string CloseMessage()
+        => """
+           {"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///Counter.viu"}}}
            """;
 
     private static async Task<List<JsonDocument>> ReadAllMessagesAsync(Stream stream)
@@ -272,12 +364,119 @@ public class LanguageServerCancellationTests
     }
 
     /// <summary>
+    /// Models the semantic cache boundary: the first completion reaches the cache only if close
+    /// fails to cancel it, while a completion from a reopened document may populate normally.
+    /// </summary>
+    private sealed class CloseRacingCompletionLanguageService : ILanguageService
+    {
+        private int cachePopulationCount;
+        private int completionCount;
+
+        internal TaskCompletionSource FirstCompletionStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal TaskCompletionSource FirstCompletionCanceled { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal TaskCompletionSource CloseObserved { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal ManualResetEventSlim ReleaseFirstCompletion { get; } = new(initialState: false);
+
+        internal int CachePopulationCount => Volatile.Read(ref cachePopulationCount);
+
+        public void OpenDocument(string documentUri, string text, int? version)
+        {
+        }
+
+        public bool ChangeDocument(
+            string documentUri,
+            int? version,
+            IReadOnlyList<LanguageDocumentChange> changes)
+            => true;
+
+        public bool CloseDocument(string documentUri)
+        {
+            CloseObserved.TrySetResult();
+            return true;
+        }
+
+        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
+            string documentUri,
+            CancellationToken cancellationToken = default)
+            => Array.Empty<LanguageDiagnostic>();
+
+        public IReadOnlyList<LanguageCompletionItem> GetCompletions(
+            string documentUri,
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref completionCount) == 1)
+            {
+                FirstCompletionStarted.TrySetResult();
+                WaitHandle.WaitAny(
+                    [ReleaseFirstCompletion.WaitHandle, cancellationToken.WaitHandle],
+                    TimeSpan.FromSeconds(10));
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    FirstCompletionCanceled.TrySetResult();
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            var population = Interlocked.Increment(ref cachePopulationCount);
+            return
+            [
+                new LanguageCompletionItem(
+                    $"cache-population:{population}",
+                    LanguageCompletionItemKind.Property,
+                    "Cache lifecycle probe",
+                    "Reports semantic cache population after close and reopen.",
+                    $"cache-population:{population}",
+                    IsSnippet: false,
+                    SortText: "01"),
+            ];
+        }
+
+        public LanguageHover? GetHover(
+            string documentUri,
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
+            => null;
+
+        public string? ResolveCompletionDocumentation(
+            string documentUri,
+            string completionLabel,
+            CancellationToken cancellationToken = default)
+            => null;
+
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(
+            string documentUri,
+            CancellationToken cancellationToken = default)
+            => Array.Empty<LanguageDocumentSymbol>();
+
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(
+            string documentUri,
+            CancellationToken cancellationToken = default)
+            => Array.Empty<LanguageFoldingRange>();
+
+        public IReadOnlyList<LanguageCodeAction> GetCodeActions(
+            string documentUri,
+            LanguageRange range,
+            CancellationToken cancellationToken = default)
+            => Array.Empty<LanguageCodeAction>();
+    }
+
+    /// <summary>
     /// A service whose completion reports how many document changes it observed at call time,
     /// proving a dispatched request sees every notification read before it.
     /// </summary>
     private sealed class ChangeCountingLanguageService : ILanguageService
     {
         private int changeCount;
+
+        internal bool DiagnosticsCancellationCanBeCanceled { get; private set; }
 
         public void OpenDocument(string documentUri, string text, int? version)
         {
@@ -297,7 +496,10 @@ public class LanguageServerCancellationTests
         public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
             string documentUri,
             CancellationToken cancellationToken = default)
-            => Array.Empty<LanguageDiagnostic>();
+        {
+            DiagnosticsCancellationCanBeCanceled = cancellationToken.CanBeCanceled;
+            return Array.Empty<LanguageDiagnostic>();
+        }
 
         public IReadOnlyList<LanguageCompletionItem> GetCompletions(
             string documentUri,

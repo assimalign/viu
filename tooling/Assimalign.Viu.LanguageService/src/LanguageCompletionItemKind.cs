@@ -42,4 +42,10 @@ public enum LanguageCompletionItemKind
 
     /// <summary>An editor snippet.</summary>
     Snippet = 15,
+
+    /// <summary>
+    /// A CSS color value. Its protocol-stable value is serialized without translation so clients
+    /// can apply their standard color presentation. [V01.01.12.07.13]
+    /// </summary>
+    Color = 16,
 }

@@ -17,7 +17,8 @@ namespace Assimalign.Viu.LanguageServer.Tests;
 
 /// <summary>
 /// Pins the project-context status plumbing ([V01.01.12.23], #259): the host probes on document
-/// open and on semantic feature requests, feeds the resolved context to
+/// open, in debounced publication rounds, and on semantic feature requests, feeds the resolved
+/// context to
 /// <see cref="IScriptSemanticLanguageService"/>, and reports each (project, status, detail) via
 /// <c>window/logMessage</c> exactly once — never once per keystroke.
 /// </summary>
@@ -150,6 +151,57 @@ public class LanguageServerSemanticStatusTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_DidChange_RefreshesProjectContextBeforeDiagnostics()
+    {
+        const string InitialSiblingText = "// initial sibling";
+        const string RefreshedSiblingText = "// refreshed sibling with a changed length";
+        var directory = CreateFixtureRoot("did-change-refresh");
+        try
+        {
+            var projectFilePath = Path.Combine(directory, "Application.csproj");
+            File.WriteAllText(projectFilePath, "<Project Sdk=\"Assimalign.Viu.Sdk\" />");
+            var siblingFilePath = Path.Combine(directory, "Sibling.cs");
+            File.WriteAllText(siblingFilePath, InitialSiblingText);
+            var componentPath = Path.Combine(directory, "Card.viu");
+            File.WriteAllText(componentPath, "@script\n");
+            WriteMinimalResolvableAssetsFile(directory);
+            File.SetLastWriteTimeUtc(projectFilePath, DateTime.UtcNow.AddMinutes(-10));
+            var documentUri = new Uri(componentPath).AbsoluteUri;
+
+            var languageService = new ContextRecordingLanguageService(
+                () => File.WriteAllText(siblingFilePath, RefreshedSiblingText));
+            await using var session = new LanguageServerHostSession(
+                new LanguageServerHost(languageService));
+
+            await session.SendAsync(CreateOpenMessage(documentUri, "@script\n"));
+            await session.SendAsync(CreateChangeMessage(documentUri, "@script { }\n"));
+            await languageService.RefreshedDiagnosticsCompleted.Task.WaitAsync(
+                TimeSpan.FromSeconds(5));
+            languageService.DiagnosticSiblingTexts.ShouldBe(
+                [InitialSiblingText, RefreshedSiblingText]);
+
+            await session.SendAsync(
+                """
+                {"jsonrpc":"2.0","id":"shutdown","method":"shutdown","params":null}
+                """);
+            using (JsonDocument shutdown = await session.ReadResponseAsync("shutdown"))
+            {
+                shutdown.RootElement.TryGetProperty("result", out _).ShouldBeTrue();
+            }
+
+            await session.SendAsync(
+                """
+                {"jsonrpc":"2.0","method":"exit"}
+                """);
+            (await session.CompleteAsync()).ShouldBe(0);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string CreateFixtureRoot(string scenario)
     {
         var directory = Path.Combine(
@@ -217,6 +269,29 @@ public class LanguageServerSemanticStatusTests
                 },
             });
 
+    private static string CreateChangeMessage(string documentUri, string text)
+        => JsonSerializer.Serialize(
+            new
+            {
+                jsonrpc = "2.0",
+                method = "textDocument/didChange",
+                @params = new
+                {
+                    textDocument = new
+                    {
+                        uri = documentUri,
+                        version = 2,
+                    },
+                    contentChanges = new[]
+                    {
+                        new
+                        {
+                            text,
+                        },
+                    },
+                },
+            });
+
     private static List<JsonElement> FindLogMessages(List<JsonDocument> messages)
         => messages
             .Where(
@@ -263,6 +338,11 @@ public class LanguageServerSemanticStatusTests
     {
         private readonly object synchronization = new();
         private readonly List<(string DocumentUri, LanguageProjectContext? Context)> configured = [];
+        private readonly List<string?> diagnosticSiblingTexts = [];
+        private readonly Action? documentChanged;
+
+        internal ContextRecordingLanguageService(Action? documentChanged = null)
+            => this.documentChanged = documentChanged;
 
         internal IReadOnlyList<(string DocumentUri, LanguageProjectContext? Context)> ConfiguredContexts
         {
@@ -274,6 +354,20 @@ public class LanguageServerSemanticStatusTests
                 }
             }
         }
+
+        internal IReadOnlyList<string?> DiagnosticSiblingTexts
+        {
+            get
+            {
+                lock (synchronization)
+                {
+                    return diagnosticSiblingTexts.ToArray();
+                }
+            }
+        }
+
+        internal TaskCompletionSource RefreshedDiagnosticsCompleted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void ConfigureProjectContext(string documentUri, LanguageProjectContext? context)
         {
@@ -291,14 +385,32 @@ public class LanguageServerSemanticStatusTests
             string documentUri,
             int? version,
             IReadOnlyList<LanguageDocumentChange> changes)
-            => true;
+        {
+            documentChanged?.Invoke();
+            return true;
+        }
 
         public bool CloseDocument(string documentUri) => true;
 
         public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
             string documentUri,
             CancellationToken cancellationToken = default)
-            => Array.Empty<LanguageDiagnostic>();
+        {
+            lock (synchronization)
+            {
+                var context = configured.Count == 0
+                    ? null
+                    : configured[configured.Count - 1].Context;
+                diagnosticSiblingTexts.Add(
+                    context?.SourceDocuments.SingleOrDefault()?.Text);
+                if (diagnosticSiblingTexts.Count >= 2)
+                {
+                    RefreshedDiagnosticsCompleted.TrySetResult();
+                }
+
+                return Array.Empty<LanguageDiagnostic>();
+            }
+        }
 
         public IReadOnlyList<LanguageCompletionItem> GetCompletions(
             string documentUri,

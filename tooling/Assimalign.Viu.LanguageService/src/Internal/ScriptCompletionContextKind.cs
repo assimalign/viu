@@ -8,6 +8,13 @@ namespace Assimalign.Viu.LanguageService;
 internal enum ScriptCompletionContextKind
 {
     /// <summary>
+    /// A position inside a C# comment or a literal's text segment. No completion source is offered
+    /// because its text is not an expression or declaration context; interpolation holes remain
+    /// expression positions. [V01.01.12.07.14]
+    /// </summary>
+    Suppressed,
+
+    /// <summary>
     /// A position where an identifier is legal — a class-body member declaration, a method body, or
     /// a field initializer. Every source applies: the semantic symbol lookup (which honors the
     /// position's own accessibility, so the component's private members complete inside its own

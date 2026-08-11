@@ -13,8 +13,9 @@ namespace Assimalign.Viu.LanguageServer.Tests;
 
 /// <summary>
 /// Pins the tier-two capability declarations and the client-capability honesty rules: the server
-/// advertises resolve/symbol/folding/code-action support, and emits hover content in the format the
-/// client actually advertised — Visual Studio advertises plaintext and renders Markdown literally
+/// advertises resolve/symbol/folding/semantic-token/code-action support, and emits hover content in
+/// the format the client actually advertised — Visual Studio advertises plaintext and renders
+/// Markdown literally
 /// (https://github.com/microsoft/VSExtensibility/issues/271), so plaintext is also the
 /// no-initialize default.
 /// </summary>
@@ -51,6 +52,44 @@ public class LanguageServerCapabilityTests
             .ShouldBeTrue();
         capabilities.GetProperty("documentSymbolProvider").GetBoolean().ShouldBeTrue();
         capabilities.GetProperty("foldingRangeProvider").GetBoolean().ShouldBeTrue();
+        var semanticTokens = capabilities.GetProperty("semanticTokensProvider");
+        semanticTokens.GetProperty("full").GetBoolean().ShouldBeTrue();
+        semanticTokens
+            .GetProperty("legend")
+            .GetProperty("tokenTypes")
+            .EnumerateArray()
+            .Select(tokenType => tokenType.GetString())
+            .ShouldBe(
+            [
+                "namespace",
+                "type",
+                "class",
+                "enum",
+                "interface",
+                "struct",
+                "typeParameter",
+                "parameter",
+                "variable",
+                "property",
+                "enumMember",
+                "event",
+                "function",
+                "method",
+                "macro",
+                "label",
+                "comment",
+                "string",
+                "keyword",
+                "number",
+                "regexp",
+                "operator",
+                "decorator",
+            ]);
+        semanticTokens
+            .GetProperty("legend")
+            .GetProperty("tokenModifiers")
+            .GetArrayLength()
+            .ShouldBe(0);
         capabilities
             .GetProperty("codeActionProvider")
             .GetProperty("codeActionKinds")

@@ -76,6 +76,12 @@
     <!-- The classic in-process language-server client API (ILanguageClient, Connection) and the
          threading primitives its events are typed with. -->
     <ViuPackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" />
+    <!-- Async Completion supplies the presentation-only item-manager seam. The shell contracts
+         register runtime color images and expose their monikers; no completion semantics or parser
+         dependency moves into devenv.exe. -->
+    <ViuPackageReference Include="Microsoft.VisualStudio.Language" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Shell.Framework" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Interop" />
     <ViuPackageReference Include="Microsoft.VisualStudio.Threading" />
     <!-- Transitive dependencies of the client package pinned to silence NU1603, exactly as
          Imaging.Interop is above. -->

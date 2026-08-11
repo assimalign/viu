@@ -23,6 +23,12 @@ public static class CompilerDomKnowledge
     private static readonly HashSet<string> KnownSvgAttributeSet = Build(DomKnowledgeData.KnownSvgAttributes, StringComparer.Ordinal);
     private static readonly HashSet<string> KnownMathMlAttributeSet =
         Build(DomKnowledgeData.KnownMathMlAttributes, StringComparer.Ordinal);
+    private static readonly IReadOnlyList<string> KnownHtmlAttributes =
+        new List<string>(KnownHtmlAttributeSet).AsReadOnly();
+    private static readonly IReadOnlyList<string> KnownSvgAttributes =
+        new List<string>(KnownSvgAttributeSet).AsReadOnly();
+    private static readonly IReadOnlyList<string> KnownMathMlAttributes =
+        new List<string>(KnownMathMlAttributeSet).AsReadOnly();
 
     /// <summary>Whether <paramref name="tag"/> is a known HTML element.</summary>
     /// <param name="tag">The tag name (matched case-insensitively).</param>
@@ -48,9 +54,25 @@ public static class CompilerDomKnowledge
     /// <param name="attributeName">The attribute name (matched case-sensitively).</param>
     public static bool IsKnownHtmlAttribute(string attributeName) => KnownHtmlAttributeSet.Contains(attributeName);
 
+    /// <summary>
+    /// Enumerates the known HTML attributes from the shared DOM table. The order is unspecified;
+    /// consumers that present the names sort them for their own surface. Exposing the shared table
+    /// keeps template binding completion aligned with compiler classification [V01.01.12.07.12].
+    /// </summary>
+    /// <returns>Every known HTML attribute exactly once.</returns>
+    public static IEnumerable<string> EnumerateKnownHtmlAttributes() => KnownHtmlAttributes;
+
     /// <summary>Whether <paramref name="attributeName"/> is a known SVG attribute.</summary>
     /// <param name="attributeName">The attribute name (matched case-sensitively).</param>
     public static bool IsKnownSvgAttribute(string attributeName) => KnownSvgAttributeSet.Contains(attributeName);
+
+    /// <summary>
+    /// Enumerates the known SVG attributes from the shared DOM table. The order is unspecified;
+    /// consumers that present the names sort them for their own surface. Exposing the shared table
+    /// keeps template binding completion aligned with compiler classification [V01.01.12.07.12].
+    /// </summary>
+    /// <returns>Every known SVG attribute exactly once.</returns>
+    public static IEnumerable<string> EnumerateKnownSvgAttributes() => KnownSvgAttributes;
 
     /// <summary>
     /// Returns whether <paramref name="attributeName"/> belongs to Viu's bounded MathML Core attribute table.
@@ -66,6 +88,15 @@ public static class CompilerDomKnowledge
     /// [V01.01.05.10].
     /// </remarks>
     public static bool IsKnownMathMlAttribute(string attributeName) => KnownMathMlAttributeSet.Contains(attributeName);
+
+    /// <summary>
+    /// Enumerates the bounded MathML Core attributes from the shared DOM table. The order is
+    /// unspecified; consumers that present the names sort them for their own surface. Exposing the
+    /// shared table keeps template binding completion aligned with compiler classification
+    /// [V01.01.12.07.12].
+    /// </summary>
+    /// <returns>Every bounded MathML Core attribute exactly once.</returns>
+    public static IEnumerable<string> EnumerateKnownMathMlAttributes() => KnownMathMlAttributes;
 
     private static HashSet<string> Build(string list, StringComparer comparer)
     {

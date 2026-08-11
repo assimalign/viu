@@ -39,14 +39,17 @@ load-bearing half of the original decision:
 
 - the language server remains a separate stdio process, so the Viu parsers and Roslyn never load
   into `devenv.exe` and a parser fault or dependency conflict cannot destabilize the IDE;
-- the server stays editor-neutral — it speaks the Language Server Protocol and reads file paths, and
-  knows nothing about Visual Studio;
+- the server stays editor-neutral — it speaks the Language Server Protocol plus an opt-in,
+  data-only exact-classification notification, reads file paths, and references no Visual Studio
+  assembly;
 - the Visual Studio Code extension consumes the identical binary, published by the identical shared
   target (`build/Targets/Build.LanguageServer.targets`), so the two hosts cannot drift.
 
 Only the client crossed the boundary, and the client is exactly the layer the original decision
 described as "document registration, process lifetime, and editor presentation". No server change
-was required by the migration and none was made.
+was required by that migration. The later exact C# classification bridge ([V01.01.12.07.11]) adds
+one opt-in notification, but leaves every semantic decision and dependency below the process
+boundary.
 
 **Revisit condition.** If `VisualStudio.Extensibility` ships stable editor classification — custom
 classification types with user-editable format definitions — together with a pkgdef-equivalent file
@@ -61,7 +64,7 @@ Visual Studio (devenv.exe)
   -> Assimalign.Viu.VisualStudio  (classic VSSDK package, in process)
        -> Assimalign.Viu.VisualStudio.pkgdef   claims .viu for the Source Code (Text) Editor
        -> viu content type    MEF; bases: code, code-languageserver-preview
-       -> ViuClassifier       MEF; the Viu palette over ViuLexicalClassifier
+       -> ViuClassifier       MEF; lexical fallback plus exact server-authored C# classifications
        -> ViuLanguageClient   MEF ILanguageClient; starts the server, hands Visual Studio its streams
             -> stdio Language Server Protocol connection
                  -> Assimalign.Viu.LanguageServer  (separate process)
@@ -84,7 +87,11 @@ during the migration window.
 
 `Assimalign.Viu.LanguageServer` owns protocol framing and translates protocol values into
 editor-neutral contracts. It writes protocol messages only to standard output; standard error is
-reserved for diagnostics.
+reserved for diagnostics. Visual Studio opts into `viu/publishSemanticClassifications`, a custom
+notification containing only a URI, document version, text checksum, authored ranges, and exact C#
+classification-type names. The client's non-null StreamJsonRpc custom-message target receives that
+server-to-client notification; the message middle layer is reserved for outgoing requests and their
+responses. Other clients receive only the standard semantic-token response.
 
 `Assimalign.Viu.LanguageService` caches the current text and the format-appropriate immutable
 container parse for each open `.viu` or accepted `.vue` document. It exposes block diagnostics,
@@ -96,23 +103,42 @@ workspace), semantic `@script` completion when the host feeds a restored project
 project-defined utilities and variants, and generated-CSS hover documentation. It never loads a
 Roslyn workspace.
 
+Color utility completions carry their computed CSS value in the Language Server Protocol item's
+opaque `data.colorValue`. The Visual Studio message middle layer captures the completed response,
+and a Viu-only Async Completion item-manager wrapper delegates filtering and sorting to the editor's
+default manager. It matches the complete candidate identity within one completion-source group,
+then changes only that candidate's icon. Custom images are registered on the UI thread through
+`IVsManagedImageService`, their handles remain alive with the catalog, and the current document path
+is read for every list so Save As cannot strand a response under an old path. [V01.01.12.07.13]
+
 ## The Viu color theme
 
 Classification splits by ownership, specified by `[TOOL-3]`.
 
-**Embedded C# resolves the editor's own classification types.** Every kind a C# token pass can emit —
-keyword, string, number, comment, operator, punctuation, identifier, class name, method name —
-resolves the name the editor and Roslyn already register, so the `@script` block, interpolation
-interiors, and binding-expression interiors color exactly as the user's chosen C# theme colors C#.
-Viu registers none of those names and expresses no opinion about them: the theme applies 1:1.
+**Embedded C# resolves the editor's own classification types.** The immediate lexical fallback maps
+every kind its C# token pass can emit — keyword, string, number, comment, operator, punctuation,
+identifier, class name, method name — to the name the editor and Roslyn already register. It colors
+the `@script` block, interpolation interiors, and binding-expression interiors without waiting for
+the server.
 
-Resolution is defensive, because three of those names (`punctuation`, `class name`, `method name`)
-come from Roslyn's editor features rather than the core editor. Each buffer resolves every kind once
-and walks a fixed fallback chain when a name is absent: `method name` and `class name` fall back to
-`identifier`, `punctuation` falls back to `operator`, and a kind that resolves to nothing at all is
-dropped rather than mis-colored. A Visual Studio without a managed-language workload therefore still
-colors Viu templates in full, and script spans degrade to plain identifiers instead of vanishing.
-The chain lives in `ViuClassificationTypeNames.GetFallbackClassificationTypeName`.
+When project semantics are available, the server overlays authored `@script` identifiers with the
+exact names produced for the identical plain-C# construct: namespace, class, delegate, enum,
+interface, struct, type parameter, method, property, field, constant, enum member, event, parameter,
+local, and label names. The client resolves those strings through
+`IClassificationTypeRegistryService`; it neither loads Roslyn nor recomputes a classification in
+`devenv.exe`. Each publication carries the editor document version and a SHA-256 checksum of its
+UTF-8 text. A classifier uses it only when the checksum matches its current immutable snapshot, and
+removes every intersecting lexical span before adding the exact span, so one identifier never has
+two competing classifications. Missing, invalid, delayed, or cleared semantic data leaves the
+lexical result unchanged. [V01.01.12.07.11]
+
+Resolution is defensive because punctuation and semantic C# names come from Roslyn's editor features
+rather than the core editor. Each buffer caches each resolved name and walks a fixed fallback chain
+when a name is absent: every class/member/variable semantic name falls back to `identifier`,
+`punctuation` falls back to `operator`, and a name that resolves to nothing at all is dropped rather
+than mis-colored. A Visual Studio without a managed-language workload therefore still colors Viu
+templates in full, and script spans degrade to plain identifiers instead of vanishing. The chain
+lives in `ViuClassificationTypeNames.GetFallbackClassificationTypeName`.
 
 **Template, markup, and style constructs resolve ten Viu-owned classification types.**
 `ViuClassificationTypes` registers each one with `text` as its base definition, and each has exactly
@@ -169,7 +195,8 @@ general C#; a binding value is the one position where the leading name is a memb
 
 ### Classification caching
 
-`ViuClassifier` lexes the **whole document** and caches the result on the snapshot. A line's
+`ViuClassifier` lexes the **whole document**, merges any checksum-matching semantic publication, and
+caches the result on the snapshot. A line's
 classification depends on the container section enclosing it — the lexer has to see the `<template>`
 above line three hundred to color line three hundred — so asking for a range would cost exactly what
 asking for everything costs. Every `GetClassificationSpans` call is therefore answered by filtering
@@ -182,9 +209,11 @@ how line three hundred is colored, so no narrower invalidation would be correct.
 re-requests only the ranges it is actually displaying, so the cost of the wide notification is
 bounded by the visible text rather than by the document.
 
-The classifier is stored in the buffer's property collection and subscribes to that same buffer, so
-the subscription is a self-reference that dies with the buffer; `IClassifier` offers no disposal point
-to unsubscribe from.
+The classifier is stored in the buffer's property collection and subscribes to that same buffer.
+The process-wide semantic state holds listeners weakly because `IClassifier` offers no disposal
+point; a publication cannot retain a closed buffer. Closing a document removes its publication, and
+starting a language-server session clears every prior publication so a restarted version sequence
+cannot inherit stale ordering.
 
 The out-of-process tagger this replaces reported the whole document too, but for a different reason:
 each report was a JSON-RPC round trip, and reporting only the requested lines left every unscrolled
@@ -585,7 +614,7 @@ too, and because it costs a static field read when it is off.
   computation of *what* indentation it uses are both pure, and only the buffer edit is runtime-only.
 - **Expanding a `{ }` block on Return in a `<style>` section.** A CSS rule is a block and Visual
   Studio's CSS editor does expand it, so this is a plausible follow-up; it is out of scope here so
-  that [V01.01.12.07.09] carries exactly the C#-parity behavior it specifies. Template sections are
+  that [V01.01.12.07.09] carries exactly the C#-matching behavior it specifies. Template sections are
   not a candidate: a template brace is usually an interpolation.
 
 ## Activation, and where `.vue` stands in Visual Studio

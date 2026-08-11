@@ -104,22 +104,45 @@
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
+        <!-- The documented Async Completion contracts used by the Visual Studio swatch adapter:
+             its item manager delegates the stock manager and changes only CompletionItem.Icon.
+             Pinned to the same 17.14 editor floor as CoreUtility/Text; Visual Studio supplies the
+             implementation, so this remains compile-only. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Language" Version="17.14.249">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <!-- IVsManagedImageService turns each server-computed color into a custom image moniker;
+             SVsImageService is the documented shell service contract used to obtain it. Both are
+             host contracts only and never enter the VSIX container. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Shell.Framework" Version="17.14.40264">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <_ViuPackage Include="Microsoft.VisualStudio.Interop" Version="17.14.40260">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
         <!-- AsyncEventHandler<T>, the type of ILanguageClient's StartAsync/StopAsync events, which
              ViuLanguageClient declares and raises. A transitive dependency of the client package,
-             pinned explicitly because it is compiled against directly. -->
-        <_ViuPackage Include="Microsoft.VisualStudio.Threading" Version="17.13.2">
+             pinned explicitly because it is compiled against directly. Floor raised with
+             Shell.Framework 17.14.40264 (the swatch adapter), which requires >= 17.14.15. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Threading" Version="17.14.15">
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
         <!-- Two more transitive dependencies of the client package whose requested builds were never
              published, so NuGet resolves upward and warns (NU1603) - the same situation as
              Imaging.Interop above. Pinned at the builds NuGet picks anyway, which makes the
-             resolution explicit rather than approximate. -->
-        <_ViuPackage Include="Microsoft.VisualStudio.Telemetry" Version="17.14.2">
+             resolution explicit rather than approximate. Telemetry's floor is raised by
+             Shell.Framework 17.14.40264, which requires >= 17.14.18. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Telemetry" Version="17.14.18">
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
-        <_ViuPackage Include="Microsoft.VisualStudio.Utilities" Version="17.13.40008">
+        <!-- Floor raised with Shell.Framework 17.14.40264 (the swatch adapter), which requires
+             Utilities at the same 17.14.40264 build. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Utilities" Version="17.14.40264">
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>

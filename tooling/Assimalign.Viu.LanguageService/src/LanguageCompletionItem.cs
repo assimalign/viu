@@ -17,6 +17,11 @@ namespace Assimalign.Viu.LanguageService;
 /// The text the editor uses to filter the item, or <see langword="null"/> to filter by
 /// <paramref name="Label"/>.
 /// </param>
+/// <param name="ColorValue">
+/// The computed CSS color represented by this completion, or <see langword="null"/> when the item
+/// has no color presentation. The value is carried independently of documentation so language
+/// clients can render a swatch without parsing a Markdown code block. [V01.01.12.07.13]
+/// </param>
 public sealed record LanguageCompletionItem(
     string Label,
     LanguageCompletionItemKind Kind,
@@ -26,4 +31,5 @@ public sealed record LanguageCompletionItem(
     bool IsSnippet,
     string SortText,
     LanguageRange? EditRange = null,
-    string? FilterText = null);
+    string? FilterText = null,
+    string? ColorValue = null);

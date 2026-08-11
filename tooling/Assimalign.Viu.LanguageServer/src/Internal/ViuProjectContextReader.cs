@@ -44,7 +44,9 @@ internal sealed class ViuProjectContextReader
         gate.Wait(cancellationToken);
         try
         {
-            var assets = ViuProjectAssetsReader.Read(projectFilePath);
+            cancellationToken.ThrowIfCancellationRequested();
+            var assets = ViuProjectAssetsReader.Read(projectFilePath, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             if (assets.Status.Kind is not (ViuProjectContextStatusKind.SemanticsActive or
                 ViuProjectContextStatusKind.AssetsStale))
             {
@@ -57,7 +59,7 @@ internal sealed class ViuProjectContextReader
             {
                 cone = new CachedProjectCone(
                     assets.CacheStamp,
-                    ReadSourceDocuments(assets));
+                    ReadSourceDocuments(assets, cancellationToken));
                 conesByProjectFilePath[projectFilePath] = cone;
             }
 
@@ -66,6 +68,7 @@ internal sealed class ViuProjectContextReader
                 cone.SourceDocuments.Count);
             foreach (var sourceDocument in cone.SourceDocuments)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!string.Equals(
                         sourceDocument.FilePath,
                         documentPath,
@@ -94,22 +97,33 @@ internal sealed class ViuProjectContextReader
     }
 
     private static IReadOnlyList<LanguageProjectSourceDocument> ReadSourceDocuments(
-        ViuProjectAssets assets)
+        ViuProjectAssets assets,
+        CancellationToken cancellationToken)
     {
         var documents = new List<LanguageProjectSourceDocument>(
             assets.SourceFilePaths.Count + assets.ComponentFilePaths.Count);
-        AppendSourceDocuments(assets.SourceFilePaths, isComponent: false, documents);
-        AppendSourceDocuments(assets.ComponentFilePaths, isComponent: true, documents);
+        AppendSourceDocuments(
+            assets.SourceFilePaths,
+            isComponent: false,
+            documents,
+            cancellationToken);
+        AppendSourceDocuments(
+            assets.ComponentFilePaths,
+            isComponent: true,
+            documents,
+            cancellationToken);
         return documents;
     }
 
     private static void AppendSourceDocuments(
         IReadOnlyList<string> filePaths,
         bool isComponent,
-        List<LanguageProjectSourceDocument> documents)
+        List<LanguageProjectSourceDocument> documents,
+        CancellationToken cancellationToken)
     {
         foreach (var filePath in filePaths)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 documents.Add(
