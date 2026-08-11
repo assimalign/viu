@@ -21,8 +21,9 @@ A developer can create a host-neutral component library with
 A browser application uses
 `<Project Sdk="Assimalign.Viu.Sdk.Browser">`. Both paths support code-first, `.viu`, and compatible
 `.vue` component authoring. Browser applications can compose services, state, registrations, and
-lifetime middleware; run reactively; use the router and state libraries; and publish a trimmed static
-WebAssembly site. Components can also be rendered to HTML or tested without a browser. The
+lifetime middleware; run reactively; use lazy routes with post-render scroll restoration; opt into
+runtime inspection; use the state library; and publish a trimmed static WebAssembly site. Components
+can also be rendered to HTML or tested without a browser. The
 component-library path needs neither Browser nor the WebAssembly workload.
 The sibling [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) repository is the
 packaged-consumer showcase for those paths.
@@ -32,10 +33,11 @@ links without discarding browser state, while generated metadata remounts affect
 template or C# changes. That path is not yet a separate Viu development-server command, and Visual
 Studio's ordinary Hot Reload command does not invoke the SDK watch-list contract.
 
-The remaining developer-experience gaps are concrete: there is no `Assimalign.Viu.DevTools` library
-or inspection user interface, and no generated API reference or template-language reference site.
+The remaining developer-experience gaps are concrete: the opt-in `Assimalign.Viu.DevTools` protocol
+has no timeline event capture or inspection user interface yet, and there is no generated API
+reference or template-language reference site.
 The current behavioral limits are maintained in
-[`SPECIFICATION.md` §17](SPECIFICATION.md#17-non-goals-and-current-limits); the board remains the
+[`SPECIFICATION.md` §18](SPECIFICATION.md#18-non-goals-and-current-limits); the board remains the
 authority for delivery status.
 
 ## Architecture: Viu library map
@@ -55,13 +57,15 @@ with no area wrapper folders. The following table is the exact shipping-library 
 | Browser (`V01.01.04`) | `Assimalign.Viu.Browser` | Browser host: batched DOM interop, bindings, events, directives, transitions, state restore, lazy-hydration triggers, and application bootstrap | Components, Core, Reactivity, State |
 | Server rendering (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | WHATWG HTML serialization, direct compiled markup, hydration markers, state islands, and host-neutral request adaptation | Components, Core, State |
 | Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | DOM-free in-memory host and component test surface over the production renderer | Components, Core |
-| Router (`V01.01.08`) | `Assimalign.Viu.Router` | Host-free navigation convention: matching, history, route components, and guard pipeline | Components, Reactivity |
-| Browser router (`V01.01.08`) | `Assimalign.Viu.Browser.Router` | Leaf integration between Browser click dispatch and Router navigation | Core, Router, Browser |
+| Router (`V01.01.08`) | `Assimalign.Viu.Router` | Host-free navigation convention: matching, memory history, lazy route requests, guards, and scroll policy | Components, Reactivity |
+| Browser router (`V01.01.08`) | `Assimalign.Viu.Browser.Router` | Leaf integration for Browser clicks, web/hash history, and post-render scroll effects | Core, Router, Browser |
+| Runtime inspection (`V01.01.10`) | `Assimalign.Viu.DevTools` | Opt-in versioned protocol, weak component registry, snapshots, inspectors, and postMessage/WebSocket transports | Components, Core, Reactivity |
 
 Vocabulary lives low, composition lives high, and optional conventions attach through designed
 seams. Reactivity is independent; Components owns descriptions and authored behavior; State and
 Router are conventions; Core composes and executes applications; Browser, ServerRenderer, and
-Testing adapt that model to hosts. The adopted rationale and complete dependency graph are recorded
+Testing adapt that model to hosts; DevTools observes Core through a runtime-owned hook so Core never
+depends on diagnostics. The adopted rationale and complete dependency graph are recorded
 in [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md).
 
 The build/editor side contains exactly ten projects under `tooling/`: the `Assimalign.Viu.Syntax`
@@ -173,7 +177,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W02** | The component/application foundation, watch/reactive collections, keyed reconciliation, browser bootstrap, and test utilities are delivered; every planned feature row is closed | No planned feature row remains |
 | **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered; the deferred compiler optimization set has explicit implemented-or-dropped outcomes, and the size/startup budget gates are live against measured `EndToEndBrowserApp` baselines | Complete diagnostic source attribution |
 | **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; generated trees and compiled SSR share static scoped-style attributes; hosted fingerprint selection and deterministic component-library/application CSS delivery are complete | Close built-in edge cases, generated State/source-map work, and the deferred reactive scoped-CSS runtime |
-| **W05** | Host-neutral component-library and Browser SDK/framework segments, validated release packaging/staging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, explicit server-profile selection with reflection-free registration, installable `dotnet new` templates with an optional server host, editor hot-reload metadata, a working package-only `dotnet watch` CSS/component path with connected-browser conformance, the ordinary real-browser end-to-end harness, and live size/startup budget gates exist | Finish lazy routing, runtime inspection, compatibility/conformance gates, and Cohesion hosting integration |
+| **W05** | Host-neutral component-library and Browser SDK/framework segments, validated release packaging/staging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, explicit server-profile selection with reflection-free registration, installable `dotnet new` templates with an optional server host, editor hot-reload metadata, a working package-only `dotnet watch` CSS/component path with connected-browser conformance, the ordinary real-browser end-to-end harness, live size/startup budget gates, lazy route factories with Browser scroll restoration, and the opt-in runtime-inspection protocol exist | Finish compatibility/conformance gates and Cohesion hosting integration |
 | **W06** | Utility composition and semantic `@script` language-server work have begun | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
 
 This snapshot reconciles the plan with live issue state on 2026-08-10. The budget-gate activation and

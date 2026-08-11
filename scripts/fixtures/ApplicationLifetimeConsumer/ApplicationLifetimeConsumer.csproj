@@ -4,6 +4,9 @@
     <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
     <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
     <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
+    <!-- Keep the opt-in inspection package referenced while its feature switch remains disabled.
+         The trimmed publish gate proves that this unused package contributes no runtime payload. -->
+    <ViuEnableDevTools>false</ViuEnableDevTools>
   </PropertyGroup>
   <ItemGroup>
     <!--
@@ -19,6 +22,7 @@
     <PackageReference Include="Assimalign.Viu.Browser" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Browser.Router" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.DevTools" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="ComponentLibraryConsumer" Version="$(ComponentLibraryConsumerVersion)" />
   </ItemGroup>
 

@@ -26,7 +26,8 @@
             Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
         <ItemGroup>
             <_ViuLibraryWebAsset Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)wwwroot\**\*"
-                                   ReferenceName="%(ProjectReference.Filename)" />
+                                 ReferenceName="%(ProjectReference.Filename)"
+                                 Condition="'%(ProjectReference.Filename)' != 'Assimalign.Viu.DevTools'" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuLibraryWebAsset)"
               DestinationFiles="@(_ViuLibraryWebAsset->'$(MSBuildProjectDirectory)\wwwroot\_content\%(ReferenceName)\%(RecursiveDir)%(Filename)%(Extension)')"

@@ -240,6 +240,7 @@ internal sealed class ComponentActivation
             : parent.Scope.Run(() => Reactive.EffectScope());
         ComponentLifecycle lifecycle = new();
         RuntimeComponentContext context = new(
+            instance,
             registration.Contract,
             request.Invocation,
             request.MountReference,

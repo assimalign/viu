@@ -5,9 +5,10 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// The history integration behind the router: it owns the current location and its state, applies
 /// application-initiated navigations (<see cref="Push"/>/<see cref="Replace"/>), relays
-/// browser-initiated ones to listeners, and normalizes a configured base path in and out.
-/// Implemented by the memory, web (HTML5 History API), and hash modes created through
-/// <see cref="RouterHistory"/>. Specified by <c>[RTR-3]</c>.
+/// host-initiated ones to listeners, and normalizes a configured base path in and out.
+/// <see cref="RouterHistory"/> creates the host-free memory implementation; browser web and hash
+/// implementations live in the Browser.Router leaf package. Specified by <c>[RTR-3]</c> and
+/// <c>[RTR-10]</c>.
 /// </summary>
 /// <remarks>
 /// Locations are the base-stripped path portion the matcher ([V01.01.08.01]) resolves — a leading
@@ -15,7 +16,8 @@ namespace Assimalign.Viu.Router;
 /// writing to the environment and stripped when reading back, so consumers never see it. Not
 /// thread-safe: the router targets the single-threaded JS event loop.
 /// <para>
-/// Web and hash histories initialize their browser bridge through <see cref="Router.ReadyAsync"/>.
+/// A history that requires asynchronous host initialization implements
+/// <see cref="IInitializableRouterHistory"/>; <see cref="Router.ReadyAsync"/> detects and awaits it.
 /// <see cref="Listen"/> and <see cref="IDisposable.Dispose"/> are valid before readiness so a router can attach
 /// and detach safely; every other synchronous member throws <see cref="InvalidOperationException"/>
 /// until readiness completes.

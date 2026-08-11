@@ -15,6 +15,23 @@ namespace Assimalign.Viu.Reactivity;
 public static class Reactive
 {
     /// <summary>
+    /// Enters a fresh logical execution flow whose dependency tracking, batching, and effect-scope
+    /// bookkeeping are independent of the caller's ambient flow.
+    /// </summary>
+    /// <returns>
+    /// An idempotent lease that restores the previous ambient reactivity state when disposed.
+    /// Nested leases restore their parent flow when disposed in last-in, first-out order.
+    /// </returns>
+    /// <remarks>
+    /// Request-oriented hosts use this seam to prevent independently owned application graphs from
+    /// sharing ambient engine state. The lease does not clone or dispose reactive values, effects,
+    /// or scopes created inside the flow; those lifetimes remain caller-owned. Each entered flow
+    /// remains single-event-loop and is not thread-safe. Specified by <c>[EXE-1]</c> and
+    /// <c>[CMP-33]</c>.
+    /// </remarks>
+    public static IDisposable EnterExecutionFlow() => ReactivityExecutionIsolation.Enter();
+
+    /// <summary>
     /// Creates a tracked reference cell holding <paramref name="value"/>: reads inside an effect
     /// subscribe to it, and a write that changes the value notifies those subscribers.
     /// </summary>

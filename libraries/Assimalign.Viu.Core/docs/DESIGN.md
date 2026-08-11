@@ -52,7 +52,11 @@ composition root and never disposes them (`[CMP-9]` through `[CMP-11]`).
 
 `ComponentHost.RenderAsync` reuses the same activation path for one-shot hosts. Its returned scope
 keeps the parent context and reactive lifetime alive while a server consumes the tree; disposal
-aborts that lifetime without client mount hooks (`[SSR-4]`, `[SSR-5]`, `[SSR-10]`).
+aborts that lifetime without client mount hooks. `ComponentHost.ExecuteAsync` uses the same path but
+invokes one host operation with only the public component instance, render frame, and render scope.
+Core retains activation, error routing, and disposal, and returns a named success or handled-failure
+outcome so direct-render output can remain transactional (`[SSR-4]`, `[SSR-5]`, `[SSR-10]`,
+`[SSR-TARGET-3]`).
 
 ## Scheduling and application lifetime
 
@@ -67,13 +71,14 @@ post-flush watches, commits hosts at defined boundaries, and restores requeueabl
 (`[SCH-1]` through `[SCH-12]`). Scheduling policy belongs to Core; host batching crosses only the
 per-renderer `Commit` delegate.
 
-The default Browser path retains one shared event-loop state. `CoreExecutionIsolation` is the
-internal request-host boundary: it selects fresh Core, Reactivity, State, and scheduler bookkeeping
-for one asynchronous render and restores the caller's state afterward. Scheduler continuations
-capture that logical execution context even when the thread pool dispatches them; a per-flow gate
-also serializes that continuation with the synchronous-render flush. This permits distinct
-request-owned graphs to render concurrently and prevents Core from racing its own scheduler, without
-making any individual graph thread-safe (`[EXE-1]`, `[EXE-3]`).
+The default Browser path retains one shared event-loop state. Request hosts call the public
+`RuntimeExecution.EnterExecutionFlow` boundary, which composes the corresponding public Reactivity
+and State flow boundaries, selects fresh Core and scheduler bookkeeping, and restores the caller's
+state afterward. Scheduler continuations capture that logical execution context even when the
+thread pool dispatches them; a per-flow gate also serializes that continuation with the
+synchronous-render flush. This permits distinct request-owned graphs to render concurrently and
+prevents Core from racing its own scheduler, without making any individual graph thread-safe
+(`[EXE-1]`, `[EXE-3]`).
 
 ## Structural built-ins and hydration
 
@@ -96,10 +101,10 @@ one authored definition owns one boundary (`[HYD-LAZY-1]` through `[HYD-LAZY-5]`
 
 ## Generated-code and AOT constraints
 
-Compiled renderers interact through `ComponentRenderFrame`, immutable nodes, `RenderPlan`, and the
-hidden hot-reload registration interface. Update classification uses generated component and marker
-identities; Core does not reflect over authored types or expose compiler services
-(`[SFC-CG-2]` through `[SFC-CG-4]`).
+Compiled renderers interact through `ComponentRenderFrame`, immutable nodes, `RenderPlan`, the
+public one-operation `ComponentHost.ExecuteAsync` callback, and the hidden hot-reload registration
+interface. Update classification uses generated component and marker identities; Core does not
+reflect over authored types or expose compiler services (`[SFC-CG-2]` through `[SFC-CG-4]`).
 
 Core supports trimming, browser WASM AOT, and NativeAOT. It performs no reflection-based
 serialization, dynamic code generation, runtime constructor discovery, or host-object marshalling

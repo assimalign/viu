@@ -1,1 +1,5 @@
 #nullable enable
+Assimalign.Viu.Browser.Router.BrowserRouterHistory
+static Assimalign.Viu.Browser.Router.BrowserRouterHistory.CreateWeb(string? basePath = null) -> Assimalign.Viu.Router.IRouterHistory!
+static Assimalign.Viu.Browser.Router.BrowserRouterHistory.CreateWebHash(string? basePath = null) -> Assimalign.Viu.Router.IRouterHistory!
+static Assimalign.Viu.Browser.Router.BrowserRouterHistory.InitializeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

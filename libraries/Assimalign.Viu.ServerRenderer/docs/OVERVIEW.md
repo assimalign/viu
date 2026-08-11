@@ -20,10 +20,12 @@ remains unsupported [EXE-1], [SSR-9].
 The serializer dispatches all ten `VirtualNodeKind` values. Component nodes always resolve and
 activate through the ordinary component factory. Without a compiled registration,
 `ComponentHost.RenderAsync` supplies the tree and live parent scope. With an explicitly supplied
-`IServerRenderRegistry`, ServerRenderer uses Core's narrow friend activation seam to run the same
-setup and server-prefetch path without first executing the client renderer, then invokes the
-compiler-known direct-markup delegate inside the same lease. Neither path reaches the persistent
-mounted engine, downcasts a public context, or probes a hidden capability.
+`IServerRenderRegistry`, ServerRenderer uses public `ComponentHost.ExecuteAsync` to run the same
+setup and server-prefetch path without first executing the client renderer. Its callback receives
+the activated component, render frame, and public scope only while Core owns the live operation;
+the named outcome controls commit versus handled-failure output. Neither path reaches the
+persistent mounted engine, downcasts a public context, probes a hidden capability, or uses friend
+access.
 
 Serialization owns the HTML-specific rules required by `[SSR-6]`: the five-character escape set,
 repeated comment-terminator removal, void and boolean elements, safe dynamic attribute names,

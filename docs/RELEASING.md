@@ -35,6 +35,12 @@ are explicitly release-only, so this path cannot stage or promote NuGet packages
 
 ## Package contract
 
+The [V01.01.10.01] release inventory is exactly 17 main packages and 12 symbol packages. It includes
+eleven independently consumable libraries, both SDKs, both targeting packs, the Browser runtime
+pack, and the template pack. `Assimalign.Viu.DevTools` is an opt-in library like Router: it is
+published on its own and is never included in `Assimalign.Viu.App` or
+`Assimalign.Viu.App.Browser`.
+
 Shared build targets stamp every packable project with the repository URL and commit, embedded
 `LICENSE`, a package README, deterministic portable PDB settings, and SourceLink data. Executable
 library/runtime packages produce a `.snupkg`; content-only packages and these four compile/build-time
@@ -49,9 +55,13 @@ containers deliberately do not:
 
 The Browser runtime symbol package stores each PDB at
 `runtimes/browser-wasm/lib/<tfm>/<assembly>.pdb`, exactly beside the corresponding DLL path in the
-main package. Main packages never duplicate PDB files. The release validator enforces the deliberate
-symbol-package inventory and rejects every `.snupkg` PDB that lacks a DLL, EXE, or WinMD at the same
-relative path in its `.nupkg`; this is the path contract used by nuget.org symbol ingestion.
+main package. The DevTools symbol package likewise stores
+`lib/net10.0/Assimalign.Viu.DevTools.pdb`, matching
+`lib/net10.0/Assimalign.Viu.DevTools.dll` in its main package. Main packages never duplicate PDB
+files. The release validator enforces the deliberate symbol-package inventory and rejects every
+`.snupkg` PDB that lacks a DLL, EXE, or WinMD at the same relative path in its `.nupkg`; the package
+regression deliberately moves the DevTools PDB to prove that exact-path mismatch is rejected. This
+is the path contract used by nuget.org symbol ingestion.
 
 Independently consumable Viu libraries use a compatible-major range:
 

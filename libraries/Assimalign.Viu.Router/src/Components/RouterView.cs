@@ -17,7 +17,8 @@ namespace Assimalign.Viu.Router;
 /// arguments. Its effective key combines route-record identity with the authored key: the same
 /// matched record is retained across parameter-only navigation, while two records using the same
 /// component remain distinct. Non-component route nodes are returned unchanged. One default view
-/// is supported per record; named views and lazy route components remain outside this feature.
+/// is supported per record; named views remain outside this feature, while lazy requests are
+/// resolved by Router before the record can become current.
 /// Not thread-safe; Viu drives it on the host event loop. Specified by <c>[RTR-4]</c>,
 /// <c>[RTR-7]</c>, <c>[CMP-7]</c>, and <c>[CMP-33]</c>.
 /// </remarks>

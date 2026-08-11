@@ -31,6 +31,7 @@ jobs:
           - { area: libraries, project: Assimalign.Viu.Browser.Router }
           - { area: libraries, project: Assimalign.Viu.Components }
           - { area: libraries, project: Assimalign.Viu.Core }
+          - { area: libraries, project: Assimalign.Viu.DevTools }
           - { area: libraries, project: Assimalign.Viu.Reactivity }
           - { area: libraries, project: Assimalign.Viu.Router }
           - { area: libraries, project: Assimalign.Viu.ServerRenderer }

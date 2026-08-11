@@ -18,8 +18,8 @@ namespace Assimalign.Viu.Router;
 /// <para>
 /// <b>The navigation pipeline</b> runs guards in a fixed order — in-component before-leave (deepest
 /// child first) → global <see cref="BeforeEach"/> → reused-record before-update → per-record
-/// <see cref="RouteRecord.BeforeEnter"/> → (async component resolution, currently a no-op seam for
-/// <c>[V01.01.03.16]</c>) → in-component <see cref="IRouteEnterGuard"/> → global
+/// <see cref="RouteRecord.BeforeEnter"/> → lazy component resolution → in-component
+/// <see cref="IRouteEnterGuard"/> → global
 /// <see cref="BeforeResolve"/> → confirm (history write +
 /// <see cref="CurrentRoute"/> update, one trigger) → <see cref="AfterEach"/>. A guard may allow,
 /// abort, or redirect; a redirect re-enters the pipeline (with infinite-redirect protection), an
@@ -127,6 +127,18 @@ public sealed class Router : IDisposable
     /// </summary>
     public string LinkExactActiveClass { get; set; } = DefaultLinkExactActiveClass;
 
+    /// <summary>
+    /// Gets or sets the optional host-free scroll decision invoked for each confirmed navigation.
+    /// A browser history applies its returned target after the post-render flush; memory and other
+    /// host-free histories intentionally perform no scroll work.
+    /// </summary>
+    /// <remarks>
+    /// Back and forward navigations supply the offset saved under the arriving history position.
+    /// Pushes and replacements supply <see langword="null"/>. Specified by
+    /// <c>[V01.01.08.05]</c>.
+    /// </remarks>
+    public ScrollBehavior? ScrollBehavior { get; set; }
+
     /// <summary>Resolves a path to a location through the matcher.</summary>
     /// <param name="location">The base-stripped location to resolve (path portion).</param>
     /// <returns>The resolved location; an unmatched path yields an empty matched chain.</returns>
@@ -201,7 +213,8 @@ public sealed class Router : IDisposable
     public Action AfterEach(AfterNavigationHook hook) => Add(_afterHooks, hook);
 
     /// <summary>
-    /// Registers a handler for unexpected exceptions thrown by guards during navigation. A
+    /// Registers a handler for unexpected exceptions thrown by guards, lazy component factories,
+    /// or scroll behavior during navigation. A
     /// <see cref="NavigationFailure"/> is returned from <see cref="PushAsync"/> rather than routed here.
     /// </summary>
     /// <param name="handler">The error handler to register.</param>
@@ -320,6 +333,33 @@ public sealed class Router : IDisposable
     internal Action RegisterUpdateGuard(RouteRecord record, NavigationGuard guard)
         => AddRecordGuard(_updateGuards, record, guard);
 
+    /// <summary>
+    /// Signals a scroll-capable history that the initially confirmed route has mounted and may now
+    /// apply its deferred scroll decision. Hosts call this after the mount boundary; repeated calls
+    /// are safe, and histories without <see cref="IRouterScrollController"/> complete immediately.
+    /// Specified by <c>[RTR-9]</c>.
+    /// </summary>
+    /// <returns>A task representing the deferred initial scroll effect, when one remains current.</returns>
+    /// <exception cref="ObjectDisposedException">The router has been disposed.</exception>
+    public async Task CompleteInitialScrollAsync()
+    {
+        ThrowIfDisposed();
+        if (_history is not IRouterScrollController scrollController)
+        {
+            return;
+        }
+
+        try
+        {
+            await scrollController.CompleteInitialScrollAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            TriggerError(exception, _currentRoute.Value, RouteLocation.Start);
+            throw;
+        }
+    }
+
     private static Action Add<T>(List<T> list, T item)
     {
         ArgumentNullException.ThrowIfNull(item);
@@ -423,6 +463,7 @@ public sealed class Router : IDisposable
     {
         var from = _currentRoute.Value;
         NavigationFailure? failure;
+        Task scrollTask = Task.CompletedTask;
         // Dedup only when `from` already has a matched chain:
         // the START sentinel has an empty chain, so the initial navigation is never deduplicated and
         // always runs the full pipeline, while in-session same-location navigations still short-circuit.
@@ -485,13 +526,21 @@ public sealed class Router : IDisposable
                         // stale back-target. ReferenceEquals stays true through a redirect chain
                         // because nothing is committed until this confirm.
                         var isFirstNavigation = ReferenceEquals(from, RouteLocation.Start);
-                        FinalizeNavigation(to, isPush: true, replace || isFirstNavigation);
+                        scrollTask = FinalizeNavigation(
+                            to,
+                            from,
+                            isPush: true,
+                            replace: replace || isFirstNavigation,
+                            savedPosition: null,
+                            isInitialNavigation: isFirstNavigation,
+                            cancellationToken: token);
                         failure = null;
                     }
                     break;
             }
         }
         TriggerAfterEach(to, from, failure);
+        await scrollTask.ConfigureAwait(false);
         return failure;
     }
 
@@ -524,17 +573,32 @@ public sealed class Router : IDisposable
         {
             return outcome;
         }
-        // 4.5. Resolve async route components — a no-op seam until [V01.01.03.16]; every route
-        // component is eager today. The stage is kept so the ordering does not shift when lazy
-        // components land: before-enter -> resolve components -> in-component before-enter.
-        // 5. in-component beforeRouteEnter on entering records.
+        // 5. Resolve lazy route components. Successful component requests are retained by their
+        // records; a failed or cancelled attempt is never cached, so a later navigation can retry.
+        await ResolveRouteComponents(to, token).ConfigureAwait(false);
+        if (token.IsCancellationRequested)
+        {
+            return NavigationOutcome.Cancel;
+        }
+        // 6. in-component beforeRouteEnter on entering records.
         outcome = await RunPhase(CollectRouteEnterGuards(from, to), to, from, token);
         if (!outcome.IsAllow)
         {
             return outcome;
         }
-        // 6. global beforeResolve.
+        // 7. global beforeResolve.
         return await RunPhase(Snapshot(_beforeResolveGuards), to, from, token);
+    }
+
+    private static async Task ResolveRouteComponents(
+        RouteLocation to,
+        CancellationToken cancellationToken)
+    {
+        foreach (RouteRecord record in to.Matched)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await record.ResolveComponentAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static async Task<NavigationOutcome> RunPhase(
@@ -660,7 +724,14 @@ public sealed class Router : IDisposable
     // moved — and only updates CurrentRoute. The trigger queues the render flush; it is deliberately
     // committed before afterEach runs and before the render-phase flush, so a hook observes the new
     // route but the DOM has not been touched yet.
-    private void FinalizeNavigation(RouteLocation to, bool isPush, bool replace)
+    private Task FinalizeNavigation(
+        RouteLocation to,
+        RouteLocation from,
+        bool isPush,
+        bool replace,
+        ScrollPosition? savedPosition,
+        bool isInitialNavigation,
+        CancellationToken cancellationToken)
     {
         if (isPush)
         {
@@ -674,6 +745,19 @@ public sealed class Router : IDisposable
             }
         }
         _currentRoute.Value = to;
+
+        if (_history is not IRouterScrollController scrollController)
+        {
+            return Task.CompletedTask;
+        }
+
+        return scrollController.ApplyAsync(
+            to,
+            from,
+            savedPosition,
+            ScrollBehavior,
+            isInitialNavigation,
+            cancellationToken);
     }
 
     private void TriggerAfterEach(RouteLocation to, RouteLocation from, NavigationFailure? failure)
@@ -769,6 +853,7 @@ public sealed class Router : IDisposable
             CancellationToken token = cancellationSource.Token;
             var urlRestored = false;
             NavigationFailure? failure;
+            Task scrollTask = Task.CompletedTask;
             try
             {
                 if (IsSameLocation(from, to))
@@ -806,7 +891,14 @@ public sealed class Router : IDisposable
                             }
                             else
                             {
-                                FinalizeNavigation(to, isPush: false, replace: false);
+                                scrollTask = FinalizeNavigation(
+                                    to,
+                                    from,
+                                    isPush: false,
+                                    replace: false,
+                                    savedPosition: _history.State.Scroll,
+                                    isInitialNavigation: false,
+                                    cancellationToken: token);
                                 failure = null;
                             }
                             break;
@@ -837,6 +929,14 @@ public sealed class Router : IDisposable
                 RestorePopLocation(information);
             }
             TriggerAfterEach(to, from, failure);
+            try
+            {
+                await scrollTask.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                TriggerError(exception, to, from);
+            }
         }
         finally
         {

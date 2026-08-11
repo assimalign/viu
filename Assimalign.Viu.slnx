@@ -329,6 +329,16 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Browser.Router/test/">
 		<Project Path="libraries/Assimalign.Viu.Browser.Router/test/Assimalign.Viu.Browser.Router.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.DevTools/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.DevTools/docs/">
+		<File Path="libraries/Assimalign.Viu.DevTools/docs/PROTOCOL.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.DevTools/src/">
+		<Project Path="libraries/Assimalign.Viu.DevTools/src/Assimalign.Viu.DevTools.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.DevTools/test/">
+		<Project Path="libraries/Assimalign.Viu.DevTools/test/Assimalign.Viu.DevTools.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/docs/">
 		<File Path="libraries/Assimalign.Viu.Core/docs/ASYNCHRONOUS-AND-DYNAMIC-COMPONENTS.md" />

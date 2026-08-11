@@ -54,7 +54,10 @@ function Test-ViuMismatchedSymbolLayoutIsRejected {
         [string] $Version,
 
         [Parameter(Mandatory)]
-        [string[]] $ExpectedPackageId
+        [string[]] $ExpectedPackageId,
+
+        [Parameter(Mandatory)]
+        [string] $SymbolPackageId
     )
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -92,11 +95,12 @@ function Test-ViuMismatchedSymbolLayoutIsRejected {
             Copy-Item -Destination $resolvedTemporaryDirectory
 
         $symbolPackage = @(
-            Get-ChildItem -LiteralPath $resolvedTemporaryDirectory -Filter '*.snupkg' -File |
-                Sort-Object Name |
-                Select-Object -First 1)
+            Get-ChildItem `
+                -LiteralPath $resolvedTemporaryDirectory `
+                -Filter "$SymbolPackageId.$Version.snupkg" `
+                -File)
         if ($symbolPackage.Count -ne 1) {
-            throw 'The symbol-layout regression requires at least one symbol package.'
+            throw "The symbol-layout regression requires exactly one $SymbolPackageId symbol package, found $($symbolPackage.Count)."
         }
 
         $archive = [System.IO.Compression.ZipFile]::Open(
@@ -190,11 +194,28 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 }
 
 $expectedPackageId = @(Get-ViuPackageId)
+# [V01.01.10.01] adds one managed library to the previous 16+11 release set.
+$expectedMainPackageCount = 17
+$expectedSymbolPackageCount = 12
+if ($expectedPackageId.Count -ne $expectedMainPackageCount) {
+    throw "The release contract requires $expectedMainPackageCount main packages, but the configured inventory contains $($expectedPackageId.Count)."
+}
+$expectedSymbolPackageId = @(
+    $expectedPackageId |
+        Where-Object {
+            Test-ViuPackageRequiresSymbolPackage `
+                -PackageId $_ `
+                -PackagePath (Join-Path $resolvedPackageDirectory "$($_).$Version.nupkg")
+        })
+if ($expectedSymbolPackageId.Count -ne $expectedSymbolPackageCount) {
+    throw "The release contract requires $expectedSymbolPackageCount symbol packages, but the configured inventory requires $($expectedSymbolPackageId.Count)."
+}
 
 Test-ViuMismatchedSymbolLayoutIsRejected `
     -PackageDirectory $resolvedPackageDirectory `
     -Version $Version `
-    -ExpectedPackageId $expectedPackageId
+    -ExpectedPackageId $expectedPackageId `
+    -SymbolPackageId 'Assimalign.Viu.DevTools'
 
 Assert-ViuReleasePackageSet `
     -PackageDirectory $resolvedPackageDirectory `

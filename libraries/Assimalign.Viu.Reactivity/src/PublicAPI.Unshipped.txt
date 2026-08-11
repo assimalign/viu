@@ -26,4 +26,5 @@ Assimalign.Viu.Reactivity.ShallowReactiveAttribute.ReadOnly.get -> bool
 Assimalign.Viu.Reactivity.ShallowReactiveAttribute.ReadOnly.set -> void
 Assimalign.Viu.Reactivity.WatchFlushMode.Synchronous = 0 -> Assimalign.Viu.Reactivity.WatchFlushMode
 static Assimalign.Viu.Reactivity.Reactive.Batch() -> System.IDisposable!
+static Assimalign.Viu.Reactivity.Reactive.EnterExecutionFlow() -> System.IDisposable!
 static Assimalign.Viu.Reactivity.Reactive.IsReadOnly(object? value) -> bool

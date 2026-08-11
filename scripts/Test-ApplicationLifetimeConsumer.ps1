@@ -150,7 +150,8 @@ if (-not $ComponentLibraryOnly) {
     $requiredViuPackages += @(
         "Assimalign.Viu.Sdk.Browser.$Version.nupkg",
         "Assimalign.Viu.App.Browser.Ref.$Version.nupkg",
-        "Assimalign.Viu.App.Browser.Runtime.browser-wasm.$Version.nupkg"
+        "Assimalign.Viu.App.Browser.Runtime.browser-wasm.$Version.nupkg",
+        "Assimalign.Viu.DevTools.$Version.nupkg"
     )
 }
 foreach ($requiredViuPackage in $requiredViuPackages) {
@@ -431,6 +432,213 @@ function Assert-CssCompressionNegotiation {
     }
 }
 
+function Assert-DevToolsPublishState {
+    param(
+        [Parameter(Mandatory)]
+        [string] $PublishDirectory,
+        [Parameter(Mandatory)]
+        [bool] $Enabled,
+        [Parameter(Mandatory)]
+        [string] $Context
+    )
+
+    $frameworkDirectory = Join-Path $PublishDirectory 'wwwroot/_framework'
+    $frameworkPayload = @(
+        Get-ChildItem `
+            -LiteralPath $frameworkDirectory `
+            -Filter 'Assimalign.Viu.DevTools*' `
+            -File `
+            -ErrorAction SilentlyContinue)
+    $assetPath = Join-Path `
+        $PublishDirectory `
+        'wwwroot/_content/Assimalign.Viu.DevTools/viu-devtools.js'
+    $assetPayload = @(
+        Get-ChildItem `
+            -LiteralPath (Split-Path $assetPath -Parent) `
+            -File `
+            -Recurse `
+            -ErrorAction SilentlyContinue)
+
+    if ($Enabled) {
+        $managedAssemblies = @(
+            $frameworkPayload |
+                Where-Object {
+                    $_.Name -match '\.wasm(?:\.|$)'
+                })
+        if ($managedAssemblies.Count -eq 0) {
+            throw "$Context did not publish the enabled DevTools managed assembly."
+        }
+        if (-not [System.IO.File]::Exists($assetPath) -or
+            (Get-Item -LiteralPath $assetPath).Length -eq 0) {
+            throw "$Context did not publish the enabled DevTools browser asset: $assetPath"
+        }
+        return
+    }
+
+    if ($frameworkPayload.Count -ne 0) {
+        throw "$Context retained disabled DevTools assembly or symbol payload: $($frameworkPayload.Name -join ', ')"
+    }
+    if ($assetPayload.Count -ne 0) {
+        throw "$Context retained disabled DevTools browser payload: $($assetPayload.FullName -join ', ')"
+    }
+}
+
+function Assert-DevToolsSourceAssetState {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectDirectory,
+        [Parameter(Mandatory)]
+        [bool] $Enabled,
+        [Parameter(Mandatory)]
+        [string] $Context
+    )
+
+    $sourceAssetPath = Join-Path `
+        $ProjectDirectory `
+        'wwwroot/_content/Assimalign.Viu.DevTools/viu-devtools.js'
+    if ($Enabled) {
+        if (-not [System.IO.File]::Exists($sourceAssetPath) -or
+            (Get-Item -LiteralPath $sourceAssetPath).Length -eq 0) {
+            throw "$Context did not materialize the enabled DevTools source asset: $sourceAssetPath"
+        }
+        return
+    }
+
+    if ([System.IO.File]::Exists($sourceAssetPath)) {
+        throw "$Context retained the disabled DevTools source asset: $sourceAssetPath"
+    }
+}
+
+function Assert-DevToolsDevelopmentHostAsset {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Project,
+        [Parameter(Mandatory)]
+        [string] $ProjectDirectory,
+        [Parameter(Mandatory)]
+        [string[]] $BuildProperties
+    )
+
+    $sourceAssetPath = Join-Path `
+        $ProjectDirectory `
+        'wwwroot/_content/Assimalign.Viu.DevTools/viu-devtools.js'
+    $expectedAsset = [System.IO.File]::ReadAllText($sourceAssetPath)
+
+    $listener = [System.Net.Sockets.TcpListener]::new(
+        [System.Net.IPAddress]::Loopback,
+        0)
+    try {
+        $listener.Start()
+        $developmentHostPort =
+            ([System.Net.IPEndPoint] $listener.LocalEndpoint).Port
+    }
+    finally {
+        $listener.Stop()
+    }
+
+    $developmentHostOrigin = "http://127.0.0.1:$developmentHostPort"
+    $assetUrl =
+        "$developmentHostOrigin/_content/Assimalign.Viu.DevTools/viu-devtools.js"
+    $processStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $processStartInfo.FileName = (Get-Command dotnet -ErrorAction Stop).Source
+    $processStartInfo.WorkingDirectory = $ProjectDirectory
+    $processStartInfo.UseShellExecute = $false
+    $processStartInfo.CreateNoWindow = $true
+    $processStartInfo.RedirectStandardOutput = $true
+    $processStartInfo.RedirectStandardError = $true
+    $processStartInfo.Environment['ASPNETCORE_URLS'] = $developmentHostOrigin
+    foreach ($argument in @(
+            'run',
+            '--project',
+            $Project,
+            '--configuration',
+            'Release',
+            '--no-build',
+            '--no-restore',
+            '--no-launch-profile') +
+        $BuildProperties +
+        @(
+            '-p:OverrideHtmlAssetPlaceholders=false',
+            '-p:ViuEnableDevTools=true')) {
+        $processStartInfo.ArgumentList.Add($argument)
+    }
+
+    $developmentHostProcess = [System.Diagnostics.Process]::new()
+    $developmentHostProcess.StartInfo = $processStartInfo
+    $processStarted = $false
+    $failureMessage = $null
+    try {
+        $processStarted = $developmentHostProcess.Start()
+        if (-not $processStarted) {
+            $failureMessage = 'Starting the package-consumer development host returned false.'
+        }
+        else {
+            $deadline = [System.DateTimeOffset]::UtcNow.AddSeconds(60)
+            $response = $null
+            $lastRequestFailure = $null
+            while ([System.DateTimeOffset]::UtcNow -lt $deadline -and
+                -not $developmentHostProcess.HasExited) {
+                try {
+                    $response = Invoke-WebRequest `
+                        -Uri $assetUrl `
+                        -TimeoutSec 5
+                    break
+                }
+                catch {
+                    $lastRequestFailure = $_.Exception.Message
+                    Start-Sleep -Milliseconds 200
+                }
+            }
+
+            if ($null -eq $response) {
+                $failureMessage =
+                    "The package-consumer development host did not serve $assetUrl. Last request failure: $lastRequestFailure"
+            }
+            elseif ($response.StatusCode -ne 200) {
+                $failureMessage =
+                    "The package-consumer development host returned HTTP $($response.StatusCode) for $assetUrl."
+            }
+            elseif (-not [string]::Equals(
+                    [string] $response.Content,
+                    $expectedAsset,
+                    [System.StringComparison]::Ordinal)) {
+                $failureMessage =
+                    "The package-consumer development host served unexpected bytes for $assetUrl."
+            }
+        }
+    }
+    catch {
+        $failureMessage = $_.Exception.Message
+    }
+    finally {
+        if ($processStarted -and -not $developmentHostProcess.HasExited) {
+            $developmentHostProcess.Kill($true)
+            if (-not $developmentHostProcess.WaitForExit(10000)) {
+                $failureMessage =
+                    'The package-consumer development host did not stop within ten seconds.'
+            }
+        }
+    }
+
+    $standardOutput = $null
+    $standardError = $null
+    if ($processStarted) {
+        $standardOutput = $developmentHostProcess.StandardOutput.ReadToEnd()
+        $standardError = $developmentHostProcess.StandardError.ReadToEnd()
+    }
+    $developmentHostProcess.Dispose()
+
+    if ($null -ne $failureMessage) {
+        throw @"
+$failureMessage
+Development host stdout:
+$standardOutput
+Development host stderr:
+$standardError
+"@
+    }
+}
+
 try {
     $null = New-Item -ItemType Directory -Path $temporaryRootPath
     $componentProjectDirectory = Join-Path `
@@ -445,6 +653,9 @@ try {
     $overrideOnApplicationProjectDirectory = Join-Path `
         $temporaryRootPath `
         'ApplicationLifetimeConsumerOverrideOn'
+    $devToolsTransitionApplicationProjectDirectory = Join-Path `
+        $temporaryRootPath `
+        'ApplicationLifetimeConsumerDevToolsTransition'
     $componentPackageDirectory = Join-Path `
         $temporaryRootPath `
         'component-packages'
@@ -453,6 +664,7 @@ try {
             $applicationProjectDirectory,
             $libraryOnlyApplicationProjectDirectory,
             $overrideOnApplicationProjectDirectory,
+            $devToolsTransitionApplicationProjectDirectory,
             $componentPackageDirectory)) {
         $null = New-Item -ItemType Directory -Path $directory
     }
@@ -466,7 +678,8 @@ try {
     foreach ($applicationDirectory in @(
             $applicationProjectDirectory,
             $libraryOnlyApplicationProjectDirectory,
-            $overrideOnApplicationProjectDirectory)) {
+            $overrideOnApplicationProjectDirectory,
+            $devToolsTransitionApplicationProjectDirectory)) {
         Get-ChildItem -LiteralPath $applicationFixtureDirectory -Force | ForEach-Object {
             Copy-Item `
                 -LiteralPath $_.FullName `
@@ -690,6 +903,9 @@ try {
     $overrideOnProject = Join-Path `
         $overrideOnApplicationProjectDirectory `
         'ApplicationLifetimeConsumer.csproj'
+    $devToolsTransitionProject = Join-Path `
+        $devToolsTransitionApplicationProjectDirectory `
+        'ApplicationLifetimeConsumer.csproj'
     $applicationBuildProperties = @(
         "-p:ViuConsumerVersion=$Version",
         "-p:ComponentLibraryConsumerVersion=$componentLibraryConsumerVersion",
@@ -699,12 +915,40 @@ try {
     foreach ($applicationProject in @(
             $project,
             $libraryOnlyProject,
-            $overrideOnProject)) {
+            $overrideOnProject,
+            $devToolsTransitionProject)) {
         & dotnet restore $applicationProject @applicationBuildProperties
         if ($LASTEXITCODE -ne 0) {
             throw "Restoring application project '$applicationProject' failed with exit code $LASTEXITCODE."
         }
     }
+
+    # [DVT-1] — the package-only non-Blazor WASM development host serves the application's
+    # source wwwroot. The enabled package target must materialize its guarded module there,
+    # and the real dotnet-run host must return that exact module at the import route.
+    Assert-DevToolsSourceAssetState `
+        -ProjectDirectory $devToolsTransitionApplicationProjectDirectory `
+        -Enabled $false `
+        -Context 'Before enabled DevTools development-host Build'
+    & dotnet build `
+        $devToolsTransitionProject `
+        --configuration Release `
+        --no-restore `
+        -warnaserror `
+        @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=false `
+        -p:ViuEnableDevTools=true
+    if ($LASTEXITCODE -ne 0) {
+        throw "Building the enabled DevTools development-host canary failed with exit code $LASTEXITCODE."
+    }
+    Assert-DevToolsSourceAssetState `
+        -ProjectDirectory $devToolsTransitionApplicationProjectDirectory `
+        -Enabled $true `
+        -Context 'Enabled DevTools development-host Build'
+    Assert-DevToolsDevelopmentHostAsset `
+        -Project $devToolsTransitionProject `
+        -ProjectDirectory $devToolsTransitionApplicationProjectDirectory `
+        -BuildProperties $applicationBuildProperties
 
     & dotnet build `
         $libraryOnlyProject `
@@ -888,6 +1132,87 @@ try {
     if ((Get-Item -LiteralPath $publishedBrowserAssetPath).Length -eq 0) {
         throw "PublishTrimmed emitted an empty Browser runtime asset: $publishedBrowserAssetPath"
     }
+
+    $publishedDevToolsAssemblies = @(
+        Get-ChildItem `
+            -LiteralPath (Join-Path $trimmedOutput 'wwwroot/_framework') `
+            -Filter 'Assimalign.Viu.DevTools*.wasm' `
+            -File `
+            -ErrorAction SilentlyContinue)
+    if ($publishedDevToolsAssemblies.Count -ne 0) {
+        throw "The disabled DevTools package survived trimming: $($publishedDevToolsAssemblies.Name -join ', ')"
+    }
+    $publishedDevToolsAssets = @(
+        Get-ChildItem `
+            -LiteralPath (Join-Path $trimmedOutput 'wwwroot/_content/Assimalign.Viu.DevTools') `
+            -Recurse `
+            -File `
+            -ErrorAction SilentlyContinue)
+    if ($publishedDevToolsAssets.Count -ne 0) {
+        throw "The disabled DevTools package contributed static payload: $($publishedDevToolsAssets.FullName -join ', ')"
+    }
+
+    # [DVT-1] — the same package-only project is published enabled, then re-evaluated disabled
+    # without cleaning its intermediate directory. Fresh outputs prove that the feature switch
+    # prunes a real guarded DevToolsSession reference and that the generated development-host
+    # asset does not persist across the true-to-false transition.
+    $devToolsEnabledOutput = Join-Path `
+        $temporaryRootPath `
+        'publish-devtools-enabled'
+    Assert-DevToolsSourceAssetState `
+        -ProjectDirectory $devToolsTransitionApplicationProjectDirectory `
+        -Enabled $true `
+        -Context 'Before enabled DevTools PublishTrimmed'
+    & dotnet publish `
+        $devToolsTransitionProject `
+        --configuration Release `
+        --no-restore `
+        -warnaserror `
+        --output $devToolsEnabledOutput `
+        @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=false `
+        -p:PublishTrimmed=true `
+        -p:TrimMode=full `
+        -p:RunAOTCompilation=false `
+        -p:ViuEnableDevTools=true
+    if ($LASTEXITCODE -ne 0) {
+        throw "Publishing the enabled DevTools package canary failed with exit code $LASTEXITCODE."
+    }
+    Assert-DevToolsPublishState `
+        -PublishDirectory $devToolsEnabledOutput `
+        -Enabled $true `
+        -Context 'Enabled DevTools PublishTrimmed'
+    Assert-DevToolsSourceAssetState `
+        -ProjectDirectory $devToolsTransitionApplicationProjectDirectory `
+        -Enabled $true `
+        -Context 'Enabled DevTools PublishTrimmed'
+
+    $devToolsDisabledOutput = Join-Path `
+        $temporaryRootPath `
+        'publish-devtools-disabled-after-enabled'
+    & dotnet publish `
+        $devToolsTransitionProject `
+        --configuration Release `
+        --no-restore `
+        -warnaserror `
+        --output $devToolsDisabledOutput `
+        @applicationBuildProperties `
+        -p:OverrideHtmlAssetPlaceholders=false `
+        -p:PublishTrimmed=true `
+        -p:TrimMode=full `
+        -p:RunAOTCompilation=false `
+        -p:ViuEnableDevTools=false
+    if ($LASTEXITCODE -ne 0) {
+        throw "Publishing the disabled-after-enabled DevTools package canary failed with exit code $LASTEXITCODE."
+    }
+    Assert-DevToolsPublishState `
+        -PublishDirectory $devToolsDisabledOutput `
+        -Enabled $false `
+        -Context 'Disabled-after-enabled DevTools PublishTrimmed'
+    Assert-DevToolsSourceAssetState `
+        -ProjectDirectory $devToolsTransitionApplicationProjectDirectory `
+        -Enabled $false `
+        -Context 'Disabled-after-enabled DevTools PublishTrimmed'
 
     & dotnet restore `
         $overrideOnProject `

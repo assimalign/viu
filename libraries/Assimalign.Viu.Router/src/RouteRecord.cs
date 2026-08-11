@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
 
@@ -7,22 +9,25 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// An immutable route definition: a path, an optional name, optional nested children, optional
-/// metadata, the immutable route subtree and its argument resolver, and an optional per-record
-/// <see cref="BeforeEnter"/> navigation guard. One record type serves as both the declaration and the
-/// normalized table entry, so there is no second shape to keep in sync. Redirects and aliases belong
-/// to later router features and are intentionally not modeled here.
+/// metadata, an eager route subtree or lazy component factory and its argument resolver, and an
+/// optional per-record <see cref="BeforeEnter"/> navigation guard. One record type serves as both
+/// the declaration and the normalized table entry, so there is no second shape to keep in sync.
+/// Redirects and aliases belong to later router features and are intentionally not modeled here.
 /// </summary>
 /// <remarks>
 /// A reference type with identity semantics: the same instance appears in every resolved
 /// <see cref="RouteLocation.Matched"/> chain it participates in, so consumers can compare matched
 /// records by reference. Child paths that do not start with <c>/</c> are joined onto the parent's
 /// path; an empty child path resolves to the parent's path (the empty-path default child).
-/// Specified by <c>[RTR-1]</c>, <c>[RTR-4]</c>, <c>[RTR-5]</c>, and <c>[RTR-8]</c>.
+/// A lazy factory resolves before confirmation and only a successful result is retained; a failed
+/// or cancelled attempt leaves the record retryable. Specified by <c>[RTR-1]</c>, <c>[RTR-4]</c>,
+/// <c>[RTR-5]</c>, and <c>[V01.01.08.05]</c>.
 /// </remarks>
 public sealed class RouteRecord
 {
     private static readonly IReadOnlyDictionary<string, object?> EmptyMeta =
         new Dictionary<string, object?>(0);
+    private ComponentNode? _resolvedComponent;
 
     /// <summary>Creates a route record.</summary>
     /// <param name="path">
@@ -69,10 +74,73 @@ public sealed class RouteRecord
         RouteComponentArgumentsResolver? argumentsResolver = null,
         NavigationGuard? beforeEnter = null,
         IRouteEnterGuard? routeEnterGuard = null)
+        : this(
+            path,
+            name,
+            children,
+            meta,
+            component,
+            componentFactory: null,
+            argumentsResolver,
+            beforeEnter,
+            routeEnterGuard)
+    {
+    }
+
+    /// <summary>
+    /// Creates a route record whose component request resolves asynchronously.
+    /// </summary>
+    /// <param name="path">The route path.</param>
+    /// <param name="componentFactory">The typed component-request factory awaited during resolve.</param>
+    /// <param name="name">An optional unique route name.</param>
+    /// <param name="children">Optional nested child records.</param>
+    /// <param name="meta">Optional arbitrary route metadata.</param>
+    /// <param name="argumentsResolver">Optional route-derived component arguments.</param>
+    /// <param name="beforeEnter">An optional guard run before component resolution.</param>
+    /// <param name="routeEnterGuard">An optional guard run after component resolution.</param>
+    /// <returns>The lazy route record.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="path"/> or <paramref name="componentFactory"/> is
+    /// <see langword="null"/>.
+    /// </exception>
+    public static RouteRecord CreateLazy(
+        string path,
+        RouteComponentFactory componentFactory,
+        string? name = null,
+        IReadOnlyList<RouteRecord>? children = null,
+        IReadOnlyDictionary<string, object?>? meta = null,
+        RouteComponentArgumentsResolver? argumentsResolver = null,
+        NavigationGuard? beforeEnter = null,
+        IRouteEnterGuard? routeEnterGuard = null)
+    {
+        ArgumentNullException.ThrowIfNull(componentFactory);
+        return new RouteRecord(
+            path,
+            name,
+            children,
+            meta,
+            component: null,
+            componentFactory,
+            argumentsResolver,
+            beforeEnter,
+            routeEnterGuard);
+    }
+
+    private RouteRecord(
+        string path,
+        string? name,
+        IReadOnlyList<RouteRecord>? children,
+        IReadOnlyDictionary<string, object?>? meta,
+        VirtualNode? component,
+        RouteComponentFactory? componentFactory,
+        RouteComponentArgumentsResolver? argumentsResolver,
+        NavigationGuard? beforeEnter,
+        IRouteEnterGuard? routeEnterGuard)
     {
         ArgumentNullException.ThrowIfNull(path);
         if (argumentsResolver is not null
-            && component is not ComponentNode)
+            && component is not ComponentNode
+            && componentFactory is null)
         {
             throw new ArgumentException(
                 "Route component arguments require a ComponentNode request.",
@@ -84,6 +152,7 @@ public sealed class RouteRecord
         Children = children is null || children.Count == 0 ? Array.Empty<RouteRecord>() : [.. children];
         Meta = meta ?? EmptyMeta;
         Component = component;
+        ComponentFactory = componentFactory;
         ArgumentsResolver = argumentsResolver;
         BeforeEnter = beforeEnter;
         RouteEnterGuard = routeEnterGuard;
@@ -106,7 +175,14 @@ public sealed class RouteRecord
     /// <see langword="null"/> for a component-less grouping path. The matcher ignores this field — it
     /// is consumed only by the view components.
     /// </summary>
-    public VirtualNode? Component { get; }
+    public VirtualNode? Component { get; private set; }
+
+    /// <summary>
+    /// The optional asynchronous component-request factory. The router awaits it after per-record
+    /// before-enter guards and before component-associated enter guards. Only a successful result is
+    /// cached; failure or cancellation leaves the factory eligible for the next navigation.
+    /// </summary>
+    public RouteComponentFactory? ComponentFactory { get; }
 
     /// <summary>
     /// Resolves the arguments passed to <see cref="Component"/> from the resolved location, or
@@ -127,4 +203,25 @@ public sealed class RouteRecord
     /// preserves AOT-safe discovery without activating a component before its route is confirmed.
     /// </summary>
     public IRouteEnterGuard? RouteEnterGuard { get; }
+
+    internal async Task ResolveComponentAsync(CancellationToken cancellationToken)
+    {
+        RouteComponentFactory? componentFactory = ComponentFactory;
+        if (componentFactory is null || _resolvedComponent is not null)
+        {
+            return;
+        }
+
+        ComponentNode resolvedComponent = await componentFactory(cancellationToken)
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (resolvedComponent is null)
+        {
+            throw new InvalidOperationException(
+                "A lazy route component factory returned null instead of a ComponentNode request.");
+        }
+
+        _resolvedComponent = resolvedComponent;
+        Component = resolvedComponent;
+    }
 }

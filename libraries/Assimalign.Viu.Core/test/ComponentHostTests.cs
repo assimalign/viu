@@ -380,6 +380,99 @@ public sealed class ComponentHostTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_PublicOperationSurface_RunsAfterPrefetchWithoutTreeRender()
+    {
+        ComponentReference reference = ComponentReference.ForType(typeof(OrderedPrefetchComponent));
+        ComponentFactory components = new();
+        List<string> order = [];
+        OrderedPrefetchComponent? expectedInstance = null;
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(renderCacheSize: 5),
+                _ => expectedInstance = new OrderedPrefetchComponent(order)));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(components, new ImmediateWatchScheduler()));
+        IComponent? actualInstance = null;
+        ComponentRenderFrame? actualFrame = null;
+        IComponentRenderScope? actualScope = null;
+
+        ComponentRenderOperationOutcome outcome = await host.ExecuteAsync(
+            new ComponentRenderRequest(new ComponentNode(reference)),
+            (instance, frame, scope) =>
+            {
+                order.Add("operation");
+                actualInstance = instance;
+                actualFrame = frame;
+                actualScope = scope;
+                scope.Tree.ShouldBeNull();
+                return ValueTask.CompletedTask;
+            });
+
+        outcome.ShouldBe(ComponentRenderOperationOutcome.Succeeded);
+        actualInstance.ShouldBeSameAs(expectedInstance);
+        actualFrame.ShouldNotBeNull().Cache.Length.ShouldBe(5);
+        actualScope.ShouldNotBeNull().Context.ShouldNotBeNull();
+        order.ShouldBe(["prefetch", "operation"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HandledOperationFailure_ReturnsNamedOutcomeAndReleasesLifetime()
+    {
+        ComponentReference reference = ComponentReference.ForType(typeof(LifecycleComponent));
+        ComponentFactory components = new();
+        LifecycleProbe probe = new();
+        List<string> diagnostics = [];
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new LifecycleComponent(probe)));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(
+                components,
+                new ImmediateWatchScheduler(),
+                errorHandler: (_, _, diagnosticInformation) =>
+                    diagnostics.Add(diagnosticInformation)));
+
+        ComponentRenderOperationOutcome outcome = await host.ExecuteAsync(
+            new ComponentRenderRequest(new ComponentNode(reference)),
+            (_, _, _) => throw new InvalidOperationException("operation failure"));
+
+        outcome.ShouldBe(ComponentRenderOperationOutcome.HandledFailure);
+        diagnostics.ShouldBe(["component render"]);
+        probe.LifetimeToken.IsCancellationRequested.ShouldBeTrue();
+        probe.TeardownOrder.ShouldBe(["lifetime", "scope", "instance"]);
+        probe.ClientHookRuns.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnhandledOperationFailure_PropagatesUnchangedAfterReleasingLifetime()
+    {
+        ComponentReference reference = ComponentReference.ForType(typeof(LifecycleComponent));
+        ComponentFactory components = new();
+        LifecycleProbe probe = new();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new LifecycleComponent(probe)));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(components, new ImmediateWatchScheduler()));
+        InvalidOperationException expected = new("operation failure");
+
+        InvalidOperationException actual = await Should.ThrowAsync<InvalidOperationException>(
+            async () => await host.ExecuteAsync(
+                new ComponentRenderRequest(new ComponentNode(reference)),
+                (_, _, _) => throw expected));
+
+        actual.ShouldBeSameAs(expected);
+        probe.LifetimeToken.IsCancellationRequested.ShouldBeTrue();
+        probe.TeardownOrder.ShouldBe(["lifetime", "scope", "instance"]);
+        probe.ClientHookRuns.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task RenderAsync_HandledRenderFailure_ReturnsAnEmptyTreeLease()
     {
         ComponentReference reference = ComponentReference.ForType(

@@ -1,0 +1,78 @@
+<Project>
+  <!--
+    DevTools is opt-in and outside both shared frameworks. WasmAppHost serves only the consuming
+    application's source wwwroot during dotnet run, so materialize the guarded postMessage bridge
+    there under its framework-qualified route. Register that generated source asset as application
+    content so the same route also flows to build and publish output. A disabled rebuild and Clean
+    remove only this exact generated file, keeping the source tree clean outside an enabled loop.
+
+    This file is used from two locations:
+      * build/Targets for a direct in-repository ProjectReference;
+      * buildTransitive in the Assimalign.Viu.DevTools package, beside its assets/ directory.
+  -->
+  <PropertyGroup>
+    <_ViuDevToolsSourceWebAssetPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', 'wwwroot', '_content', 'Assimalign.Viu.DevTools', 'viu-devtools.js'))</_ViuDevToolsSourceWebAssetPath>
+  </PropertyGroup>
+
+  <Target Name="ViuRegisterDevToolsWebAsset"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true' and '$(ViuEnableDevTools)' == 'true'">
+    <ItemGroup>
+      <_ViuDevToolsProjectReference Include="@(ProjectReference)"
+                                    Condition="'%(Filename)' == 'Assimalign.Viu.DevTools'" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_ViuDevToolsWebAssetRoot Condition="Exists('$(MSBuildThisFileDirectory)../assets/Assimalign.Viu.DevTools/viu-devtools.js')">$(MSBuildThisFileDirectory)../assets/Assimalign.Viu.DevTools/</_ViuDevToolsWebAssetRoot>
+      <_ViuDevToolsWebAssetRoot Condition="'$(_ViuDevToolsWebAssetRoot)' == '' and '@(_ViuDevToolsProjectReference)' != '' and Exists('$(MSBuildThisFileDirectory)../../libraries/Assimalign.Viu.DevTools/src/wwwroot/viu-devtools.js')">$(MSBuildThisFileDirectory)../../libraries/Assimalign.Viu.DevTools/src/wwwroot/</_ViuDevToolsWebAssetRoot>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(_ViuDevToolsWebAssetRoot)' != ''">
+      <_ViuDevToolsWebAsset Include="$(_ViuDevToolsWebAssetRoot)viu-devtools.js" />
+      <_ViuDevToolsSourceWebAsset Include="$(_ViuDevToolsSourceWebAssetPath)" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ViuDevToolsWebAsset)"
+          DestinationFiles="@(_ViuDevToolsSourceWebAsset)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_ViuDevToolsWebAsset)' != ''" />
+    <ItemGroup Condition="'@(_ViuDevToolsSourceWebAsset)' != ''">
+      <!-- A previous enabled build makes this a default wwwroot Content item at evaluation time. -->
+      <Content Remove="@(_ViuDevToolsSourceWebAsset)"
+               MatchOnMetadata="FullPath"
+               MatchOnMetadataOptions="PathLike" />
+      <Content Include="@(_ViuDevToolsSourceWebAsset)"
+               Link="wwwroot/_content/Assimalign.Viu.DevTools/viu-devtools.js"
+               TargetPath="wwwroot/_content/Assimalign.Viu.DevTools/viu-devtools.js"
+               CopyToOutputDirectory="PreserveNewest"
+               CopyToPublishDirectory="PreserveNewest"
+               ExcludeFromSingleFile="true"
+               Visible="false" />
+      <_ViuDevToolsProjectReference Remove="@(_ViuDevToolsProjectReference)" />
+      <_ViuDevToolsWebAsset Remove="@(_ViuDevToolsWebAsset)" />
+      <_ViuDevToolsSourceWebAsset Remove="@(_ViuDevToolsSourceWebAsset)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- A true-to-false rebuild owns and removes only the exact source and build assets it created. -->
+  <Target Name="RemoveDisabledViuDevToolsBuildAsset"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true' and '$(ViuEnableDevTools)' != 'true'">
+    <ItemGroup>
+      <_ViuDisabledDevToolsSourceWebAsset Include="$(_ViuDevToolsSourceWebAssetPath)" />
+      <_ViuDisabledDevToolsBuildWebAsset Include="$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(OutputPath)', 'wwwroot', '_content', 'Assimalign.Viu.DevTools', 'viu-devtools.js'))"
+                                              Condition="'$(OutputPath)' != ''" />
+      <Content Remove="@(_ViuDisabledDevToolsSourceWebAsset)"
+               MatchOnMetadata="FullPath"
+               MatchOnMetadataOptions="PathLike" />
+    </ItemGroup>
+    <Delete Files="@(_ViuDisabledDevToolsSourceWebAsset);@(_ViuDisabledDevToolsBuildWebAsset)" />
+    <ItemGroup>
+      <_ViuDisabledDevToolsSourceWebAsset Remove="@(_ViuDisabledDevToolsSourceWebAsset)" />
+      <_ViuDisabledDevToolsBuildWebAsset Remove="@(_ViuDisabledDevToolsBuildWebAsset)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CleanViuDevToolsSourceWebAsset"
+          AfterTargets="Clean"
+          Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
+    <Delete Files="$(_ViuDevToolsSourceWebAssetPath)" />
+  </Target>
+</Project>

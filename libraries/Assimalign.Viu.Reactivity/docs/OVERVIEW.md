@@ -10,6 +10,12 @@ boundary; first-party values and subscribers use abstract-class dispatch and int
 notification hot path. Batches defer delivery, computed values cache by dependency version, and
 effect scopes own deterministic cleanup.
 
+Request-oriented runtime composition enters `Reactive.EnterExecutionFlow()` before executing an
+independently owned application graph. The returned idempotent lease restores the prior ambient
+flow after the request, so tracking, batching, and scope bookkeeping cannot cross request
+boundaries. This host seam is public by design; no sibling library receives friend access to the
+reactivity engine (`[EXE-1]`, `[CMP-33]`).
+
 Reactive objects are generated at build time. Runtime member interception, reflection activation,
 and dynamic code generation are not part of the model. Collections use dedicated typed
 implementations, and deep traversal follows explicit reactive contracts rather than inspecting

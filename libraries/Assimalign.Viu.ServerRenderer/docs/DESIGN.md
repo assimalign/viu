@@ -9,16 +9,15 @@ middleware (`[SSR-2]`, `[SSR-3]`).
 
 A traversal component subtree is obtained through
 `ComponentHost.RenderAsync(ComponentRenderRequest)`. A generated server registration instead uses
-Core's internal `ActivateForServerAsync` friend seam: it performs the same resolution, setup,
-server-prefetch, cancellation, and teardown but deliberately does not call the client renderer.
-Both paths retain an `IComponentRenderScope` as the nested parent. Disposal cancels the lifetime,
-stops its scope, and disposes the authored instance without invoking client mount or unmount hooks
-(`[SSR-4]`, `[SSR-5]`, `[SSR-10]`, `[SSR-TARGET-3]`).
+the public `ComponentHost.ExecuteAsync` operation seam. Core performs the same resolution, setup,
+server-prefetch, cancellation, error routing, and teardown without calling the client renderer; the
+callback receives only `IComponent`, `ComponentRenderFrame`, and `IComponentRenderScope` while the
+lease is live. Its named outcome tells ServerRenderer whether to commit the buffered body or emit
+the handled-failure placeholder (`[SSR-4]`, `[SSR-5]`, `[SSR-10]`, `[SSR-TARGET-3]`).
 
-This activation-and-lease pair is the complete runtime seam. ServerRenderer does not downcast
-`ComponentContext`, reach internal mounted state, or probe hidden capabilities. The existing friend
-assembly boundary exposes only the one-shot activation needed to avoid executing a client render
-before a compiled server body (`[CMP-33]`, `[SSR-TARGET-3]`).
+These two public ComponentHost operations are the complete runtime seam. ServerRenderer does not
+downcast `ComponentContext`, reach internal activation or mounted state, probe hidden capabilities,
+or require friend access to Core (`[CMP-33]`, `[SSR-TARGET-3]`).
 
 ## Serialization
 
@@ -95,8 +94,9 @@ identities before validating that the application uses the requested root, strea
 identities matters because a rejected scope is disposed and neither object may safely reappear.
 Weak identity tracking prevents reuse without retaining completed requests (`[V01.01.07.04]`).
 
-Both renderer entry paths enter `CoreExecutionIsolation` before user component code. That internal
-lease supplies independent component-current, scheduler, reactive tracking/batching/scope, and State
+Both renderer entry paths call `RuntimeExecution.EnterExecutionFlow` before user component code.
+That public lease composes the public Core, Reactivity, and State flow boundaries, supplies
+independent component-current, scheduler, reactive tracking/batching/scope, and State
 setup/active-registry bookkeeping across asynchronous continuations, then restores the caller's
 logical state. This closes ambient cross-request races without making a request graph itself
 thread-safe (`[EXE-1]`, `[SSR-9]`).

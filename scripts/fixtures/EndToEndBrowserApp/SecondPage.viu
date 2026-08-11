@@ -1,5 +1,5 @@
 <template>
-    <main id="second-view" data-testid="second-view">
+    <main id="second-view" data-testid="second-view" style="min-height: 2400px;">
         <h1 data-testid="route-heading">Second route</h1>
         <RouterLink to="/" data-testid="route-home">Return home</RouterLink>
     </main>

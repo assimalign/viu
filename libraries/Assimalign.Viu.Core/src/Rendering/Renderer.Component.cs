@@ -88,6 +88,13 @@ public sealed partial class Renderer<TNode>
             renderEffect.Scheduler = () => Scheduler.QueueJob(renderJob);
             Register(tree, value, mounted);
             UpdateReference(tree, mounted, null, value.MountReference);
+            if (RuntimeInspection.IsEnabled)
+            {
+                RuntimeInspectionComponent inspectionComponent =
+                    CreateRuntimeInspectionComponent(mounted);
+                RuntimeInspection.NotifyMounted(in inspectionComponent);
+            }
+
             QueueMountedLifecycle(mounted);
             mounted.HotReloadRegistration = ComponentHotReload.RegisterMountedComponent(
                 activation.Instance.GetType(),
@@ -139,6 +146,12 @@ public sealed partial class Renderer<TNode>
 
         UpdateReference(tree, mounted, previous.MountReference, next.MountReference);
         ReplaceValue(tree, mounted, next);
+        if (RuntimeInspection.IsEnabled)
+        {
+            RuntimeInspectionComponent inspectionComponent =
+                CreateRuntimeInspectionComponent(mounted);
+            RuntimeInspection.NotifyUpdated(in inspectionComponent);
+        }
     }
 
     private static bool ShouldUpdateComponent(
@@ -261,6 +274,18 @@ public sealed partial class Renderer<TNode>
             anchor,
             mounted.Context);
         mounted.PendingTree = null;
+        if (RuntimeInspection.IsEnabled)
+        {
+            NotifyRuntimeInspectionOrder(mounted.Subtree);
+        }
+
+        if (!force && RuntimeInspection.IsEnabled)
+        {
+            RuntimeInspectionComponent inspectionComponent =
+                CreateRuntimeInspectionComponent(mounted);
+            RuntimeInspection.NotifyUpdated(in inspectionComponent);
+        }
+
         Scheduler.QueuePostFlushCallback(
             new SchedulerJob(
                 () =>
@@ -629,9 +654,28 @@ public sealed partial class Renderer<TNode>
         mounted.RenderEffect.Stop();
         mounted.HotReloadRegistration?.Dispose();
         mounted.HotReloadRegistration = null;
-        mounted.Activation.ReleaseClient(
-            () => Unmount(tree, mounted.Subtree, removeHostNodes));
+        try
+        {
+            mounted.Activation.ReleaseClient(
+                () => Unmount(tree, mounted.Subtree, removeHostNodes));
+        }
+        finally
+        {
+            if (RuntimeInspection.IsEnabled)
+            {
+                RuntimeInspection.NotifyUnmounted(mounted.Instance);
+            }
+        }
     }
+
+    private static RuntimeInspectionComponent CreateRuntimeInspectionComponent(
+        MountedComponent<TNode> mounted) => new(
+            mounted.Instance,
+            mounted.Owner?.Instance,
+            mounted.Activation.Registration.Contract,
+            mounted.Context.Bindings,
+            mounted.Context.HasExposedValue ? mounted.Context.ExposedValue : null,
+            mounted.Value.Key);
 
     private void QueueComponentRemount(
         MountedTree<TNode> tree,

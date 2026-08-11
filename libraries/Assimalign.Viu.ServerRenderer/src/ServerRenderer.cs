@@ -195,7 +195,7 @@ public static class ServerRenderer
         CancellationToken cancellationToken,
         IServerRenderRegistry? serverRenders)
     {
-        using IDisposable executionIsolation = CoreExecutionIsolation.Enter();
+        using IDisposable executionIsolation = RuntimeExecution.EnterExecutionFlow();
         cancellationToken.ThrowIfCancellationRequested();
         IApplicationContext applicationContext = application.Context;
         ServerRenderStatePayload.PrepareContext(context);

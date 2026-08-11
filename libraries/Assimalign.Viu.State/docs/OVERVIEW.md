@@ -4,6 +4,12 @@ State is a state-management **convention** layered on the component model. It re
 Reactivity and Components, and owns reusable store definitions, explicit registry lifetimes,
 detached registry roots, attached per-store effect scopes, and optional service/watch composition.
 
+Request-oriented runtime composition enters `StateStores.EnterExecutionFlow()` before assigning a
+request-owned active registry. The returned idempotent lease restores the prior ambient setup and
+registry values after the request, while registry creation and disposal remain explicit. This host
+seam is public by design; no sibling library receives friend access to State internals (`[EXE-1]`,
+`[CMP-33]`).
+
 A lightweight store may be any object returned by an AOT-safe `StateStoreActivator<TStore>`.
 `StateStore<TState>` is the optional richer base for `Patch`, `Reset`, `Subscribe`, and `OnAction`
 over a source-generated reactive state object. The live state object is never replaced, and object

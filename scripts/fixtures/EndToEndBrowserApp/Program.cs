@@ -22,7 +22,7 @@ internal static class Program
         components.Register(RouterLink.Registration);
         components.Register(RegisterByName("RouterLink", RouterLink.Registration));
 
-        using IRouterHistory history = RouterHistory.CreateWebHash();
+        using IRouterHistory history = BrowserRouterHistory.CreateWebHash();
         using ViuRouter router = new(
             history,
             [
@@ -33,6 +33,9 @@ internal static class Program
                     "/second",
                     component: new ComponentNode(ComponentReference.ForName("SecondPage"))),
             ]);
+        router.ScrollBehavior = static (_, _, savedPosition) =>
+            Task.FromResult<ScrollTarget?>(
+                new ScrollTarget(savedPosition ?? new ScrollPosition(0, 0)));
         RouterServiceProvider services = new(router);
 
         await using BrowserApplication application = new BrowserApplicationBuilder()

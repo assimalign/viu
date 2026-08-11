@@ -21,6 +21,12 @@ The registry contract is synchronous. It deliberately does not block the single-
 waiting for an `IAsyncDisposable` implementation. A store with only asynchronous cleanup must keep
 that lifetime host-owned rather than relying on registry disposal.
 
+`StateStores.EnterExecutionFlow()` installs a fresh ambient setup context and active-registry slot
+for a request-oriented host. Its idempotent lease restores the previous flow when nested leases are
+disposed in last-in, first-out order. The lease neither creates nor disposes a registry: the caller
+continues to own the request registry explicitly. Keeping this host operation on the public facade
+lets Core compose state isolation without cross-library friend access (`[EXE-1]`, `[CMP-33]`).
+
 ## Setup and convention attachment
 
 Definitions contain a diagnostic `Identifier`, its equivalent ordinal `Key`, and one explicit

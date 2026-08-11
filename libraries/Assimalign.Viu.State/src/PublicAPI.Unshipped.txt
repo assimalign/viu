@@ -20,6 +20,7 @@ Assimalign.Viu.State.StateStorePayload.Version.get -> int
 Assimalign.Viu.State.StateStoreRegistry.CapturePayload() -> Assimalign.Viu.State.StateStorePayload!
 Assimalign.Viu.State.StateStoreRegistry.RestorePayload(Assimalign.Viu.State.StateStorePayload! payload) -> void
 const Assimalign.Viu.State.StateStorePayload.CurrentVersion = 1 -> int
+static Assimalign.Viu.State.StateStores.EnterExecutionFlow() -> System.IDisposable!
 static Assimalign.Viu.State.StateStorePayload.Parse(string! json) -> Assimalign.Viu.State.StateStorePayload!
 static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, Assimalign.Viu.State.StateStoreActivator<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!
 static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, System.Func<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!

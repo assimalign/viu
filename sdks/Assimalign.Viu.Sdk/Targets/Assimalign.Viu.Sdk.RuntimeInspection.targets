@@ -1,0 +1,40 @@
+<Project>
+    <!--
+        Read ViuEnableDevTools here, after the consuming project body has been evaluated. Trim=true
+        tells the linker to substitute RuntimeInspection.IsSupported with this fixed value; the
+        default false branch then erases the renderer's guarded inspection calls.
+    -->
+    <ItemGroup>
+        <RuntimeHostConfigurationOption
+            Include="Assimalign.Viu.RuntimeInspection.IsSupported"
+            Value="$(ViuEnableDevTools)"
+            Trim="true" />
+    </ItemGroup>
+
+    <!--
+        Microsoft.NET.ILLink.targets does not include trimmed runtime-host configuration options in
+        _RunILLink's incremental inputs. Give the DevTools feature state a stable, linker-owned input
+        whose timestamp changes only when the state changes, so a true-to-false publish cannot reuse
+        the enabled link result from the same intermediate directory.
+    -->
+    <Target Name="ViuPrepareRuntimeInspectionLinkInput"
+            BeforeTargets="PrepareForILLink"
+            Condition="'$(PublishTrimmed)' == 'true'">
+        <PropertyGroup>
+            <_ViuRuntimeInspectionLinkState>disabled</_ViuRuntimeInspectionLinkState>
+            <_ViuRuntimeInspectionLinkState Condition="'$(ViuEnableDevTools)' == 'true'">enabled</_ViuRuntimeInspectionLinkState>
+            <_ViuRuntimeInspectionLinkDescriptor>$(IntermediateOutputPath)viu-runtime-inspection-linker.xml</_ViuRuntimeInspectionLinkDescriptor>
+        </PropertyGroup>
+        <MakeDir Directories="$(IntermediateOutputPath)"
+                 Condition="'$(IntermediateOutputPath)' != '' and !Exists('$(IntermediateOutputPath)')" />
+        <WriteLinesToFile File="$(_ViuRuntimeInspectionLinkDescriptor)"
+                          Lines="&lt;linker&gt;&lt;!-- Assimalign.Viu.RuntimeInspection.IsSupported=$(_ViuRuntimeInspectionLinkState) --&gt;&lt;/linker&gt;"
+                          Overwrite="true"
+                          WriteOnlyWhenDifferent="true"
+                          Encoding="UTF-8" />
+        <ItemGroup>
+            <TrimmerRootDescriptor Include="$(_ViuRuntimeInspectionLinkDescriptor)" />
+            <FileWrites Include="$(_ViuRuntimeInspectionLinkDescriptor)" />
+        </ItemGroup>
+    </Target>
+</Project>

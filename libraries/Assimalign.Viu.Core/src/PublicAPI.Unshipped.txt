@@ -30,3 +30,30 @@ Assimalign.Viu.RendererOptions<TNode>.ScheduleHydrationTrigger.get -> System.Fun
 Assimalign.Viu.RendererOptions<TNode>.ScheduleHydrationTrigger.init -> void
 const Assimalign.Viu.HydrationMarkers.LazyHydrationEnd = "<!--lazy hydration end-->" -> string!
 static Assimalign.Viu.HydrationMarkers.GetLazyHydrationStart(Assimalign.Viu.Components.HydrationStrategyKind kind) -> string!
+Assimalign.Viu.IRuntimeInspectionHook
+Assimalign.Viu.IRuntimeInspectionHook.ComponentEvent(object! instance, string! name, System.Collections.Generic.IReadOnlyList<object?>! arguments) -> void
+Assimalign.Viu.IRuntimeInspectionHook.ComponentMounted(in Assimalign.Viu.RuntimeInspectionComponent component) -> void
+Assimalign.Viu.IRuntimeInspectionHook.ComponentReordered(object! instance, int index) -> void
+Assimalign.Viu.IRuntimeInspectionHook.ComponentUnmounted(object! instance) -> void
+Assimalign.Viu.IRuntimeInspectionHook.ComponentUpdated(in Assimalign.Viu.RuntimeInspectionComponent component) -> void
+Assimalign.Viu.RuntimeInspection
+Assimalign.Viu.RuntimeInspectionComponent
+Assimalign.Viu.RuntimeInspectionComponent.Bindings.get -> Assimalign.Viu.Components.ComponentBindings!
+Assimalign.Viu.RuntimeInspectionComponent.Contract.get -> Assimalign.Viu.Components.ComponentContract!
+Assimalign.Viu.RuntimeInspectionComponent.ExposedState.get -> object?
+Assimalign.Viu.RuntimeInspectionComponent.Instance.get -> Assimalign.Viu.Components.IComponent!
+Assimalign.Viu.RuntimeInspectionComponent.Key.get -> object?
+Assimalign.Viu.RuntimeInspectionComponent.Parent.get -> Assimalign.Viu.Components.IComponent?
+Assimalign.Viu.RuntimeInspectionComponent.RuntimeInspectionComponent() -> void
+const Assimalign.Viu.RuntimeInspection.FeatureSwitchName = "Assimalign.Viu.RuntimeInspection.IsSupported" -> string!
+static Assimalign.Viu.RuntimeInspection.IsEnabled.get -> bool
+static Assimalign.Viu.RuntimeInspection.IsSupported.get -> bool
+static Assimalign.Viu.RuntimeInspection.Use(Assimalign.Viu.IRuntimeInspectionHook! hook) -> System.IDisposable!
+Assimalign.Viu.ComponentRenderOperation
+virtual Assimalign.Viu.ComponentRenderOperation.Invoke(Assimalign.Viu.Components.IComponent! component, Assimalign.Viu.Components.ComponentRenderFrame! frame, Assimalign.Viu.IComponentRenderScope! scope) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.ComponentRenderOperationOutcome
+Assimalign.Viu.ComponentRenderOperationOutcome.HandledFailure = 1 -> Assimalign.Viu.ComponentRenderOperationOutcome
+Assimalign.Viu.ComponentRenderOperationOutcome.Succeeded = 0 -> Assimalign.Viu.ComponentRenderOperationOutcome
+Assimalign.Viu.ComponentHost.ExecuteAsync(Assimalign.Viu.ComponentRenderRequest! request, Assimalign.Viu.ComponentRenderOperation! operation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.ComponentRenderOperationOutcome>
+Assimalign.Viu.RuntimeExecution
+static Assimalign.Viu.RuntimeExecution.EnterExecutionFlow() -> System.IDisposable!

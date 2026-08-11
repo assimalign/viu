@@ -604,8 +604,69 @@ internal sealed class EndToEndHarness
         await NavigateAsync(page, new Uri(browserAddress, "#/").AbsoluteUri);
         await RequireTextAsync(page, "route-heading", "Home route");
 
-        await page.Locator("[data-testid='route-second']").ClickAsync();
+        // WHATWG HTML defines history.scrollRestoration and CSSOM View defines the offsets in Viu's
+        // saved-position ledger. This exercises the shipped module in an isolated same-origin realm:
+        // https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-history-scroll-restoration-dev
+        // https://drafts.csswg.org/cssom-view/#dom-window-scrollx
+        string activeScrollRestoration = await page.EvaluateAsync<string>(
+            "window.history.scrollRestoration");
+        Require(
+            string.Equals(activeScrollRestoration, "manual", StringComparison.Ordinal),
+            "Browser.Router did not suspend native scroll restoration while its history was active.");
+        bool[] restorationLifecycle = await page.EvaluateAsync<bool[]>(
+            """
+            async () => {
+                const frame = document.createElement('iframe')
+                frame.src = 'about:blank'
+                document.body.appendChild(frame)
+                try {
+                    const frameWindow = frame.contentWindow
+                    const previous = frameWindow.history.scrollRestoration
+                    const moduleAddress = new URL(
+                        '/_content/Assimalign.Viu.Browser.Router/viu-history.js',
+                        window.location.href)
+                    moduleAddress.searchParams.set('contract', `${Date.now()}-${Math.random()}`)
+                    const module = await frameWindow.eval(
+                        `import(${JSON.stringify(moduleAddress.href)})`)
+                    module.history.subscribe(1000001)
+                    const firstIsManual = frameWindow.history.scrollRestoration === 'manual'
+                    module.history.subscribe(1000002)
+                    module.history.unsubscribe(1000001)
+                    const coexistingIsManual = frameWindow.history.scrollRestoration === 'manual'
+                    module.history.unsubscribe(1000002)
+                    const previousWasRestored =
+                        frameWindow.history.scrollRestoration === previous
+                    return [firstIsManual, coexistingIsManual, previousWasRestored]
+                }
+                finally {
+                    frame.remove()
+                }
+            }
+            """);
+        Require(
+            restorationLifecycle.SequenceEqual([true, true, true]),
+            "The history module did not hold manual restoration until the last subscription disposed.");
+
+        await page.EvaluateAsync("window.scrollTo({ left: 0, top: 900, behavior: 'instant' })");
+        await RequireScrollOffsetAsync(page, 900);
+
+        // Programmatic dispatch preserves the deliberate leaving offset; Locator.ClickAsync would
+        // scroll the top-of-page link into view before the history module captures the ledger entry.
+        await page.EvaluateAsync(
+            "document.querySelector('[data-testid=route-second]').click()");
         await RequireTextAsync(page, "route-heading", "Second route");
+        await RequireScrollOffsetAsync(page, 0);
+        await page.EvaluateAsync("window.scrollTo({ left: 0, top: 500, behavior: 'instant' })");
+        await RequireScrollOffsetAsync(page, 500);
+
+        await page.GoBackAsync();
+        await RequireTextAsync(page, "route-heading", "Home route");
+        await RequireScrollOffsetAsync(page, 900);
+
+        await page.GoForwardAsync();
+        await RequireTextAsync(page, "route-heading", "Second route");
+        await RequireScrollOffsetAsync(page, 500);
+
         await page.Locator("[data-testid='route-home']").ClickAsync();
         await RequireTextAsync(page, "route-heading", "Home route");
 
@@ -671,6 +732,13 @@ internal sealed class EndToEndHarness
             page,
             "next-tick-result",
             "rendered-before-next-tick");
+    }
+
+    private static Task RequireScrollOffsetAsync(IPage page, double expected)
+    {
+        return WaitUntilAsync(
+            async () => Math.Abs(await page.EvaluateAsync<double>("window.scrollY") - expected) < 1,
+            $"the router to restore scroll offset {expected.ToString(CultureInfo.InvariantCulture)}");
     }
 
     private static async Task RunHydrationScenarioAsync(IPage page, Uri hydrationAddress)
