@@ -184,6 +184,12 @@ function Invoke-DotNetExpectFailure {
         throw "Expected dotnet to fail: dotnet $($Arguments -join ' ')"
     }
 
+    # The non-zero code is the asserted result and is fully consumed here, so clear it. The
+    # shadow-diagnostic build is the script's last native command; leaving $LASTEXITCODE at 1
+    # made the GitHub Actions pwsh shell -- which exits with $LASTEXITCODE when the variable is
+    # set -- fail the step after every check had passed. Failures are signalled by throw.
+    $global:LASTEXITCODE = 0
+
     return $output -join [System.Environment]::NewLine
 }
 
