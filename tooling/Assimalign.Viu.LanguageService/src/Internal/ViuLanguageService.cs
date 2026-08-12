@@ -440,6 +440,31 @@ internal sealed class ViuLanguageService :
         };
     }
 
+    public IReadOnlyList<LanguageLocation> GetDefinition(
+        string documentUri,
+        LanguagePosition position,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var (document, _) = CaptureSnapshot(documentUri);
+        var projectContext = CaptureProjectContext(documentUri);
+        if (document is null ||
+            projectContext is null ||
+            !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
+        {
+            return Array.Empty<LanguageLocation>();
+        }
+
+        return scriptSemantics.GetDefinition(
+            projectContext,
+            GetDocumentFilePath(documentUri),
+            document.Text,
+            offset,
+            cancellationToken);
+    }
+
     public string? ResolveCompletionDocumentation(
         string documentUri,
         string completionLabel,

@@ -237,6 +237,7 @@ internal sealed class LanguageServerHost
 
                 case "textDocument/completion":
                 case "textDocument/hover":
+                case "textDocument/definition":
                 case "completionItem/resolve":
                 case "textDocument/documentSymbol":
                 case "textDocument/foldingRange":
@@ -431,13 +432,18 @@ internal sealed class LanguageServerHost
         {
             case "textDocument/completion":
             case "textDocument/hover":
+            case "textDocument/definition":
             {
                 var (documentUri, position) = GetDocumentPosition(parameters);
                 if (!IsOpenAndSupported(documentUri))
                 {
-                    inlineResult = method == "textDocument/completion"
-                        ? CreateCompletionList(new JsonArray(), isIncomplete: false)
-                        : null;
+                    inlineResult = method switch
+                    {
+                        "textDocument/completion" =>
+                            CreateCompletionList(new JsonArray(), isIncomplete: false),
+                        "textDocument/definition" => new JsonArray(),
+                        _ => null,
+                    };
                     return null;
                 }
 
@@ -678,6 +684,9 @@ internal sealed class LanguageServerHost
                 request,
                 documentState!,
                 cancellationToken),
+            "textDocument/definition" => ComputeDefinitionResult(
+                request,
+                cancellationToken),
             "completionItem/resolve" => ComputeCompletionItemResolveResult(
                 request,
                 documentState!,
@@ -879,6 +888,58 @@ internal sealed class LanguageServerHost
         return CreateCompletionList(
             items,
             completions.Count >= LanguageCompletionLimits.MaximumItems);
+    }
+
+    /// <summary>
+    /// Answers <c>textDocument/definition</c> with the authored declarations of the symbol at the
+    /// requested position.
+    /// </summary>
+    /// <remarks>
+    /// Always an array, empty included: the protocol allows a null result, but a symbol with more
+    /// than one declaration is ordinary in C# and one shape for every answer keeps the client from
+    /// having to tell the two apart. Paths become URIs here because a path is what the language
+    /// service speaks and a URI is what the protocol does.
+    /// </remarks>
+    private JsonNode ComputeDefinitionResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
+    {
+        var locations = new JsonArray();
+        foreach (var location in languageService.GetDefinition(
+                     request.DocumentUri,
+                     request.Position,
+                     cancellationToken))
+        {
+            if (!TryCreateDocumentUri(location.FilePath, out var uri))
+            {
+                continue;
+            }
+
+            locations.Add((JsonNode)new JsonObject
+            {
+                ["uri"] = uri,
+                ["range"] = ToJsonRange(location.Range),
+            });
+        }
+
+        return locations;
+    }
+
+    private static bool TryCreateDocumentUri(string filePath, out string uri)
+    {
+        uri = string.Empty;
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        if (Uri.TryCreate(filePath, UriKind.Absolute, out var absolute))
+        {
+            uri = absolute.AbsoluteUri;
+            return true;
+        }
+
+        return false;
     }
 
     private JsonNode? ComputeHoverResult(
@@ -1381,6 +1442,7 @@ internal sealed class LanguageServerHost
                         "'"),
                 },
                 ["hoverProvider"] = true,
+                ["definitionProvider"] = true,
                 ["documentSymbolProvider"] = true,
                 ["foldingRangeProvider"] = true,
                 ["semanticTokensProvider"] =

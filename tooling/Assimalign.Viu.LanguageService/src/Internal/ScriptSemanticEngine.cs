@@ -633,6 +633,61 @@ internal sealed class ScriptSemanticEngine
     }
 
     /// <summary>
+    /// Resolves where the symbol at one authored position is declared, in authored coordinates.
+    /// [V01.01.12.07.16]
+    /// </summary>
+    /// <param name="context">The host-fed project context.</param>
+    /// <param name="documentFilePath">The document's file path.</param>
+    /// <param name="documentText">The document's live editor text.</param>
+    /// <param name="documentOffset">The zero-based offset the request was made at.</param>
+    /// <param name="cancellationToken">The token cancelling the computation.</param>
+    /// <returns>The declaring locations, empty when the position names nothing declared in source.</returns>
+    /// <remarks>
+    /// The position is bound wherever it lives — the merged <c>@script</c> block or a template
+    /// expression's image in the render body — and every declaration found is carried back through
+    /// the <c>#line</c> map of whichever document declares it. A component's member is declared in
+    /// that component's generated document, so navigating there without the map would open a file the
+    /// author never wrote; a location that will not map is dropped rather than reported at a
+    /// position that means nothing.
+    /// </remarks>
+    internal IReadOnlyList<LanguageLocation> GetDefinition(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return GetDefinitionCore(
+                    context,
+                    documentFilePath,
+                    documentText,
+                    documentOffset,
+                    cancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Navigation is additive: a projection or binding failure leaves the position
+            // un-navigable rather than failing the request.
+            return Array.Empty<LanguageLocation>();
+        }
+    }
+
+    /// <summary>
     /// Resolves deferred documentation for a label from the document's most recent semantic
     /// completion: the symbol's signature plus its XML documentation summary (source-declared
     /// <c>///</c> or the reference assembly's sibling <c>.xml</c> provider).
@@ -1107,6 +1162,155 @@ internal sealed class ScriptSemanticEngine
             new LanguageRange(
                 TextCoordinateConverter.GetPosition(documentText, start),
                 TextCoordinateConverter.GetPosition(documentText, end)));
+    }
+
+    private IReadOnlyList<LanguageLocation> GetDefinitionCore(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        CancellationToken cancellationToken)
+    {
+        var request = CreateLiveDocumentRequest(
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken);
+
+        // The @script block maps affinely; a template expression only exists in the render body. One
+        // request answers both, because the author does not think of them as different documents.
+        if (!request.Mapper.TryMapFileOffsetToGenerated(documentOffset, out var generatedPosition) &&
+            !request.Mapper.TryMapTemplateExpressionOffsetToGenerated(
+                documentOffset,
+                out generatedPosition))
+        {
+            return Array.Empty<LanguageLocation>();
+        }
+
+        if (generatedPosition >= request.Root.FullSpan.End)
+        {
+            return Array.Empty<LanguageLocation>();
+        }
+
+        var token = request.Root.FindToken(generatedPosition);
+        if (!token.Span.Contains(generatedPosition) || token.Span.Length == 0)
+        {
+            return Array.Empty<LanguageLocation>();
+        }
+
+        var symbol = ResolveHoverSymbol(request.SemanticModel, token, cancellationToken);
+        if (symbol is IAliasSymbol alias)
+        {
+            symbol = alias.Target;
+        }
+
+        if (symbol is null)
+        {
+            return Array.Empty<LanguageLocation>();
+        }
+
+        var locations = new List<LanguageLocation>();
+        foreach (var location in symbol.OriginalDefinition.Locations)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (location.IsInSource &&
+                TryMapDeclarationLocation(request, location, documentText, out var authored))
+            {
+                locations.Add(authored);
+            }
+        }
+
+        return locations;
+    }
+
+    /// <summary>
+    /// Carries one declaration back to the file the author wrote it in.
+    /// </summary>
+    /// <remarks>
+    /// Three kinds of declaring document. The live one is mapped by the request's own map. A sibling
+    /// component is projected too, so it gets a map built from its authored text and the generated
+    /// text already parsed for it. A plain C# sibling was never projected, so its tree <em>is</em> the
+    /// authored file and its span needs no translation at all.
+    /// </remarks>
+    private static bool TryMapDeclarationLocation(
+        LiveDocumentRequest request,
+        Location location,
+        string documentText,
+        out LanguageLocation authored)
+    {
+        authored = default;
+        var tree = location.SourceTree;
+        if (tree is null)
+        {
+            return false;
+        }
+
+        var span = location.SourceSpan;
+        if (ReferenceEquals(tree, request.Tree))
+        {
+            if (!request.Mapper.TryMapGeneratedSpanToFile(
+                    span.Start,
+                    span.Length,
+                    out var liveStart,
+                    out var liveLength))
+            {
+                return false;
+            }
+
+            authored = new LanguageLocation(
+                tree.FilePath,
+                new LanguageRange(
+                    TextCoordinateConverter.GetPosition(documentText, liveStart),
+                    TextCoordinateConverter.GetPosition(documentText, liveStart + liveLength)));
+            return true;
+        }
+
+        if (!request.ProjectState.Trees.TryGetValue(tree.FilePath, out var sibling) ||
+            !ReferenceEquals(sibling.Tree, tree))
+        {
+            return false;
+        }
+
+        if (!sibling.IsComponent)
+        {
+            var lineSpan = location.GetLineSpan();
+            authored = new LanguageLocation(
+                tree.FilePath,
+                new LanguageRange(
+                    new LanguagePosition(
+                        lineSpan.StartLinePosition.Line,
+                        lineSpan.StartLinePosition.Character),
+                    new LanguagePosition(
+                        lineSpan.EndLinePosition.Line,
+                        lineSpan.EndLinePosition.Character)));
+            return true;
+        }
+
+        var siblingMapper = GeneratedScriptDocumentMapper.Create(
+            sibling.Text,
+            tree.ToString(),
+            tree.FilePath);
+        if (!siblingMapper.TryMapGeneratedSpanToFile(
+                span.Start,
+                span.Length,
+                out var siblingStart,
+                out var siblingLength))
+        {
+            // The component's own class is scaffold: the author wrote a file, not a type, so there is
+            // no authored name to land on. The file is the declaration, and opening it is the answer
+            // the author expects from asking where the component is.
+            authored = new LanguageLocation(
+                tree.FilePath,
+                new LanguageRange(new LanguagePosition(0, 0), new LanguagePosition(0, 0)));
+            return true;
+        }
+
+        authored = new LanguageLocation(
+            tree.FilePath,
+            new LanguageRange(
+                TextCoordinateConverter.GetPosition(sibling.Text, siblingStart),
+                TextCoordinateConverter.GetPosition(sibling.Text, siblingStart + siblingLength)));
+        return true;
     }
 
     // The authored name under the caret. An expression's generated image is the compiler's, so the

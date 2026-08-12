@@ -290,11 +290,17 @@ internal sealed class GeneratedScriptDocumentMapper
     /// available: the offset's distance from the expression's start is its distance from the anchor
     /// column. The compiler rewrites expression <em>roots</em> (a component member becomes
     /// <c>component.Member</c>) but records the mapping at the rewritten identifier, so the text from
-    /// the anchor onward is the authored text verbatim — verified here character-for-character before
+    /// the anchor onward is the authored text verbatim - verified here character-for-character before
     /// answering, so a rewrite the map did not anticipate can never place the caret on another token.
-    /// The narrowest expression containing the offset wins, and an offset the compiler dropped
-    /// entirely (a malformed <c>v-for</c>, an expression sharing a generated line with the one that
-    /// claimed the anchor) has no image at all.
+    /// <para>
+    /// An anchor says where an expression <em>starts</em>, not how far it reaches: a rewritten root is
+    /// recorded against the identifier alone, so the rest of <c>Item.Name</c> lies past the anchor
+    /// while still being the same expression running verbatim. The nearest anchor beginning at or
+    /// before the offset on its line therefore wins, and the character-for-character check is what
+    /// makes reaching past it safe. An offset the compiler dropped entirely - a malformed
+    /// <c>v-for</c>, an expression sharing a generated line with the one that claimed the anchor -
+    /// has no image at all.
+    /// </para>
     /// </remarks>
     internal bool TryMapTemplateExpressionOffsetToGenerated(int fileOffset, out int generatedOffset)
     {
@@ -304,23 +310,21 @@ internal sealed class GeneratedScriptDocumentMapper
             return false;
         }
 
-        var matchedLength = int.MaxValue;
+        var fileLine = GetLineIndex(fileLineStarts, fileOffset);
+        var matchedStart = -1;
         foreach (var pair in renderExpressionAnchors)
         {
             var anchor = pair.Value;
             if (pair.Key >= generatedLineStarts.Length ||
-                anchor.StartLine >= fileLineStarts.Length ||
-                anchor.EndLine >= fileLineStarts.Length)
+                anchor.StartLine != fileLine ||
+                anchor.StartLine >= fileLineStarts.Length)
             {
                 continue;
             }
 
             var expressionStart = fileLineStarts[anchor.StartLine] + anchor.StartCharacter;
-            var expressionEnd = fileLineStarts[anchor.EndLine] + anchor.EndCharacter;
             var offsetInExpression = fileOffset - expressionStart;
-            if (offsetInExpression < 0 ||
-                fileOffset > expressionEnd ||
-                expressionEnd - expressionStart >= matchedLength)
+            if (offsetInExpression < 0 || expressionStart <= matchedStart)
             {
                 continue;
             }
@@ -339,10 +343,10 @@ internal sealed class GeneratedScriptDocumentMapper
             }
 
             generatedOffset = candidate;
-            matchedLength = expressionEnd - expressionStart;
+            matchedStart = expressionStart;
         }
 
-        return matchedLength != int.MaxValue;
+        return matchedStart >= 0;
     }
 
     private static IReadOnlyList<MappedRegion> ScanRegions(

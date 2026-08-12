@@ -52,6 +52,7 @@ public class LanguageServerCapabilityTests
             .ShouldBeTrue();
         capabilities.GetProperty("documentSymbolProvider").GetBoolean().ShouldBeTrue();
         capabilities.GetProperty("foldingRangeProvider").GetBoolean().ShouldBeTrue();
+        capabilities.GetProperty("definitionProvider").GetBoolean().ShouldBeTrue();
         var semanticTokens = capabilities.GetProperty("semanticTokensProvider");
         semanticTokens.GetProperty("full").GetBoolean().ShouldBeTrue();
         semanticTokens

@@ -140,6 +140,36 @@ public interface ILanguageService
         LanguagePosition position,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Gets where the symbol at a document position is declared.</summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <param name="position">The zero-based editor position.</param>
+    /// <param name="cancellationToken">
+    /// The token that cancels the computation. Cancellation is cooperative; a canceled call throws
+    /// <see cref="System.OperationCanceledException"/> and leaves no service state modified.
+    /// </param>
+    /// <returns>
+    /// The declaring locations, or an empty list when the position names nothing declared in source.
+    /// A symbol declared in more than one place — a partial type — reports each of them.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// Every location is an authored one. A member declared in a single-file component lives in that
+    /// component's generated document as far as the compiler is concerned, and reporting that
+    /// position would send the editor to a file the author cannot edit; the position is mapped back
+    /// through the same <c>#line</c> map the diagnostics use, and a declaration that cannot be mapped
+    /// is omitted rather than reported somewhere wrong.
+    /// </para>
+    /// <para>
+    /// Navigation is an optional capability and defaults to reporting none, so an implementation
+    /// without a compilation to resolve against is complete without it.
+    /// </para>
+    /// </remarks>
+    IReadOnlyList<LanguageLocation> GetDefinition(
+        string documentUri,
+        LanguagePosition position,
+        CancellationToken cancellationToken = default)
+        => System.Array.Empty<LanguageLocation>();
+
     /// <summary>Computes the deferred documentation body for a previously returned completion item.</summary>
     /// <param name="documentUri">The document URI used by the editor.</param>
     /// <param name="completionLabel">The label of the completion item being resolved.</param>
