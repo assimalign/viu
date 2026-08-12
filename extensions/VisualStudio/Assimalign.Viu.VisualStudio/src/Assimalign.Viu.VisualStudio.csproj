@@ -73,6 +73,7 @@
     <ViuPackageReference Include="Microsoft.VisualStudio.Text.Logic" />
     <ViuPackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
     <ViuPackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.ImageCatalog" />
     <!-- The classic in-process language-server client API (ILanguageClient, Connection) and the
          threading primitives its events are typed with. -->
     <ViuPackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" />

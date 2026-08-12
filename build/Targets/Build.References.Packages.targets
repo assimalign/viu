@@ -123,6 +123,16 @@
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
+        <!-- KnownMonikers, the documented catalog of Visual Studio's own glyphs. A markup element
+             completion carries the angle-bracket glyph from it rather than a custom image, so the
+             list reads with the same icons the HTML editor uses. Only the moniker constants are
+             compiled against and Visual Studio supplies the catalog assembly, so this stays
+             compile-only like every editor package above; the 17.6 line is the oldest build that
+             carries every moniker used and nothing here needs the 17.14 surface. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.ImageCatalog" Version="17.6.36389">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
         <!-- AsyncEventHandler<T>, the type of ILanguageClient's StartAsync/StopAsync events, which
              ViuLanguageClient declares and raises. A transitive dependency of the client package,
              pinned explicitly because it is compiled against directly. Floor raised with

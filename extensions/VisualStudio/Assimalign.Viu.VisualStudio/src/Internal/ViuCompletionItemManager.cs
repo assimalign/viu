@@ -4,6 +4,8 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.VisualStudio.Core.Imaging;
+using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Shell;
@@ -12,10 +14,21 @@ using Microsoft.VisualStudio.Text.Adornments;
 namespace Assimalign.Viu.VisualStudio;
 
 /// <summary>
-/// Delegates filtering and sorting to Visual Studio and changes only candidate-specific color icons.
+/// Delegates filtering and sorting to Visual Studio and changes only presentation: the angle-bracket
+/// glyph and filter button a markup element carries, and candidate-specific color icons.
 /// </summary>
 internal sealed class ViuCompletionItemManager : IAsyncCompletionItemManager
 {
+    // The Language Server Protocol has no completion kind for a markup element, so an element arrives
+    // under the nearest kind the protocol carries and is drawn as that - a property, glyph and filter
+    // button alike. Both are corrected here, to the angle brackets the editor's own markup lists use.
+    private static readonly ImageElement ElementImage = new(
+        new ImageId(KnownMonikers.XMLElement.Guid, KnownMonikers.XMLElement.Id),
+        "Element");
+
+    private static readonly ImmutableArray<CompletionFilter> ElementFilters =
+        ImmutableArray.Create(new CompletionFilter("Elements", "e", ElementImage));
+
     private readonly IAsyncCompletionItemManager inner;
     private readonly ViuCompletionDocumentPath documentPath;
     private readonly ViuCompletionColorState state;
@@ -42,6 +55,7 @@ internal sealed class ViuCompletionItemManager : IAsyncCompletionItemManager
     {
         ImmutableArray<CompletionItem> sorted =
             await this.inner.SortCompletionListAsync(session, data, token).ConfigureAwait(false);
+        sorted = ApplyElementPresentation(sorted);
         List<CompletionSourceGroup> sourceGroups = CreateSourceGroups(sorted);
         var candidateGroups = new List<IReadOnlyList<ViuCompletionCandidateIdentity>>(
             sourceGroups.Count);
@@ -105,6 +119,25 @@ internal sealed class ViuCompletionItemManager : IAsyncCompletionItemManager
         CancellationToken token)
         => this.inner.UpdateCompletionListAsync(session, data, token);
 
+    private static ImmutableArray<CompletionItem> ApplyElementPresentation(
+        ImmutableArray<CompletionItem> items)
+    {
+        ImmutableArray<CompletionItem>.Builder? decorated = null;
+        for (var index = 0; index < items.Length; index++)
+        {
+            CompletionItem item = items[index];
+            if (!ViuCompletionMarkupCandidate.IsElement(item.InsertText))
+            {
+                continue;
+            }
+
+            decorated ??= items.ToBuilder();
+            decorated[index] = Clone(item, ElementImage, ElementFilters);
+        }
+
+        return decorated?.MoveToImmutable() ?? items;
+    }
+
     private static List<CompletionSourceGroup> CreateSourceGroups(
         ImmutableArray<CompletionItem> items)
     {
@@ -141,12 +174,18 @@ internal sealed class ViuCompletionItemManager : IAsyncCompletionItemManager
             item.FilterText);
 
     private static CompletionItem CloneWithImage(CompletionItem item, ImageElement image)
+        => Clone(item, image, item.Filters);
+
+    private static CompletionItem Clone(
+        CompletionItem item,
+        ImageElement image,
+        ImmutableArray<CompletionFilter> filters)
     {
         var clone = new CompletionItem(
             item.DisplayText,
             item.Source,
             image,
-            item.Filters,
+            filters,
             item.Suffix,
             item.InsertText,
             item.SortText,

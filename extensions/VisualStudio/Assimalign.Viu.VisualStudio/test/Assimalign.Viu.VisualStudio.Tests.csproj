@@ -47,6 +47,12 @@
          transport/state/merge contract can be exercised without launching Visual Studio. -->
     <Compile Include="..\src\Internal\IViuSemanticClassificationListener.cs"
              Link="Internal\IViuSemanticClassificationListener.cs" />
+    <Compile Include="..\src\Internal\ViuCompletionMarkupCandidate.cs"
+             Link="Internal\ViuCompletionMarkupCandidate.cs" />
+    <Compile Include="..\src\Internal\ViuCompletionCommitLogic.cs"
+             Link="Internal\ViuCompletionCommitLogic.cs" />
+    <Compile Include="..\src\Internal\ViuCompletionCommitEdit.cs"
+             Link="Internal\ViuCompletionCommitEdit.cs" />
     <Compile Include="..\src\Internal\ViuClassificationMerge.cs"
              Link="Internal\ViuClassificationMerge.cs" />
     <Compile Include="..\src\Internal\ViuDocumentTextChecksum.cs"
