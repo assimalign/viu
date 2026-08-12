@@ -58,6 +58,13 @@ internal sealed class ViuClassifier : IClassifier, IViuSemanticClassificationLis
     private readonly object classificationLock = new();
     private readonly object classificationTypeLock = new();
 
+    // The last publication and the snapshot it described, held so the colors it established survive
+    // the keystrokes before the next one arrives.
+    private readonly object carriedClassificationLock = new();
+    private ITextSnapshot? carriedSnapshot;
+    private IReadOnlyList<ViuSemanticClassification> carriedClassifications =
+        Array.Empty<ViuSemanticClassification>();
+
     private ITextSnapshot? classifiedSnapshot;
     private IReadOnlyList<ClassificationSpan>? classifiedSpans;
     private long classificationGeneration;
@@ -168,19 +175,100 @@ internal sealed class ViuClassifier : IClassifier, IViuSemanticClassificationLis
         IReadOnlyList<ViuLexicalSpan> lexicalSpans =
             ViuLexicalClassifier.Classify(ViuSnapshotLines.Read(snapshot));
         IReadOnlyList<ViuSemanticClassification> semanticClassifications =
-            Array.Empty<ViuSemanticClassification>();
-        string? associatedDocumentIdentifier = Volatile.Read(ref this.documentIdentifier);
-        if (associatedDocumentIdentifier is not null)
-        {
-            string checksum = ViuDocumentTextChecksum.Compute(snapshot.GetText());
-            this.semanticClassificationState.TryGetClassifications(
-                associatedDocumentIdentifier,
-                checksum,
-                out semanticClassifications);
-        }
+            this.ReadSemanticClassifications(snapshot);
 
         IReadOnlyList<ViuResolvedClassificationSpan> resolvedSpans =
             ViuClassificationMerge.Merge(lexicalSpans, semanticClassifications);
+        return this.ResolveSpans(snapshot, resolvedSpans);
+    }
+
+    /// <summary>
+    /// Reads the exact classifications for this snapshot, carrying the last publication forward when
+    /// the server has not answered for the current text yet.
+    /// </summary>
+    /// <remarks>
+    /// A publication describes one exact text and stops describing the buffer at the next keystroke.
+    /// Dropping it there left the lexical fallback alone, whose PascalCase-is-a-type guess repainted
+    /// every declared name while it was being typed near. Holding the publication with the snapshot
+    /// it described lets the untouched words keep the colors the server established, and the editor's
+    /// own span tracking says where they moved to.
+    /// </remarks>
+    private IReadOnlyList<ViuSemanticClassification> ReadSemanticClassifications(
+        ITextSnapshot snapshot)
+    {
+        string? associatedDocumentIdentifier = Volatile.Read(ref this.documentIdentifier);
+        if (associatedDocumentIdentifier is null)
+        {
+            return Array.Empty<ViuSemanticClassification>();
+        }
+
+        string checksum = ViuDocumentTextChecksum.Compute(snapshot.GetText());
+        if (this.semanticClassificationState.TryGetClassifications(
+                associatedDocumentIdentifier,
+                checksum,
+                out IReadOnlyList<ViuSemanticClassification> published))
+        {
+            lock (this.carriedClassificationLock)
+            {
+                this.carriedSnapshot = snapshot;
+                this.carriedClassifications = published;
+            }
+
+            return published;
+        }
+
+        ITextSnapshot? publishedSnapshot;
+        IReadOnlyList<ViuSemanticClassification> carried;
+        lock (this.carriedClassificationLock)
+        {
+            publishedSnapshot = this.carriedSnapshot;
+            carried = this.carriedClassifications;
+        }
+
+        if (publishedSnapshot is null ||
+            carried.Count == 0 ||
+            !ReferenceEquals(publishedSnapshot.TextBuffer, snapshot.TextBuffer) ||
+            publishedSnapshot.Version.VersionNumber > snapshot.Version.VersionNumber)
+        {
+            return Array.Empty<ViuSemanticClassification>();
+        }
+
+        return ViuSemanticClassificationCarryOver.Translate(
+            carried,
+            ReadLineStarts(publishedSnapshot),
+            ReadLineStarts(snapshot),
+            offset => TranslateOffset(publishedSnapshot, snapshot, offset));
+    }
+
+    private static IReadOnlyList<int> ReadLineStarts(ITextSnapshot snapshot)
+    {
+        var lineStarts = new int[snapshot.LineCount];
+        for (var index = 0; index < lineStarts.Length; index++)
+        {
+            lineStarts[index] = snapshot.GetLineFromLineNumber(index).Start.Position;
+        }
+
+        return lineStarts;
+    }
+
+    // The editor's own tracking answers where an offset moved to; a position the edit consumed comes
+    // back inside the replaced text, and is reported as gone.
+    private static int TranslateOffset(ITextSnapshot from, ITextSnapshot to, int offset)
+    {
+        if (offset < 0 || offset > from.Length)
+        {
+            return -1;
+        }
+
+        return new SnapshotPoint(from, offset)
+            .TranslateTo(to, PointTrackingMode.Negative)
+            .Position;
+    }
+
+    private IReadOnlyList<ClassificationSpan> ResolveSpans(
+        ITextSnapshot snapshot,
+        IReadOnlyList<ViuResolvedClassificationSpan> resolvedSpans)
+    {
         List<ClassificationSpan> snapshotSpans = new(resolvedSpans.Count);
 
         foreach (ViuResolvedClassificationSpan resolvedSpan in resolvedSpans)

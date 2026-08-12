@@ -53,6 +53,8 @@
              Link="Internal\ViuCompletionCommitLogic.cs" />
     <Compile Include="..\src\Internal\ViuCompletionCommitEdit.cs"
              Link="Internal\ViuCompletionCommitEdit.cs" />
+    <Compile Include="..\src\Internal\ViuSemanticClassificationCarryOver.cs"
+             Link="Internal\ViuSemanticClassificationCarryOver.cs" />
     <Compile Include="..\src\Internal\ViuClassificationMerge.cs"
              Link="Internal\ViuClassificationMerge.cs" />
     <Compile Include="..\src\Internal\ViuDocumentTextChecksum.cs"
