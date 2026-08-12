@@ -81,17 +81,26 @@ public sealed class HoverPublicationTests
             ScriptSemanticFixture.DocumentUri,
             new LanguagePosition(1, eventStart + 2));
 
+        // The Quick Info shape ([V01.01.12.07.16]): the declaration leads, fenced so a client
+        // colorizes it and renders it at body size, and the prose follows. Bold text and bullet lists
+        // are a document's structure and a client renders them at heading and list sizes, which is
+        // what made a Viu tooltip read as something other than the editor's own.
         tagHover.ShouldNotBeNull();
-        tagHover!.Markdown.ShouldContain("resolves to component `FeatureCard`");
-        tagHover.Markdown.ShouldContain("`title`: `string Title`");
-        tagHover.Markdown.ShouldContain("`@selected`");
+        tagHover!.Markdown.ShouldStartWith("```csharp\nclass FeatureCard\n");
+        tagHover.Markdown.ShouldContain("    string Title   // :title (required)");
+        tagHover.Markdown.ShouldContain(
+            "    public partial void Selected(int identifier)   // @selected");
+        tagHover.Markdown.ShouldContain(
+            "```\nResolves the `<FeatureCard>` tag to component `FeatureCard`.");
+        tagHover.Markdown.ShouldNotContain("**");
         tagHover.Range.ShouldBe(
             new LanguageRange(
                 new LanguagePosition(1, tagStart),
                 new LanguagePosition(1, tagStart + "FeatureCard".Length)));
 
         parameterHover.ShouldNotBeNull();
-        parameterHover!.Markdown.ShouldContain("parameter on component `<FeatureCard>`");
+        parameterHover!.Markdown.ShouldStartWith("```csharp\nstring Title\n```\n");
+        parameterHover.Markdown.ShouldContain("parameter on component `<FeatureCard>`");
         parameterHover.Markdown.ShouldContain("Required.");
         parameterHover.Range.ShouldBe(
             new LanguageRange(
@@ -99,8 +108,9 @@ public sealed class HoverPublicationTests
                 new LanguagePosition(1, parameterStart + "title".Length)));
 
         eventHover.ShouldNotBeNull();
-        eventHover!.Markdown.ShouldContain("event on component `<FeatureCard>`");
-        eventHover.Markdown.ShouldContain("Selected(int identifier)");
+        eventHover!.Markdown.ShouldStartWith(
+            "```csharp\npublic partial void Selected(int identifier)\n```\n");
+        eventHover.Markdown.ShouldContain("event on component `<FeatureCard>`");
         eventHover.Range.ShouldBe(
             new LanguageRange(
                 new LanguagePosition(1, eventStart),

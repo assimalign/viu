@@ -57,6 +57,10 @@ internal sealed class ScriptSemanticEngine
         "Assimalign.Viu.Components.ComponentTemplateBase";
     private const string LegacyComponentBaseCompatibilityFilePath =
         "Viu.LanguageService.ComponentBase.Compatibility.g.cs";
+    private const string RenderGlueMetadataName =
+        SingleFileComponentRenderGlue.GeneratedNamespace + ".RenderGlue";
+    private const string RenderGlueFilePath =
+        "Viu.LanguageService.RenderGlue.g.cs";
     private const string LegacyComponentBaseCompatibilitySource =
         "#nullable enable\n" +
         "\n" +
@@ -207,6 +211,66 @@ internal sealed class ScriptSemanticEngine
         {
             // ANY non-cancellation failure is an engine miss: the syntax-only fallback is the
             // existing code path, and a semantic hiccup must never surface as a request failure.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Computes the semantic completions for one position inside a template expression, or
+    /// <see langword="null"/> on any miss — an offset the render source map does not cover, a
+    /// position whose receiver does not bind, or a position that is not a member access.
+    /// </summary>
+    /// <param name="context">The host-fed project context.</param>
+    /// <param name="documentUri">The editor document URI (the resolution-cache key).</param>
+    /// <param name="documentFilePath">The document's file path (the projection and <c>#line</c> anchor).</param>
+    /// <param name="documentText">The document's live editor text.</param>
+    /// <param name="documentOffset">The zero-based cursor offset within <paramref name="documentText"/>.</param>
+    /// <param name="typedPrefix">The partially typed member name at the cursor, or empty.</param>
+    /// <param name="cancellationToken">The token cancelling the computation.</param>
+    /// <returns>The semantic completion result, or <see langword="null"/> on a miss.</returns>
+    /// <remarks>
+    /// A template expression is compiled into the render body rather than merged verbatim, so its
+    /// only image in the compilation is the one the render source map's span directives name. Binding
+    /// there is what lets a <c>v-for</c> alias complete at all: the alias is a local the compiler
+    /// declares over the loop source, so nothing outside that body knows its type. [V01.01.12.07.12]
+    /// </remarks>
+    internal ScriptSemanticCompletionResult? GetTemplateExpressionCompletions(
+        LanguageProjectContext context,
+        string documentUri,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        string typedPrefix,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return GetTemplateExpressionCompletionsCore(
+                    context,
+                    documentUri,
+                    documentFilePath,
+                    documentText,
+                    documentOffset,
+                    typedPrefix,
+                    cancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Template completion is additive over the syntax-only answer, exactly as the script
+            // path's is: any projection or binding failure degrades rather than failing the request.
             return null;
         }
     }
@@ -436,9 +500,9 @@ internal sealed class ScriptSemanticEngine
     }
 
     /// <summary>
-    /// Gets compiler diagnostics whose generated spans map back into the authored C# regions of the
-    /// live document. Generated component scaffold and template-render spans are suppressed.
-    /// [V01.01.12.07.15]
+    /// Gets compiler diagnostics whose generated spans map back onto authored code in the live
+    /// document — the merged <c>@script</c> block and the template expressions the render body
+    /// compiles. Generated component scaffold spans are suppressed. [V01.01.12.07.15]
     /// </summary>
     internal IReadOnlyList<LanguageDiagnostic>? GetDiagnostics(
         LanguageProjectContext context,
@@ -612,12 +676,66 @@ internal sealed class ScriptSemanticEngine
             documentFilePath,
             documentText,
             cancellationToken);
-        if (!request.Mapper.TryMapFileOffsetToGenerated(documentOffset, out var generatedPosition))
+        return request.Mapper.TryMapFileOffsetToGenerated(documentOffset, out var generatedPosition)
+            ? CompleteAtGeneratedPosition(
+                request,
+                documentUri,
+                generatedPosition,
+                typedPrefix,
+                contextKind,
+                requireMemberAccess: false,
+                cancellationToken)
+            : null;
+    }
+
+    private ScriptSemanticCompletionResult? GetTemplateExpressionCompletionsCore(
+        LanguageProjectContext context,
+        string documentUri,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        string typedPrefix,
+        CancellationToken cancellationToken)
+    {
+        var request = CreateLiveDocumentRequest(
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken);
+        return request.Mapper.TryMapTemplateExpressionOffsetToGenerated(
+                documentOffset,
+                out var generatedPosition)
+            ? CompleteAtGeneratedPosition(
+                request,
+                documentUri,
+                generatedPosition,
+                typedPrefix,
+                ScriptCompletionContextKind.Expression,
+                requireMemberAccess: true,
+                cancellationToken)
+            : null;
+    }
+
+    private ScriptSemanticCompletionResult? CompleteAtGeneratedPosition(
+        LiveDocumentRequest request,
+        string documentUri,
+        int generatedPosition,
+        string typedPrefix,
+        ScriptCompletionContextKind contextKind,
+        bool requireMemberAccess,
+        CancellationToken cancellationToken)
+    {
+        if (!TryFindMemberAccessTarget(request.Root, generatedPosition, out var target))
         {
             return null;
         }
 
-        if (!TryFindMemberAccessTarget(request.Root, generatedPosition, out var target))
+        // A template expression's generated home is the render body, whose locals and static-method
+        // scope are the code generator's rather than the author's: a bare-identifier lookup there
+        // would answer the template with the loop temporaries the compiler happened to emit. A bound
+        // receiver has no such problem — its members are the same members either scope would name —
+        // so the template path takes the member lookup and leaves every other position to its caller.
+        if (requireMemberAccess && target is null)
         {
             return null;
         }
@@ -741,21 +859,14 @@ internal sealed class ScriptSemanticEngine
                 continue;
             }
 
-            var generatedSpan = diagnostic.Location.SourceSpan;
-            if (!request.Mapper.TryMapGeneratedSpanToFile(
-                    generatedSpan.Start,
-                    generatedSpan.Length,
-                    out var fileStart,
-                    out var fileLength))
+            if (!TryMapDiagnosticRange(request, diagnostic, documentText, out var range))
             {
                 continue;
             }
 
             authored.Add(
                 new LanguageDiagnostic(
-                    new LanguageRange(
-                        TextCoordinateConverter.GetPosition(documentText, fileStart),
-                        TextCoordinateConverter.GetPosition(documentText, fileStart + fileLength)),
+                    range,
                     diagnostic.Severity switch
                     {
                         Microsoft.CodeAnalysis.DiagnosticSeverity.Error =>
@@ -772,6 +883,68 @@ internal sealed class ScriptSemanticEngine
         }
 
         return authored;
+    }
+
+    /// <summary>
+    /// Places one compiler diagnostic on the authored source, or reports that it belongs to generated
+    /// code no author wrote. [V01.01.12.07.15]
+    /// </summary>
+    /// <remarks>
+    /// Two mappings, in order. The <c>@script</c> block is merged verbatim under simple-form
+    /// <c>#line</c> regions, so its spans map affinely and are verified character-for-character. A
+    /// template expression has no verbatim image — it is compiled into the render body — but the
+    /// emitted body carries span-form <c>#line</c> directives ([V01.01.05.08]) that Roslyn itself
+    /// resolves onto the template, so the position is taken from Roslyn and only the decision to trust
+    /// it belongs here: <see cref="GeneratedScriptDocumentMapper.IsRenderExpressionDiagnostic"/> admits
+    /// it only when it lands inside the expression its directive names, keeping scaffolding that shares
+    /// the generated line out of the template. Anything else stays suppressed rather than misplaced.
+    /// </remarks>
+    private static bool TryMapDiagnosticRange(
+        LiveDocumentRequest request,
+        Diagnostic diagnostic,
+        string documentText,
+        out LanguageRange range)
+    {
+        var generatedSpan = diagnostic.Location.SourceSpan;
+        if (request.Mapper.TryMapGeneratedSpanToFile(
+                generatedSpan.Start,
+                generatedSpan.Length,
+                out var fileStart,
+                out var fileLength))
+        {
+            range = new LanguageRange(
+                TextCoordinateConverter.GetPosition(documentText, fileStart),
+                TextCoordinateConverter.GetPosition(documentText, fileStart + fileLength));
+            return true;
+        }
+
+        range = default;
+        var mapped = diagnostic.Location.GetMappedLineSpan();
+        if (!mapped.IsValid || !mapped.HasMappedPath)
+        {
+            return false;
+        }
+
+        var unmapped = diagnostic.Location.GetLineSpan();
+        if (!request.Mapper.IsRenderExpressionDiagnostic(
+                unmapped.StartLinePosition.Line,
+                unmapped.StartLinePosition.Character,
+                mapped.StartLinePosition.Line,
+                mapped.StartLinePosition.Character,
+                mapped.EndLinePosition.Line,
+                mapped.EndLinePosition.Character))
+        {
+            return false;
+        }
+
+        range = new LanguageRange(
+            new LanguagePosition(
+                mapped.StartLinePosition.Line,
+                mapped.StartLinePosition.Character),
+            new LanguagePosition(
+                mapped.EndLinePosition.Line,
+                mapped.EndLinePosition.Character));
+        return true;
     }
 
     private LanguageHover? GetHoverCore(
@@ -1364,6 +1537,7 @@ internal sealed class ScriptSemanticEngine
             compilation,
             context,
             cancellationToken);
+        compilation = AddRenderGlueIfRequired(compilation, context, cancellationToken);
         return new ProjectCompilationState(
             key,
             environmentSignature,
@@ -1388,6 +1562,37 @@ internal sealed class ScriptSemanticEngine
             LegacyComponentBaseCompatibilityFilePath,
             cancellationToken: cancellationToken);
         return compilation.AddSyntaxTrees(compatibilityTree);
+    }
+
+    /// <summary>
+    /// Adds the tier-three render glue the build's source generator emits once per consumer assembly.
+    /// </summary>
+    /// <remarks>
+    /// Every compiled template reaches the runtime through this glue — a <c>v-for</c> source is
+    /// unwrapped by it, an event handler is wrapped by it — and no generator runs over the editor's
+    /// compilation to produce it. Without it those calls bind to an error type and carry the whole
+    /// surrounding expression with them, which is what left a <c>v-for</c> alias untypeable and its
+    /// members uncompletable. The text is the generator's own
+    /// (<see cref="SingleFileComponentRenderGlue.Source"/>), so the two compilations cannot drift.
+    /// A project whose own sources already declare the glue — a consumer that checked generator output
+    /// in, or a second component projection in the same cone — keeps its declaration and skips this.
+    /// </remarks>
+    private static CSharpCompilation AddRenderGlueIfRequired(
+        CSharpCompilation compilation,
+        LanguageProjectContext context,
+        CancellationToken cancellationToken)
+    {
+        if (compilation.GetTypeByMetadataName(RenderGlueMetadataName) is not null)
+        {
+            return compilation;
+        }
+
+        SyntaxTree glueTree = CSharpSyntaxTree.ParseText(
+            SingleFileComponentRenderGlue.Source,
+            CreateParseOptions(context),
+            RenderGlueFilePath,
+            cancellationToken: cancellationToken);
+        return compilation.AddSyntaxTrees(glueTree);
     }
 
     private static IReadOnlyList<MetadataReference> CreateReferences(

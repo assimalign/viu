@@ -53,6 +53,70 @@ public sealed class DiagnosticPublicationTests
                 new LanguagePosition(1, missingStart + "MissingValue".Length)));
     }
 
+    [Fact]
+    public void GetDiagnostics_TemplateExpressionBindingError_MapsRoslynSpanIntoTemplateBlock()
+    {
+        // A template expression is compiled C#, and [V01.01.05.08] maps the compiled body back to the
+        // authored span it came from, so an unresolved v-for source is reported on the name the author
+        // typed instead of disappearing with the render body.
+        const string templateLine = "  <div v-for=\"navigation in Missing\"></div>";
+        var source =
+            $"<template>\n{templateLine}\n</template>\n" +
+            "@script {\n" +
+            "    public string CurrentPath { get; set; } = \"\";\n" +
+            "}\n";
+        var missingStart = templateLine.IndexOf("Missing", StringComparison.Ordinal);
+        var service = CreateSemanticService(source);
+
+        var diagnostic = service.GetDiagnostics(ScriptSemanticFixture.DocumentUri)
+            .Single(item => item.Code == "CS1061");
+
+        diagnostic.Source.ShouldBe("csharp");
+        diagnostic.Severity.ShouldBe(LanguageDiagnosticSeverity.Error);
+        diagnostic.Range.ShouldBe(
+            new LanguageRange(
+                new LanguagePosition(1, missingStart),
+                new LanguagePosition(1, missingStart + "Missing".Length)));
+    }
+
+    [Fact]
+    public void GetDiagnostics_TemplateOnlyComponentExpression_StillReportsBindingError()
+    {
+        // Template expressions bind against the component whether or not it declares an @script
+        // block, so a component that is only a template still reports their errors.
+        const string templateLine = "  <div v-for=\"navigation in Missing\"></div>";
+        var source = $"<template>\n{templateLine}\n</template>\n";
+        var missingStart = templateLine.IndexOf("Missing", StringComparison.Ordinal);
+        var service = CreateSemanticService(source);
+
+        var diagnostic = service.GetDiagnostics(ScriptSemanticFixture.DocumentUri)
+            .Single(item => item.Code == "CS1061");
+
+        diagnostic.Range.ShouldBe(
+            new LanguageRange(
+                new LanguagePosition(1, missingStart),
+                new LanguagePosition(1, missingStart + "Missing".Length)));
+    }
+
+    [Fact]
+    public void GetDiagnostics_ResolvedTemplateExpression_ReportsNoGeneratedScaffoldError()
+    {
+        // The scaffolding the code generator wraps a compiled expression in shares the expression's
+        // #line-mapped generated line. Only the expression is the author's, so a template whose own
+        // names all resolve reports nothing — whatever the scaffolding around them does.
+        const string source =
+            "<template>\n" +
+            "  <div>{{ CurrentPath }}</div>\n" +
+            "</template>\n" +
+            "@script {\n" +
+            "    public string CurrentPath { get; set; } = \"\";\n" +
+            "}\n";
+        var service = CreateSemanticService(source);
+
+        service.GetDiagnostics(ScriptSemanticFixture.DocumentUri)
+            .ShouldNotContain(item => item.Source == "csharp");
+    }
+
     [Theory]
     [InlineData(
         "VIU1204",

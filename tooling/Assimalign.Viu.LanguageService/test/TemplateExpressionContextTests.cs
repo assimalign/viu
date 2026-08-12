@@ -74,6 +74,37 @@ public class TemplateExpressionContextTests
     }
 
     [Fact]
+    public void GetCompletions_InterpolationMemberAccess_OffersNothing()
+    {
+        // The reported defect: `{{ navigation. }}`, whose receiver is a v-for alias over an
+        // unresolved source, answered with the component's own declared members. Those names answer
+        // the ROOT of a template expression and are never the members of a receiver, so the position
+        // after a dot has no honest answer here and must stay empty.
+        var completions = CompleteAfterWithScript(
+            "    <p>{{ navigation. }}</p>",
+            "{{ navigation.",
+            "public string CurrentPath { get; set; }\npublic void GoBack() { }");
+
+        completions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void GetCompletions_InterpolationMemberAccessWithPartialName_OffersNothing()
+        => CompleteAfterWithScript(
+                "    <p>{{ navigation.Cur }}</p>",
+                "{{ navigation.Cur",
+                "public string CurrentPath { get; set; }")
+            .ShouldBeEmpty();
+
+    [Fact]
+    public void GetCompletions_EventHandlerMemberAccess_OffersNoMethodsOrSnippets()
+        => CompleteAfterWithScript(
+                "    <button @click=\"navigation.\"></button>",
+                "@click=\"navigation.",
+                "public void Increment() { }")
+            .ShouldBeEmpty();
+
+    [Fact]
     public void GetCompletions_StaticClassAttribute_StillOffersUtilityCandidates()
     {
         // The gate must sit after the utility branch, or every working case regresses.

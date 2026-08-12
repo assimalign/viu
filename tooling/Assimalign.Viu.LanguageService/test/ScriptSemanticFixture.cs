@@ -78,7 +78,12 @@ internal static class ScriptSemanticFixture
             }
         }
 
+        // The runtime assemblies a Viu application always references. The generated render body and
+        // the tier-three glue bind against all three, so a fixture missing one would error-type every
+        // compiled template expression and hide exactly what these tests exist to pin.
         paths.Add(typeof(Assimalign.Viu.Components.ComponentContext).Assembly.Location);
+        paths.Add(typeof(Assimalign.Viu.Reactivity.IReactiveReference).Assembly.Location);
+        paths.Add(typeof(Assimalign.Viu.DisplayStringFormatter).Assembly.Location);
         return paths;
     }
 }

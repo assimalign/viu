@@ -813,15 +813,22 @@ internal sealed class LanguageServerHost
             request.Position,
             cancellationToken);
         var items = new JsonArray();
+        var supportsSnippets = request.ClientCapabilities.CompletionSupportsSnippets;
         foreach (var completion in completions)
         {
+            // A snippet reaches a client that cannot expand it as literal "$1"/"$0" in the author's
+            // buffer, so the placeholders are rendered out and the item is sent as plain text.
+            var isSnippet = completion.IsSnippet && supportsSnippets;
+            var insertText = completion.IsSnippet && !supportsSnippets
+                ? LanguageServerSnippetText.ToPlainText(completion.InsertText)
+                : completion.InsertText;
             var item = new JsonObject
             {
                 ["label"] = completion.Label,
                 ["kind"] = (int)completion.Kind,
                 ["detail"] = completion.Detail,
-                ["insertText"] = completion.InsertText,
-                ["insertTextFormat"] = completion.IsSnippet ? 2 : 1,
+                ["insertText"] = insertText,
+                ["insertTextFormat"] = isSnippet ? 2 : 1,
                 ["sortText"] = completion.SortText,
                 // Every item carries the resolve round-trip payload: the label is a sufficient
                 // lookup key (resolution recomputes through the hover path) and the URI selects
@@ -860,7 +867,7 @@ internal sealed class LanguageServerHost
                 item["textEdit"] = new JsonObject
                 {
                     ["range"] = ToJsonRange(editRange),
-                    ["newText"] = completion.InsertText,
+                    ["newText"] = insertText,
                 };
             }
 

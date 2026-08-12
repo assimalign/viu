@@ -11,6 +11,11 @@ namespace Assimalign.Viu.LanguageServer;
 /// </summary>
 /// <param name="HoverSupportsMarkdown">Whether <c>textDocument.hover.contentFormat</c> includes <c>markdown</c>.</param>
 /// <param name="CompletionDocumentationSupportsMarkdown">Whether <c>textDocument.completion.completionItem.documentationFormat</c> includes <c>markdown</c>.</param>
+/// <param name="CompletionSupportsSnippets">
+/// Whether <c>textDocument.completion.completionItem.snippetSupport</c> is <see langword="true"/>.
+/// A client that does not advertise it has no way to expand <c>$1</c>/<c>$0</c> and would insert them
+/// as literal text, so the server sends such a client the placeholder-free rendering instead.
+/// </param>
 /// <param name="SupportsHierarchicalDocumentSymbols">Whether <c>textDocument.documentSymbol.hierarchicalDocumentSymbolSupport</c> is <see langword="true"/>.</param>
 /// <param name="SupportsCodeActionLiterals">Whether <c>textDocument.codeAction.codeActionLiteralSupport</c> is present.</param>
 /// <param name="SupportsViuSemanticClassificationNotifications">
@@ -20,6 +25,7 @@ namespace Assimalign.Viu.LanguageServer;
 internal sealed record LanguageServerClientCapabilities(
     bool HoverSupportsMarkdown,
     bool CompletionDocumentationSupportsMarkdown,
+    bool CompletionSupportsSnippets,
     bool SupportsHierarchicalDocumentSymbols,
     bool SupportsCodeActionLiterals,
     bool SupportsViuSemanticClassificationNotifications)
@@ -29,6 +35,7 @@ internal sealed record LanguageServerClientCapabilities(
         new(
             HoverSupportsMarkdown: false,
             CompletionDocumentationSupportsMarkdown: false,
+            CompletionSupportsSnippets: false,
             SupportsHierarchicalDocumentSymbols: false,
             SupportsCodeActionLiterals: false,
             SupportsViuSemanticClassificationNotifications: false);
@@ -58,10 +65,17 @@ internal sealed record LanguageServerClientCapabilities(
         var hoverSupportsMarkdown =
             TryGetObject(textDocument, "hover", out var hover) &&
             ContainsMarkdown(hover, "contentFormat");
-        var completionDocumentationSupportsMarkdown =
-            TryGetObject(textDocument, "completion", out var completion) &&
-            TryGetObject(completion, "completionItem", out var completionItem) &&
-            ContainsMarkdown(completionItem, "documentationFormat");
+        var completionDocumentationSupportsMarkdown = false;
+        var completionSupportsSnippets = false;
+        if (TryGetObject(textDocument, "completion", out var completion) &&
+            TryGetObject(completion, "completionItem", out var completionItem))
+        {
+            completionDocumentationSupportsMarkdown =
+                ContainsMarkdown(completionItem, "documentationFormat");
+            completionSupportsSnippets =
+                completionItem.TryGetProperty("snippetSupport", out var snippetSupport) &&
+                snippetSupport.ValueKind == JsonValueKind.True;
+        }
         var supportsHierarchicalDocumentSymbols =
             TryGetObject(textDocument, "documentSymbol", out var documentSymbol) &&
             documentSymbol.TryGetProperty(
@@ -75,6 +89,7 @@ internal sealed record LanguageServerClientCapabilities(
         return new LanguageServerClientCapabilities(
             hoverSupportsMarkdown,
             completionDocumentationSupportsMarkdown,
+            completionSupportsSnippets,
             supportsHierarchicalDocumentSymbols,
             supportsCodeActionLiterals,
             supportsViuSemanticClassificationNotifications);

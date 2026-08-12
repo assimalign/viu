@@ -110,6 +110,46 @@ public class LanguageServiceTests
     }
 
     [Fact]
+    public void GetCompletions_TagAfterOpeningAngle_ReplacesTheAngleItWasTriggeredBy()
+    {
+        // The reported defect: committing <template> after typing '<' produced '<<template>'. An
+        // editor left to infer the replaced span takes the typed word, and '<' is no part of a word,
+        // so the item must name the range it replaces — the angle bracket included.
+        const string templateLine = "    <";
+        var service = LanguageServices.Create();
+        service.OpenDocument(DocumentUri, $"<template>\n{templateLine}\n</template>\n", 1);
+
+        var completions = service.GetCompletions(
+            DocumentUri,
+            new LanguagePosition(1, templateLine.Length));
+
+        var tag = completions.Single(item => item.Label == "template");
+        tag.EditRange.ShouldBe(
+            new LanguageRange(
+                new LanguagePosition(1, templateLine.Length - 1),
+                new LanguagePosition(1, templateLine.Length)));
+        // A directive is not a tag: it never opens with '<', so its span stays the editor's own.
+        completions.Single(item => item.Label == "v-for").EditRange.ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetCompletions_TagWithoutOpeningAngle_ReplacesOnlyTheTypedName()
+    {
+        const string templateLine = "    tem";
+        var service = LanguageServices.Create();
+        service.OpenDocument(DocumentUri, $"<template>\n{templateLine}\n</template>\n", 1);
+
+        var completions = service.GetCompletions(
+            DocumentUri,
+            new LanguagePosition(1, templateLine.Length));
+
+        completions.Single(item => item.Label == "template").EditRange.ShouldBe(
+            new LanguageRange(
+                new LanguagePosition(1, templateLine.Length - "tem".Length),
+                new LanguagePosition(1, templateLine.Length)));
+    }
+
+    [Fact]
     public void GetCompletions_LegacyTemplateBlock_StillCompletesDuringTransitionWindow()
     {
         // Transition-window pin ([V01.01.06.10]): the legacy '@template { }' container parses with a

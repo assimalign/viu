@@ -605,13 +605,16 @@ internal static class ViuLexicalClassifier
             Group contentGroup = match.Groups["content"];
             if (contentGroup.Length > 0)
             {
+                // An interpolation hole names component state exactly as a binding value does, so its
+                // bare identifiers are members rather than types.
                 ClassifyCSharpTokens(
                     line,
                     lineNumber,
                     contentGroup.Index,
                     contentGroup.Length,
                     occupiedCharacters,
-                    spans);
+                    spans,
+                    ViuClassificationKind.Identifier);
             }
         }
 
@@ -910,7 +913,8 @@ internal static class ViuLexicalClassifier
     /// <param name="spans">Accumulator the passes append to.</param>
     /// <param name="bareIdentifierKind">
     /// What an identifier that no earlier pass claimed should become, or <see langword="null"/> to
-    /// leave bare identifiers to the type pass.
+    /// leave bare identifiers to the type pass. Supplying it also marks the window as a template
+    /// expression, where a name after a dot is classified as a member rather than left to that pass.
     /// </param>
     /// <remarks>
     /// <para>
@@ -921,16 +925,23 @@ internal static class ViuLexicalClassifier
     /// <c>(</c> — is a method wherever a C# pass runs, the <c>@script</c> block included. In an
     /// event-handler value the handler slot itself is a method position too, so a bare identifier
     /// there is a method even without parentheses: <c>@click="Increment"</c> names a method exactly as
-    /// <c>@click="Increment()"</c> does. An identifier followed by <c>.</c> is a receiver rather than
-    /// the handler, so <c>@click="ViewModel.Increment"</c> still colors its two halves apart.
+    /// <c>@click="Increment()"</c> does. The name ending the chain is that slot, so
+    /// <c>@click="ViewModel.Increment"</c> still colors its two halves apart.
     /// </para>
     /// <para>
-    /// A plain binding (<c>:value="Count"</c>, <c>v-if="Visible"</c>) names component state, so its
-    /// bare identifiers stay identifiers. That is why <paramref name="bareIdentifierKind"/> exists at
-    /// all: without it the PascalCase-is-a-type heuristic below would color every bound property as a
-    /// type. The heuristic still runs unchanged in the <c>@script</c> block and in interpolation
-    /// interiors, which are general C# where a PascalCase name really is usually a type; a binding
-    /// value is the one position where the leading name is a member by construction.
+    /// A template expression — a plain binding (<c>:value="Count"</c>, <c>v-if="Visible"</c>) or an
+    /// interpolation hole (<c>{{ Count }}</c>) — names component state, so its bare identifiers stay
+    /// identifiers. That is why <paramref name="bareIdentifierKind"/> exists at all: without it the
+    /// PascalCase-is-a-type heuristic below would color every bound property as a type. Only the
+    /// <c>@script</c> block leaves bare identifiers to that heuristic, being general C# where a
+    /// PascalCase name really is usually a type.
+    /// </para>
+    /// <para>
+    /// Within a template expression only the <em>head</em> of a member chain reaches the type pass:
+    /// <c>DateTime.Now</c> and <c>ViewModel.Increment</c> keep their receivers colored as types, while
+    /// every name after a dot is a member of what precedes it and can never be a type —
+    /// <c>{{ navigation.Path }}</c> colors <c>Path</c> as a member, not as a class. Call syntax still
+    /// wins over both, because the method pass runs first.
     /// </para>
     /// </remarks>
     private static void ClassifyCSharpTokens(
@@ -978,10 +989,12 @@ internal static class ViuLexicalClassifier
         {
             foreach (Match match in ScriptIdentifierExpression.Matches(window))
             {
+                bool followsDot = match.Index > 0 && window[match.Index - 1] == '.';
                 int afterMatch = match.Index + match.Length;
-                if (afterMatch < window.Length && window[afterMatch] == '.')
+                bool precedesDot = afterMatch < window.Length && window[afterMatch] == '.';
+                if (precedesDot && !followsDot)
                 {
-                    // A receiver, not the bound member: leave it to the type pass.
+                    // The head of the chain, which may name a type: leave it to the type pass.
                     continue;
                 }
 
@@ -989,7 +1002,9 @@ internal static class ViuLexicalClassifier
                     lineNumber,
                     windowStart + match.Index,
                     match.Length,
-                    identifierKind,
+                    // Every name after a dot is a member of what precedes it, never a type — but only
+                    // the name ending the chain occupies the position the expression is read for.
+                    precedesDot ? ViuClassificationKind.Identifier : identifierKind,
                     occupiedCharacters,
                     spans);
             }

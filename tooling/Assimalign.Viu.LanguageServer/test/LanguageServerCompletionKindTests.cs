@@ -22,8 +22,10 @@ namespace Assimalign.Viu.LanguageServer.Tests;
 /// utility color reaches it as <c>Color</c> (16) with the computed theme value in item data, so the
 /// value remains available to a Viu-aware client without parsing emitted CSS. Stock clients can use
 /// the standard color-category presentation without interpreting the opaque data
-/// Snippet insert text also crosses unchanged: an escaped dollar sign keeps the authored
-/// <c>$event</c> identifier literal while the numbered placeholder remains active
+/// Snippet insert text crosses unchanged to a client that advertised snippet support: an escaped
+/// dollar sign keeps the authored <c>$event</c> identifier literal while the numbered placeholder
+/// remains active. A client that advertised none receives the placeholder-free rendering instead,
+/// because it would otherwise insert <c>$1</c> into the author's buffer as text
 /// ([V01.01.12.07.12], #333; [V01.01.12.07.13], #334).
 /// <see href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind">
 /// Language Server Protocol 3.17, <c>CompletionItemKind</c></see>.
@@ -68,13 +70,62 @@ public class LanguageServerCompletionKindTests
         color.GetProperty("kind").GetInt32().ShouldBe(16);
         color.GetProperty("data").GetProperty("colorValue").GetString()
             .ShouldBe("oklch(62.3% 0.214 259.815)");
+        // No initialize request ran, so the client advertised nothing and the snippet downgrades:
+        // the escape resolves to the literal dollar sign the author wants and the tabstop is dropped.
+        var eventLambda = FindItem(items, "$event lambda")!.Value;
+        eventLambda.GetProperty("insertText").GetString().ShouldBe("$event => ");
+        eventLambda.GetProperty("insertTextFormat").GetInt32().ShouldBe(1);
+        var asynchronousEventLambda = FindItem(items, "async $event lambda")!.Value;
+        asynchronousEventLambda.GetProperty("insertText").GetString()
+            .ShouldBe("async $event => ");
+        asynchronousEventLambda.GetProperty("insertTextFormat").GetInt32().ShouldBe(1);
+
+        foreach (var message in messages)
+        {
+            message.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_CompletionsForSnippetCapableClient_KeepTheSnippetFormat()
+    {
+        var inputBytes = Encoding.UTF8.GetBytes(
+            Frame(
+                """
+                {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"textDocument":{"completion":{"completionItem":{"snippetSupport":true}}}}}}
+                """) +
+            Frame(
+                """
+                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Card.viu","languageId":"viu","version":1,"text":"@script {\nusing \n}\n"}}}
+                """) +
+            Frame(
+                """
+                {"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///Card.viu"},"position":{"line":1,"character":6}}}
+                """) +
+            Frame(
+                """
+                {"jsonrpc":"2.0","method":"exit"}
+                """));
+
+        await using var input = new MemoryStream(inputBytes);
+        await using var output = new MemoryStream();
+        var host = new LanguageServerHost(new StubLanguageService());
+
+        await host.RunAsync(input, output);
+
+        output.Position = 0;
+        var messages = await ReadAllMessagesAsync(output);
+        var completion = messages.Find(
+            message =>
+                message.RootElement.TryGetProperty("id", out var identifier) &&
+                identifier.ValueKind == JsonValueKind.Number &&
+                identifier.GetInt32() == 2);
+
+        completion.ShouldNotBeNull();
+        var items = completion!.RootElement.GetProperty("result").GetProperty("items");
         var eventLambda = FindItem(items, "$event lambda")!.Value;
         eventLambda.GetProperty("insertText").GetString().ShouldBe("\\$event => $1");
         eventLambda.GetProperty("insertTextFormat").GetInt32().ShouldBe(2);
-        var asynchronousEventLambda = FindItem(items, "async $event lambda")!.Value;
-        asynchronousEventLambda.GetProperty("insertText").GetString()
-            .ShouldBe("async \\$event => $1");
-        asynchronousEventLambda.GetProperty("insertTextFormat").GetInt32().ShouldBe(2);
 
         foreach (var message in messages)
         {

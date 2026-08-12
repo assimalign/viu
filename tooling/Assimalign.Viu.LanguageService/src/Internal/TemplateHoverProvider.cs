@@ -103,8 +103,10 @@ internal static class TemplateHoverProvider
                 ? string.Empty
                 : $"\n\n{builtIn.Documentation}";
             return new LanguageHover(
-                $"**`<{token}>`** is a native {family} element. Viu emits it directly through the host's element renderer." +
-                    documentation,
+                CreateQuickInfoMarkdown(
+                    $"<{token}>",
+                    $"A native {family} element. Viu emits it directly through the host's element renderer." +
+                        documentation),
                 CreateRange(document.Text, tokenStart, tokenEnd));
         }
 
@@ -113,57 +115,63 @@ internal static class TemplateHoverProvider
             : CreateCatalogHover(document.Text, tokenStart, tokenEnd, $"<{token}>", builtIn);
     }
 
+    /// <summary>
+    /// Renders one hover the way the editor's own Quick Info reads: the declaration in a fenced code
+    /// block first, then the prose below it.
+    /// </summary>
+    /// <remarks>
+    /// The alternative — bold text and bullet lists — is a document's structure, not a tooltip's, and
+    /// a client renders those markers at heading and list sizes. Fencing the declaration gets the
+    /// signature colorized by the C# grammar and keeps every following line at ordinary body size, so
+    /// a Viu tooltip sits beside a C# one without announcing itself as something else. Clients that
+    /// take plaintext receive the same content with the fences and emphasis stripped.
+    /// </remarks>
+    private static string CreateQuickInfoMarkdown(string declaration, string description)
+        => $"```csharp\n{declaration}\n```\n{description}";
+
     private static LanguageHover CreateComponentHover(
         ComponentUsage usage,
         TemplateComponentDeclaration declaration)
     {
         var compilerDeclaration = declaration.CompilerDeclaration;
-        var markdown = new StringBuilder()
-            .Append("**`<")
-            .Append(usage.Tag)
-            .Append(">`** resolves to component `")
-            .Append(compilerDeclaration.Name)
-            .Append("`.");
-
-        if (!compilerDeclaration.IsParameterSurfaceKnown)
+        var signature = new StringBuilder("class ").Append(compilerDeclaration.Name);
+        if (compilerDeclaration.IsParameterSurfaceKnown)
         {
-            markdown.Append("\n\nParameters are declared imperatively and cannot be enumerated at design time.");
-        }
-        else if (compilerDeclaration.Parameters.Count > 0)
-        {
-            markdown.Append("\n\n**Parameters**");
             foreach (var parameter in compilerDeclaration.Parameters)
             {
-                markdown
-                    .Append("\n- `")
-                    .Append(parameter.Name)
-                    .Append("`: `")
+                signature
+                    .Append("\n    ")
                     .Append(parameter.TypeText)
                     .Append(' ')
                     .Append(parameter.PropertyName)
-                    .Append('`');
+                    .Append("   // :")
+                    .Append(parameter.Name);
                 if (parameter.IsRequired)
                 {
-                    markdown.Append(" (required)");
+                    signature.Append(" (required)");
                 }
             }
         }
 
-        if (declaration.Events.Count > 0)
+        foreach (var componentEvent in declaration.Events)
         {
-            markdown.Append("\n\n**Events**");
-            foreach (var componentEvent in declaration.Events)
-            {
-                markdown
-                    .Append("\n- `@")
-                    .Append(componentEvent.Name)
-                    .Append("`: `")
-                    .Append(componentEvent.Detail)
-                    .Append('`');
-            }
+            signature
+                .Append("\n    ")
+                .Append(componentEvent.Detail)
+                .Append("   // @")
+                .Append(componentEvent.Name);
         }
 
-        return new LanguageHover(markdown.ToString(), ToLanguageRange(usage.Location));
+        var description = $"Resolves the `<{usage.Tag}>` tag to component `{compilerDeclaration.Name}`.";
+        if (!compilerDeclaration.IsParameterSurfaceKnown)
+        {
+            description +=
+                " Parameters are declared imperatively and cannot be enumerated at design time.";
+        }
+
+        return new LanguageHover(
+            CreateQuickInfoMarkdown(signature.ToString(), description),
+            ToLanguageRange(usage.Location));
     }
 
     private static LanguageHover? CreateComponentPropertyHover(
@@ -185,8 +193,9 @@ internal static class TemplateHoverProvider
                 }
 
                 return new LanguageHover(
-                    $"**`@{property.AuthoredName}`** — event on component `<{usage.Tag}>`.\n\n" +
-                        $"```csharp\n{componentEvent.Detail}\n```",
+                    CreateQuickInfoMarkdown(
+                        componentEvent.Detail,
+                        $"`@{property.AuthoredName}` — event on component `<{usage.Tag}>`."),
                     ToLanguageRange(property.Location));
             }
 
@@ -212,8 +221,9 @@ internal static class TemplateHoverProvider
 
             var requirement = parameter.IsRequired ? " Required." : string.Empty;
             return new LanguageHover(
-                $"**`{property.AuthoredName}`** — parameter on component `<{usage.Tag}>`.{requirement}\n\n" +
-                    $"```csharp\n{parameter.TypeText} {parameter.PropertyName}\n```",
+                CreateQuickInfoMarkdown(
+                    $"{parameter.TypeText} {parameter.PropertyName}",
+                    $"`{property.AuthoredName}` — parameter on component `<{usage.Tag}>`.{requirement}"),
                 ToLanguageRange(property.Location));
         }
 
@@ -282,7 +292,7 @@ internal static class TemplateHoverProvider
         string displayToken,
         LanguageCompletionItem item)
         => new(
-            $"**`{displayToken}`** — {item.Detail}.\n\n{item.Documentation}",
+            CreateQuickInfoMarkdown(displayToken, $"{item.Detail}. {item.Documentation}"),
             CreateRange(documentText, tokenStart, tokenEnd));
 
     private static bool ContainsOffset(LocationInfo location, int offset)

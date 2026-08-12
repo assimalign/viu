@@ -260,6 +260,8 @@ public class ViuLexicalClassifierTests
     [Fact]
     public void Classify_InterpolationContent_ClassifiesScriptTokens()
     {
+        // An interpolation hole names component state exactly as a binding value does, so Count is a
+        // member rather than the type the PascalCase heuristic would otherwise make of it.
         string[] lines =
         [
             "<template>",
@@ -271,9 +273,67 @@ public class ViuLexicalClassifierTests
 
         ViuClassificationKind[] classifications = ClassificationsOnLine(spans, 1);
         classifications.ShouldContain(ViuClassificationKind.InterpolationDelimiter);
-        classifications.ShouldContain(ViuClassificationKind.Type);
         classifications.ShouldContain(ViuClassificationKind.Operator);
         classifications.ShouldContain(ViuClassificationKind.Number);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Identifier).ShouldBe(["Count"]);
+        classifications.ShouldNotContain(ViuClassificationKind.Type);
+    }
+
+    [Fact]
+    public void Classify_TemplateExpressionMemberChain_ClassifiesEveryNameAfterADotAsAMember()
+    {
+        // The reported defect: Path, Glyph, and Description colored as class names because the
+        // PascalCase-is-a-type heuristic claimed them. A name after a dot is a member of what precedes
+        // it and can never be a type, in an interpolation and in a binding value alike.
+        string[] lines =
+        [
+            "<template>",
+            "    <div :key=\"navigation.Path\">{{ navigation.Target.Glyph }}</div>",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Identifier)
+            .ShouldBe(["Path", "Target", "Glyph"]);
+        ClassificationsOnLine(spans, 1).ShouldNotContain(ViuClassificationKind.Type);
+    }
+
+    [Fact]
+    public void Classify_TemplateExpressionCallOnAMemberChain_StaysAMethod()
+    {
+        // Call syntax outranks the member rule: the method pass runs first, so only the invoked name
+        // carries the method color while the receiver chain stays members. A class value is exempt
+        // from the C# passes entirely — it colors as one utility value — so this probes :title.
+        string[] lines =
+        [
+            "<template>",
+            "    <div :title=\"NavigationClass(navigation.Path)\"></div>",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Method).ShouldBe(["NavigationClass"]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Identifier).ShouldBe(["Path"]);
+    }
+
+    [Fact]
+    public void Classify_TemplateExpressionChainHead_StaysAvailableToTheTypePass()
+    {
+        // Only the head of a chain can name a type, and it still reaches the type pass so a static
+        // receiver such as DateTime keeps its type color.
+        string[] lines =
+        [
+            "<template>",
+            "    <p>{{ DateTime.Now }}</p>",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Type).ShouldBe(["DateTime"]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Identifier).ShouldBe(["Now"]);
     }
 
     [Fact]

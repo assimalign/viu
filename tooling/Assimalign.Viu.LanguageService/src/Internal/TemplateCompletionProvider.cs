@@ -66,6 +66,7 @@ internal static class TemplateCompletionProvider
         ScriptDeclarationReader declarationReader,
         ScriptSemanticEngine semanticEngine,
         LanguageProjectContext? projectContext,
+        string documentUri,
         string documentFilePath,
         CancellationToken cancellationToken)
     {
@@ -95,12 +96,16 @@ internal static class TemplateCompletionProvider
         {
             if (tagContext.IsAttributeValue)
             {
-                return IsEventAttribute(tagContext.AttributeName)
-                    ? GetHandlerCompletions(
-                        document.Syntax,
-                        tagContext.AttributeValuePrefix,
-                        declarationReader)
-                    : Array.Empty<LanguageCompletionItem>();
+                return GetAttributeValueCompletions(
+                    document,
+                    tagContext,
+                    documentOffset,
+                    declarationReader,
+                    semanticEngine,
+                    projectContext,
+                    documentUri,
+                    documentFilePath,
+                    cancellationToken);
             }
 
             if (IsEventAttributePrefix(tagContext.AttributeNamePrefix))
@@ -135,14 +140,203 @@ internal static class TemplateCompletionProvider
             return null;
         }
 
-        return isInterpolation
-            ? GetMemberCompletions(
+        if (!isInterpolation)
+        {
+            return null;
+        }
+
+        return GetExpressionCompletions(
+            document,
+            template.Content,
+            relativeOffset,
+            documentOffset,
+            semanticEngine,
+            projectContext,
+            documentUri,
+            documentFilePath,
+            cancellationToken) ??
+            GetMemberCompletions(
                 document.Syntax,
                 GetTrailingIdentifier(template.Content, relativeOffset),
                 declarationReader,
-                methodsOnly: false)
+                methodsOnly: false);
+    }
+
+    // An attribute value is either an expression the component binds or plain markup text. Only the
+    // directive and binding forms are expressions; a static class="..." is markup, and its utility
+    // candidates were already offered before this provider ran.
+    private static IReadOnlyList<LanguageCompletionItem> GetAttributeValueCompletions(
+        LanguageDocument document,
+        TemplateTagContext tagContext,
+        int documentOffset,
+        ScriptDeclarationReader declarationReader,
+        ScriptSemanticEngine semanticEngine,
+        LanguageProjectContext? projectContext,
+        string documentUri,
+        string documentFilePath,
+        CancellationToken cancellationToken)
+    {
+        var valuePrefix = tagContext.AttributeValuePrefix;
+        if (!IsExpressionAttributeName(tagContext.AttributeName))
+        {
+            return Array.Empty<LanguageCompletionItem>();
+        }
+
+        // A v-for value is "alias in source": only the source is an expression. The aliases are
+        // declarations, and completing a name the author is in the middle of introducing is noise.
+        if (IsForDirectiveName(tagContext.AttributeName) &&
+            !IsAfterForSourceKeyword(valuePrefix))
+        {
+            return Array.Empty<LanguageCompletionItem>();
+        }
+
+        var semantic = GetExpressionCompletions(
+            document,
+            valuePrefix,
+            valuePrefix.Length,
+            documentOffset,
+            semanticEngine,
+            projectContext,
+            documentUri,
+            documentFilePath,
+            cancellationToken);
+        if (semantic is not null)
+        {
+            // An event value's handler slot also accepts an inline lambda, which no symbol lookup can
+            // offer. The snippets join the bound members at the root of the expression, and only there:
+            // after a dot the author is naming a member, and a lambda cannot follow one.
+            return IsEventAttribute(tagContext.AttributeName) &&
+                   !IsMemberAccess(valuePrefix, valuePrefix.Length)
+                ? [.. semantic, .. HandlerSnippets]
+                : semantic;
+        }
+
+        // The degraded answers, which know no types: the file's own declared members for a v-for
+        // source, the handler surface for an event value, and nothing for every other expression —
+        // the same silence [V01.01.12.07.12] chose rather than guessing at a bound value.
+        if (IsForDirectiveName(tagContext.AttributeName))
+        {
+            return GetMemberCompletions(
+                document.Syntax,
+                GetTrailingIdentifier(valuePrefix, valuePrefix.Length),
+                declarationReader,
+                methodsOnly: false);
+        }
+
+        return IsEventAttribute(tagContext.AttributeName)
+            ? GetHandlerCompletions(document.Syntax, valuePrefix, declarationReader)
+            : Array.Empty<LanguageCompletionItem>();
+    }
+
+    /// <summary>
+    /// Answers a position inside a template expression by binding it where the compiler put it, or
+    /// returns <see langword="null"/> when it cannot be bound and the caller's degraded answer applies.
+    /// </summary>
+    /// <remarks>
+    /// A member position — after the dot of <c>receiver.</c> — resolves through the render source map
+    /// to the receiver's real members, which is the only way an alias such as <c>v-for</c>'s
+    /// <c>capability</c> can complete at all: nothing outside the compiled loop knows its type. When
+    /// that lookup misses, a member position still answers with an empty list rather than the caller's
+    /// root-level member list: the names of the component are never the names of a receiver.
+    /// </remarks>
+    private static IReadOnlyList<LanguageCompletionItem>? GetExpressionCompletions(
+        LanguageDocument document,
+        string expressionText,
+        int expressionOffset,
+        int documentOffset,
+        ScriptSemanticEngine semanticEngine,
+        LanguageProjectContext? projectContext,
+        string documentUri,
+        string documentFilePath,
+        CancellationToken cancellationToken)
+    {
+        if (projectContext is not null)
+        {
+            var semantic = semanticEngine.GetTemplateExpressionCompletions(
+                projectContext,
+                documentUri,
+                documentFilePath,
+                document.Text,
+                documentOffset,
+                GetTrailingIdentifier(expressionText, expressionOffset),
+                cancellationToken);
+            if (semantic is not null)
+            {
+                return semantic.Items;
+            }
+        }
+
+        return IsMemberAccess(expressionText, expressionOffset)
+            ? Array.Empty<LanguageCompletionItem>()
             : null;
     }
+
+    /// <summary>
+    /// Returns whether the position sits in the member position of a template expression — after the
+    /// dot of <c>receiver.</c>, with or without a partially typed member name.
+    /// </summary>
+    private static bool IsMemberAccess(string text, int offset)
+    {
+        var start = offset;
+        while (start > 0 &&
+               (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] == '_'))
+        {
+            start--;
+        }
+
+        return start > 0 && text[start - 1] == '.';
+    }
+
+    /// <summary>
+    /// Returns whether an attribute's value is a C# expression the component binds, rather than the
+    /// markup text of a plain attribute or the prop declarations of a slot.
+    /// </summary>
+    private static bool IsExpressionAttributeName(string attributeName)
+        => (attributeName.StartsWith(':') ||
+            attributeName.StartsWith('@') ||
+            attributeName.StartsWith("v-", StringComparison.Ordinal)) &&
+           !string.Equals(attributeName, "v-slot", StringComparison.Ordinal) &&
+           !attributeName.StartsWith("v-slot:", StringComparison.Ordinal);
+
+    private static bool IsForDirectiveName(string attributeName)
+        => string.Equals(attributeName, "v-for", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Returns whether a <c>v-for</c> value prefix has passed its <c>in</c> keyword, which is where
+    /// the alias declarations end and the iterated source expression begins.
+    /// </summary>
+    private static bool IsAfterForSourceKeyword(string valuePrefix)
+    {
+        var depth = 0;
+        for (var index = 0; index < valuePrefix.Length; index++)
+        {
+            var character = valuePrefix[index];
+            if (character == '(')
+            {
+                depth++;
+            }
+            else if (character == ')')
+            {
+                depth--;
+            }
+            else if (depth == 0 &&
+                     character == 'i' &&
+                     index + 1 < valuePrefix.Length &&
+                     valuePrefix[index + 1] == 'n' &&
+                     !IsIdentifierCharacter(index - 1, valuePrefix) &&
+                     !IsIdentifierCharacter(index + 2, valuePrefix))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsIdentifierCharacter(int index, string text)
+        => index >= 0 &&
+           index < text.Length &&
+           (char.IsLetterOrDigit(text[index]) || text[index] == '_');
 
     private static IReadOnlyList<LanguageCompletionItem> GetHandlerCompletions(
         LanguageDocumentSyntax syntax,

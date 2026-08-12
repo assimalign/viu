@@ -14,7 +14,11 @@
     <ViuProjectReference Include="Assimalign.Viu.UtilityCss" />
     <!-- The semantic engine tests ([V01.01.12.23], #259) bind the generated component
          bridge's Context property against the real runtime contract assembly: the fixture project
-         context references the test runtime's own copy by path. -->
+         context references the test runtime's own copy by path. Core and Reactivity join it because a
+         compiled template binds through both — the display formatter every interpolation calls, and
+         the reactive reference the tier-three glue unwraps a v-for source through. -->
     <ViuProjectReference Include="Assimalign.Viu.Components" />
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
   </ItemGroup>
 </Project>
