@@ -133,7 +133,7 @@ internal static class ViuCompletionCatalog
         Tag("div", "Container element", "01"),
         Tag("span", "Inline container element", "02"),
         Tag("button", "Button element", "03"),
-        Tag("input", "Input element", "04", selfClosing: true),
+        Tag("input", "Input element", "04"),
         Tag("form", "Form element", "05"),
         Tag("label", "Label element", "06"),
         Tag("ul", "Unordered list element", "07"),
@@ -142,7 +142,7 @@ internal static class ViuCompletionCatalog
         Tag("section", "Section element", "10"),
         Tag("template", "Non-rendering template fragment", "11"),
         Tag("component", "Dynamic component", "12"),
-        Tag("slot", "Slot outlet", "13", selfClosing: true),
+        Tag("slot", "Slot outlet", "13"),
         Tag("Transition", "Viu transition component", "14"),
         Tag("TransitionGroup", "Viu transition-group component", "15"),
         Tag("KeepAlive", "Viu keep-alive component", "16"),
@@ -347,16 +347,31 @@ internal static class ViuCompletionCatalog
         string sortText)
         => new(label, kind, detail, documentation, label, false, sortText);
 
+    /// <summary>
+    /// Creates an element completion, which commits the open tag alone.
+    /// </summary>
+    /// <param name="label">The element name.</param>
+    /// <param name="documentation">What the element is.</param>
+    /// <param name="sortText">The stable key used to order the item.</param>
+    /// <returns>The completion item.</returns>
+    /// <remarks>
+    /// Committing writes <c>&lt;template</c> and stops, leaving the author exactly where typing the
+    /// name by hand would have left them — and the <c>&gt;</c> they type next is what closes the
+    /// element and puts the caret between the two tags. Writing the whole element here instead would
+    /// need the caret placed inside it, which a completion item cannot ask for unless the editor
+    /// expands snippets, and the two spellings of the same element would then behave differently.
+    /// </remarks>
     private static LanguageCompletionItem Tag(
         string label,
         string documentation,
-        string sortText,
-        bool selfClosing = false)
-        => Snippet(
+        string sortText)
+        => new(
             label,
+            LanguageCompletionItemKind.Snippet,
             "Template element",
             documentation,
-            selfClosing ? $"<{label} $1/>" : $"<{label}$1>$0</{label}>",
+            "<" + label,
+            IsSnippet: false,
             sortText);
 
     private static LanguageCompletionItem Member(

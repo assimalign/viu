@@ -128,6 +128,11 @@ public class LanguageServiceTests
             new LanguageRange(
                 new LanguagePosition(1, templateLine.Length - 1),
                 new LanguagePosition(1, templateLine.Length)));
+        // Committing writes the open tag and stops: the '>' typed next is what closes the element
+        // and puts the caret between the two tags, so completing the name and typing it out by hand
+        // reach the same place.
+        tag.InsertText.ShouldBe("<template");
+        tag.IsSnippet.ShouldBeFalse();
         // A directive is not a tag: it never opens with '<', so its span stays the editor's own.
         completions.Single(item => item.Label == "v-for").EditRange.ShouldBeNull();
     }
