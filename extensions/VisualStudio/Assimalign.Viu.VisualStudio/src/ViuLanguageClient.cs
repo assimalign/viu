@@ -238,7 +238,17 @@ internal sealed class ViuLanguageClient :
     public Task OnServerInitializedAsync() => Task.CompletedTask;
 
     /// <inheritdoc />
-    public Task AttachForCustomMessageAsync(JsonRpc rpc) => Task.CompletedTask;
+    /// <remarks>
+    /// The connection is retained so the Quick Info adapter can ask the server for hover content
+    /// directly. It renders the tooltip from classified runs rather than handing Visual Studio the
+    /// server's Markdown, and the middle layer therefore declines the editor's own hover request —
+    /// two answers to one gesture would stack two tooltips.
+    /// </remarks>
+    public Task AttachForCustomMessageAsync(JsonRpc rpc)
+    {
+        ViuLanguageServerConnection.Attach(rpc);
+        return Task.CompletedTask;
+    }
 
     /// <summary>
     /// Composes the message shown when the server never reached an initialized state.

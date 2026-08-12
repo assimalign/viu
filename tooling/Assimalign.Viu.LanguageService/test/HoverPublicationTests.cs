@@ -81,10 +81,11 @@ public sealed class HoverPublicationTests
             ScriptSemanticFixture.DocumentUri,
             new LanguagePosition(1, eventStart + 2));
 
-        // The Quick Info shape ([V01.01.12.07.16]): the declaration leads, fenced so a client
-        // colorizes it and renders it at body size, and the prose follows. Bold text and bullet lists
-        // are a document's structure and a client renders them at heading and list sizes, which is
-        // what made a Viu tooltip read as something other than the editor's own.
+        // The Quick Info shape ([V01.01.12.07.16]): the declaration leads and the prose follows. The
+        // fence carries the declaration's language, which is the only thing telling a host which
+        // grammar to colorize it with — the same body serves a C# signature and a CSS rule. Bold and
+        // list markers stay out: a host renders those at heading and list sizes, which is what made a
+        // Viu tooltip read as something other than the editor's own.
         tagHover.ShouldNotBeNull();
         tagHover!.Markdown.ShouldStartWith("```csharp\nclass FeatureCard\n");
         tagHover.Markdown.ShouldContain("    string Title   // :title (required)");

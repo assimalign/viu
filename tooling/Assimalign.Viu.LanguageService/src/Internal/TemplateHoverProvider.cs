@@ -127,7 +127,7 @@ internal static class TemplateHoverProvider
     /// take plaintext receive the same content with the fences and emphasis stripped.
     /// </remarks>
     private static string CreateQuickInfoMarkdown(string declaration, string description)
-        => $"```csharp\n{declaration}\n```\n{description}";
+        => LanguageHoverMarkdown.Create(declaration, description);
 
     private static LanguageHover CreateComponentHover(
         ComponentUsage usage,

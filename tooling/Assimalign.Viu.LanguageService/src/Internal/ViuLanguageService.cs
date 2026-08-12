@@ -1198,7 +1198,9 @@ internal sealed class ViuLanguageService :
     }
 
     private static string GetUtilityDocumentation(UtilityClassMetadata metadata)
-        => $"**`{metadata.CandidateText}`** — {metadata.Description}\n\n```css\n{metadata.Css}\n```";
+        => LanguageHoverMarkdown.CreateDescribed(
+            $"`{metadata.CandidateText}` — {metadata.Description}",
+            metadata.Css);
 
     // Reads utilityContexts, so every caller must hold the synchronization lock.
     private UtilityStylesheetLanguageContext GetUtilityContext(string documentUri)

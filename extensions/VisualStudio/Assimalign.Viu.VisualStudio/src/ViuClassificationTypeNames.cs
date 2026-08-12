@@ -83,6 +83,12 @@ internal static class ViuClassificationTypeNames
     /// <summary>The editor's identifier classification.</summary>
     public const string Identifier = "identifier";
 
+    /// <summary>
+    /// The editor's plain-text classification, which every tooltip's prose takes so it reads as body
+    /// text rather than as any kind of code.
+    /// </summary>
+    public const string Text = "text";
+
     /// <summary>Roslyn's type-name classification.</summary>
     public const string ClassName = "class name";
 

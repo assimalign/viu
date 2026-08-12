@@ -737,9 +737,7 @@ internal sealed class ScriptSemanticEngine
             // A malformed documentation payload degrades to the signature alone.
         }
 
-        return summary is null
-            ? $"```csharp\n{detail}\n```"
-            : $"```csharp\n{detail}\n```\n\n{summary}";
+        return LanguageHoverMarkdown.Create(detail, summary ?? string.Empty);
     }
 
     /// <summary>Clears the semantic and component-contract state a closed document leaves behind.</summary>

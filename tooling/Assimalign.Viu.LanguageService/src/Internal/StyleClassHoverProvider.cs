@@ -53,8 +53,9 @@ internal static class StyleClassHoverProvider
             }
 
             return new LanguageHover(
-                $"**`.{context.TokenText}`** — declared in this component's style block.\n\n" +
-                    $"```css\n{rule.Location.Source.Trim()}\n```",
+                LanguageHoverMarkdown.CreateDescribed(
+                    $"`.{context.TokenText}` — declared in this component's style block.",
+                    rule.Location.Source.Trim()),
                 new LanguageRange(
                     TextCoordinateConverter.GetPosition(document.Text, context.TokenStart),
                     TextCoordinateConverter.GetPosition(document.Text, context.TokenEnd)));
