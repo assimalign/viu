@@ -631,15 +631,26 @@ internal sealed class ViuLanguageService :
             }
         }
 
-        // A C# expression inside an attribute value or interpolation must not be documented as if
-        // it were markup: without this gate `title="v-if"` hovers as the v-if directive.
+        var projectContext = CaptureProjectContext(documentUri);
+
+        // A C# expression inside an attribute value or interpolation is C#, and documenting it as
+        // markup would answer `title="v-if"` with the v-if directive. It is bound where the compiler
+        // put it — the same route the alias completion takes — so a name in a template reads exactly
+        // as the same name reads in the script block. Without a compilation there is nothing to bind
+        // against, and silence remains the honest answer.
         if (template is not null &&
             IsExpressionContext(document.Text, template, offset))
         {
-            return null;
+            return projectContext is null
+                ? null
+                : scriptSemantics.GetTemplateExpressionHover(
+                    projectContext,
+                    GetDocumentFilePath(documentUri),
+                    document.Text,
+                    offset,
+                    cancellationToken);
         }
 
-        var projectContext = CaptureProjectContext(documentUri);
         if (block is SingleFileComponentScriptBlock script &&
             IsCSharpScript(script) &&
             projectContext is not null)

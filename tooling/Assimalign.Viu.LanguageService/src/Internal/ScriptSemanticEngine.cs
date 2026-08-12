@@ -580,6 +580,59 @@ internal sealed class ScriptSemanticEngine
     }
 
     /// <summary>
+    /// Resolves the symbol a template expression names and returns the same signature and
+    /// documentation the <c>@script</c> block's hover returns for it. [V01.01.12.07.16]
+    /// </summary>
+    /// <param name="context">The host-fed project context.</param>
+    /// <param name="documentFilePath">The document's file path.</param>
+    /// <param name="documentText">The document's live editor text.</param>
+    /// <param name="documentOffset">The zero-based hovered offset within <paramref name="documentText"/>.</param>
+    /// <param name="cancellationToken">The token cancelling the computation.</param>
+    /// <returns>The hover, or <see langword="null"/> when the position names nothing bindable.</returns>
+    /// <remarks>
+    /// A template expression is compiled into the render body, so it is bound there — the route the
+    /// alias completion already takes. The hovered range is read from the authored text rather than
+    /// mapped back from the generated token: the author is pointing at a name they wrote, and its
+    /// extent is a fact about their document, not about the compiler's rendering of it.
+    /// </remarks>
+    internal LanguageHover? GetTemplateExpressionHover(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return GetTemplateExpressionHoverCore(
+                    context,
+                    documentFilePath,
+                    documentText,
+                    documentOffset,
+                    cancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Hover is additive: a projection or binding failure leaves the position undocumented
+            // rather than failing the request.
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Resolves deferred documentation for a label from the document's most recent semantic
     /// completion: the symbol's signature plus its XML documentation summary (source-declared
     /// <c>///</c> or the reference assembly's sibling <c>.xml</c> provider).
@@ -1006,6 +1059,86 @@ internal sealed class ScriptSemanticEngine
                 TextCoordinateConverter.GetPosition(documentText, fileStart),
                 TextCoordinateConverter.GetPosition(documentText, fileStart + fileLength)));
     }
+
+    private LanguageHover? GetTemplateExpressionHoverCore(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        CancellationToken cancellationToken)
+    {
+        var request = CreateLiveDocumentRequest(
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken);
+        if (!request.Mapper.TryMapTemplateExpressionOffsetToGenerated(
+                documentOffset,
+                out var generatedPosition) ||
+            generatedPosition >= request.Root.FullSpan.End ||
+            !TryGetAuthoredIdentifierRange(documentText, documentOffset, out var start, out var end))
+        {
+            return null;
+        }
+
+        var token = request.Root.FindToken(generatedPosition);
+        if (!token.Span.Contains(generatedPosition) || token.Span.Length == 0)
+        {
+            return null;
+        }
+
+        var symbol = ResolveHoverSymbol(request.SemanticModel, token, cancellationToken);
+        if (symbol is null)
+        {
+            return null;
+        }
+
+        if (symbol is IAliasSymbol alias)
+        {
+            symbol = alias.Target;
+        }
+
+        var detail = symbol.ToMinimalDisplayString(
+            request.SemanticModel,
+            generatedPosition,
+            DetailFormat);
+        return new LanguageHover(
+            FormatSymbolDocumentation(detail, symbol, cancellationToken),
+            new LanguageRange(
+                TextCoordinateConverter.GetPosition(documentText, start),
+                TextCoordinateConverter.GetPosition(documentText, end)));
+    }
+
+    // The authored name under the caret. An expression's generated image is the compiler's, so the
+    // span the tooltip underlines is read from what the author actually wrote.
+    private static bool TryGetAuthoredIdentifierRange(
+        string documentText,
+        int offset,
+        out int start,
+        out int end)
+    {
+        start = offset;
+        end = offset;
+        if (offset < 0 || offset > documentText.Length)
+        {
+            return false;
+        }
+
+        while (start > 0 && IsIdentifierCharacter(documentText[start - 1]))
+        {
+            start--;
+        }
+
+        while (end < documentText.Length && IsIdentifierCharacter(documentText[end]))
+        {
+            end++;
+        }
+
+        return end > start;
+    }
+
+    private static bool IsIdentifierCharacter(char character)
+        => char.IsLetterOrDigit(character) || character == '_';
 
     private static ISymbol? ResolveHoverSymbol(
         SemanticModel semanticModel,

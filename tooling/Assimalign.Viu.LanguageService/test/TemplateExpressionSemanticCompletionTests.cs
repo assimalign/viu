@@ -156,6 +156,96 @@ public class TemplateExpressionSemanticCompletionTests
             .ShouldBeEmpty();
     }
 
+    [Fact]
+    public void GetHover_InterpolatedComponentMember_ReadsAsItDoesInTheScriptBlock()
+    {
+        // The reported defect: a name in the script block hovered with its type and documentation
+        // while the same name in a template hovered with nothing at all — template expressions were
+        // suppressed outright, because documenting one as markup would have been worse than silence.
+        const string source =
+            "<template>\n" +
+            "  <p>{{ CurrentPath }}</p>\n" +
+            "</template>\n" +
+            "@script {\n" +
+            "    /// <summary>The route being shown.</summary>\n" +
+            "    public string CurrentPath { get; set; } = \"\";\n" +
+            "}\n";
+        var reference = "  <p>{{ ".Length;
+
+        var hover = Hover(source, 1, reference + 2);
+
+        hover.ShouldNotBeNull();
+        hover!.Markdown.ShouldContain("string CurrentPath");
+        hover.Markdown.ShouldContain("The route being shown.");
+        hover.Range.ShouldBe(
+            new LanguageRange(
+                new LanguagePosition(1, reference),
+                new LanguagePosition(1, reference + "CurrentPath".Length)));
+    }
+
+    [Fact]
+    public void GetHover_BoundAttributeValue_ResolvesTheMemberItNames()
+    {
+        const string source =
+            "<template>\n" +
+            "  <p :title=\"CurrentPath\"></p>\n" +
+            "</template>\n" +
+            "@script {\n" +
+            "    public string CurrentPath { get; set; } = \"\";\n" +
+            "}\n";
+
+        Hover(source, 1, "  <p :title=\"".Length + 2)!
+            .Markdown.ShouldContain("string CurrentPath");
+    }
+
+    [Fact]
+    public void GetHover_ForAliasMember_ResolvesThroughTheCompiledLoop()
+    {
+        // The alias has a type only inside the compiled loop, which is the same reason its members
+        // could not complete before the render source map was walked forward.
+        const string source =
+            "<template>\n" +
+            "  <article v-for=\"capability in Capabilities\">\n" +
+            "    <h3>{{ capability.Label }}</h3>\n" +
+            "  </article>\n" +
+            "</template>\n" +
+            Script;
+
+        Hover(source, 2, "    <h3>{{ capability.".Length + 2)!
+            .Markdown.ShouldContain("string Label");
+    }
+
+    [Fact]
+    public void GetHover_MarkupOutsideAnExpression_IsStillNotDocumentedAsCode()
+    {
+        // The gate this replaced existed so `title="v-if"` would not hover as the v-if directive.
+        // Prose in template content is not an expression and still resolves nothing.
+        const string source =
+            "<template>\n" +
+            "  <p>CurrentPath</p>\n" +
+            "</template>\n" +
+            Script;
+
+        Hover(source, 1, "  <p>".Length + 2).ShouldBeNull();
+    }
+
+    private static LanguageHover? Hover(string source, int line, int character)
+    {
+        var service = LanguageServices.Create();
+        service.ShouldBeAssignableTo<IScriptSemanticLanguageService>()
+            .ConfigureProjectContext(
+                ScriptSemanticFixture.DocumentUri,
+                ScriptSemanticFixture.CreateContext(
+                    new LanguageProjectSourceDocument(
+                        "C:/workspace/App/Capability.cs",
+                        Sibling,
+                        IsComponent: false)));
+        service.OpenDocument(ScriptSemanticFixture.DocumentUri, source, 1);
+        return service.GetHover(
+            ScriptSemanticFixture.DocumentUri,
+            new LanguagePosition(line, character));
+    }
+
     private static IReadOnlyList<LanguageCompletionItem> CompleteInLoopBody(
         string bodyLine,
         string probe)
