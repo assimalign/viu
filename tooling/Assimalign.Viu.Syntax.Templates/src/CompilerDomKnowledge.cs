@@ -29,10 +29,20 @@ public static class CompilerDomKnowledge
         new List<string>(KnownSvgAttributeSet).AsReadOnly();
     private static readonly IReadOnlyList<string> KnownMathMlAttributes =
         new List<string>(KnownMathMlAttributeSet).AsReadOnly();
+    private static readonly IReadOnlyList<string> KnownHtmlTags =
+        new List<string>(HtmlTagSet).AsReadOnly();
 
     /// <summary>Whether <paramref name="tag"/> is a known HTML element.</summary>
     /// <param name="tag">The tag name (matched case-insensitively).</param>
     public static bool IsHtmlTag(string tag) => HtmlTagSet.Contains(tag);
+
+    /// <summary>
+    /// Enumerates the known HTML elements from the shared DOM table. The order is unspecified;
+    /// consumers that present the names sort them for their own surface. Exposing the shared table
+    /// keeps template element completion aligned with compiler classification [V01.01.12.07.12].
+    /// </summary>
+    /// <returns>Every known HTML element exactly once.</returns>
+    public static IEnumerable<string> EnumerateKnownHtmlTags() => KnownHtmlTags;
 
     /// <summary>Whether <paramref name="tag"/> is a known SVG element.</summary>
     /// <param name="tag">The tag name (matched case-sensitively).</param>

@@ -86,7 +86,7 @@ public class TemplateContractCompletionTests
     }
 
     [Fact]
-    public void GetCompletions_ComponentEventName_OffersDeclaredEventSnippet()
+    public void GetCompletions_ComponentEventName_OffersTheDeclaredEvent()
     {
         const string source = "<template>\n  <Button @sub></Button>\n</template>\n";
         var service = CreateServiceWithButtonComponent();
@@ -97,10 +97,89 @@ public class TemplateContractCompletionTests
                 PositionAfter(source, "<Button @sub"))
             .Single(item => item.Label == "@submitted");
 
-        completion.Kind.ShouldBe(LanguageCompletionItemKind.Snippet);
-        completion.IsSnippet.ShouldBeTrue();
+        // The item writes its own empty value: a snippet-capable client puts the caret in it from
+        // the tabstop, and Visual Studio's commit adapter places it there for a client that is not.
         completion.InsertText.ShouldBe("@submitted=\"$1\"");
+        completion.IsSnippet.ShouldBeTrue();
         completion.Detail.ShouldContain("Submitted(string value)");
+    }
+
+    [Fact]
+    public void GetCompletions_ComponentAttributeName_OffersParametersStaticallyAndBound()
+    {
+        // A parameter takes a static value as readily as a bound one, so both forms are offered. The
+        // colon spelling was the only one before, which hid half the surface from anyone who had not
+        // already typed one.
+        const string source = "<template>\n  <Button ></Button>\n</template>\n";
+        var service = CreateServiceWithButtonComponent();
+        service.OpenDocument(ScriptSemanticFixture.DocumentUri, source, 1);
+
+        var completions = service.GetCompletions(
+            ScriptSemanticFixture.DocumentUri,
+            PositionAfter(source, "<Button "));
+
+        var staticParameter = completions.Single(item => item.Label == "label");
+        staticParameter.InsertText.ShouldBe("label=\"$1\"");
+        staticParameter.Detail.ShouldBe("string component parameter");
+        completions.ShouldContain(item => item.Label == ":label");
+        completions.ShouldContain(item => item.Label == "@submitted");
+        completions.ShouldContain(item => item.Label == "v-if");
+        // The native vocabulary still stays out of a component's attribute area ([SFC-CG-8]).
+        completions.ShouldNotContain(item => item.Label == "type");
+    }
+
+    [Fact]
+    public void GetCompletions_NativeAttributeName_OffersAttributesHandlersAndDirectives()
+    {
+        const string source = "<template>\n  <button ></button>\n</template>\n";
+        var completions = CompleteAfter(source, "<button ");
+
+        completions.ShouldContain(item => item.Label == "type");
+        completions.ShouldContain(item => item.Label == ":type");
+        completions.ShouldContain(item => item.Label == "@click");
+        completions.ShouldContain(item => item.Label == "v-if");
+    }
+
+    [Theory]
+    // The reported defect: the shorthand is punctuation, so an editor inferring the replaced span
+    // from the typed word left it in place and the committed name landed beside it — ::label, @@sub.
+    [InlineData("<Button :", ":label")]
+    [InlineData("<Button @", "@submitted")]
+    [InlineData("<Button v-i", "v-if")]
+    public void GetCompletions_AttributeName_ReplacesTheShorthandItWasTriggeredBy(
+        string marker,
+        string label)
+    {
+        var source = $"<template>\n  {marker}></Button>\n</template>\n";
+        var service = CreateServiceWithButtonComponent();
+        service.OpenDocument(ScriptSemanticFixture.DocumentUri, source, 1);
+        var position = PositionAfter(source, marker);
+        var typedName = marker.Substring(marker.LastIndexOf(' ') + 1);
+
+        var completion = service
+            .GetCompletions(ScriptSemanticFixture.DocumentUri, position)
+            .Single(item => item.Label == label);
+
+        completion.EditRange.ShouldBe(
+            new LanguageRange(
+                new LanguagePosition(position.Line, position.Character - typedName.Length),
+                position));
+    }
+
+    [Fact]
+    public void GetCompletions_LongFormBindingPrefix_OffersTheSameSurfaceAsTheShorthand()
+    {
+        const string source = "<template>\n  <Button v-bind:></Button>\n</template>\n";
+        var service = CreateServiceWithButtonComponent();
+        service.OpenDocument(ScriptSemanticFixture.DocumentUri, source, 1);
+
+        var completion = service
+            .GetCompletions(
+                ScriptSemanticFixture.DocumentUri,
+                PositionAfter(source, "<Button v-bind:"))
+            .Single(item => item.Label == "v-bind:label");
+
+        completion.InsertText.ShouldBe("v-bind:label=\"$1\"");
     }
 
     [Fact]
@@ -123,6 +202,28 @@ public class TemplateContractCompletionTests
             "</style>\n";
 
         CompleteAfter(source, "dis").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void GetCompletions_NodePosition_OffersTheComponentsThisCompilationResolves()
+    {
+        // A node position names a component from the same [SFC-USE-5] catalog the compiler resolves
+        // usages against, so a sibling the author just wrote is offered without registering it
+        // anywhere — and it is offered as a type, not as an element.
+        const string source = "<template>\n  <\n</template>\n";
+        var service = CreateServiceWithButtonComponent();
+        service.OpenDocument(ScriptSemanticFixture.DocumentUri, source, 1);
+
+        var completions = service.GetCompletions(
+            ScriptSemanticFixture.DocumentUri,
+            PositionAfter(source, "  <"));
+
+        var component = completions.Single(item => item.Label == "Button");
+        component.Kind.ShouldBe(LanguageCompletionItemKind.Class);
+        component.InsertText.ShouldBe("<Button");
+        // A component sorts above the native element vocabulary: it is the author's own code.
+        component.SortText.ShouldBe("10:Button");
+        completions.Single(item => item.Label == "div").SortText.ShouldBe("30:div");
     }
 
     private static System.Collections.Generic.IReadOnlyList<LanguageCompletionItem> CompleteAfter(

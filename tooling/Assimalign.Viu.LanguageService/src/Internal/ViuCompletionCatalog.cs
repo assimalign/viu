@@ -95,58 +95,88 @@ internal static class ViuCompletionCatalog
 
     internal static IReadOnlyList<LanguageCompletionItem> TemplateDirectives { get; } =
     [
-        Snippet("v-if", "Conditional directive", "Renders the element when the expression is truthy.", "v-if=\"$1\"", "01"),
-        Snippet("v-else-if", "Conditional directive", "Adds another conditional branch.", "v-else-if=\"$1\"", "02"),
+        Attribute("v-if", "Conditional directive", "Renders the element when the expression is truthy.", "v-if=\"$1\"", "01"),
+        Attribute("v-else-if", "Conditional directive", "Adds another conditional branch.", "v-else-if=\"$1\"", "02"),
         Text("v-else", LanguageCompletionItemKind.Keyword, "Conditional directive", "Adds an unconditional alternative branch.", "03"),
-        Snippet("v-for", "List directive", "Repeats the element for each value in a source.", "v-for=\"$1 in $2\"", "04"),
-        Snippet("v-show", "Visibility directive", "Toggles element visibility while preserving the element.", "v-show=\"$1\"", "05"),
-        Snippet("v-model", "Two-way binding", "Creates a form value binding.", "v-model=\"$1\"", "06"),
-        Snippet("v-bind", "Property binding", "Binds an element property or component argument.", ":$1=\"$2\"", "07"),
-        Snippet("v-on", "Event listener", "Registers an event handler.", "@$1=\"$2\"", "08"),
-        Snippet("v-slot", "Named slot", "Declares slot content and optional slot arguments.", "#$1=\"$2\"", "09"),
+        Attribute("v-for", "List directive", "Repeats the element for each value in a source.", "v-for=\"$1\"", "04"),
+        Attribute("v-show", "Visibility directive", "Toggles element visibility while preserving the element.", "v-show=\"$1\"", "05"),
+        Attribute("v-model", "Two-way binding", "Creates a form value binding.", "v-model=\"$1\"", "06"),
+        Attribute("v-bind", "Property binding", "Binds an element property or component argument.", "v-bind:", "07"),
+        Attribute("v-on", "Event listener", "Registers an event handler.", "v-on:", "08"),
+        Attribute("v-slot", "Named slot", "Declares slot content and optional slot arguments.", "v-slot=\"$1\"", "09"),
         Text("v-once", LanguageCompletionItemKind.Keyword, "Render directive", "Renders the subtree once.", "10"),
-        Snippet("v-memo", "Render memoization", "Skips updates while the dependency list is unchanged.", "v-memo=\"[$1]\"", "11"),
+        Attribute("v-memo", "Render memoization", "Skips updates while the dependency list is unchanged.", "v-memo=\"$1\"", "11"),
     ];
 
     internal static IReadOnlyList<LanguageCompletionItem> TemplateEvents { get; } =
     [
-        Snippet("@click", "DOM event", "Registers a click handler.", "@click=\"$1\"", "01"),
-        Snippet("@submit", "DOM event", "Registers a submit handler.", "@submit=\"$1\"", "02"),
-        Snippet("@input", "DOM event", "Registers an input handler.", "@input=\"$1\"", "03"),
-        Snippet("@change", "DOM event", "Registers a change handler.", "@change=\"$1\"", "04"),
-        Snippet("@keydown", "DOM event", "Registers a keydown handler.", "@keydown=\"$1\"", "05"),
-        Snippet("@keyup", "DOM event", "Registers a keyup handler.", "@keyup=\"$1\"", "06"),
+        Attribute("@click", "DOM event", "Registers a click handler.", "@click=\"$1\"", "01"),
+        Attribute("@submit", "DOM event", "Registers a submit handler.", "@submit=\"$1\"", "02"),
+        Attribute("@input", "DOM event", "Registers an input handler.", "@input=\"$1\"", "03"),
+        Attribute("@change", "DOM event", "Registers a change handler.", "@change=\"$1\"", "04"),
+        Attribute("@keydown", "DOM event", "Registers a keydown handler.", "@keydown=\"$1\"", "05"),
+        Attribute("@keyup", "DOM event", "Registers a keyup handler.", "@keyup=\"$1\"", "06"),
     ];
 
     internal static IReadOnlyList<LanguageCompletionItem> TemplateBindings { get; } =
     [
-        Snippet(":class", "Property binding", "Binds the element's class value.", ":class=\"$1\"", "01"),
-        Snippet(":style", "Property binding", "Binds the element's inline style value.", ":style=\"$1\"", "02"),
-        Snippet(":key", "Renderer identity", "Supplies a stable identity for keyed diffing.", ":key=\"$1\"", "03"),
-        Snippet(":ref", "Template reference", "Captures the element or component reference.", ":ref=\"$1\"", "04"),
-        Snippet(":disabled", "Boolean property binding", "Binds the disabled property.", ":disabled=\"$1\"", "05"),
-        Snippet(":value", "Value binding", "Binds the element value.", ":value=\"$1\"", "06"),
+        Attribute(":class", "Property binding", "Binds the element's class value.", ":class=\"$1\"", "01"),
+        Attribute(":style", "Property binding", "Binds the element's inline style value.", ":style=\"$1\"", "02"),
+        Attribute(":key", "Renderer identity", "Supplies a stable identity for keyed diffing.", ":key=\"$1\"", "03"),
+        Attribute(":ref", "Template reference", "Captures the element or component reference.", ":ref=\"$1\"", "04"),
+        Attribute(":disabled", "Boolean property binding", "Binds the disabled property.", ":disabled=\"$1\"", "05"),
+        Attribute(":value", "Value binding", "Binds the element value.", ":value=\"$1\"", "06"),
     ];
 
+    /// <summary>
+    /// The tags Viu owns: its framework elements and its built-in components. The native elements are
+    /// not listed here — they are enumerated from the shared DOM table, which is the same one the
+    /// compiler classifies against, so the two can never disagree about what an element is.
+    /// </summary>
     internal static IReadOnlyList<LanguageCompletionItem> TemplateTags { get; } =
     [
-        Tag("div", "Container element", "01"),
-        Tag("span", "Inline container element", "02"),
-        Tag("button", "Button element", "03"),
-        Tag("input", "Input element", "04"),
-        Tag("form", "Form element", "05"),
-        Tag("label", "Label element", "06"),
-        Tag("ul", "Unordered list element", "07"),
-        Tag("li", "List item element", "08"),
-        Tag("p", "Paragraph element", "09"),
-        Tag("section", "Section element", "10"),
-        Tag("template", "Non-rendering template fragment", "11"),
-        Tag("component", "Dynamic component", "12"),
-        Tag("slot", "Slot outlet", "13"),
-        Tag("Transition", "Viu transition component", "14"),
-        Tag("TransitionGroup", "Viu transition-group component", "15"),
-        Tag("KeepAlive", "Viu keep-alive component", "16"),
-        Tag("Suspense", "Viu suspense component", "17"),
+        Tag(
+            "template",
+            LanguageCompletionItemKind.Property,
+            "Viu framework element",
+            "Groups children without rendering an element of its own.",
+            "20:template"),
+        Tag(
+            "slot",
+            LanguageCompletionItemKind.Property,
+            "Viu framework element",
+            "Renders content the parent supplied for this outlet.",
+            "20:slot"),
+        Tag(
+            "component",
+            LanguageCompletionItemKind.Property,
+            "Viu framework element",
+            "Renders the component its bound `is` value selects.",
+            "20:component"),
+        Tag(
+            "Transition",
+            LanguageCompletionItemKind.Class,
+            "Viu built-in component",
+            "Animates a single child as it enters and leaves.",
+            "10:Transition"),
+        Tag(
+            "TransitionGroup",
+            LanguageCompletionItemKind.Class,
+            "Viu built-in component",
+            "Animates a list of children as items enter, leave, and move.",
+            "10:TransitionGroup"),
+        Tag(
+            "KeepAlive",
+            LanguageCompletionItemKind.Class,
+            "Viu built-in component",
+            "Retains a swapped-out child's state instead of unmounting it.",
+            "10:KeepAlive"),
+        Tag(
+            "Suspense",
+            LanguageCompletionItemKind.Class,
+            "Viu built-in component",
+            "Renders fallback content until its asynchronous children resolve.",
+            "10:Suspense"),
     ];
 
     internal static IReadOnlyList<LanguageCompletionItem> ScriptGeneral { get; } =
@@ -339,6 +369,37 @@ internal static class ViuCompletionCatalog
         string sortText)
         => new(label, LanguageCompletionItemKind.Snippet, detail, documentation, insertText, true, sortText);
 
+    /// <summary>
+    /// Creates an attribute completion, which commits up to the equals sign.
+    /// </summary>
+    /// <param name="label">The attribute name, its shorthand included.</param>
+    /// <param name="detail">The category shown beside the name.</param>
+    /// <param name="documentation">What the attribute does.</param>
+    /// <param name="insertText">The committed text, ending at the equals sign.</param>
+    /// <param name="sortText">The stable key used to order the item.</param>
+    /// <returns>The completion item.</returns>
+    /// <remarks>
+    /// The item writes its own empty value, because the value is where the author is going. A client
+    /// that expands snippets puts the caret in it from the tabstop; a client that does not receives
+    /// the tabstop rendered out and Visual Studio's commit adapter places the caret instead.
+    /// </remarks>
+    private static LanguageCompletionItem Attribute(
+        string label,
+        string detail,
+        string documentation,
+        string insertText,
+        string sortText)
+        => new(
+            label,
+            LanguageCompletionItemKind.Property,
+            detail,
+            documentation,
+            insertText,
+            // The flag states whether the text carries placeholders, so it is read off the text
+            // rather than repeated at every call site where the two could drift apart.
+            IsSnippet: insertText.IndexOf('$') >= 0,
+            sortText);
+
     private static LanguageCompletionItem Text(
         string label,
         LanguageCompletionItemKind kind,
@@ -351,6 +412,8 @@ internal static class ViuCompletionCatalog
     /// Creates an element completion, which commits the open tag alone.
     /// </summary>
     /// <param name="label">The element name.</param>
+    /// <param name="kind">The glyph category: a component is a type, a framework element is not.</param>
+    /// <param name="detail">The category shown beside the name.</param>
     /// <param name="documentation">What the element is.</param>
     /// <param name="sortText">The stable key used to order the item.</param>
     /// <returns>The completion item.</returns>
@@ -363,12 +426,14 @@ internal static class ViuCompletionCatalog
     /// </remarks>
     private static LanguageCompletionItem Tag(
         string label,
+        LanguageCompletionItemKind kind,
+        string detail,
         string documentation,
         string sortText)
         => new(
             label,
-            LanguageCompletionItemKind.Snippet,
-            "Template element",
+            kind,
+            detail,
             documentation,
             "<" + label,
             IsSnippet: false,

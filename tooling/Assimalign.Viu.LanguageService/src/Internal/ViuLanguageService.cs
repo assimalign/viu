@@ -863,62 +863,18 @@ internal sealed class ViuLanguageService :
             return ViuCompletionCatalog.TemplateBindings;
         }
 
+        // Every position that can host a node, an expression, or a tag context is answered by
+        // TemplateCompletionProvider before this runs. What is left is an attribute-name position,
+        // where the attribute vocabularies are the whole answer — an element is not one of them.
         var completions = new List<LanguageCompletionItem>(
-            ViuCompletionCatalog.TemplateTags.Count +
             ViuCompletionCatalog.TemplateDirectives.Count +
             ViuCompletionCatalog.TemplateEvents.Count +
             ViuCompletionCatalog.TemplateBindings.Count);
-        AppendTagCompletions(documentText, offset, completions);
         completions.AddRange(ViuCompletionCatalog.TemplateDirectives);
         completions.AddRange(ViuCompletionCatalog.TemplateEvents);
         completions.AddRange(ViuCompletionCatalog.TemplateBindings);
         return completions;
     }
-
-    /// <summary>
-    /// Appends the element catalog, each item carrying the range its insertion replaces.
-    /// </summary>
-    /// <remarks>
-    /// A tag's insertion opens with <c>&lt;</c>, which the author has almost always typed already —
-    /// that keystroke is what asked for the list. An editor left to guess the replaced span takes the
-    /// typed <em>word</em>, and <c>&lt;</c> is no part of a word, so committing appends a second one
-    /// (<c>&lt;&lt;template&gt;</c>). Naming the range removes the guess: it starts at the <c>&lt;</c>
-    /// when one is there and at the partially typed name when it is not.
-    /// </remarks>
-    private static void AppendTagCompletions(
-        string documentText,
-        int offset,
-        List<LanguageCompletionItem> completions)
-    {
-        var editRange = GetTagEditRange(documentText, offset);
-        foreach (var tag in ViuCompletionCatalog.TemplateTags)
-        {
-            completions.Add(editRange is null ? tag : tag with { EditRange = editRange });
-        }
-    }
-
-    private static LanguageRange? GetTagEditRange(string documentText, int offset)
-    {
-        var start = offset;
-        while (start > 0 && IsTagNameCharacter(documentText[start - 1]))
-        {
-            start--;
-        }
-
-        if (start > 0 && documentText[start - 1] == '<')
-        {
-            start--;
-        }
-
-        return start == offset
-            ? null
-            : new LanguageRange(
-                TextCoordinateConverter.GetPosition(documentText, start),
-                TextCoordinateConverter.GetPosition(documentText, offset));
-    }
-
-    private static bool IsTagNameCharacter(char character)
-        => char.IsLetterOrDigit(character) || character is '-' or '_' or '.';
 
     private static bool IsExpressionContext(
         string documentText,

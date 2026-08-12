@@ -133,8 +133,42 @@ public class LanguageServiceTests
         // reach the same place.
         tag.InsertText.ShouldBe("<template");
         tag.IsSnippet.ShouldBeFalse();
-        // A directive is not a tag: it never opens with '<', so its span stays the editor's own.
-        completions.Single(item => item.Label == "v-for").EditRange.ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetCompletions_NodePosition_OffersOnlyWhatCanBeANode()
+    {
+        // The reported defect: starting a node offered :class, @click, and v-if beside div and span.
+        // A directive, a binding, and an event handler are attributes — they can only appear inside a
+        // tag that already has a name, so markup naming one where a node begins cannot parse.
+        var service = LanguageServices.Create();
+        service.OpenDocument(DocumentUri, "<template>\n    <\n</template>\n", 1);
+
+        var completions = service.GetCompletions(DocumentUri, new LanguagePosition(1, 5));
+
+        completions.ShouldContain(item => item.Label == "div");
+        completions.ShouldContain(item => item.Label == "section");
+        completions.ShouldContain(item => item.Label == "Transition");
+        completions.ShouldNotContain(item => item.Label.StartsWith(':'));
+        completions.ShouldNotContain(item => item.Label.StartsWith('@'));
+        completions.ShouldNotContain(item => item.Label.StartsWith("v-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void GetCompletions_NodePosition_OffersEveryNativeElementNotAHandfulOfThem()
+    {
+        // The element vocabulary is the shared DOM table the compiler classifies against, so the
+        // editor cannot know a different set of elements than the build does.
+        var service = LanguageServices.Create();
+        service.OpenDocument(DocumentUri, "<template>\n    <\n</template>\n", 1);
+
+        var completions = service.GetCompletions(DocumentUri, new LanguagePosition(1, 5));
+
+        // None of these were in the hand-written list the node position used to answer with.
+        completions.ShouldContain(item => item.Label == "article");
+        completions.ShouldContain(item => item.Label == "table");
+        completions.ShouldContain(item => item.Label == "h1");
+        completions.Single(item => item.Label == "article").InsertText.ShouldBe("<article");
     }
 
     [Fact]
