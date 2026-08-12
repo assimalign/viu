@@ -130,6 +130,7 @@ internal sealed class ViuBraceCompletionContext : IBraceCompletionContext
         IEditorOptions options = textView.Options;
         ViuBlockExpansion expansion = ViuBraceIndentation.ComputeBlockExpansion(
             openingBraceLine.GetText(),
+            openingBracePosition - openingBraceLine.Start.Position,
             options.GetOptionValue(DefaultOptions.IndentSizeOptionId),
             options.GetOptionValue(DefaultOptions.ConvertTabsToSpacesOptionId));
 
@@ -142,8 +143,25 @@ internal sealed class ViuBraceCompletionContext : IBraceCompletionContext
         }
 
         int replacementStart = caretLine.Start.Position;
+        // The brace's move happens in the same edit, and therefore the same undo unit: one Return
+        // produced one block, and stepping back through half of it would leave a shape nobody typed.
+        // Both spans are measured against this snapshot and cannot overlap - the brace's line is
+        // above the caret's.
+        int openingBraceMoveStart = expansion.OpeningBraceReplaceStart < 0
+            ? -1
+            : openingBraceLine.Start.Position + expansion.OpeningBraceReplaceStart;
+        int caretDelta = 0;
         using (ITextEdit edit = subjectBuffer.CreateEdit())
         {
+            if (openingBraceMoveStart >= 0)
+            {
+                string movedBrace = lineBreak + expansion.ClosingBraceIndentation + "{";
+                caretDelta = movedBrace.Length - (openingBracePosition + 1 - openingBraceMoveStart);
+                edit.Replace(
+                    Span.FromBounds(openingBraceMoveStart, openingBracePosition + 1),
+                    movedBrace);
+            }
+
             edit.Replace(
                 Span.FromBounds(replacementStart, closingBracePosition),
                 expansion.CaretIndentation + lineBreak + expansion.ClosingBraceIndentation);
@@ -156,7 +174,10 @@ internal sealed class ViuBraceCompletionContext : IBraceCompletionContext
             edit.Apply();
         }
 
-        MoveCaret(textView, subjectBuffer, replacementStart + expansion.CaretIndentation.Length);
+        MoveCaret(
+            textView,
+            subjectBuffer,
+            replacementStart + caretDelta + expansion.CaretIndentation.Length);
     }
 
     /// <inheritdoc />

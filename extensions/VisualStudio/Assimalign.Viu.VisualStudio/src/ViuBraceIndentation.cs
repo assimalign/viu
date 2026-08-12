@@ -31,10 +31,15 @@ namespace Assimalign.Viu.VisualStudio;
 internal static class ViuBraceIndentation
 {
     /// <summary>
-    /// Computes the indentation for the closing brace's line and the caret's line.
+    /// Computes where the three lines of an expanded block begin, the opening brace's own line
+    /// included.
     /// </summary>
     /// <param name="openingBraceLineText">
     /// The full text of the line the opening brace sits on, without its line break.
+    /// </param>
+    /// <param name="openingBraceIndex">
+    /// Zero-based offset of the opening brace within that line. A value outside the line leaves the
+    /// brace where it is.
     /// </param>
     /// <param name="indentSize">
     /// The buffer's indent size, in spaces. Values below one are treated as one: the whole point of
@@ -45,9 +50,19 @@ internal static class ViuBraceIndentation
     /// Whether the buffer indents with spaces. When <see langword="false"/> the added level is a
     /// single tab character, whatever <paramref name="indentSize"/> says.
     /// </param>
-    /// <returns>The two indentation strings, which are never <see langword="null"/>.</returns>
+    /// <returns>The expansion, whose indentation strings are never <see langword="null"/>.</returns>
+    /// <remarks>
+    /// <b>The brace takes a line of its own.</b> A brace typed after a declaration stays on that
+    /// declaration's line unless something moves it, and the block then opens in a shape no C# in the
+    /// file is written in. Moving it is the same decision Visual Studio's C# editor makes by default,
+    /// and it is made here for the same reason the indentation is: the content type has no formatter
+    /// to defer to, so the one keystroke that creates a block does the whole shape or none of it.
+    /// A brace that already begins its line is left alone, which is also what keeps a second
+    /// <c>Enter</c> inside an expanded block from moving anything.
+    /// </remarks>
     public static ViuBlockExpansion ComputeBlockExpansion(
         string openingBraceLineText,
+        int openingBraceIndex,
         int indentSize,
         bool convertTabsToSpaces)
     {
@@ -58,7 +73,29 @@ internal static class ViuBraceIndentation
 
         return new ViuBlockExpansion(
             closingBraceIndentation,
-            closingBraceIndentation + indentLevel);
+            closingBraceIndentation + indentLevel,
+            FindOpeningBraceReplaceStart(openingBraceLineText, openingBraceIndex));
+    }
+
+    // The whitespace run before the brace is part of the move: leaving it behind would strand a
+    // trailing space on the declaration's line.
+    private static int FindOpeningBraceReplaceStart(string lineText, int openingBraceIndex)
+    {
+        if (string.IsNullOrEmpty(lineText) ||
+            openingBraceIndex <= 0 ||
+            openingBraceIndex >= lineText.Length)
+        {
+            return -1;
+        }
+
+        int start = openingBraceIndex;
+        while (start > 0 && IsIndentationWhitespace(lineText[start - 1]))
+        {
+            start--;
+        }
+
+        // Only whitespace precedes it: the brace already begins its line.
+        return start == 0 ? -1 : start;
     }
 
     /// <summary>

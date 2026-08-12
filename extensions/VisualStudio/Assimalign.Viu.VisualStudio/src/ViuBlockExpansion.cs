@@ -12,10 +12,17 @@ namespace Assimalign.Viu.VisualStudio;
 /// The whitespace the caret's line begins with: <paramref name="ClosingBraceIndentation"/> plus one
 /// indent level, so the caret lands one level inside the block.
 /// </param>
+/// <param name="OpeningBraceReplaceStart">
+/// Where on its own line the opening brace's move begins — the start of the whitespace run before it,
+/// so the move takes the separating space with it — or <c>-1</c> when the brace already begins its
+/// line and stays where it is. The brace moves to <paramref name="ClosingBraceIndentation"/>, the
+/// same column its closer takes.
+/// </param>
 /// <remarks>
 /// A value type with no editor dependency, so the computation that produces it stays unit-testable
 /// while only the buffer edit that applies it is runtime-verified.
 /// </remarks>
 internal readonly record struct ViuBlockExpansion(
     string ClosingBraceIndentation,
-    string CaretIndentation);
+    string CaretIndentation,
+    int OpeningBraceReplaceStart);
