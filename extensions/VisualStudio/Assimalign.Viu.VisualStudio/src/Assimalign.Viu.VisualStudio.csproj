@@ -74,6 +74,8 @@
     <ViuPackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
     <ViuPackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" />
     <ViuPackageReference Include="Microsoft.VisualStudio.ImageCatalog" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Editor" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Shell.15.0" />
     <!-- The classic in-process language-server client API (ILanguageClient, Connection) and the
          threading primitives its events are typed with. -->
     <ViuPackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" />
@@ -128,6 +130,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="language-server.json">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- The code snippets, laid out under the folder the pkgdef's CodeExpansions Paths entry names.
+         A new shortcut is a file added here plus its name in ViuSnippetShortcut; the glob means the
+         packaging never has to be touched again. -->
+    <Content Include="Snippets\**\*.snippet">
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

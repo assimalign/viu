@@ -133,6 +133,20 @@
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
+        <!-- IVsEditorAdaptersFactoryService, the documented bridge from an editor ITextView to the
+             IVsTextView the snippet expansion service works against. Same compile-only stance and
+             the same 17.6 floor as the image catalog: Visual Studio supplies the implementation. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Editor" Version="17.6.268">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <!-- The editor package asks for a Shell.15.0 build that was never published, so NuGet
+             resolves upward and warns (NU1603) - the same situation as Imaging.Interop above.
+             Pinned at the build NuGet picks anyway, which makes the resolution explicit. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Shell.15.0" Version="17.6.36389">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
         <!-- AsyncEventHandler<T>, the type of ILanguageClient's StartAsync/StopAsync events, which
              ViuLanguageClient declares and raises. A transitive dependency of the client package,
              pinned explicitly because it is compiled against directly. Floor raised with

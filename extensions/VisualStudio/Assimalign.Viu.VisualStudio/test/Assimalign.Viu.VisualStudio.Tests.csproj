@@ -56,6 +56,8 @@
     <Compile Include="..\src\Internal\ViuSemanticClassificationCarryOver.cs"
              Link="Internal\ViuSemanticClassificationCarryOver.cs" />
     <Compile Include="..\src\Internal\ViuHoverRun.cs" Link="Internal\ViuHoverRun.cs" />
+    <Compile Include="..\src\Internal\ViuSnippetShortcut.cs"
+             Link="Internal\ViuSnippetShortcut.cs" />
     <Compile Include="..\src\Internal\ViuHoverPresentation.cs"
              Link="Internal\ViuHoverPresentation.cs" />
     <Compile Include="..\src\Internal\ViuClassificationMerge.cs"

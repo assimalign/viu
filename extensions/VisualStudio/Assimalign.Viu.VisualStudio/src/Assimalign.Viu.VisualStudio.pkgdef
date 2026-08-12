@@ -31,3 +31,26 @@
 // Source Code (Text) Editor with Encoding
 [$RootKey$\Editors\{C7747503-0E24-4FBE-BE4B-94180C3947D7}\Extensions]
 "viu"=dword:00000031
+
+// Code snippet registration.
+//
+// Snippets are looked up per language, and the obvious way to register a language is
+// [$RootKey$\Languages\File Extensions\.viu] - which is exactly the key the comment above forbids,
+// because it attaches a legacy language service that stamps its own content type and re-breaks the
+// editor-factory ownership this file exists to establish.
+//
+// CodeExpansions needs no such binding. The key's default value is a GUID naming the language for
+// expansion lookup only, matching ViuSnippetExpansionClient.LanguageGuid, and the Paths subkey is
+// where the expansion manager looks for .snippet files. Nothing here attaches anything to a buffer.
+//
+// There is no Package value: this extension is MEF parts and this pkgdef, with no VSPackage. That
+// value is what the Code Snippets Manager UI would use to load an owning package; expansion lookup
+// through IVsExpansionManager.GetExpansionByShortcut does not need one.
+[$RootKey$\Languages\CodeExpansions\Viu]
+@="{4a1cf1b2-3d70-4e0e-9b2f-5a4d2f7f8f61}"
+"DisplayName"="Viu"
+"LangStringId"="viu"
+"ShowRoots"=dword:00000000
+
+[$RootKey$\Languages\CodeExpansions\Viu\Paths]
+"Viu"="$PackageFolder$\Snippets"
