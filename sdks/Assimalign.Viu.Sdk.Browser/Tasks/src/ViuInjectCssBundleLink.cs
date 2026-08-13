@@ -51,20 +51,6 @@ public sealed class ViuInjectCssBundleLink : Microsoft.Build.Utilities.Task, ICa
     public string OutputPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// The single <c>href</c> to inject when <see cref="StylesheetLinks"/> is empty. This compatibility input
-    /// keeps utility-style injection and existing task callers on the original single-link contract. Component
-    /// CSS callers provide the complete deterministic set through <see cref="StylesheetLinks"/> instead.
-    /// </summary>
-    public string LinkHref { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The bundle's plain file name (e.g. <c>&lt;PackageId&gt;.viu.css</c>), used only for the idempotency
-    /// check: if the host page already references it, no link is injected. Optional; when empty only an exact
-    /// <see cref="LinkHref"/> match suppresses injection.
-    /// </summary>
-    public string BundleFileName { get; set; } = string.Empty;
-
-    /// <summary>
     /// Gets or sets the stylesheet links to inject in one read/transform/write pass. Each item uses its
     /// <c>Href</c> metadata, falling back to its item specification; <c>BundleFileName</c> scopes the
     /// idempotency check; and the integer <c>Order</c> metadata groups links before ordinal href ordering.
@@ -161,16 +147,6 @@ public sealed class ViuInjectCssBundleLink : Microsoft.Build.Utilities.Task, ICa
     private bool TryResolveStylesheetLinks(out List<StylesheetLink> links)
     {
         links = new List<StylesheetLink>();
-        if (StylesheetLinks.Length == 0)
-        {
-            if (!string.IsNullOrEmpty(LinkHref))
-            {
-                links.Add(new StylesheetLink(LinkHref, BundleFileName, 0));
-            }
-
-            return true;
-        }
-
         var hrefs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in StylesheetLinks)
         {

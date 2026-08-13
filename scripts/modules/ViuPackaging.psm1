@@ -10,7 +10,8 @@
     a new packable library under either code root — libraries/ (the runtime
     framework) or tooling/ (developer tooling: build-time and editor libraries) —
     that is not in the inventory fails the pack rather than silently shipping an
-    incomplete set.
+    incomplete set. Tooling currently contributes no package, but remains scanned
+    so a future packability change cannot bypass the inventory.
 #>
 
 Set-StrictMode -Version Latest
@@ -24,7 +25,6 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Components',
     'Assimalign.Viu.State',
     'Assimalign.Viu.Router',
-    'Assimalign.Viu.UtilityCss',
     'Assimalign.Viu.Core',
     # [V01.01.10.01] is an opt-in package and deliberately stays outside both App frameworks.
     'Assimalign.Viu.DevTools',
@@ -34,10 +34,10 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Browser.Router'
 )
 
-# The repository's code roots that hold independently published libraries. Projects can be
+# The repository's code roots that can hold independently published libraries. Projects can be
 # direct children or grouped one level below an area folder; both shapes retain the inverted
-# <assembly id>/{src,test} layout. Both roots are scanned so a new project in either is caught
-# by the drift guard.
+# <assembly id>/{src,test} layout. The tooling root currently contributes no package, but both
+# roots remain scanned so a future packable project is caught by the drift guard.
 $script:ViuCodeRoot = @('libraries', 'tooling')
 
 function Test-ViuProjectPackable {

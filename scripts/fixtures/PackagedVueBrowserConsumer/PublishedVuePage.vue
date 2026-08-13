@@ -1,5 +1,5 @@
 <template>
-    <main class="block published-vue-page">
+    <main class="published-vue-page">
         Packaged .vue Browser publish
     </main>
 </template>

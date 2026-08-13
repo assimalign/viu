@@ -17,23 +17,16 @@ namespace Assimalign.Viu.Sdk.CssHotReload.Tests;
 public sealed class CssHotReloadWorkerTests
 {
     [Fact]
-    public void WatchCollection_DebugDotNetWatch_RegistersGeneratedStylesheetsAsStaticFiles()
+    public void WatchCollection_DebugDotNetWatch_RegistersComponentStylesheetAsStaticFile()
     {
-        var context = TestContext.Create(includeComponentStyles: true);
+        var context = TestContext.Create();
         try
         {
-            File.Exists(context.UtilityBundlePath).ShouldBeFalse();
-            File.Exists(
-                Path.Combine(
-                    context.DirectoryPath,
-                    "obj",
-                    "viu",
-                    "Probe.viu.css")).ShouldBeFalse();
+            File.Exists(context.BundlePath).ShouldBeFalse();
             var debugResultPath = Path.Combine(context.DirectoryPath, "debug-watch.txt");
             RunMsBuild(
                 context,
                 "ProbeWatch",
-                redirectOutput: true,
                 new Dictionary<string, string>
                 {
                     ["DotNetWatchBuild"] = "true",
@@ -47,20 +40,14 @@ public sealed class CssHotReloadWorkerTests
                 line => line.EndsWith(
                     "Probe.viu.css|wwwroot/Probe.viu.css",
                     StringComparison.OrdinalIgnoreCase));
-            debugLines.ShouldContain(
-                line => line.EndsWith(
-                    "Probe.utilities.css|wwwroot/Probe.utilities.css",
-                    StringComparison.OrdinalIgnoreCase));
-            File.Exists(context.UtilityBundlePath).ShouldBeTrue();
-            new FileInfo(context.UtilityBundlePath).Length.ShouldBe(0);
-            File.Exists(
-                context.UtilityBundlePath + ".hot-reload-empty").ShouldBeTrue();
+            debugLines.Count(
+                    line => line.Contains(".viu.css|", StringComparison.OrdinalIgnoreCase))
+                .ShouldBe(1);
 
             var releaseResultPath = Path.Combine(context.DirectoryPath, "release-watch.txt");
             RunMsBuild(
                 context,
                 "ProbeWatch",
-                redirectOutput: true,
                 new Dictionary<string, string>
                 {
                     ["Configuration"] = "Release",
@@ -75,7 +62,6 @@ public sealed class CssHotReloadWorkerTests
             RunMsBuild(
                 context,
                 "ProbeWatch",
-                redirectOutput: true,
                 new Dictionary<string, string>
                 {
                     ["DotNetWatchBuild"] = "false",
@@ -92,143 +78,38 @@ public sealed class CssHotReloadWorkerTests
     }
 
     [Fact]
-    public void Worker_ExternalReferenceAndSourceRootChanges_RegeneratesUtilityBundle()
+    public void Worker_ComponentChanges_RegeneratesBundleAndIgnoresHostMarkup()
     {
-        var context = TestContext.Create(includeComponentStyles: false);
-        var externalDirectory = context.DirectoryPath + "-external";
+        var context = TestContext.Create();
         Process? workerProcess = null;
         try
         {
-            Directory.CreateDirectory(externalDirectory);
-            var externalSourcePath = Path.Combine(
-                externalDirectory,
-                "External.html");
-            var referencePath = Path.Combine(
-                externalDirectory,
-                "Theme.css");
-            File.WriteAllText(
-                externalSourcePath,
-                "<div class=\"bg-shared\"></div>",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.WriteAllText(
-                referencePath,
-                "@theme { --color-shared: #112233; }",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            var entryPath = Path.Combine(
-                context.DirectoryPath,
-                "Utilities.css");
-            var externalSpecifier = Path.GetRelativePath(
-                    context.DirectoryPath,
-                    externalDirectory)
-                .Replace('\\', '/');
-            File.WriteAllText(
-                entryPath,
-                "@import \"viu-utilities\" source(\"" +
-                externalSpecifier +
-                "\");" +
-                Environment.NewLine +
-                "@reference \"" +
-                externalSpecifier +
-                "/Theme.css\";",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            var project = File.ReadAllText(context.ProjectPath);
-            project = project.Replace(
-                "    <ViuSingleFileComponent Include=\"App.vue\" />",
-                "    <ViuSingleFileComponent Include=\"App.vue\" />" +
-                Environment.NewLine +
-                "    <ViuUtilityCss Include=\"Utilities.css\" />",
-                StringComparison.Ordinal);
-            File.WriteAllText(
-                context.ProjectPath,
-                project,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
             RunMsBuild(
                 context,
                 "_ViuRegenerateCssHotReloadBundles",
-                redirectOutput: true,
                 new Dictionary<string, string>
                 {
                     ["ViuCssHotReloadWorker"] = "true",
                 });
-            File.ReadAllText(context.UtilityBundlePath)
-                .ShouldContain("#112233");
-            File.Exists(context.DependencyManifestPath).ShouldBeTrue();
+            File.ReadAllText(context.BundlePath).ShouldContain("color: red");
 
             workerProcess = StartWorker(context);
             WaitFor(() => File.Exists(context.StatePath), "worker state file");
 
             WriteWatchedFile(
-                referencePath,
-                "@theme { --color-shared: #445566; }");
+                context.ComponentPath,
+                "<template><div /></template><style>.component { color: blue; }</style>");
             WaitForEventCount(context.EventLogPath, 1);
             WaitFor(
-                () => File.ReadAllText(context.UtilityBundlePath)
-                    .Contains("#445566", StringComparison.Ordinal),
-                "referenced stylesheet regeneration");
+                () => File.ReadAllText(context.BundlePath)
+                    .Contains("color: blue", StringComparison.Ordinal),
+                "component stylesheet regeneration");
 
-            using (var retainedEventLogReader = new FileStream(
-                       context.EventLogPath,
-                       FileMode.Open,
-                       FileAccess.Read,
-                       FileShare.Read))
-            {
-                WriteWatchedFile(
-                    externalSourcePath,
-                    "<div class=\"hidden\"></div>");
-                Thread.Sleep(500);
-            }
-
-            WaitForEventCount(context.EventLogPath, 2);
-            WaitFor(
-                () => File.ReadAllText(context.UtilityBundlePath)
-                    .Contains(".hidden", StringComparison.Ordinal),
-                "external source-root regeneration");
-            File.ReadAllText(context.UtilityBundlePath)
-                .ShouldNotContain(".bg-shared");
-        }
-        finally
-        {
-            StopWorker(workerProcess);
-            context.Dispose();
-            if (Directory.Exists(externalDirectory))
-            {
-                Directory.Delete(
-                    externalDirectory,
-                    recursive: true);
-            }
-        }
-    }
-
-    [Fact]
-    public void Worker_FirstCandidate_CreatesPreviouslyAbsentWatchedBundle()
-    {
-        var context = TestContext.Create(includeComponentStyles: false);
-        Process? workerProcess = null;
-        try
-        {
-            File.Exists(context.UtilityBundlePath).ShouldBeFalse();
-            workerProcess = StartWorker(context);
-            WaitFor(() => File.Exists(context.StatePath), "worker state file");
-
-            File.WriteAllText(
-                Path.Combine(context.DirectoryPath, "Candidate.html"),
-                "<div class=\"flex\"></div>",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            WaitForEventCount(context.EventLogPath, 1);
-
-            File.Exists(context.UtilityBundlePath).ShouldBeTrue();
-            File.ReadAllText(context.UtilityBundlePath).ShouldContain(".flex");
-
-            File.Delete(context.StatePath);
-            WaitFor(
-                () =>
-                {
-                    workerProcess.Refresh();
-                    return workerProcess.HasExited;
-                },
-                "worker shutdown after state-file removal");
+            WriteWatchedFile(
+                context.IndexPath,
+                "<div class=\"unrelated\"></div>");
+            Thread.Sleep(500);
+            CountCompletedEvents(context.EventLogPath).ShouldBe(1);
         }
         finally
         {
@@ -238,91 +119,46 @@ public sealed class CssHotReloadWorkerTests
     }
 
     [Fact]
-    public void Worker_ChangesNoOpRemovalAndShutdown_PreservesIncrementalContract()
+    public void Worker_NoOpRemovalAndShutdown_PreservesComponentCssIncrementalContract()
     {
-        var context = TestContext.Create(includeComponentStyles: false);
+        var context = TestContext.Create();
         Process? workerProcess = null;
         try
         {
+            RunMsBuild(
+                context,
+                "_ViuRegenerateCssHotReloadBundles",
+                new Dictionary<string, string>
+                {
+                    ["ViuCssHotReloadWorker"] = "true",
+                });
+
+            var originalCss = File.ReadAllText(context.BundlePath);
+            var originalWriteTime = File.GetLastWriteTimeUtc(context.BundlePath);
+
+            RunMsBuild(
+                context,
+                "_ViuRegenerateCssHotReloadBundles",
+                new Dictionary<string, string>
+                {
+                    ["ViuCssHotReloadWorker"] = "true",
+                });
+            File.ReadAllText(context.BundlePath).ShouldBe(originalCss);
+            File.GetLastWriteTimeUtc(context.BundlePath).ShouldBe(originalWriteTime);
+
             File.WriteAllText(
-                context.IndexPath,
-                "<div class=\"flex\"></div>",
+                context.ComponentPath,
+                "<template><div /></template>",
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             RunMsBuild(
                 context,
                 "_ViuRegenerateCssHotReloadBundles",
-                redirectOutput: true,
                 new Dictionary<string, string>
                 {
                     ["ViuCssHotReloadWorker"] = "true",
                 });
-
-            File.Exists(context.UtilityBundlePath).ShouldBeTrue();
-            var originalCss = File.ReadAllText(context.UtilityBundlePath);
-            var originalWriteTime = File.GetLastWriteTimeUtc(context.UtilityBundlePath);
-
-            WriteWatchedFile(
-                context.IndexPath,
-                "<div   class=\"flex\"></div>");
-            RunMsBuild(
-                context,
-                "_ViuRegenerateCssHotReloadBundles",
-                redirectOutput: true,
-                new Dictionary<string, string>
-                {
-                    ["ViuCssHotReloadWorker"] = "true",
-                });
-            File.ReadAllText(context.UtilityBundlePath).ShouldBe(originalCss);
-            File.GetLastWriteTimeUtc(context.UtilityBundlePath).ShouldBe(originalWriteTime);
-
-            var changedSourcePath = Path.Combine(
-                context.DirectoryPath,
-                "Changed.html");
-            File.WriteAllText(
-                changedSourcePath,
-                "<div class=\"hidden block\"></div>",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            RunMsBuild(
-                context,
-                "_ViuRegenerateCssHotReloadBundles",
-                redirectOutput: true,
-                new Dictionary<string, string>
-                {
-                    ["ViuCssHotReloadWorker"] = "true",
-                });
-            var changedCss = File.ReadAllText(context.UtilityBundlePath);
-            changedCss.ShouldNotBe(originalCss);
-            changedCss.ShouldContain(".hidden");
-
-            File.Delete(changedSourcePath);
-            RunMsBuild(
-                context,
-                "_ViuRegenerateCssHotReloadBundles",
-                redirectOutput: true,
-                new Dictionary<string, string>
-                {
-                    ["ViuCssHotReloadWorker"] = "true",
-                });
-            var partialDeletionCss = File.ReadAllText(context.UtilityBundlePath);
-            partialDeletionCss.ShouldContain(".flex");
-            partialDeletionCss.ShouldNotContain(".hidden");
-            partialDeletionCss.ShouldNotContain(".block");
-
-            File.Delete(context.IndexPath);
-            File.WriteAllText(
-                Path.Combine(context.DirectoryPath, "Empty.html"),
-                "<div></div>",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            RunMsBuild(
-                context,
-                "_ViuRegenerateCssHotReloadBundles",
-                redirectOutput: true,
-                new Dictionary<string, string>
-                {
-                    ["ViuCssHotReloadWorker"] = "true",
-                });
-            new FileInfo(context.UtilityBundlePath).Length.ShouldBe(0);
-            File.Exists(context.UtilityBundlePath + ".hot-reload-empty").ShouldBeTrue();
+            new FileInfo(context.BundlePath).Length.ShouldBe(0);
+            File.Exists(context.BundlePath + ".hot-reload-empty").ShouldBeTrue();
 
             workerProcess = StartWorker(context);
             WaitFor(() => File.Exists(context.StatePath), "worker state file");
@@ -341,183 +177,13 @@ public sealed class CssHotReloadWorkerTests
                 },
                 "worker shutdown after state-file removal");
 
-            RunMsBuild(
-                context,
-                "_ViuBundleUtilityCss",
-                redirectOutput: true,
-                new Dictionary<string, string>());
-            File.Exists(context.UtilityBundlePath).ShouldBeFalse();
-            File.Exists(context.UtilityBundlePath + ".hot-reload-empty").ShouldBeFalse();
+            RunMsBuild(context, "_ViuBundleSingleFileComponentCss", new Dictionary<string, string>());
+            File.Exists(context.BundlePath).ShouldBeFalse();
+            File.Exists(context.BundlePath + ".hot-reload-empty").ShouldBeFalse();
         }
         finally
         {
             StopWorker(workerProcess);
-            context.Dispose();
-        }
-    }
-
-    [Fact]
-    public void Bundle_CssFirstEntry_ExecutesImportThemeSourcesReferencesAndCustomRules()
-    {
-        var context = TestContext.Create(includeComponentStyles: false);
-        try
-        {
-            var entryPath = Path.Combine(
-                context.DirectoryPath,
-                "Utilities.css");
-            var referencePath = Path.Combine(
-                context.DirectoryPath,
-                "Shared.css");
-            var explicitSourcePath = Path.Combine(
-                context.DirectoryPath,
-                "Explicit.html");
-            var automaticSourcePath = Path.Combine(
-                context.DirectoryPath,
-                "Automatic.html");
-            File.WriteAllText(
-                entryPath,
-                """
-                @charset "UTF-8";
-                @import url("data:text/css,.imported%7Bcolor:red%7D");
-                @import "viu-utilities" source(none) prefix(vu) theme(static) important;
-                @reference "./Shared.css";
-                @source inline("vu:flex");
-                @source inline("vu:night:badge-shared");
-                """,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.WriteAllText(
-                referencePath,
-                """
-                @theme {
-                  --color-shared: oklch(0.63 0.19 260);
-                }
-                @custom-variant night (&:where(.night *));
-                @utility badge-* {
-                  color: --value(--color-*);
-                }
-                """,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.WriteAllText(
-                explicitSourcePath,
-                """<div class="vu:hidden"></div>""",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.WriteAllText(
-                automaticSourcePath,
-                """<div class="vu:block"></div>""",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            var project = File.ReadAllText(context.ProjectPath);
-            project = project.Replace(
-                "    <ViuSingleFileComponent Include=\"App.vue\" />",
-                "    <ViuSingleFileComponent Include=\"App.vue\" />" +
-                Environment.NewLine +
-                "    <ViuUtilityCss Include=\"Utilities.css\" />" +
-                Environment.NewLine +
-                "    <ViuUtilityCssSource Include=\"Explicit.html\" />",
-                StringComparison.Ordinal);
-            File.WriteAllText(
-                context.ProjectPath,
-                project,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            RunMsBuild(
-                context,
-                "_ViuBundleUtilityCss",
-                redirectOutput: true,
-                new Dictionary<string, string>());
-
-            var bundle = File.ReadAllText(context.UtilityBundlePath);
-            bundle.ShouldStartWith("@charset \"UTF-8\";");
-            bundle.IndexOf(
-                    "data:text/css",
-                    StringComparison.Ordinal)
-                .ShouldBeLessThan(
-                    bundle.IndexOf(
-                        "@layer theme",
-                        StringComparison.Ordinal));
-            bundle.ShouldContain("--vu-color-red-500:");
-            bundle.ShouldContain(".vu\\:flex");
-            bundle.ShouldContain("display: flex !important;");
-            bundle.ShouldContain(".vu\\:hidden");
-            bundle.ShouldNotContain(".vu\\:block");
-            bundle.ShouldContain("--vu-color-shared:");
-            bundle.ShouldContain(".vu\\:night\\:badge-shared");
-            bundle.ShouldContain("color: var(--vu-color-shared) !important;");
-            bundle.ShouldContain(":where(.night *)");
-            bundle.ShouldNotContain("@source");
-            bundle.ShouldNotContain("@reference");
-            bundle.ShouldNotContain("\"viu-utilities\"");
-        }
-        finally
-        {
-            context.Dispose();
-        }
-    }
-
-    [Fact]
-    public void Bundle_ImportSourceRootAndExclusion_ReplacesAutomaticTemplateDiscovery()
-    {
-        var context = TestContext.Create(includeComponentStyles: false);
-        try
-        {
-            var alternativeDirectory = Path.Combine(
-                context.DirectoryPath,
-                "Alternative");
-            var legacyDirectory = Path.Combine(
-                alternativeDirectory,
-                "Legacy");
-            Directory.CreateDirectory(legacyDirectory);
-            File.WriteAllText(
-                Path.Combine(context.DirectoryPath, "Utilities.css"),
-                """
-                @import "viu-utilities" source("./Alternative");
-                @source not "./Alternative/Legacy";
-                """,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.WriteAllText(
-                Path.Combine(alternativeDirectory, "Keep.vue"),
-                """
-                <template><div class="flex"></div></template>
-                <script setup lang="csharp">
-                private string Incidental => "hidden";
-                </script>
-                <style>.block { display: block; }</style>
-                """,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.WriteAllText(
-                Path.Combine(legacyDirectory, "Skip.vue"),
-                """<template><div class="hidden"></div></template>""",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.WriteAllText(
-                Path.Combine(context.DirectoryPath, "Automatic.html"),
-                """<div class="block"></div>""",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            var project = File.ReadAllText(context.ProjectPath);
-            project = project.Replace(
-                "    <ViuSingleFileComponent Include=\"App.vue\" />",
-                "    <ViuSingleFileComponent Include=\"App.vue\" />" +
-                Environment.NewLine +
-                "    <ViuUtilityCss Include=\"Utilities.css\" />",
-                StringComparison.Ordinal);
-            File.WriteAllText(
-                context.ProjectPath,
-                project,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            RunMsBuild(
-                context,
-                "_ViuBundleUtilityCss",
-                redirectOutput: true,
-                new Dictionary<string, string>());
-
-            var bundle = File.ReadAllText(context.UtilityBundlePath);
-            bundle.ShouldContain(".flex");
-            bundle.ShouldNotContain(".hidden");
-            bundle.ShouldNotContain(".block");
-        }
-        finally
-        {
             context.Dispose();
         }
     }
@@ -576,12 +242,10 @@ public sealed class CssHotReloadWorkerTests
         startInfo.ArgumentList.Add(context.StatePath);
         startInfo.ArgumentList.Add("--event-log");
         startInfo.ArgumentList.Add(context.EventLogPath);
-        startInfo.ArgumentList.Add("--dependency-manifest");
-        startInfo.ArgumentList.Add(context.DependencyManifestPath);
         startInfo.ArgumentList.Add("--owner-process-id");
         startInfo.ArgumentList.Add(
             currentProcess.Id.ToString(CultureInfo.InvariantCulture));
-        startInfo.ArgumentList.Add("--watch-utility-markup");
+        startInfo.ArgumentList.Add("--watch-components");
         startInfo.ArgumentList.Add("--exclude-directory");
         startInfo.ArgumentList.Add(Path.Combine(context.DirectoryPath, "obj"));
         startInfo.ArgumentList.Add("--exclude-directory");
@@ -593,7 +257,6 @@ public sealed class CssHotReloadWorkerTests
     private static void RunMsBuild(
         TestContext context,
         string target,
-        bool redirectOutput,
         IReadOnlyDictionary<string, string> properties)
     {
         var startInfo = new ProcessStartInfo
@@ -601,9 +264,9 @@ public sealed class CssHotReloadWorkerTests
             FileName = GetDotNetHostPath(),
             WorkingDirectory = context.DirectoryPath,
             UseShellExecute = false,
-            RedirectStandardOutput = redirectOutput,
-            RedirectStandardError = redirectOutput,
-            CreateNoWindow = redirectOutput,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
         };
         startInfo.ArgumentList.Add("msbuild");
         startInfo.ArgumentList.Add(context.ProjectPath);
@@ -618,19 +281,8 @@ public sealed class CssHotReloadWorkerTests
 
         using var process = Process.Start(startInfo);
         process.ShouldNotBeNull();
-        string standardOutput;
-        string standardError;
-        if (redirectOutput)
-        {
-            standardOutput = process.StandardOutput.ReadToEnd();
-            standardError = process.StandardError.ReadToEnd();
-        }
-        else
-        {
-            standardOutput = string.Empty;
-            standardError = string.Empty;
-        }
-
+        var standardOutput = process.StandardOutput.ReadToEnd();
+        var standardError = process.StandardError.ReadToEnd();
         if (!process.WaitForExit(30000))
         {
             process.Kill(entireProcessTree: true);
@@ -720,8 +372,8 @@ public sealed class CssHotReloadWorkerTests
             string directoryPath,
             string projectPath,
             string indexPath,
-            string utilityBundlePath,
-            string dependencyManifestPath,
+            string componentPath,
+            string bundlePath,
             string statePath,
             string eventLogPath,
             string workerAssemblyPath)
@@ -729,8 +381,8 @@ public sealed class CssHotReloadWorkerTests
             DirectoryPath = directoryPath;
             ProjectPath = projectPath;
             IndexPath = indexPath;
-            UtilityBundlePath = utilityBundlePath;
-            DependencyManifestPath = dependencyManifestPath;
+            ComponentPath = componentPath;
+            BundlePath = bundlePath;
             StatePath = statePath;
             EventLogPath = eventLogPath;
             WorkerAssemblyPath = workerAssemblyPath;
@@ -742,9 +394,9 @@ public sealed class CssHotReloadWorkerTests
 
         public string IndexPath { get; }
 
-        public string UtilityBundlePath { get; }
+        public string ComponentPath { get; }
 
-        public string DependencyManifestPath { get; }
+        public string BundlePath { get; }
 
         public string StatePath { get; }
 
@@ -752,7 +404,7 @@ public sealed class CssHotReloadWorkerTests
 
         public string WorkerAssemblyPath { get; }
 
-        public static TestContext Create(bool includeComponentStyles)
+        public static TestContext Create()
         {
             var repositoryDirectory = FindRepositoryDirectory();
             var bundleTaskAssemblyPath = FindOutputFile(
@@ -783,11 +435,6 @@ public sealed class CssHotReloadWorkerTests
                 "build",
                 "Targets",
                 "Build.Css.Bundling.targets");
-            var utilityTargetsPath = Path.Combine(
-                repositoryDirectory,
-                "build",
-                "Targets",
-                "Build.UtilityCss.targets");
             var hotReloadTargetsPath = Path.Combine(
                 repositoryDirectory,
                 "build",
@@ -802,16 +449,10 @@ public sealed class CssHotReloadWorkerTests
                 "    <IntermediateOutputPath>obj\\</IntermediateOutputPath>" + Environment.NewLine +
                 "    <BaseOutputPath>bin\\</BaseOutputPath>" + Environment.NewLine +
                 "    <ViuUseSingleFileComponents>true</ViuUseSingleFileComponents>" + Environment.NewLine +
-                "    <ViuBundleSingleFileComponentCss>" +
-                includeComponentStyles.ToString().ToLowerInvariant() +
-                "</ViuBundleSingleFileComponentCss>" + Environment.NewLine +
-                "    <ViuBundleUtilityCss>true</ViuBundleUtilityCss>" + Environment.NewLine +
+                "    <ViuBundleSingleFileComponentCss>true</ViuBundleSingleFileComponentCss>" + Environment.NewLine +
                 "    <ViuBundleCssTaskAssembly>" +
                 EscapeAttribute(bundleTaskAssemblyPath) +
                 "</ViuBundleCssTaskAssembly>" + Environment.NewLine +
-                "    <ViuUtilityCssTaskAssembly>" +
-                EscapeAttribute(browserTaskAssemblyPath) +
-                "</ViuUtilityCssTaskAssembly>" + Environment.NewLine +
                 "    <ViuCssHotReloadTaskAssembly>" +
                 EscapeAttribute(browserTaskAssemblyPath) +
                 "</ViuCssHotReloadTaskAssembly>" + Environment.NewLine +
@@ -830,12 +471,10 @@ public sealed class CssHotReloadWorkerTests
                 "  </ItemGroup>" + Environment.NewLine +
                 "  <Target Name=\"ResolveStaticWebAssetsConfiguration\" />" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(componentTargetsPath) + "\" />" + Environment.NewLine +
-                "  <Import Project=\"" + EscapeAttribute(utilityTargetsPath) + "\" />" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(hotReloadTargetsPath) + "\" />" + Environment.NewLine +
                 "  <Target Name=\"ProbeWatch\" DependsOnTargets=\"_ViuCollectCssHotReloadWatchItems\">" + Environment.NewLine +
                 "    <WriteLinesToFile File=\"$(ProbeOutput)\" Lines=\"@(Watch->'%(FullPath)|%(StaticWebAssetPath)')\" Overwrite=\"true\" />" + Environment.NewLine +
                 "  </Target>" + Environment.NewLine +
-                "  <Target Name=\"ProbeLaunch\" DependsOnTargets=\"_ViuCollectCssHotReloadWatchItems\" />" + Environment.NewLine +
                 "</Project>" + Environment.NewLine;
             File.WriteAllText(
                 projectPath,
@@ -846,12 +485,8 @@ public sealed class CssHotReloadWorkerTests
                 directoryPath,
                 projectPath,
                 indexPath,
-                Path.Combine(directoryPath, "obj", "viu", "Probe.utilities.css"),
-                Path.Combine(
-                    directoryPath,
-                    "obj",
-                    "viu",
-                    "Probe.utilities.css.hot-reload-dependencies"),
+                componentPath,
+                Path.Combine(directoryPath, "obj", "viu", "Probe.viu.css"),
                 statePath,
                 eventLogPath,
                 workerAssemblyPath);

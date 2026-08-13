@@ -48,7 +48,6 @@ jobs:
           - { project: Assimalign.Viu.Compiler.SingleFileComponent, path: tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent }
           - { project: Assimalign.Viu.LanguageServer, path: tooling/Editor/Assimalign.Viu.LanguageServer }
           - { project: Assimalign.Viu.LanguageService, path: tooling/Editor/Assimalign.Viu.LanguageService }
-          - { project: Assimalign.Viu.UtilityCss, path: tooling/Assimalign.Viu.UtilityCss }
           - { project: Assimalign.Viu.Generators.Reactive, path: analyzers/Assimalign.Viu.Generators.Reactive }
           - { project: Assimalign.Viu.Generators.Syntax, path: analyzers/Assimalign.Viu.Generators.Syntax }
     steps:
@@ -182,24 +181,11 @@ jobs:
             Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Release package count: $packageCount"
 
-      - name: Verify utility release artifacts
+      - name: Verify no Node toolchain in release packages
         shell: pwsh
-        env:
-          VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          $packageDirectory = '_out/release/packages'
-          $browserSdkPackage = Join-Path `
-            $packageDirectory `
-            "Assimalign.Viu.Sdk.Browser.$($env:VIU_PACKAGE_VERSION).nupkg"
-          $utilityPackage = Join-Path `
-            $packageDirectory `
-            "Assimalign.Viu.UtilityCss.$($env:VIU_PACKAGE_VERSION).nupkg"
-
-          ./scripts/Test-UtilityCssArtifactShape.ps1 `
-            -BrowserSdkPackage $browserSdkPackage `
-            -UtilityCssPackage $utilityPackage
-          ./scripts/Test-UtilityCssIndependence.ps1 `
-            -Artifact (Get-ChildItem $packageDirectory -Filter '*.nupkg' | ForEach-Object FullName)
+        run: >-
+          ./scripts/Test-NoNodeToolchain.ps1
+          -Artifact (Get-ChildItem _out/release/packages -Filter '*.nupkg' | ForEach-Object FullName)
 
       - name: Verify package checksums
         shell: bash
@@ -568,14 +554,11 @@ jobs:
           $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
           Write-Host "Validated preview VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
 
-      - name: Verify Marketplace utility payload
+      - name: Verify no Node toolchain in Marketplace payload
         shell: pwsh
-        run: |
-          $extensionPath = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
-          ./scripts/Test-UtilityCssArtifactShape.ps1 `
-            -VisualStudioExtension $extensionPath
-          ./scripts/Test-UtilityCssIndependence.ps1 `
-            -Artifact $extensionPath
+        run: >-
+          ./scripts/Test-NoNodeToolchain.ps1
+          -Artifact _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
 
       - name: Upload Marketplace preview artifact
         # actions/upload-artifact v4

@@ -8,9 +8,6 @@
     </PropertyGroup>
     <ItemGroup>
         <Compile Remove="test\**\*.cs" />
-        <ViuPrivateProjectReference Include="Assimalign.Viu.UtilityCss" />
-        <ViuPrivateProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
-        <ViuPrivateProjectReference Include="Assimalign.Viu.Syntax" />
         <ViuPrivateProjectReference Include="Assimalign.Viu.Sdk.CssHotReload"
                                     ReferenceOutputAssembly="false"
                                     SkipGetTargetFrameworkProperties="true"

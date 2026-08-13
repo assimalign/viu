@@ -35,17 +35,13 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
         _artifactDirectory = Path.GetFullPath(artifactDirectory);
         ViuVersion = viuVersion;
         MainSourcePath = Path.Combine(ProjectDirectory, "HotReloadPage.vue");
-        UtilityCandidateSourcePath = Path.Combine(
-            ProjectDirectory,
-            "UtilityCandidate.html");
-        UtilityBundlePath = Path.Combine(
+        ComponentBundlePath = Path.Combine(
             ProjectDirectory,
             "obj",
             "Debug",
             "net10.0",
             "viu",
-            "EndToEndHotReloadApp.utilities.css");
-        UtilityEmptyMarkerPath = UtilityBundlePath + ".hot-reload-empty";
+            "EndToEndHotReloadApp.viu.css");
         CssEventLogPath = Path.Combine(
             ProjectDirectory,
             "obj",
@@ -72,11 +68,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
 
     internal string MainSourcePath { get; }
 
-    internal string UtilityCandidateSourcePath { get; }
-
-    internal string UtilityBundlePath { get; }
-
-    internal string UtilityEmptyMarkerPath { get; }
+    internal string ComponentBundlePath { get; }
 
     internal string CssEventLogPath { get; }
 
@@ -86,7 +78,6 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
     {
         RequireFile(ProjectPath, "hot-reload fixture project");
         RequireFile(MainSourcePath, "mounted .vue source");
-        RequireFile(UtilityCandidateSourcePath, "non-served utility candidate source");
         Directory.CreateDirectory(_artifactDirectory);
 
         ProcessStartInfo startInfo = new()
@@ -134,7 +125,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
         _process.BeginErrorReadLine();
         await WaitForApplicationAsync();
         _workerProcessIdentifier = await WaitForWorkerAsync();
-        RequireFile(UtilityBundlePath, "initial utility bundle");
+        RequireFile(ComponentBundlePath, "initial component stylesheet bundle");
     }
 
     internal async Task StopAsync()

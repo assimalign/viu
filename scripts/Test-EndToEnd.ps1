@@ -22,7 +22,7 @@
     Adds Chromium boot-to-interactive warm-up and measured runs and writes stable JSON.
 
 .PARAMETER HotReload
-    Runs the isolated packaged Debug .vue and utility-CSS watch scenario instead of the ordinary
+    Runs the isolated packaged Debug .vue component-CSS watch scenario instead of the ordinary
     three-scenario published fixture lane. This mode requires Chromium and owns the complete
     dotnet-watch process tree for its staged consumer.
 
@@ -40,8 +40,8 @@
     test occurs.
 
 .PARAMETER PackagedVuePublish
-    With PublishOnly, publishes the isolated .vue-only Browser consumer and verifies both generated
-    CSS assets. Release and AOT metadata-absence checks then inspect that .vue consumer assembly.
+    With PublishOnly, publishes the isolated .vue-only Browser consumer and verifies its generated
+    component-CSS asset. Release and AOT metadata-absence checks then inspect that .vue consumer assembly.
 
 .PARAMETER PublishDirectory
     Exact retained output for PublishOnly. It must be a child of this repository's _out directory.
@@ -797,9 +797,7 @@ if (-not $HotReload) {
     }
 
     if ($PackagedVuePublish) {
-        $requiredCssAssetNames = @(
-            "$browserAssemblyName.viu.css",
-            "$browserAssemblyName.utilities.css")
+        $requiredCssAssetNames = @("$browserAssemblyName.viu.css")
         foreach ($requiredCssAssetName in $requiredCssAssetNames) {
             $requiredCssAsset = Join-Path $browserWebRoot $requiredCssAssetName
             if (-not [System.IO.File]::Exists($requiredCssAsset) -or
@@ -810,7 +808,6 @@ if (-not $HotReload) {
 
         $publishedVueHostPage = [System.IO.File]::ReadAllText(
             (Join-Path $browserWebRoot 'index.html'))
-        $cssHrefOffsets = @{}
         foreach ($requiredCssAssetName in $requiredCssAssetNames) {
             $hrefPattern =
                 'href\s*=\s*["'']' +
@@ -823,13 +820,7 @@ if (-not $HotReload) {
             if ($hrefMatches.Count -ne 1) {
                 throw "The packaged .vue Browser host page must link '$requiredCssAssetName' exactly once; found $($hrefMatches.Count)."
             }
-            $cssHrefOffsets[$requiredCssAssetName] = $hrefMatches[0].Index
         }
-        if ($cssHrefOffsets[$requiredCssAssetNames[0]] -ge
-            $cssHrefOffsets[$requiredCssAssetNames[1]]) {
-            throw 'The packaged .vue Browser host page must link component CSS before utility CSS.'
-        }
-
         $vueGeneratedSources = @(
             Get-ChildItem `
                 -LiteralPath $browserGeneratedSourceDirectory `
@@ -851,7 +842,7 @@ if (-not $HotReload) {
         }
 
         Write-Host `
-            'Packaged .vue Browser publish contains component and utility CSS assets.' `
+            'Packaged .vue Browser publish contains its component CSS asset.' `
             -ForegroundColor Green
     }
 

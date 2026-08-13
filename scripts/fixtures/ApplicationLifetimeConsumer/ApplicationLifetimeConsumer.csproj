@@ -1,7 +1,6 @@
 <Project Sdk="Assimalign.Viu.Sdk.Browser">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
     <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
     <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
     <!-- Keep the opt-in inspection package referenced while its feature switch remains disabled.

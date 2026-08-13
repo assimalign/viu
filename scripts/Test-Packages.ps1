@@ -194,9 +194,9 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 }
 
 $expectedPackageId = @(Get-ViuPackageId)
-# [V01.01.10.01] adds one managed library to the previous 16+11 release set.
-$expectedMainPackageCount = 17
-$expectedSymbolPackageCount = 12
+# The parked add-on removes one managed library from the previous 17-main/12-symbol release set.
+$expectedMainPackageCount = 16
+$expectedSymbolPackageCount = 11
 if ($expectedPackageId.Count -ne $expectedMainPackageCount) {
     throw "The release contract requires $expectedMainPackageCount main packages, but the configured inventory contains $($expectedPackageId.Count)."
 }

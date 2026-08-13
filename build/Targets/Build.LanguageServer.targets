@@ -6,8 +6,8 @@
     Before this existed the extension project only ASSERTED the payload was present and copied
     whatever sat in the output directory, while extensions\VisualStudio\Build.ps1 was the sole
     producer and a separate manual step. Pressing F5 therefore rebuilt the extension assembly and
-    redeployed a months-old language server, so utility-CSS IntelliSense was tested against a binary
-    that predated the utility engine. Both callers now drive the SAME target:
+    redeployed a months-old language server, so editor behavior was tested against a stale binary.
+    Both callers now drive the SAME target:
 
       * extensions\VisualStudio\Build.ps1 -> dotnet msbuild <extension csproj> -t:ViuPublishLanguageServer
       * the extension build itself        -> ViuIncludeLanguageServerPayload depends on it
@@ -87,9 +87,9 @@
 
   <!--
     Visual Studio's fast up-to-date check decides whether to invoke MSBuild for this project at all.
-    Left alone it only knows this project's own sources, so editing the utility-CSS engine would leave
-    the extension "up to date", the publish hook would never run, and the stale payload would deploy
-    again. These items are harvested from DESIGN-TIME builds, so they must be evaluation-time items.
+    Left alone it only knows this project's own sources, so editing a language-service dependency would
+    leave the extension "up to date", the publish hook would never run, and the stale payload would
+    deploy again. These items are harvested from DESIGN-TIME builds, so they must be evaluation-time items.
   -->
   <ItemGroup Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
     <UpToDateCheckInput Include="$(ViuRepositoryDirectory)extensions\VisualStudio\**\src\**\*.cs"

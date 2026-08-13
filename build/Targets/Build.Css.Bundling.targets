@@ -350,7 +350,6 @@
            edited in place — each build/publish copy is written here and re-registered from it. -->
       <_ViuCssLinkBuildContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\htmllink\build\'))</_ViuCssLinkBuildContentRoot>
       <_ViuCssLinkPublishContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\htmllink\publish\'))</_ViuCssLinkPublishContentRoot>
-      <_ViuCssLinkUtilityBuildContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\utilityhtmllink\build\'))</_ViuCssLinkUtilityBuildContentRoot>
       <!-- Order the injector strictly after the SDK's host-page rewrite when that rewrite is active, so the
            link is added to the placeholder-resolved page (and never lost to a stale rewrite snapshot). The
            fallback waits for the relevant static-web-asset graph before transforming the discovered page. -->
@@ -460,8 +459,6 @@
     <ViuInjectCssBundleLink Condition="'@(_ViuCssLinkHostPageBuild)' != ''"
                             HostPagePath="%(_ViuCssLinkHostPageBuild.FullPath)"
                             OutputPath="$(_ViuCssLinkBuildContentRoot)%(_ViuCssLinkHostPageBuild.FileName)%(_ViuCssLinkHostPageBuild.Extension)"
-                            LinkHref="$(ViuSingleFileComponentCssBundleLinkHref)"
-                            BundleFileName="$(ViuSingleFileComponentCssBundleName)"
                             StylesheetLinks="@(_ViuCssStylesheetLink)"
                             StaticWebAssetEndpoints="@(StaticWebAssetEndpoint)" />
 
@@ -574,13 +571,13 @@
 
     <ItemGroup Condition="'@(_ViuCssLinkHostPagePublish)' != ''">
       <!-- A build-kind compression pass may already have produced alternatives for the AssetKind=All
-           injected page. Replacing that primary for Publish must retire those alternatives too, including
-           alternatives produced after utility CSS performed the final build transform. Only the two Viu
-           host-page roots are matched; compressed CSS and every unrelated asset remain in the graph. -->
+           injected page. Replacing that primary for Publish must retire those alternatives too. Only the
+           Viu component-CSS host-page root is matched; compressed CSS and every unrelated asset remain in
+           the graph. -->
       <_ViuCssLinkObsoleteHostPagePublish Include="@(_ViuCssLinkHostPagePublishRetirementDistinct)" />
       <_ViuCssLinkObsoleteHostPagePublish
         Include="@(StaticWebAsset)"
-        Condition="'%(StaticWebAsset.AssetRole)' == 'Alternative' and '%(StaticWebAsset.RelatedAsset)' != '' and ($([System.String]::Copy('%(StaticWebAsset.RelatedAsset)').StartsWith('$(_ViuCssLinkBuildContentRoot)')) or $([System.String]::Copy('%(StaticWebAsset.RelatedAsset)').StartsWith('$(_ViuCssLinkUtilityBuildContentRoot)')))" />
+        Condition="'%(StaticWebAsset.AssetRole)' == 'Alternative' and '%(StaticWebAsset.RelatedAsset)' != '' and $([System.String]::Copy('%(StaticWebAsset.RelatedAsset)').StartsWith('$(_ViuCssLinkBuildContentRoot)'))" />
     </ItemGroup>
 
     <!-- Physical FILE NAME, not %(RelativePath) — see the build target above for why the URL template is not a
@@ -588,8 +585,6 @@
     <ViuInjectCssBundleLink Condition="'@(_ViuCssLinkHostPagePublish)' != ''"
                             HostPagePath="%(_ViuCssLinkHostPagePublish.FullPath)"
                             OutputPath="$(_ViuCssLinkPublishContentRoot)%(_ViuCssLinkHostPagePublish.FileName)%(_ViuCssLinkHostPagePublish.Extension)"
-                            LinkHref="$(ViuSingleFileComponentCssBundleLinkHref)"
-                            BundleFileName="$(ViuSingleFileComponentCssBundleName)"
                             StylesheetLinks="@(_ViuCssStylesheetLink)"
                             StaticWebAssetEndpoints="@(StaticWebAssetEndpoint)" />
 

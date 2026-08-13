@@ -27,8 +27,6 @@ internal sealed class CssHotReloadOptions
 
     public string EventLogPath { get; private set; } = string.Empty;
 
-    public string DependencyManifestPath { get; private set; } = string.Empty;
-
     public int? LauncherProcessIdentifier { get; private set; }
 
     public int? OwnerProcessIdentifier { get; private set; }
@@ -36,8 +34,6 @@ internal sealed class CssHotReloadOptions
     public int DebounceMilliseconds { get; private set; } = 100;
 
     public bool WatchComponents { get; private set; }
-
-    public bool WatchUtilityMarkup { get; private set; }
 
     public IReadOnlyList<string> ExplicitWatchFiles { get; private set; } = Array.Empty<string>();
 
@@ -131,21 +127,6 @@ internal sealed class CssHotReloadOptions
                     options.EventLogPath = Path.GetFullPath(eventLogPath);
                     break;
 
-                case "--dependency-manifest":
-                    if (!TryReadValue(
-                            arguments,
-                            ref index,
-                            argument,
-                            errorWriter,
-                            out var dependencyManifestPath))
-                    {
-                        return false;
-                    }
-
-                    options.DependencyManifestPath =
-                        Path.GetFullPath(dependencyManifestPath);
-                    break;
-
                 case "--launcher-process-id":
                     if (!TryReadPositiveInteger(
                             arguments,
@@ -190,10 +171,6 @@ internal sealed class CssHotReloadOptions
 
                 case "--watch-components":
                     options.WatchComponents = true;
-                    break;
-
-                case "--watch-utility-markup":
-                    options.WatchUtilityMarkup = true;
                     break;
 
                 case "--watch-file":

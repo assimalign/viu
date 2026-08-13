@@ -2,7 +2,7 @@
 # [V01.01.12.02.02]). This is the one root that is not a per-project matrix: Install-Local.ps1 packs
 # both base SDK -> targeting pack and Browser SDK -> targeting/runtime pack chains as one artifact set,
 # below are about the SHAPE of that set, not about any one project. It replaces area-packaging.yml
-# and absorbs the artifact assertions the standalone area-utility-css.yml used to duplicate.
+# and keeps the cross-package artifact assertions in one place.
 #
 # Nothing here pushes: release.yml is the sole publisher of the checksummed, validated set.
 name: Packaging
@@ -69,8 +69,8 @@ jobs:
         with:
           install-wasm-tools: 'true'
 
-      # Carried over from area-utility-css.yml: Install-Local.ps1 builds the SDK task host on its
-      # way to packing it, but not with warnings as errors. This keeps that gate explicit.
+      # Install-Local.ps1 builds the SDK task hosts on its way to packing them, but not with warnings
+      # as errors. Keep that gate explicit for both SDK segments.
       - name: Build base SDK task host (warnings are errors)
         run: dotnet build sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj --configuration Release -warnaserror
 
@@ -141,35 +141,11 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-PackagedVueConsumer.ps1 -SkipPack
 
-      - name: Verify standalone utility dependency boundary
+      - name: Verify no Node toolchain boundary
         shell: pwsh
         run: >-
-          ./scripts/Test-UtilityCssIndependence.ps1
+          ./scripts/Test-NoNodeToolchain.ps1
           -Artifact (Get-ChildItem _out/packages -Filter '*.nupkg' | ForEach-Object FullName)
-
-      # Both halves of the utility artifact contract in one place: the SDK's packed utility payload
-      # (was area-packaging) and the standalone engine package's own shape (was area-utility-css,
-      # which packed it a second time into its own output directory to assert exactly this).
-      - name: Verify utility artifact shapes
-        shell: pwsh
-        run: |
-          $browserSdkPackages = @(
-            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.Sdk.Browser.*.nupkg'
-          )
-          if ($browserSdkPackages.Count -ne 1) {
-            throw "Expected exactly one Browser SDK package, found $($browserSdkPackages.Count)."
-          }
-
-          $utilityPackages = @(
-            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.UtilityCss.*.nupkg'
-          )
-          if ($utilityPackages.Count -ne 1) {
-            throw "Expected exactly one utility engine package, found $($utilityPackages.Count)."
-          }
-
-          ./scripts/Test-UtilityCssArtifactShape.ps1 `
-            -BrowserSdkPackage $browserSdkPackages[0].FullName `
-            -UtilityCssPackage $utilityPackages[0].FullName
 
       - name: Assert package shapes
         shell: pwsh
@@ -466,6 +442,14 @@ jobs:
             }
           }
 
+          $parkedCssAddOnName = 'Utility' + 'Css'
+          $parkedCssAddOnEntries = @(
+            "Tasks/Assimalign.Viu.$parkedCssAddOnName.dll",
+            "Tasks/Assimalign.Viu.$parkedCssAddOnName.THIRD-PARTY-NOTICES.md",
+            "Targets/Assimalign.Viu.Sdk.$parkedCssAddOnName.targets",
+            "Targets/Assimalign.Viu.Sdk.Browser.$parkedCssAddOnName.targets"
+          )
+
           $sdkArchive = [System.IO.Compression.ZipFile]::OpenRead($sdkPackage.FullName)
           try {
             Assert-ArchiveEntries `
@@ -489,9 +473,7 @@ jobs:
             Assert-NoArchiveEntries `
               -Archive $sdkArchive `
               -Package $sdkPackage `
-              -EntryNames @(
-                'Tasks/Assimalign.Viu.UtilityCss.dll',
-                'Targets/Assimalign.Viu.Sdk.UtilityCss.targets',
+              -EntryNames (@(
                 'Targets/Assimalign.Viu.Sdk.Css.HotReload.targets',
                 'Targets/Assimalign.Viu.Sdk.StaticWebAssets.targets',
                 'Targets/Assimalign.Viu.Sdk.WebAssembly.targets',
@@ -499,13 +481,12 @@ jobs:
                 'Targets/Assimalign.Viu.Sdk.Browser.ComponentStyles.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.props',
                 'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.targets',
-                'Targets/Assimalign.Viu.Sdk.Browser.UtilityCss.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.Css.HotReload.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.WebAssembly.targets',
                 'Watch/Assimalign.Viu.Sdk.CssHotReload.dll',
                 'assets/Assimalign.Viu.Browser/viu-dom.js'
-              )
+              ) + $parkedCssAddOnEntries)
 
             $baseBrowserPayload = @(
               $sdkArchive.Entries |
@@ -564,12 +545,10 @@ jobs:
                 'Sdk/Sdk.targets',
                 'Tasks/Assimalign.Viu.Sdk.Browser.Tasks.dll',
                 'Tasks/Assimalign.Viu.Sdk.Browser.Tasks.deps.json',
-                'Tasks/Assimalign.Viu.UtilityCss.dll',
                 'Targets/Assimalign.Viu.Sdk.Browser.Css.Bundling.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.ComponentStyles.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.props',
                 'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.targets',
-                'Targets/Assimalign.Viu.Sdk.Browser.UtilityCss.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.Css.HotReload.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.WebAssembly.targets',
@@ -581,12 +560,32 @@ jobs:
             Assert-NoArchiveEntries `
               -Archive $browserSdkArchive `
               -Package $browserSdkPackage `
-              -EntryNames @(
+              -EntryNames (@(
                 'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
+                'Tasks/Assimalign.Viu.Syntax.dll',
+                'Tasks/Assimalign.Viu.Syntax.SingleFileComponent.dll',
                 'Targets/Assimalign.Viu.Generators.Syntax.props',
                 'Targets/Assimalign.Viu.Generators.Syntax.targets',
                 'Targets/Assimalign.Viu.Sdk.ComponentStyles.targets'
-              )
+              ) + $parkedCssAddOnEntries)
+
+            $expectedWatchEntries = @(
+              'Watch/Assimalign.Viu.Sdk.CssHotReload.deps.json',
+              'Watch/Assimalign.Viu.Sdk.CssHotReload.dll',
+              'Watch/Assimalign.Viu.Sdk.CssHotReload.runtimeconfig.json'
+            ) | Sort-Object
+            $actualWatchEntries = @(
+              $browserSdkArchive.Entries |
+                ForEach-Object FullName |
+                Where-Object {
+                  $_.StartsWith('Watch/', [System.StringComparison]::Ordinal)
+                } |
+                Sort-Object
+            )
+            $watchDifference = @(Compare-Object $expectedWatchEntries $actualWatchEntries)
+            if ($watchDifference.Count -ne 0) {
+              throw "$($browserSdkPackage.Name) Watch payload differs from the platform-neutral worker contract: $($watchDifference | Out-String)"
+            }
 
             $browserSdkProps = Read-ArchiveEntryText `
               -Archive $browserSdkArchive `

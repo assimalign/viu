@@ -35,9 +35,6 @@
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
               Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Browser.Css.Bundling.targets" Visible="false" />
-        <None Include="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
-              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
-              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Browser.UtilityCss.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.HotReload.targets"
               Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Browser.Css.HotReload.targets" Visible="false" />
@@ -73,9 +70,6 @@
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
               Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Browser.Css.Bundling.targets" />
-        <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
-              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
-              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Browser.UtilityCss.targets" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.HotReload.targets"
               Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Browser.Css.HotReload.targets" />

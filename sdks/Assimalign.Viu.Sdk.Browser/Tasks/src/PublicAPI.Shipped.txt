@@ -1,37 +1,10 @@
 #nullable enable
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundleExists.get -> bool
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundleExists.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundleOutputPath.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundleOutputPath.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundlePath.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundlePath.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundleWritten.get -> bool
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.BundleWritten.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.Cancel() -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.EmptyBundleMarkerPath.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.EmptyBundleMarkerPath.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.HotReloadDependencyManifestPath.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.HotReloadDependencyManifestPath.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.PreserveEmptyBundleOnRemoval.get -> bool
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.PreserveEmptyBundleOnRemoval.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.ProjectDirectory.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.ProjectDirectory.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.SourceFiles.get -> Microsoft.Build.Framework.ITaskItem![]!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.SourceFiles.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.UtilityStylesheets.get -> Microsoft.Build.Framework.ITaskItem![]!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.UtilityStylesheets.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.ViuBundleUtilityCss() -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink
-Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.BundleFileName.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.BundleFileName.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.Cancel() -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.HostPagePath.get -> string!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.HostPagePath.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.InjectedHostPagePath.get -> string!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.InjectedHostPagePath.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.LinkHref.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.LinkHref.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.LinkInjected.get -> bool
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.LinkInjected.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.OutputPath.get -> string!
@@ -42,8 +15,6 @@ Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.Configuration.get ->
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.Configuration.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.DebounceMilliseconds.get -> int
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.DebounceMilliseconds.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.DependencyManifestPath.get -> string!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.DependencyManifestPath.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.DotNetHostPath.get -> string!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.DotNetHostPath.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.EventLogPath.get -> string!
@@ -65,10 +36,7 @@ Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchComponents.get 
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchComponents.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchFiles.get -> Microsoft.Build.Framework.ITaskItem![]!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchFiles.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchUtilityMarkup.get -> bool
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchUtilityMarkup.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WorkerAssemblyPath.get -> string!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WorkerAssemblyPath.set -> void
-override Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss.Execute() -> bool
 override Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.Execute() -> bool
 override Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.Execute() -> bool

@@ -10,6 +10,5 @@
 	<Import Project="Targets\Build.StaticWebAssets.targets" />
 	<Import Project="Targets\Build.DevTools.targets" />
 	<Import Project="Targets\Build.Css.Bundling.targets" />
-	<Import Project="Targets\Build.UtilityCss.targets" />
 	<Import Project="Targets\Build.Css.HotReload.targets" />
 </Project>

@@ -52,11 +52,6 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
     public string EventLogPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the optional compiler-produced utility dependency manifest.
-    /// </summary>
-    public string DependencyManifestPath { get; set; } = string.Empty;
-
-    /// <summary>
     /// Gets or sets the .NET host used to run the worker and nested MSBuild regeneration.
     /// </summary>
     public string DotNetHostPath { get; set; } = string.Empty;
@@ -80,11 +75,6 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
     /// Gets or sets whether component <c>.viu</c> and <c>.vue</c> inputs are watched.
     /// </summary>
     public bool WatchComponents { get; set; }
-
-    /// <summary>
-    /// Gets or sets whether utility candidates are discovered from markup files.
-    /// </summary>
-    public bool WatchUtilityMarkup { get; set; }
 
     /// <summary>
     /// Gets or sets exact additional input files watched by the worker.
@@ -225,18 +215,9 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
         AddOptionalArgument(arguments, "--target-framework", TargetFramework);
         AddOptionalArgument(arguments, "--runtime-identifier", RuntimeIdentifier);
         AddOptionalArgument(arguments, "--event-log", EventLogPath);
-        AddOptionalArgument(
-            arguments,
-            "--dependency-manifest",
-            DependencyManifestPath);
         if (WatchComponents)
         {
             arguments.Add("--watch-components");
-        }
-
-        if (WatchUtilityMarkup)
-        {
-            arguments.Add("--watch-utility-markup");
         }
 
         AddItemArguments(arguments, "--watch-file", WatchFiles);

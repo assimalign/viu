@@ -1,7 +1,7 @@
 # Build+test lane for the developer-tooling libraries ([V01.01.12.02.02]): the shared .viu -> C#
 # projection and CSS composition cores, the Viu Utilities engine, and the editor pair (language
-# service + language server). None ships into a Viu app's runtime. Only the Viu
-# Utilities engine is independently packable; release.yml alone packs and publishes it.
+# service + language server). None ships into a Viu app's runtime. The parked Viu Utilities engine
+# remains in this build/test lane but is not packable or part of the Viu release train.
 name: Tooling
 
 on:

@@ -7,7 +7,6 @@
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>full</TrimMode>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
-    <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
     <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
     <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
   </PropertyGroup>

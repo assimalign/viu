@@ -17,7 +17,6 @@ internal sealed class EndToEndHarness
         "C# and Razor changes applied";
     private const string StaticAssetHotReloadCompletionMessage =
         "Static asset changes applied";
-    private const string UtilityCandidateFileName = "UtilityCandidate.html";
     private static readonly TimeSpan AssertionTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan HotReloadAssertionTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan HotReloadNoOperationObservationWindow =
@@ -125,11 +124,7 @@ internal sealed class EndToEndHarness
             page,
             ".viu.css",
             minimumRuleCount: 1);
-        await RequireStylesheetRulesAsync(
-            page,
-            ".utilities.css",
-            minimumRuleCount: 1);
-        await RequireComputedDisplayAsync(page, "none");
+        await RequireComputedDisplayAsync(page, "hot-shell", "grid");
 
         string documentToken = await page.EvaluateAsync<string>(
             "() => { const token = `${Date.now()}-${Math.random()}`; "
@@ -137,93 +132,60 @@ internal sealed class EndToEndHarness
         await page.Locator("[data-testid='hot-increment']").ClickAsync();
         await RequireTextAsync(page, "hot-count", "1");
 
-        int utilityManagedUpdateCount = session.CountOutputLinesContaining(
-            ManagedHotReloadCompletionMessage);
-        int utilityCandidateUpdateCount = session.CountOutputLinesContaining(
-            UtilityCandidateFileName);
+        byte[] originalBundleContent = await File.ReadAllBytesAsync(
+            session.ComponentBundlePath);
         int completionCount = ReadCssCompletionCount(session.CssEventLogPath);
         await ReplaceSourceTextAsync(
-            session.UtilityCandidateSourcePath,
-            "class=\"hidden\"",
-            "class=\"block\"");
+            session.MainSourcePath,
+            "display: grid;",
+            "display: flex;");
         await WaitForCssCompletionAsync(session, completionCount + 1);
-        await RequireComputedDisplayAsync(page, "block");
-        await WaitForUtilityCandidateAcknowledgementAsync(
-            session,
-            utilityCandidateUpdateCount + 1);
+        await RequireComputedDisplayAsync(page, "hot-shell", "flex");
+        byte[] changedBundleContent = await File.ReadAllBytesAsync(
+            session.ComponentBundlePath);
+        Require(
+            !originalBundleContent.SequenceEqual(changedBundleContent),
+            "The component style edit did not rewrite the generated bundle.");
         await RequireTextAsync(page, "hot-count", "1");
         await RequireDocumentTokenAsync(page, documentToken);
 
-        DateTime bundleWriteTime = File.GetLastWriteTimeUtc(session.UtilityBundlePath);
+        await Task.Delay(HotReloadNoOperationObservationWindow);
+        DateTime bundleWriteTime = File.GetLastWriteTimeUtc(
+            session.ComponentBundlePath);
         string stylesheetAddress = await ReadStylesheetAddressAsync(
             page,
-            ".utilities.css");
-        utilityCandidateUpdateCount = session.CountOutputLinesContaining(
-            UtilityCandidateFileName);
+            ".viu.css");
         int managedUpdateCount = session.CountOutputLinesContaining(
             ManagedHotReloadCompletionMessage);
         int staticAssetUpdateCount = session.CountOutputLinesContaining(
             StaticAssetHotReloadCompletionMessage);
         completionCount = ReadCssCompletionCount(session.CssEventLogPath);
-        await ReplaceSourceTextAsync(
-            session.UtilityCandidateSourcePath,
-            "Unserved utility candidate",
-            "  Unserved utility candidate  ");
+        await RewriteSourceWithoutContentChangeAsync(session.MainSourcePath);
         await WaitForCssCompletionAsync(session, completionCount + 1);
-        await WaitForUtilityCandidateAcknowledgementAsync(
-            session,
-            utilityCandidateUpdateCount + 1);
         await Task.Delay(HotReloadNoOperationObservationWindow);
         Require(
-            File.GetLastWriteTimeUtc(session.UtilityBundlePath) == bundleWriteTime,
-            "A semantic utility-CSS no-op rewrote the generated bundle.");
+            (await File.ReadAllBytesAsync(session.ComponentBundlePath))
+                .SequenceEqual(changedBundleContent),
+            "A no-content-change component-style update changed the generated bundle.");
+        Require(
+            File.GetLastWriteTimeUtc(session.ComponentBundlePath) == bundleWriteTime,
+            "A no-content-change component-style update rewrote the generated bundle.");
         Require(
             string.Equals(
-                await ReadStylesheetAddressAsync(page, ".utilities.css"),
+                await ReadStylesheetAddressAsync(page, ".viu.css"),
                 stylesheetAddress,
                 StringComparison.Ordinal),
-            "A semantic utility-CSS no-op replaced the browser stylesheet link.");
+            "A no-content-change component-style update replaced the browser stylesheet link.");
         Require(
             session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage)
                 == managedUpdateCount,
-            "A semantic utility-CSS no-op triggered a managed hot-reload update.");
+            "A no-content-change component-style update triggered a managed hot-reload update.");
         Require(
             session.CountOutputLinesContaining(StaticAssetHotReloadCompletionMessage)
                 == staticAssetUpdateCount,
-            "A semantic utility-CSS no-op triggered a static-asset update.");
+            "A no-content-change component-style update triggered a static-asset update.");
         await RequireTextAsync(page, "hot-count", "1");
         await RequireDocumentTokenAsync(page, documentToken);
-
-        utilityCandidateUpdateCount = session.CountOutputLinesContaining(
-            UtilityCandidateFileName);
-        completionCount = ReadCssCompletionCount(session.CssEventLogPath);
-        await ReplaceSourceTextAsync(
-            session.UtilityCandidateSourcePath,
-            "class=\"block\"",
-            "data-candidate=\"removed\"");
-        await WaitForCssCompletionAsync(session, completionCount + 1);
-        await WaitUntilAsync(
-            () => Task.FromResult(
-                File.Exists(session.UtilityBundlePath)
-                && new FileInfo(session.UtilityBundlePath).Length == 0
-                && File.Exists(session.UtilityEmptyMarkerPath)),
-            "the final utility rule to produce a marked zero-byte tombstone",
-            HotReloadAssertionTimeout);
-        await RequireStylesheetRulesAsync(
-            page,
-            ".utilities.css",
-            minimumRuleCount: 0,
-            exactRuleCount: 0);
-        await WaitForUtilityCandidateAcknowledgementAsync(
-            session,
-            utilityCandidateUpdateCount + 1);
-        await Task.Delay(HotReloadNoOperationObservationWindow);
-        await RequireTextAsync(page, "hot-count", "1");
-        await RequireDocumentTokenAsync(page, documentToken);
-        Require(
-            session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage)
-                == utilityManagedUpdateCount,
-            "The non-SFC utility scan input triggered a managed hot-reload update.");
 
         await ReplaceSourceTextAsync(
             session.MainSourcePath,
@@ -286,6 +248,15 @@ internal sealed class EndToEndHarness
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    private static async Task RewriteSourceWithoutContentChangeAsync(string path)
+    {
+        string source = await File.ReadAllTextAsync(path);
+        await File.WriteAllTextAsync(
+            path,
+            source,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
     private static async Task WaitForCssCompletionAsync(
         HotReloadWatchSession session,
         int expectedCount)
@@ -298,18 +269,6 @@ internal sealed class EndToEndHarness
                     ReadCssCompletionCount(session.CssEventLogPath) >= expectedCount);
             },
             $"CSS regeneration completion {expectedCount}",
-            HotReloadAssertionTimeout);
-    }
-
-    private static async Task WaitForUtilityCandidateAcknowledgementAsync(
-        HotReloadWatchSession session,
-        int expectedCount)
-    {
-        await WaitUntilAsync(
-            () => Task.FromResult(
-                session.CountOutputLinesContaining(UtilityCandidateFileName)
-                >= expectedCount),
-            $"dotnet watch to acknowledge utility input update {expectedCount}",
             HotReloadAssertionTimeout);
     }
 
@@ -332,16 +291,17 @@ internal sealed class EndToEndHarness
 
     private static async Task RequireComputedDisplayAsync(
         IPage page,
+        string testIdentifier,
         string expected)
     {
         await WaitUntilAsync(
             async () => string.Equals(
                 await page
-                    .Locator("[data-testid='utility-probe']")
+                    .Locator($"[data-testid='{testIdentifier}']")
                     .EvaluateAsync<string>("element => getComputedStyle(element).display"),
                 expected,
                 StringComparison.Ordinal),
-            $"the utility probe display to become '{expected}'",
+            $"'{testIdentifier}' display to become '{expected}'",
             HotReloadAssertionTimeout);
     }
 

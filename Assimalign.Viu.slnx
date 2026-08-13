@@ -175,7 +175,7 @@
 		<File Path="scripts/Install-Local.ps1" />
 		<File Path="scripts/Measure-PublishBudget.ps1" />
 		<File Path="scripts/Test-Templates.ps1" />
-		<File Path="scripts/Test-UtilityCssIndependence.ps1" />
+		<File Path="scripts/Test-NoNodeToolchain.ps1" />
 	</Folder>
 	<Folder Name="/viu/scripts/budgets/">
 		<File Path="scripts/budgets/PublishBudgets.json" />

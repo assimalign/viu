@@ -12,16 +12,14 @@ on:
     branches: [main]
     paths:
       - 'extensions/VisualStudio/**'
-      # The language service, the language server, and the build-time tooling libraries they
-      # carry (the shared .viu -> C# projection core [V01.01.06.11] and the utility engine) all
-      # ship inside the language-server payload, so any tooling change must re-verify the
-      # extension build and the packaged VSIX.
+      # The language service, the language server, and the shared .viu -> C# projection core
+      # [V01.01.06.11] ship inside the language-server payload, so changes to those tooling
+      # areas must re-verify the extension build and the packaged VSIX.
       - 'tooling/**'
       - 'libraries/Syntax/**'
       - 'libraries/ServerRenderer/**'
       - 'build/**'
-      - 'scripts/Test-UtilityCssArtifactShape.ps1'
-      - 'scripts/Test-UtilityCssIndependence.ps1'
+      - 'scripts/Test-NoNodeToolchain.ps1'
       # The packed-consumer round trip consumes the Install-Local feed (SDK + framework packs), so
       # its lane inputs re-verify this workflow ([V01.01.12.23]).
       - 'scripts/Install-Local.ps1'
@@ -43,8 +41,7 @@ on:
       - 'libraries/Syntax/**'
       - 'libraries/ServerRenderer/**'
       - 'build/**'
-      - 'scripts/Test-UtilityCssArtifactShape.ps1'
-      - 'scripts/Test-UtilityCssIndependence.ps1'
+      - 'scripts/Test-NoNodeToolchain.ps1'
       - 'scripts/Install-Local.ps1'
       - 'scripts/Test-LanguageServerSemanticRoundTrip.ps1'
       - 'sdks/**'
@@ -167,16 +164,10 @@ jobs:
           $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
           Write-Host "Validated VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
 
-      - name: Verify Visual Studio utility payload
+      - name: Verify no Node toolchain boundary
         shell: pwsh
         run: >-
-          ./scripts/Test-UtilityCssArtifactShape.ps1
-          -VisualStudioExtension _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
-
-      - name: Verify standalone utility dependency boundary
-        shell: pwsh
-        run: >-
-          ./scripts/Test-UtilityCssIndependence.ps1
+          ./scripts/Test-NoNodeToolchain.ps1
           -Artifact _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
 
       - name: Upload VSIX build artifact

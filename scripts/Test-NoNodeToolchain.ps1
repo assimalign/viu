@@ -1,7 +1,11 @@
 <#
 .SYNOPSIS
-    Verifies that Viu Utilities source and distributable archives contain no Tailwind, Node,
-    PostCSS, or Vite dependency or executable payload.
+    Verifies that Viu source and distributable archives contain no Node-based CSS toolchain.
+
+.DESCRIPTION
+    Scans the repository's build and dependency manifests plus optional NuGet, VSIX, or ZIP
+    archives for Tailwind, Node, PostCSS, or Vite dependencies and executable payloads. The guard
+    protects Viu's standalone build and distribution boundary independently of any CSS add-on.
 
 .PARAMETER RepositoryRoot
     Repository root to inspect. Defaults to the parent of this script directory.
@@ -146,7 +150,7 @@ foreach ($artifactPath in $Artifact) {
 
 if ($violations.Count -ne 0) {
     $violations | ForEach-Object { Write-Error $_ }
-    throw "Viu Utilities independence validation found $($violations.Count) violation(s)."
+    throw "Viu no-Node-toolchain validation found $($violations.Count) violation(s)."
 }
 
-Write-Host 'Viu Utilities independence validation passed.'
+Write-Host 'Viu no-Node-toolchain validation passed.'

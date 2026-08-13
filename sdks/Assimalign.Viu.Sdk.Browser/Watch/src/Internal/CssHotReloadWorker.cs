@@ -225,46 +225,17 @@ internal sealed class CssHotReloadWorker
             return true;
         }
 
-        var extension = Path.GetExtension(fullPath);
-        if (options.WatchComponents &&
-            (extension.Equals(".viu", StringComparison.OrdinalIgnoreCase) ||
-             extension.Equals(".vue", StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        return options.WatchUtilityMarkup &&
-            (extension.Equals(".viu", StringComparison.OrdinalIgnoreCase) ||
-             extension.Equals(".vue", StringComparison.OrdinalIgnoreCase) ||
-             extension.Equals(".html", StringComparison.OrdinalIgnoreCase) ||
-             extension.Equals(".htm", StringComparison.OrdinalIgnoreCase));
+        return options.WatchComponents && IsComponentFile(fullPath);
     }
 
     private Dictionary<string, SourceFileStamp> CaptureSourceSnapshot()
     {
         var snapshot = new Dictionary<string, SourceFileStamp>(PathComparer);
-        if (options.WatchComponents || options.WatchUtilityMarkup)
+        if (options.WatchComponents)
         {
-            CaptureMarkupDirectory(
+            CaptureComponentDirectory(
                 snapshot,
-                options.ProjectDirectory,
-                options.WatchComponents,
-                options.WatchUtilityMarkup);
-        }
-
-        var utilityDependencies = ReadUtilityDependencyManifest();
-        foreach (var directory in utilityDependencies.SourceDirectories)
-        {
-            CaptureMarkupDirectory(
-                snapshot,
-                directory,
-                watchComponents: false,
-                watchUtilityMarkup: true);
-        }
-
-        foreach (var file in utilityDependencies.DependencyFiles)
-        {
-            TryAddFileStamp(snapshot, file);
+                options.ProjectDirectory);
         }
 
         foreach (var file in explicitWatchFiles)
@@ -275,11 +246,9 @@ internal sealed class CssHotReloadWorker
         return snapshot;
     }
 
-    private void CaptureMarkupDirectory(
+    private void CaptureComponentDirectory(
         IDictionary<string, SourceFileStamp> snapshot,
-        string rootDirectory,
-        bool watchComponents,
-        bool watchUtilityMarkup)
+        string rootDirectory)
     {
         TryAddDirectoryStamp(snapshot, rootDirectory);
         if (!Directory.Exists(rootDirectory))
@@ -323,10 +292,7 @@ internal sealed class CssHotReloadWorker
 
             foreach (var file in files)
             {
-                if (IsRelevantExtension(
-                        file,
-                        watchComponents,
-                        watchUtilityMarkup))
+                if (IsComponentFile(file))
                 {
                     TryAddFileStamp(snapshot, file);
                 }
@@ -368,86 +334,11 @@ internal sealed class CssHotReloadWorker
         eventLog.Append("snapshot-change");
     }
 
-    private static bool IsRelevantExtension(
-        string path,
-        bool watchComponents,
-        bool watchUtilityMarkup)
+    private static bool IsComponentFile(string path)
     {
         var extension = Path.GetExtension(path);
-        return (watchComponents &&
-                (extension.Equals(".viu", StringComparison.OrdinalIgnoreCase) ||
-                 extension.Equals(".vue", StringComparison.OrdinalIgnoreCase))) ||
-            (watchUtilityMarkup &&
-                (extension.Equals(".viu", StringComparison.OrdinalIgnoreCase) ||
-                 extension.Equals(".vue", StringComparison.OrdinalIgnoreCase) ||
-                 extension.Equals(".html", StringComparison.OrdinalIgnoreCase) ||
-                 extension.Equals(".htm", StringComparison.OrdinalIgnoreCase)));
-    }
-
-    private UtilityDependencyManifest ReadUtilityDependencyManifest()
-    {
-        if (string.IsNullOrEmpty(options.DependencyManifestPath) ||
-            !File.Exists(options.DependencyManifestPath))
-        {
-            return UtilityDependencyManifest.Empty;
-        }
-
-        try
-        {
-            var dependencyFiles = new HashSet<string>(PathComparer);
-            var sourceDirectories = new HashSet<string>(PathComparer);
-            foreach (var line in File.ReadAllLines(options.DependencyManifestPath))
-            {
-                if (TryDecodeManifestPath(
-                        line,
-                        "file:",
-                        out var dependencyFile))
-                {
-                    dependencyFiles.Add(dependencyFile);
-                }
-                else if (TryDecodeManifestPath(
-                             line,
-                             "directory:",
-                             out var sourceDirectory))
-                {
-                    sourceDirectories.Add(sourceDirectory);
-                }
-            }
-
-            return new UtilityDependencyManifest(
-                dependencyFiles,
-                sourceDirectories);
-        }
-        catch (Exception exception) when (
-            exception is IOException or
-                UnauthorizedAccessException or
-                FormatException or
-                ArgumentException or
-                NotSupportedException)
-        {
-            eventLog.Append(
-                "manifest-error:" +
-                exception.GetType().Name);
-            return UtilityDependencyManifest.Empty;
-        }
-    }
-
-    private static bool TryDecodeManifestPath(
-        string line,
-        string prefix,
-        out string path)
-    {
-        path = string.Empty;
-        if (!line.StartsWith(prefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        path = Path.GetFullPath(
-            Encoding.UTF8.GetString(
-                Convert.FromBase64String(
-                    line.Substring(prefix.Length))));
-        return true;
+        return extension.Equals(".viu", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".vue", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsExcludedDirectory(string path)
@@ -617,13 +508,4 @@ internal sealed class CssHotReloadWorker
         long Length,
         long LastWriteTimeUtcTicks);
 
-    private sealed record UtilityDependencyManifest(
-        IReadOnlyCollection<string> DependencyFiles,
-        IReadOnlyCollection<string> SourceDirectories)
-    {
-        public static UtilityDependencyManifest Empty { get; } =
-            new UtilityDependencyManifest(
-                Array.Empty<string>(),
-                Array.Empty<string>());
-    }
 }
