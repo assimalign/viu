@@ -832,17 +832,20 @@ internal static class TemplateCompletionProvider
         return text.Substring(start, offset - start);
     }
 
-    private static void AnalyzeMarkupPrefix(
+    internal static void AnalyzeMarkupPrefix(
         string content,
         int offset,
         out int currentTagStart,
         out bool isInterpolation,
-        out bool isComment)
+        out bool isComment,
+        bool recognizeInterpolations = true,
+        bool recognizeEscapedQuotes = false)
     {
         currentTagStart = -1;
         isInterpolation = false;
         isComment = false;
         var quote = '\0';
+        var isEscaped = false;
         for (var index = 0; index < offset; index++)
         {
             if (isComment)
@@ -861,7 +864,15 @@ internal static class TemplateCompletionProvider
                 var character = content[index];
                 if (quote != '\0')
                 {
-                    if (character == quote)
+                    if (recognizeEscapedQuotes && isEscaped)
+                    {
+                        isEscaped = false;
+                    }
+                    else if (recognizeEscapedQuotes && character == '\\')
+                    {
+                        isEscaped = true;
+                    }
+                    else if (character == quote)
                     {
                         quote = '\0';
                     }
@@ -872,6 +883,7 @@ internal static class TemplateCompletionProvider
                 if (character is '\'' or '"')
                 {
                     quote = character;
+                    isEscaped = false;
                 }
                 else if (character == '>')
                 {
@@ -881,7 +893,7 @@ internal static class TemplateCompletionProvider
                 continue;
             }
 
-            if (isInterpolation)
+            if (recognizeInterpolations && isInterpolation)
             {
                 if (StartsWith(content, index, "}}"))
                 {
@@ -897,7 +909,7 @@ internal static class TemplateCompletionProvider
                 isComment = true;
                 index += 3;
             }
-            else if (StartsWith(content, index, "{{"))
+            else if (recognizeInterpolations && StartsWith(content, index, "{{"))
             {
                 isInterpolation = true;
                 index++;
@@ -909,11 +921,12 @@ internal static class TemplateCompletionProvider
         }
     }
 
-    private static bool TryReadTagContext(
+    internal static bool TryReadTagContext(
         string content,
         int tagStart,
         int offset,
-        out TemplateTagContext context)
+        out TemplateTagContext context,
+        bool recognizeEscapedQuotes = false)
     {
         context = null!;
         var cursor = tagStart + 1;
@@ -990,6 +1003,7 @@ internal static class TemplateCompletionProvider
             }
 
             cursor++;
+            var valueSearchStart = cursor;
             while (cursor < offset && char.IsWhiteSpace(content[cursor]))
             {
                 cursor++;
@@ -997,7 +1011,12 @@ internal static class TemplateCompletionProvider
 
             if (cursor >= offset)
             {
-                context = new TemplateTagContext(tagName, attributeName, string.Empty, true);
+                context = CreateAttributeValueContext(
+                    content,
+                    tagName,
+                    attributeName,
+                    string.Empty,
+                    valueSearchStart);
                 return true;
             }
 
@@ -1005,18 +1024,33 @@ internal static class TemplateCompletionProvider
             var valueStart = cursor;
             if (quote != '\0')
             {
-                while (cursor < offset && content[cursor] != quote)
+                var isEscaped = false;
+                while (cursor < offset)
                 {
+                    if (recognizeEscapedQuotes && isEscaped)
+                    {
+                        isEscaped = false;
+                    }
+                    else if (recognizeEscapedQuotes && content[cursor] == '\\')
+                    {
+                        isEscaped = true;
+                    }
+                    else if (content[cursor] == quote)
+                    {
+                        break;
+                    }
+
                     cursor++;
                 }
 
                 if (cursor == offset)
                 {
-                    context = new TemplateTagContext(
+                    context = CreateAttributeValueContext(
+                        content,
                         tagName,
                         attributeName,
                         content.Substring(valueStart, cursor - valueStart),
-                        true);
+                        valueSearchStart);
                     return true;
                 }
 
@@ -1031,11 +1065,12 @@ internal static class TemplateCompletionProvider
 
                 if (cursor == offset)
                 {
-                    context = new TemplateTagContext(
+                    context = CreateAttributeValueContext(
+                        content,
                         tagName,
                         attributeName,
                         content.Substring(valueStart, cursor - valueStart),
-                        true);
+                        valueSearchStart);
                     return true;
                 }
             }
@@ -1045,6 +1080,65 @@ internal static class TemplateCompletionProvider
         return true;
     }
 
+    private static TemplateTagContext CreateAttributeValueContext(
+        string content,
+        string tagName,
+        string attributeName,
+        string attributeValuePrefix,
+        int valueSearchStart)
+    {
+        var cursor = valueSearchStart;
+        while (cursor < content.Length && char.IsWhiteSpace(content[cursor]))
+        {
+            cursor++;
+        }
+
+        if (cursor >= content.Length)
+        {
+            return new TemplateTagContext(
+                tagName,
+                attributeName,
+                attributeValuePrefix,
+                true);
+        }
+
+        var quote = content[cursor] is '\'' or '"' ? content[cursor++] : '\0';
+        var valueStart = cursor;
+        var isEscaped = false;
+        while (cursor < content.Length)
+        {
+            var character = content[cursor];
+            if (quote == '\0' &&
+                (char.IsWhiteSpace(character) || character == '>'))
+            {
+                break;
+            }
+
+            if (isEscaped)
+            {
+                isEscaped = false;
+            }
+            else if (character == '\\')
+            {
+                isEscaped = true;
+            }
+            else if (quote != '\0' && character == quote)
+            {
+                break;
+            }
+
+            cursor++;
+        }
+
+        return new TemplateTagContext(
+            tagName,
+            attributeName,
+            attributeValuePrefix,
+            true,
+            valueStart,
+            cursor);
+    }
+
     private static bool StartsWith(string text, int offset, string value)
         => offset + value.Length <= text.Length &&
            text.AsSpan(offset, value.Length).SequenceEqual(value.AsSpan());
@@ -1052,11 +1146,13 @@ internal static class TemplateCompletionProvider
     private static bool IsNameCharacter(char character)
         => char.IsLetterOrDigit(character) || character is '-' or '_' or ':' or '.';
 
-    private sealed record TemplateTagContext(
+    internal sealed record TemplateTagContext(
         string TagName,
         string AttributeNamePrefix,
         string AttributeValuePrefix,
-        bool IsAttributeValue)
+        bool IsAttributeValue,
+        int AttributeValueStart = -1,
+        int AttributeValueEnd = -1)
     {
         internal string AttributeName => AttributeNamePrefix;
     }

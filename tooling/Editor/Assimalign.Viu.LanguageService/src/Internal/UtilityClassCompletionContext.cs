@@ -1,5 +1,3 @@
-using Assimalign.Viu.UtilityCss;
-
 namespace Assimalign.Viu.LanguageService;
 
 internal sealed record UtilityClassCompletionContext(
@@ -23,22 +21,19 @@ internal sealed record UtilityClassCompletionContext(
             return false;
         }
 
-        var token = UtilityCandidateScanner.FindTokenAtPosition(
+        var token = TemplateClassTokenScanner.FindTokenAtPosition(
             templateText,
-            documentOffset - templateStart,
-            new UtilityCandidateScanOptions
-            {
-                ContentOffset = templateStart,
-            });
+            templateStart,
+            documentOffset);
         if (token is null)
         {
             return false;
         }
 
         context = new UtilityClassCompletionContext(
-            token.SourceSpan.Start,
-            token.SourceSpan.End,
-            token.Text,
+            token.TokenStart,
+            token.TokenEnd,
+            token.TokenText,
             token.Prefix);
         return true;
     }

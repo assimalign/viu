@@ -917,7 +917,7 @@ internal sealed class ViuLanguageService :
         SingleFileComponentTemplateBlock template,
         int offset)
     {
-        if (UtilityCandidateScanner.IsInsideAttributeValue(
+        if (TemplateClassTokenScanner.IsInsideAttributeValue(
                 template.Content,
                 offset - template.ContentLocation.Start.Offset))
         {
