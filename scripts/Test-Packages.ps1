@@ -194,9 +194,9 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 }
 
 $expectedPackageId = @(Get-ViuPackageId)
-# The parked add-on removes one managed library from the previous 17-main/12-symbol release set.
-$expectedMainPackageCount = 16
-$expectedSymbolPackageCount = 11
+# [V01.01.12.30] restores the standalone UtilityCss library to the 17-main/12-symbol release set.
+$expectedMainPackageCount = 17
+$expectedSymbolPackageCount = 12
 if ($expectedPackageId.Count -ne $expectedMainPackageCount) {
     throw "The release contract requires $expectedMainPackageCount main packages, but the configured inventory contains $($expectedPackageId.Count)."
 }

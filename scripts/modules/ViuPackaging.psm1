@@ -7,8 +7,8 @@
     Both scripts/Install-Local.ps1 (the local dogfooding feed) and
     scripts/Pack-Release.ps1 (the release set) import this module, so the two can
     never disagree about what ships. Get-ViuLibraryProject carries the drift guard:
-    a new packable library under either code root — libraries/ (the runtime
-    framework) or tooling/ (developer tooling: build-time and editor libraries) —
+    a new packable library under either code root — libraries/ (public package
+    surfaces) or tooling/ (developer tooling: build-time and editor libraries) —
     that is not in the inventory fails the pack rather than silently shipping an
     incomplete set. Tooling currently contributes no package, but remains scanned
     so a future packability change cannot bypass the inventory.
@@ -25,6 +25,7 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Components',
     'Assimalign.Viu.State',
     'Assimalign.Viu.Router',
+    'Assimalign.Viu.UtilityCss',
     'Assimalign.Viu.Core',
     # [V01.01.10.01] is an opt-in package and deliberately stays outside both App frameworks.
     'Assimalign.Viu.DevTools',

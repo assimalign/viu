@@ -29,8 +29,8 @@
   `libraries/<Area>/Assimalign.Viu.<Name>/{src,test}` for publicly consumable runtime and parser
   projects, and `tooling/<Area>/Assimalign.Viu.<Name>/{src,test}` for compiler and editor
   implementation projects. The area location carries the role without changing the assembly id or
-  namespace. `tooling/Assimalign.Viu.UtilityCss/{src,test}` is a parked, non-packable root-level
-  exception pending an add-on redesign under `libraries/Utilities/`.
+  namespace. Standalone add-ons such as UtilityCss use the `libraries/Utilities/` area and remain
+  outside Viu SDK and framework surfaces unless a work item explicitly changes that boundary.
 - Preserve later-wave requirements in planning notes even when implementing only current-wave scope.
   If a ticket needs prerequisite work from another ticket, call that out rather than silently
   reordering.
@@ -46,5 +46,5 @@
   names a declared compatibility target (the `.vue` container format, the Language Server Protocol,
   or a WHATWG/W3C specification); performance ideas borrowed from other frameworks are recorded in
   `docs/PERFORMANCE-RESEARCH.md` and never make that framework normative. Tailwind CSS v4.3.3 may be
-  cited only by work explicitly scoped to the parked utility-CSS add-on or its future redesign, never
+  cited only by work explicitly scoped to the standalone utility-CSS add-on, never
   as a Viu core target.

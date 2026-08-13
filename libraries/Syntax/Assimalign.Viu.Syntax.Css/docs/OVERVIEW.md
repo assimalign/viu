@@ -25,7 +25,7 @@ ones.
   (declarations, qualified rules, `@media`/conditional-group at-rules, selectors) from code; the fluent
   `CssStylesheetBuilder` accumulates a stylesheet; `CssSyntheticLocation` marks and recognizes the
   synthetic `SourceLocation`s constructed nodes carry. Generic CSS construction only — it knows nothing of
-  utilities. The parked utility add-on ([V01.01.12.16]) remains a historical consumer; the surface is
+  utilities. The standalone utility add-on ([V01.01.12.16]) is a consumer; the surface is
   also available to developer-authored CSS tooling without taking a dependency on that add-on.
 - **`CssError` / `CssErrorCode`** — the Viu-defined recoverable-diagnostic catalog (2000-based).
 

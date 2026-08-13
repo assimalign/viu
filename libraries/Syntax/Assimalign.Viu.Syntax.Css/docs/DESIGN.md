@@ -132,10 +132,10 @@ The parser turns CSS *text* into the record graph; `CssSyntaxFactory` (and the f
 `CssStylesheetBuilder`) build the **same** graph from code, so a build-time generator can synthesize rules
 from scratch and hand them to the same canonical serializer. Scoped CSS ([V01.01.06.04]) and the module /
 `v-bind()` rewrites all transform an *already-parsed* tree, so none of them ever needed to *create* a rule;
-the now-parked utility add-on ([V01.01.12.16]) was its first rule-generating consumer. The surface is
+the standalone utility add-on ([V01.01.12.16]) was its first rule-generating consumer. The surface is
 deliberately **language-agnostic generic CSS construction** — it knows nothing about utilities, variants, or
-themes — so `Assimalign.Viu.Syntax.Css` stays a leaf in the cluster. The parked engine at
-`tooling/Assimalign.Viu.UtilityCss` may reference Css; Css never references back, and future developer
+themes — so `Assimalign.Viu.Syntax.Css` stays a leaf in the cluster. The standalone engine at
+`libraries/Utilities/Assimalign.Viu.UtilityCss` may reference Css; Css never references back, and future developer
 tooling can consume the public construction surface independently. `CssSyntaxFactory.QualifiedRule`,
 `Declaration`, `Media`/`ConditionalGroupAtRule`, `Stylesheet`, and the selector builders
 (`SimpleSelector`/`Combinator`/`Pseudo`/`ComplexSelector`/`SelectorList`) mint the existing node types; a
@@ -178,7 +178,7 @@ Determinism is therefore a property of **construction**: identical node lists se
 identically, and construction converges on the same canonical text as parsing the equivalent source
 (pinned against a parsed graph in `CssConstructionTests`). The construction surface preserves the order it
 is given and applies no canonicalization of its own — so a consumer that needs a canonical ordering (the
-parked utility add-on is the historical example) sorts **before**
+standalone utility add-on is the example) sorts **before**
 constructing. Keeping ordering policy in the consumer is exactly what lets Css stay language-agnostic: it
 holds no opinion on how utilities, media queries, or properties "should" be ordered.
 
@@ -220,11 +220,11 @@ only the scope-id string.
   compound/complex/grouped scoping are covered.
 - **Comment preservation in scoped output.** Comments are tokenized (for exact spans) but dropped by the
   canonical serializer; scoped CSS is machine-generated.
-- **Parked add-on history — utility-class generation.** [#129] introduced a separate consumer of this
+- **Standalone add-on history — utility-class generation.** [#129] introduced a separate consumer of this
   library that reused the tokenizer, tree, `CssScopedRewriter`, and the programmatic construction surface
-  added by [V01.01.12.11]. Its Viu integration was removed on 2026-08-13; the engine is parked at
-  `tooling/Assimalign.Viu.UtilityCss` pending a fresh `libraries/Utilities/` add-on design. Tailwind CSS
-  v4.3.3 compatibility belongs only to that parked add-on. The retained, non-normative design history is
+  added by [V01.01.12.11]. Its Viu integration was removed on 2026-08-13; the engine is now independently
+  published from `libraries/Utilities/Assimalign.Viu.UtilityCss`. Tailwind CSS v4.3.3 compatibility
+  belongs only to that standalone add-on. The retained, non-normative design history is
   [`docs/UTILITY-CSS-DESIGN.md`](../../../../docs/UTILITY-CSS-DESIGN.md).
 - **Reserved functional pseudos, `@keyframes`, and statement at-rules are not *constructed*.** The
   [V01.01.12.11] factory builds ordinary selectors, declarations, qualified rules, and conditional-group

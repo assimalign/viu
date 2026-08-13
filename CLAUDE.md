@@ -13,8 +13,8 @@ external **compatibility targets** (the `.vue` container format, WHATWG HTML ser
 Language Server Protocol) are real product features and are documented as such; and
 [`docs/PERFORMANCE-RESEARCH.md`](docs/PERFORMANCE-RESEARCH.md) is the non-normative channel for
 evaluating other frameworks' performance work — including Vue's — for possible replication.
-Tailwind CSS v4.3.3 is now only the target of the parked utility-CSS add-on engine at
-`tooling/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility target (owner decision,
+Tailwind CSS v4.3.3 is only the target of the standalone add-on at
+`libraries/Utilities/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility target (owner decision,
 2026-08-13). Component `<style>` CSS remains fully supported, including scoping, bundling, and hot
 reload.
 
@@ -23,16 +23,15 @@ reload.
 - `libraries/` — publicly consumable package surfaces in the area-based inverted layout
   `libraries/<Area>/<AssemblyId>/{src,test}`. Areas are `Browser` (Browser, Browser.Router),
   `DevTools` (DevTools, Testing), `Router`, `Runtime` (Components, Core, Reactivity, State),
-  `ServerRenderer`, and `Syntax` (all five Syntax projects). The public netstandard2.0 build/editor-time
+  `ServerRenderer`, `Syntax` (all five Syntax projects), and `Utilities` (standalone add-ons). The public netstandard2.0 build/editor-time
   parser cluster is deliberately here so developers can parse CSS, templates, and single-file
   components directly; `libraries/` no longer means runtime-only.
 - `tooling/` — implementation projects under `tooling/<Area>/<AssemblyId>/{src,test}`:
   `Compiler/{Assimalign.Viu.Compiler.Css, Assimalign.Viu.Compiler.SingleFileComponent}` and
   `Editor/{Assimalign.Viu.LanguageService, Assimalign.Viu.LanguageServer}`. No tooling project is
-  currently independently published. `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the parked,
-  non-packable root-level exception; it remains built and tested by the tooling lane pending a fresh
-  add-on design under `libraries/Utilities/` with add-on-owned MSBuild props/targets and, if needed,
-  its own editor extension.
+  currently independently published. The independently published UtilityCss add-on lives at
+  `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}`. It remains outside every Viu SDK and
+  framework surface; consumer MSBuild integration arrives separately through #346.
 - `extensions/` — ecosystem integration points: `VisualStudio/`, `VisualStudioCode/`, and `dotnet/`;
   templates live at `extensions/dotnet/Assimalign.Viu.Templates`.
 - `benchmarks/Assimalign.Viu.Testing.EndToEnd/` — real-browser end-to-end harness.

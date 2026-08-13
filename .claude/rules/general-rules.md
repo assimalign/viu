@@ -16,7 +16,7 @@ Where a type implements a documented **external compatibility target** — the `
 single-file-component container format ([V01.01.06.09], a shipping feature), WHATWG HTML
 serialization, or the Language Server Protocol — name and link that target. That is a compatibility
 *requirement* on a foreign format, not a semantic authority over Viu. Tailwind CSS v4.3.3 is a target
-only of the parked utility-CSS add-on engine at `tooling/Assimalign.Viu.UtilityCss`; it is not a Viu
+only of the standalone add-on at `libraries/Utilities/Assimalign.Viu.UtilityCss`; it is not a Viu
 core compatibility target (owner decision, 2026-08-13).
 
 ## Project layout
@@ -24,7 +24,8 @@ core compatibility target (owner decision, 2026-08-13).
 - Publicly consumable package surfaces use the area-based inverted layout
   `libraries/<Area>/<AssemblyId>/{src,test}`. The areas are `Browser` (Browser, Browser.Router),
   `DevTools` (DevTools, Testing), `Router`, `Runtime` (Components, Core, Reactivity, State),
-  `ServerRenderer`, and `Syntax` (Syntax plus Css, Html, SingleFileComponent, and Templates); the
+  `ServerRenderer`, `Syntax` (Syntax plus Css, Html, SingleFileComponent, and Templates), and
+  `Utilities` (standalone add-ons); the
   assembly-id folder remains the package/project identity. `libraries/` therefore contains both
   runtime libraries and the public netstandard2.0 build/editor-time parser cluster. The parsers are
   deliberately consumable by developers and are the foundation for future extensible tooling;
@@ -35,12 +36,11 @@ core compatibility target (owner decision, 2026-08-13).
   `Assimalign.Viu.LanguageServer`. The location carries the developer-tooling classification without
   adding a blanket `Tooling.` assembly/namespace segment. No tooling project is currently an
   independently published package.
-- `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the single root-level exception. It is a parked,
-  non-packable add-on engine that remains built and tested by the tooling lane pending a fresh design
-  under `libraries/Utilities/`; that redesign must own its MSBuild props/targets and may own a
-  dedicated editor extension. Utility CSS is not integrated into the Viu SDK, hot reload, editors,
-  packaging, release train, or core specification. Component `<style>` CSS remains fully supported,
-  including scoping, bundling, and hot reload.
+- `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}` is the independently published,
+  standalone UtilityCss add-on library. It is not integrated into a Viu SDK or framework surface;
+  consumer MSBuild integration arrives separately through [V01.01.12.30] (#346). Utility CSS remains
+  non-normative for Viu core. Component `<style>` CSS remains fully supported, including scoping,
+  bundling, and hot reload.
 - Ecosystem integration points live under `extensions/`: `VisualStudio/`, `VisualStudioCode/`, and
   `dotnet/`. The dotnet templates project is
   `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives at
@@ -86,7 +86,7 @@ core compatibility target (owner decision, 2026-08-13).
   for this layout:
   - Syntax siblings link `Shims/IsExternalInit.cs` and `Shims/RequiredMemberShims.cs` through
     `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`.
-  - `Assimalign.Viu.Compiler.Css`, `Assimalign.Viu.Compiler.SingleFileComponent`, and the parked
+  - `Assimalign.Viu.Compiler.Css`, `Assimalign.Viu.Compiler.SingleFileComponent`, and the standalone
     `Assimalign.Viu.UtilityCss` engine link those shims through
     `$(ViuRepositoryDirectory)libraries\Syntax\Assimalign.Viu.Syntax\src\Shims\<File>`.
   - `Assimalign.Viu.Syntax.Templates` links `PatchFlags.cs` and `SlotStability.cs` from

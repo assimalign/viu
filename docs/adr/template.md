@@ -15,7 +15,7 @@ baseline, and no external project's behavior is authoritative here. Where the de
 documented **external compatibility target** Viu deliberately consumes — the `.vue`
 single-file-component container format, WHATWG HTML serialization, or the Language Server Protocol
 — name and link that target: there the citation *is* the requirement. Tailwind CSS v4.3.3 belongs
-only to the parked, non-normative utility add-on and is not a Viu core compatibility target.
+only to the standalone, non-normative utility add-on and is not a Viu core compatibility target.
 
 ## Decision
 

@@ -1,10 +1,9 @@
-> **Status — parked add-on; non-normative (2026-08-13).** Viu Utilities is no longer part of Viu.
-> The SDK, hot-reload, editor, packaging, release-train, and CI integrations described below were
-> removed in commits `f952b19`, `7330f74`, and `b3f71f0`. The non-packable engine is parked at
-> `tooling/Assimalign.Viu.UtilityCss` pending a fresh add-on design under `libraries/Utilities/`,
-> with its own MSBuild integration and potentially its own Visual Studio extension. This document is
-> retained unchanged as design history for that redesign; its Tailwind CSS v4.3.3 target belongs to
-> the parked add-on, not to Viu's core compatibility contract.
+> **Status — standalone add-on; non-normative for Viu core (2026-08-13).** Viu Utilities is
+> independently published from `libraries/Utilities/Assimalign.Viu.UtilityCss`. The SDK, hot-reload,
+> and editor integrations described below were removed in commits `f952b19`, `7330f74`, and
+> `b3f71f0`; the add-on remains outside every Viu SDK and framework surface. Consumer MSBuild
+> integration arrives separately through [V01.01.12.30] (#346). This document is retained as add-on
+> design history; its Tailwind CSS v4.3.3 target is not part of Viu's core compatibility contract.
 
 # Viu Utilities — standalone Tailwind CSS v4.3.3 compatibility design
 
@@ -97,7 +96,7 @@ AOT release WebAssembly payload.
 Create the inverted-layout library:
 
 ```text
-tooling/Assimalign.Viu.UtilityCss/
+libraries/Utilities/Assimalign.Viu.UtilityCss/
   src/Assimalign.Viu.UtilityCss.csproj
   test/Assimalign.Viu.UtilityCss.Tests.csproj
   conformance/
@@ -398,11 +397,11 @@ The repository-owned manifest under the utility library's `conformance/` folder 
 - golden vectors and the authoritative official reference for each behavior.
 
 The frozen contract is
-[`compatibility-v4.3.3.json`](../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json);
+[`compatibility-v4.3.3.json`](../libraries/Utilities/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json);
 its independently authored executable expectations are
-[`golden-vectors-v4.3.3.json`](../tooling/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json).
+[`golden-vectors-v4.3.3.json`](../libraries/Utilities/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json).
 These files are copied only to the test output and are not embedded in or loaded by the shipping
-tooling assembly.
+add-on assembly or package.
 
 The manifest may use JSON as test data, but it is **not user configuration** and is never loaded from
 a consuming project. No JSON theme/configuration contract exists.

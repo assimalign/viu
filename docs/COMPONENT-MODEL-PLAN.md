@@ -84,7 +84,7 @@ The shim treadmill exists because attachments were made without designed seams. 
 | `Router` | A navigation *convention* above the model — already the model citizen | Components + Reactivity |
 | `Core` | **The Application Model**: the composition root (D5/D5a `ApplicationOptions`/`ApplicationContext`, lifetime, middleware), the engine (renderer, scheduler, mounted internals), and the public operations (render lease, mounted views) | Components, Reactivity, State (composition-root sugar) |
 | Hosts (`Browser`, `ServerRenderer`, `Testing`, future platforms) | Platform adapters behind the host contract | Core |
-| Styling (component CSS modules and scoped CSS) | Build-time concern; compiled trees carry scope identifiers as ordinary static attributes, so the runtime component context carries no style-scope state. The utility-CSS add-on is parked and outside this model. | compiler tooling — never in the runtime graph |
+| Styling (component CSS modules and scoped CSS) | Build-time concern; compiled trees carry scope identifiers as ordinary static attributes, so the runtime component context carries no style-scope state. The standalone utility-CSS add-on remains outside this model. | compiler tooling — never in the runtime graph |
 
 Vocabulary lives low (Components declares what things *are*); composition lives high (Core wires
 what the *application* uses); conventions attach through seams. Core containing both the

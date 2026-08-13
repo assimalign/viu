@@ -13,4 +13,4 @@
 # the expected value — a CRLF checkout (autocrlf on Windows) makes the expected value CRLF
 # while the emitter still produces LF, failing 7 tests that pass on a LF checkout (Linux/CI).
 # Pin LF so a fresh clone or worktree is green on every platform ([V01.01.12.24]).
-tooling/Assimalign.Viu.UtilityCss/test/**/*.cs text eol=lf
+libraries/Utilities/Assimalign.Viu.UtilityCss/test/**/*.cs text eol=lf

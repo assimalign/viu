@@ -654,30 +654,30 @@ separate halves.**
   Studio is future work, worth doing only if it is demanded, and would need an activation path that
   coexists with Web Tools rather than replacing it.
 
-## Parked Viu Utilities integration (design history)
+## Former Viu Utilities integration (design history)
 
-> **Parked add-on — non-normative.** The SDK, hot-reload, language-service, language-server, and
-> Visual Studio integration described in this section was removed on 2026-08-13. The engine remains
-> at `tooling/Assimalign.Viu.UtilityCss` as a non-packable prototype pending a fresh add-on design
-> under `libraries/Utilities/`. Its Tailwind CSS v4.3.3 compatibility target is not a Viu core or
-> current extension contract.
+> **Standalone add-on — non-normative here.** The SDK, hot-reload, language-service, language-server,
+> and Visual Studio integration described in this section was removed on 2026-08-13. The engine is
+> independently published from `libraries/Utilities/Assimalign.Viu.UtilityCss`, but it is not part of
+> a Viu SDK, framework, or current extension contract. Consumer MSBuild integration arrives through
+> #346; its Tailwind CSS v4.3.3 compatibility target is not a Viu core contract.
 
 Before removal, `Assimalign.Viu.UtilityCss` supplied one compiler/editor registry, pinned by
-[`compatibility-v4.3.3.json`](../../../../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json)
+[`compatibility-v4.3.3.json`](../../../../libraries/Utilities/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json)
 and
-[`golden-vectors-v4.3.3.json`](../../../../tooling/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json).
+[`golden-vectors-v4.3.3.json`](../../../../libraries/Utilities/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json).
 The language server located one literal project utility entry, loaded its recursive references and
 CSS-first configuration, and used the same compiler for completion detail, generated-CSS hover, and
 SDK output. Candidate discovery was deliberately limited to template class text and explicitly
 configured sources; script/style regions, ordinary C# strings, and runtime-built fragments were
-outside that former contract. This record is retained to inform the add-on redesign, not to promise
-that Viu or the VSIX currently consumes the parked engine.
+outside that former contract. This record does not promise that Viu or the VSIX currently consumes
+the standalone engine.
 
 ## Current component-style source and update boundaries
 
 Component-style completion activates in static class attributes and literal class-binding strings.
 It reads class selectors from the current `.viu` or accepted `.vue` document's `<style>` blocks and
-offers the authored declarations; it does not consult the parked add-on or scan arbitrary C#.
+offers the authored declarations; it does not consult the standalone add-on or scan arbitrary C#.
 
 The language server does not write bundles or refresh the browser. In a Debug `dotnet watch`
 session, the packaged Browser SDK launches the component-CSS sidecar, batches regeneration for

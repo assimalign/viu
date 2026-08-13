@@ -32,7 +32,7 @@ paths:
   single-file-component container format. It is never used to cite another framework as the
   authority for Viu's own behavior. Version-pin format-citation URLs and frame them explicitly, e.g.
   *"Container-format reference for the input this parser accepts: `<see href=…>`"*. Tailwind URLs are
-  no longer authorized in Viu XML documentation; they may remain inside the parked utility-CSS add-on
+  no longer authorized in Viu XML documentation; they may remain inside the standalone utility-CSS add-on
   tree as references for that add-on's v4.3.3 compatibility target.
 - **The `.vue` compatibility surface is a shipping feature, not a legacy reference.** [V01.01.06.09]
   (#250) parses the tag-based `.vue` container so Vue single-file components compile under Viu. Every
@@ -40,12 +40,12 @@ paths:
   `viu-vue` document type, `**/*.vue` globs, and `.vue`-format spec compatibility **must be
   preserved** — removing them misdescribes the product. The banned-phrase rules above govern *how
   Viu's own semantics are described*, not the naming of the foreign format Viu reads.
-- **Utility CSS is parked design history, not Viu specification.**
+- **Utility CSS is standalone add-on design, not Viu specification.**
   [`docs/UTILITY-CSS-DESIGN.md`](../../docs/UTILITY-CSS-DESIGN.md) is non-normative after the
-  2026-08-13 removal of SDK, hot-reload, editor, packaging, release, and CI integration. The engine at
-  `tooling/Assimalign.Viu.UtilityCss` remains a non-packable add-on candidate pending a redesign under
-  `libraries/Utilities/` with add-on-owned MSBuild props/targets and, if needed, its own editor
-  extension; do not cite the design document or Tailwind CSS as authority for Viu core behavior.
+  2026-08-13 removal of SDK, hot-reload, and editor integration. The independently published engine
+  lives at `libraries/Utilities/Assimalign.Viu.UtilityCss`; it remains outside every Viu SDK and
+  framework surface, with consumer MSBuild integration arriving separately through [V01.01.12.30]
+  (#346). Do not cite the design document or Tailwind CSS as authority for Viu core behavior.
 - **Other frameworks are performance research, not specification.** Viu tracks other renderers'
   performance work as an input to its own optimization backlog. That tracking lives in
   [`docs/PERFORMANCE-RESEARCH.md`](../../docs/PERFORMANCE-RESEARCH.md) and in the work items it
@@ -55,8 +55,7 @@ paths:
 - Per-library design docs mature into
   `libraries/<Area>/Assimalign.Viu.<Name>/docs/OVERVIEW.md` (what it is) and `docs/DESIGN.md` (why it
   is shaped this way, WASM/AOT constraints, non-goals) — the same pair under
-  `tooling/<Area>/Assimalign.Viu.<Name>/docs/` for compiler and editor projects. The parked
-  `tooling/Assimalign.Viu.UtilityCss/docs/` tree is the root-level historical exception. Keep docs
+  `tooling/<Area>/Assimalign.Viu.<Name>/docs/` for compiler and editor projects. Keep docs
   current in the same change as the code — a `DESIGN.md` that lags the code actively misleads.
 - Repo-level planning lives in `docs/` — `docs/SPECIFICATION.md` is the authoritative statement of
   Viu's semantics; `docs/PLAN.md` is the authoritative delivery narrative (architecture map, founding

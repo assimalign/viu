@@ -144,13 +144,13 @@ The complete repository and Marketplace setup is documented in
   partial-component contract in Viu SDK projects — a **language-server** capability, live for hosts
   that route `.vue` to it, and not reachable from Visual Studio today (see below)
 
-## Parked utility add-on
+## Standalone utility add-on
 
 The former Viu Utilities integration — including utility-class completion, generated-CSS hover,
 SDK delivery, and editor project configuration — was removed from Viu on 2026-08-13. The engine is
-parked at `tooling/Assimalign.Viu.UtilityCss` as a non-packable add-on prototype pending a fresh
-design under `libraries/Utilities/`; it is not a current Visual Studio feature. The former Tailwind
-CSS v4.3.3 compatibility target belongs only to that parked add-on.
+independently published from `libraries/Utilities/Assimalign.Viu.UtilityCss`, but it remains outside
+the Viu SDK and is not a current Visual Studio feature. Consumer MSBuild integration arrives
+separately through #346. The Tailwind CSS v4.3.3 compatibility target belongs only to that add-on.
 
 The generic `LanguageCompletionItem.ColorValue` and Language Server Protocol `Color` completion
 kind remain as dormant transport. The Visual Studio swatch adapter can present those values if a

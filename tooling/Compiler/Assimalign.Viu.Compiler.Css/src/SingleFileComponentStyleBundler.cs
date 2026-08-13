@@ -30,9 +30,9 @@ namespace Assimalign.Viu.Compiler.Css;
 /// verbatim pass-through blocks — matching the generator's constant exactly.
 /// </para>
 /// This bundles opaque compiled component-CSS strings and embeds no add-on-specific knowledge. The former
-/// utility integration ([V01.01.12.16]) was removed on 2026-08-13 and remains parked outside the SDK; any
-/// future add-on delivers its own assets without changing this contract (see
-/// <c>docs/UTILITY-CSS-DESIGN.md</c>, parked non-normative history).
+/// utility integration ([V01.01.12.16]) was removed on 2026-08-13. The independently published add-on
+/// remains outside the SDK; its build-time delivery is tracked by [V01.01.12.30] without changing this
+/// contract (see <c>docs/UTILITY-CSS-DESIGN.md</c>, non-normative add-on history).
 /// </summary>
 public static class SingleFileComponentStyleBundler
 {

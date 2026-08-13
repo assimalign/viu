@@ -48,13 +48,13 @@ limits). The packaged-consumer showcase lives in the separate
 Publicly consumable packages use the area-based layout
 `libraries/<Area>/<AssemblyId>/{src,test,docs}`. `libraries/` is not limited to application-runtime
 assemblies: it also contains the `netstandard2.0` Syntax parsers that developers may consume directly
-to parse CSS, templates, HTML, and single-file components. Each documented project carries a
+and standalone add-ons under `Utilities`. Each documented project carries a
 `docs/OVERVIEW.md` and, where its shape needs justification, a `docs/DESIGN.md`; neither may
 contradict [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
 
 Developer tooling follows `tooling/<Area>/<AssemblyId>/{src,test,docs}` under the `Compiler/` and
-`Editor/` areas. The parked, non-packable utility-CSS engine is the one root-level exception. The
-`extensions/` root contains ecosystem integrations (`VisualStudio`, `VisualStudioCode`, and
+`Editor/` areas. The `extensions/` root contains ecosystem integrations (`VisualStudio`,
+`VisualStudioCode`, and
 `dotnet`), while the Playwright end-to-end executable lives with the performance harnesses under
 [`benchmarks/Assimalign.Viu.Testing.EndToEnd`](benchmarks/Assimalign.Viu.Testing.EndToEnd).
 
@@ -77,6 +77,7 @@ Developer tooling follows `tooling/<Area>/<AssemblyId>/{src,test,docs}` under th
 | Syntax | [`Assimalign.Viu.Syntax.SingleFileComponent`](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent) | Canonical `.viu` and compatible `.vue` container parsers | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md) · [FORMAT](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md) |
 | Syntax | [`Assimalign.Viu.Syntax.Css`](libraries/Syntax/Assimalign.Viu.Syntax.Css) | CSS tokenizer, parser, and scoped-style rewrite | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md) |
 | Syntax | [`Assimalign.Viu.Syntax.Html`](libraries/Syntax/Assimalign.Viu.Syntax.Html) | HTML parser used for host-page build-time rewriting | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Html/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Html/docs/DESIGN.md) |
+| Utilities | [`Assimalign.Viu.UtilityCss`](libraries/Utilities/Assimalign.Viu.UtilityCss) | Standalone utility-CSS parsing, scanning, registry, theme, and deterministic emission engine | [OVERVIEW](libraries/Utilities/Assimalign.Viu.UtilityCss/docs/OVERVIEW.md) · [DESIGN](libraries/Utilities/Assimalign.Viu.UtilityCss/docs/DESIGN.md) |
 
 ### Developer tooling (`tooling/`)
 
@@ -90,13 +91,11 @@ and none is currently published as an independent tooling package.
 | [`Assimalign.Viu.LanguageService`](tooling/Editor/Assimalign.Viu.LanguageService) | Editor-neutral document state, completion, hover, symbols, folding, code actions, and C# semantic analysis | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
 | [`Assimalign.Viu.LanguageServer`](tooling/Editor/Assimalign.Viu.LanguageServer) | Standalone Language Server Protocol executable used by both editor extensions | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
 
-**Parked add-on.** Viu Utilities is no longer part of Viu's SDK, editor, packaging, release, or CI
-product surface (decision of 2026-08-13: utility means add-on, not baked in). Its `IsPackable=false`
-engine remains parked at [`tooling/Assimalign.Viu.UtilityCss`](tooling/Assimalign.Viu.UtilityCss) and
-is still built and tested by the tooling lane. Tailwind CSS v4.3.3 is a compatibility target of that
-parked add-on only. A future redesign may move it under `libraries/Utilities/` with its own MSBuild
-integration and editor support. Component `<style>` CSS compilation, bundling, delivery, and hot
-reload remain active Viu features.
+**Standalone add-on.** Viu Utilities is independently published from
+[`libraries/Utilities/Assimalign.Viu.UtilityCss`](libraries/Utilities/Assimalign.Viu.UtilityCss).
+It remains outside every Viu SDK and framework surface, and its Tailwind CSS v4.3.3 compatibility
+target is not a Viu core contract. Consumer MSBuild integration arrives separately through #346;
+component `<style>` CSS compilation, bundling, delivery, and hot reload remain active Viu features.
 
 ### Source generators and SDK build tools (`analyzers/`, `sdks/`)
 

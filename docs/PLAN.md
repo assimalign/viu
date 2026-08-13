@@ -77,9 +77,9 @@ in [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md).
 
 The active build/editor implementation side contains four projects under `tooling/`: the Css and
 SingleFileComponent compiler composition roots in `tooling/Compiler/`, plus LanguageService and
-LanguageServer in `tooling/Editor/`. The non-packable utility-CSS engine is a parked root-level
-exception at `tooling/Assimalign.Viu.UtilityCss`; it is not integrated into Viu or its release train
-and awaits a fresh add-on design under `libraries/Utilities/`. The Reactivity and Syntax generators
+LanguageServer in `tooling/Editor/`. The standalone utility-CSS add-on at
+`libraries/Utilities/Assimalign.Viu.UtilityCss` is independently published but remains outside every
+Viu SDK and framework surface; consumer MSBuild integration arrives separately through #346. The Reactivity and Syntax generators
 live under `analyzers/`. The single-file-component compiler is the shared `.viu`/`.vue` to C#
 projection used by both build and editor hosts, preserving the shipping `.vue` compatibility input
 while keeping Viu's runtime independent of JavaScript execution.
@@ -407,7 +407,8 @@ The utility-specific descendants `[V01.01.12.05.01]` (utility stylesheet watch),
 `[V01.01.12.07.01]` (utility IntelliSense), and `[V01.01.12.16.01]` (Tailwind CSS v4.3.3
 conformance) are likewise parked and superseded by the 2026-08-13 removal. Their completed work is
 retained as non-normative design history in [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) for the
-future `libraries/Utilities/` add-on redesign. Component CSS bundling, scoped styles, CSS Modules,
+standalone add-on now published from `libraries/Utilities/`. Consumer MSBuild integration is tracked
+by [V01.01.12.30] (#346). Component CSS bundling, scoped styles, CSS Modules,
 and component-style hot reload remain active Viu features.
 
 ### [V01.01.13] Framework - Documentation (W02, P003)

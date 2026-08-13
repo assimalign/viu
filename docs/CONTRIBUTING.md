@@ -33,7 +33,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 | `PLAN.md` | [`docs/PLAN.md`](PLAN.md) | The delivery narrative: the wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. The GitHub [Project #15](https://github.com/orgs/assimalign/projects/15) board is the authoritative *backlog*. |
 | `DEVELOPER-EXAMPLES.md` | [`docs/DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked package-consumer examples for Components, Reactivity, State, Core, and Browser. |
 | Getting-started guide | [`docs/guide/getting-started.md`](guide/getting-started.md) | The external-consumer walkthrough from manual project creation through browser execution and publish. |
-| `UTILITY-CSS-DESIGN.md` | [`docs/UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Parked, non-normative design history.** The former Viu Utilities integration and its Tailwind CSS v4.3.3 target, retained for a future add-on redesign under `libraries/Utilities/`. |
+| `UTILITY-CSS-DESIGN.md` | [`docs/UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Standalone add-on design; non-normative for Viu core.** The former Viu integration and the independently published add-on's Tailwind CSS v4.3.3 target. |
 | `NET-RESHAPE-PLAN.md` | [`docs/NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The dated historical record of the completed .NET reshape and its later supersession notes. |
 | `RELEASING.md` | [`docs/RELEASING.md`](RELEASING.md) | Package and extension release channels, credentials, validation, and publication sequence. |
 | Architecture decision records | [`docs/adr/`](adr/) | The append-only log of repo-wide, cross-cutting decisions (see [`adr/README.md`](adr/README.md)). Normative for *rationale*, not for current API shape. |
@@ -73,7 +73,7 @@ The rationale and the trade-offs — why the shape, not the shape itself.
   Protocol), name it and link a version-pinned reference. There
   the citation *is* the requirement: it constrains a format Viu deliberately consumes, and it is not
   an authority over Viu's own semantics. Tailwind CSS v4.3.3 is no longer a Viu compatibility
-  target; it remains only the target recorded for the parked, non-normative utility add-on in
+  target; it remains only the target recorded for the standalone, non-normative utility add-on in
   [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md).
 - **Platform adaptations** — where a design that reads oddly is forced by the WASM/AOT/single-thread
   reality rather than chosen, say so and link the test that pins the chosen behavior. A repo-wide
@@ -102,12 +102,12 @@ The rationale and the trade-offs — why the shape, not the shape itself.
 
 - **A new publicly consumable library** —
   `libraries/<Area>/Assimalign.Viu.<Name>/{src,test,docs}`. This root contains both runtime packages
-  and the `netstandard2.0` Syntax parser cluster. The area folder expresses product ownership; the
-  assembly-id folder still owns the inverted `{src,test}` project layout.
+  and the `netstandard2.0` Syntax parser cluster, plus standalone add-ons under `Utilities`. The area
+  folder expresses product ownership; the assembly-id folder still owns the inverted `{src,test}`
+  project layout.
 - **A new compiler or editor project** —
-  `tooling/<Area>/Assimalign.Viu.<Name>/{src,test,docs}`. The parked, non-packable
-  `tooling/Assimalign.Viu.UtilityCss` engine is the sole root-level exception pending a future
-  `libraries/Utilities/` add-on design. Seed `docs/OVERVIEW.md` and `docs/DESIGN.md` with the code,
+  `tooling/<Area>/Assimalign.Viu.<Name>/{src,test,docs}`. Seed `docs/OVERVIEW.md` and
+  `docs/DESIGN.md` with the code,
   wire the csprojs per [`.claude/rules/build-system.md`](../.claude/rules/build-system.md)
   ("Adding a new library"), and add a row to the root `README.md` repository map.
 - **A new sample** — add it to

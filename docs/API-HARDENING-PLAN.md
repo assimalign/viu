@@ -26,9 +26,9 @@ The `netstandard2.0` Syntax cluster is a publicly consumable parser surface unde
 `libraries/Syntax/`, not a runtime app reference; its placement supports the planned extensible
 tooling surface for developers who parse CSS, templates, or single-file components directly. The
 compiler and language-service/server assemblies remain internal build/editor tooling under
-`tooling/Compiler/` and `tooling/Editor/`. The non-packable utility-CSS engine is parked at
-`tooling/Assimalign.Viu.UtilityCss` and is no longer integrated with Viu or included in its release
-train. ServerRenderer, Router, Browser.Router, and Testing remain opt-in packages. PublicAPI
+`tooling/Compiler/` and `tooling/Editor/`. The standalone utility-CSS add-on at
+`libraries/Utilities/Assimalign.Viu.UtilityCss` is independently published but remains outside every
+Viu SDK and framework surface. ServerRenderer, Router, Browser.Router, and Testing remain opt-in packages. PublicAPI
 enforcement applies to every packable public project regardless of which delivery path exposes it.
 
 The runtime dependency direction relevant to this arc is:

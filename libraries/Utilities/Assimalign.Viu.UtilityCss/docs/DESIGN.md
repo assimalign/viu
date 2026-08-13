@@ -1,7 +1,7 @@
 # Viu Utilities engine design
 
 This library is the pure engine boundary defined by
-[`docs/UTILITY-CSS-DESIGN.md`](../../../docs/UTILITY-CSS-DESIGN.md). That document is authoritative;
+[`docs/UTILITY-CSS-DESIGN.md`](../../../../docs/UTILITY-CSS-DESIGN.md). That document is authoritative;
 this file records the local constraints that must remain true as the implementation grows.
 
 ## Boundaries
@@ -173,7 +173,7 @@ input must produce byte-identical output on every platform, not merely equivalen
 
 The tests pin that contract by asserting emitter output against C# raw string literals, which makes
 each literal's line endings part of the expected value. So the test sources themselves must check
-out LF — `.gitattributes` pins `tooling/Assimalign.Viu.UtilityCss/test/**/*.cs` to
+out LF — `.gitattributes` pins `libraries/Utilities/Assimalign.Viu.UtilityCss/test/**/*.cs` to
 `eol=lf` ([V01.01.12.24]); without it a Windows checkout under `core.autocrlf=true` turns the
 expected values into CRLF and the assertions fail against correct LF output. Keep new expected-CSS
 assertions in that directory, and do not relax them to be line-ending agnostic — the canonical LF

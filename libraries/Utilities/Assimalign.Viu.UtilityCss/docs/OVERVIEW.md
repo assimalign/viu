@@ -24,7 +24,7 @@ integration.
 
 The authoritative feature boundary, compatibility matrix, dependency direction, and definition of
 done are in the repository-level
-[`UTILITY-CSS-DESIGN.md`](../../../docs/UTILITY-CSS-DESIGN.md).
+[`UTILITY-CSS-DESIGN.md`](../../../../docs/UTILITY-CSS-DESIGN.md).
 
 `UtilityThemeParser` is the CSS-first entry point for the design-system layer. It accepts CSS plus
 optional source identity, content offset, base theme, and cancellation context, then returns an

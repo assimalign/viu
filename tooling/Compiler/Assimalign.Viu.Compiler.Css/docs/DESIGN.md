@@ -77,10 +77,10 @@ blocks — matching the generator's constant exactly.
 
 ## Delivery boundary
 
-- **Parked utility add-on history ([V01.01.12.13]+).** The former utility engine was a separate
+- **Standalone utility add-on history ([V01.01.12.13]+).** The utility engine was a separate
   producer with its own Browser SDK task, and never entered this component-style core. That SDK
-  integration was removed on 2026-08-13; the non-packable engine remains parked at
-  `tooling/Assimalign.Viu.UtilityCss` pending a redesign under `libraries/Utilities/`. Its historical,
+  integration was removed on 2026-08-13; the engine is independently published from
+  `libraries/Utilities/Assimalign.Viu.UtilityCss` and remains outside the Viu SDK. Its historical,
   non-normative contract remains in
   [`docs/UTILITY-CSS-DESIGN.md`](../../../../docs/UTILITY-CSS-DESIGN.md).
 - **Browser delivery is not part of this compiler.** Static-web-asset registration, labeled endpoint

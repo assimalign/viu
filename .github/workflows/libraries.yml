@@ -1,4 +1,4 @@
-# Build+test lane for the runtime and syntax libraries ([V01.01.12.02.02]). One matrix entry per
+# Build+test lane for publicly consumable libraries ([V01.01.12.02.02]). One matrix entry per
 # project folder under libraries/ — the single list to maintain for this code root — each delegating
 # to the shared .github/actions/build recipe. A per-project job keeps a failure scoped to the project
 # that caused it instead of taking a whole area down, and adding a library is one matrix-row edit.
@@ -78,6 +78,8 @@ jobs:
                       path: "libraries/Syntax/Assimalign.Viu.Syntax.Templates"
                     - project: "Assimalign.Viu.Testing"
                       path: "libraries/DevTools/Assimalign.Viu.Testing"
+                    - project: "Assimalign.Viu.UtilityCss"
+                      path: "libraries/Utilities/Assimalign.Viu.UtilityCss"
         steps:
             - name: "Checkout: ${{ matrix.project }}"
               # actions/checkout v4

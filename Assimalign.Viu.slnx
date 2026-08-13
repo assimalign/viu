@@ -243,20 +243,22 @@
 	<Folder Name="/viu/tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/test/">
 		<Project Path="tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/test/Assimalign.Viu.Compiler.SingleFileComponent.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/tooling/Assimalign.Viu.UtilityCss/" />
-	<Folder Name="/viu/tooling/Assimalign.Viu.UtilityCss/docs/">
-		<File Path="tooling/Assimalign.Viu.UtilityCss/docs/DESIGN.md" />
-		<File Path="tooling/Assimalign.Viu.UtilityCss/docs/OVERVIEW.md" />
-	</Folder>
-	<Folder Name="/viu/tooling/Assimalign.Viu.UtilityCss/src/">
-		<Project Path="tooling/Assimalign.Viu.UtilityCss/src/Assimalign.Viu.UtilityCss.csproj" />
-	</Folder>
-	<Folder Name="/viu/tooling/Assimalign.Viu.UtilityCss/test/">
-		<Project Path="tooling/Assimalign.Viu.UtilityCss/test/Assimalign.Viu.UtilityCss.Tests.csproj" />
-	</Folder>
 	<Folder Name="/viu/libraries/">
 		<File Path="libraries/Directory.Build.props" />
 		<File Path="libraries/Directory.Build.targets" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss/">
+		<File Path="libraries/Utilities/Assimalign.Viu.UtilityCss/Assimalign.Viu.UtilityCss.slnx" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss/docs/">
+		<File Path="libraries/Utilities/Assimalign.Viu.UtilityCss/docs/DESIGN.md" />
+		<File Path="libraries/Utilities/Assimalign.Viu.UtilityCss/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss/src/">
+		<Project Path="libraries/Utilities/Assimalign.Viu.UtilityCss/src/Assimalign.Viu.UtilityCss.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss/test/">
+		<Project Path="libraries/Utilities/Assimalign.Viu.UtilityCss/test/Assimalign.Viu.UtilityCss.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Syntax/Assimalign.Viu.Syntax/">
 		<File Path="libraries/Syntax/Assimalign.Viu.Syntax/Assimalign.Viu.Syntax.slnx" />

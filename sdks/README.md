@@ -170,14 +170,14 @@ Opt out / pin independently:
 the base property and keeps both segments coherent. The Browser auto-include property exists only on
 the Browser SDK path; disabling it does not disable the inherited base framework reference.
 
-## Parked utility add-on
+## Standalone UtilityCss add-on
 
-Viu Utilities was removed from the Viu SDK, build targets, hot-reload path, editor stack,
-packaging, release train, and product CI on 2026-08-13. Its non-packable engine remains parked at
-[`tooling/Assimalign.Viu.UtilityCss`](../tooling/Assimalign.Viu.UtilityCss) while a fresh add-on is
-designed for a possible `libraries/Utilities/` area with its own MSBuild and editor integration.
-Tailwind CSS v4.3.3 is a compatibility target of that parked add-on, not of Viu core. The retained
-[utility-CSS design](../docs/UTILITY-CSS-DESIGN.md) is non-normative design history.
+Viu Utilities was removed from the Viu SDK, build targets, hot-reload path, and editor stack on
+2026-08-13. Its engine is now independently published from
+[`libraries/Utilities/Assimalign.Viu.UtilityCss`](../libraries/Utilities/Assimalign.Viu.UtilityCss),
+but it remains outside every Viu SDK and framework surface. Consumer MSBuild integration arrives
+separately through #346. Tailwind CSS v4.3.3 is a compatibility target of the add-on, not of Viu
+core; the retained [utility-CSS design](../docs/UTILITY-CSS-DESIGN.md) remains non-normative there.
 
 ## Component stylesheet hot reload
 

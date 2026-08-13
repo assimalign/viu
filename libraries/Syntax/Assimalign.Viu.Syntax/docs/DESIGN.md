@@ -15,7 +15,7 @@ to a container language's nodes (the `.viu` file being the canonical container).
 - **Language libraries never reference each other.** The single-file-component library does not know
   the template or CSS parsers exist; the *composition root* (a generator, a build task, a test)
   constructs the aggregate options and registers whatever parsers it needs — including Viu's
-  component-style compiler or developer-supplied parsers for custom blocks. The parked utility
+  component-style compiler or developer-supplied parsers for custom blocks. The standalone utility
   add-on is another possible consumer, not part of the Viu compiler contract.
 - **First matching registration wins**, in registration order, so specific predicates
   (`lang`-qualified) register before general ones. Unmatched nodes are simply not dispatched — a

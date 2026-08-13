@@ -40,16 +40,15 @@ project ships only source and its DLL.
 
 - Publicly consumable package surfaces live at `libraries/<Area>/<AssemblyId>/{src,test}`. Runtime
   libraries occupy `Browser`, `DevTools`, `Router`, `Runtime`, and `ServerRenderer`; the public
-  netstandard2.0 build/editor-time parser libraries occupy `Syntax` so developers can consume the
-  parsing APIs directly.
+  netstandard2.0 build/editor-time parser libraries occupy `Syntax`, and independently published
+  add-ons occupy `Utilities`.
 - Compiler and editor implementation projects live at `tooling/<Area>/<AssemblyId>/{src,test}`, with
   the `Compiler` and `Editor` areas carrying the role. No tooling project is currently independently
   published.
-- The parked, non-packable utility-CSS add-on engine at
-  `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the root-level exception. It remains in the tooling
-  build and test lane pending a redesign under `libraries/Utilities/`. That add-on must own its
-  MSBuild props/targets (and may own a dedicated editor extension); do not wire it back into a Viu SDK
-  or the release inventory as incidental shared build logic.
+- The standalone UtilityCss add-on library lives at
+  `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}` and is independently published. It stays
+  outside every Viu SDK and framework surface; consumer build-time integration arrives separately
+  through [V01.01.12.30] (#346).
 - Ecosystem integrations live under `extensions/{VisualStudio|VisualStudioCode|dotnet}`; the templates
   project is `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives under
   `benchmarks/Assimalign.Viu.Testing.EndToEnd`. SDK task projects use
@@ -137,12 +136,11 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 
 ## Adding a new library
 
-1. Use `libraries/<Area>/Assimalign.Viu.<Name>/{src,test}` for a publicly consumable runtime or parser
-   library. Use `tooling/<Area>/Assimalign.Viu.<Name>/{src,test}` for compiler/build-time or editor
+1. Use `libraries/<Area>/Assimalign.Viu.<Name>/{src,test}` for a publicly consumable runtime, parser,
+   or standalone add-on library. Use `tooling/<Area>/Assimalign.Viu.<Name>/{src,test}` for
+   compiler/build-time or editor
    implementation code. The area location carries the role; do not add a blanket `Tooling.` segment
-   to the assembly id or namespace. The parked `tooling/Assimalign.Viu.UtilityCss` root is an existing
-   exception, not a template for new projects; a redesigned utility add-on belongs under
-   `libraries/Utilities/`.
+   to the assembly id or namespace.
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.

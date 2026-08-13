@@ -17,7 +17,7 @@
 # Template enhancements for `viu` files
 
 **Intellisense**
-1. [`Parked add-on history`] The former UtilityCss color-swatch request is retained for a future add-on redesign; utility completion is no longer a Viu or Visual Studio extension feature. The generic color-value completion transport remains dormant.
+1. [`Standalone add-on history`] The former UtilityCss color-swatch request is retained as add-on design input; utility completion is no longer a Viu or Visual Studio extension feature. The generic color-value completion transport remains dormant.
 2. [`Template Block`] Event handler bindings should have intellisense within the template. Currently nothing shows up ![alt text](../../assets/vs-enhancement-event-handler-intellisense.png)
 3. [`Template Block`] Template compiler is unable to differentiate between element tags and components that are of the same name. For example, having a template component called Button will render a `<button/>` element. ![alt text](../../assets/vs-enhancement-component-element-differentiation.png)
 4. [`Delivered — Template/Style Block`] CSS classes defined in a component's `<style>` blocks are offered in template class-value IntelliSense.

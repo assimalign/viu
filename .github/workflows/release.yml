@@ -44,6 +44,7 @@ jobs:
           - { project: Assimalign.Viu.Syntax.SingleFileComponent, path: libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent }
           - { project: Assimalign.Viu.Syntax.Templates, path: libraries/Syntax/Assimalign.Viu.Syntax.Templates }
           - { project: Assimalign.Viu.Testing, path: libraries/DevTools/Assimalign.Viu.Testing }
+          - { project: Assimalign.Viu.UtilityCss, path: libraries/Utilities/Assimalign.Viu.UtilityCss }
           - { project: Assimalign.Viu.Compiler.Css, path: tooling/Compiler/Assimalign.Viu.Compiler.Css }
           - { project: Assimalign.Viu.Compiler.SingleFileComponent, path: tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent }
           - { project: Assimalign.Viu.LanguageServer, path: tooling/Editor/Assimalign.Viu.LanguageServer }
