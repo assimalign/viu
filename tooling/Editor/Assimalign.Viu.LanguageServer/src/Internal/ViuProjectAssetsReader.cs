@@ -727,9 +727,8 @@ internal static class ViuProjectAssetsReader
 
     private static string? ReadLiteralRootNamespace(string projectFilePath)
     {
-        // The ViuUtilityStylesheetContext precedent: a deliberately non-evaluating project probe
-        // that understands only literal assignments; the last literal wins, matching MSBuild's
-        // document-ordered property evaluation.
+        // This deliberately non-evaluating project probe understands only literal assignments; the
+        // last literal wins, matching MSBuild's document-ordered property evaluation.
         try
         {
             var project = XDocument.Load(projectFilePath, LoadOptions.None);

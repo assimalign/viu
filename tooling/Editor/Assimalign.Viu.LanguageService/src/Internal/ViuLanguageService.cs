@@ -6,17 +6,13 @@ using System.Threading;
 using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Compiler.SingleFileComponent;
-using Assimalign.Viu.UtilityCss;
 
 namespace Assimalign.Viu.LanguageService;
 
 internal sealed class ViuLanguageService :
     ILanguageService,
-    IUtilityCssLanguageService,
     IScriptSemanticLanguageService
 {
-    private static readonly UtilityCssRegistry UtilityRegistry = UtilityCssRegistry.BuiltIn;
-
     private static readonly IReadOnlyDictionary<string, string> HoverDocumentation =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -70,11 +66,6 @@ internal sealed class ViuLanguageService :
     // The artifact-fed semantic engine ([V01.01.12.23], #259) likewise computes outside the
     // service lock under its own gate; the service only snapshots the per-document context here.
     private readonly ScriptSemanticEngine scriptSemantics = new();
-    // Document URIs must compare exactly as they do in the server host's open-document set, or a
-    // client that varies casing (a Windows drive letter, most commonly) reports a document as open
-    // while the workspace fails to find it and every language feature silently returns nothing.
-    private readonly Dictionary<string, UtilityStylesheetLanguageContext> utilityContexts =
-        new(StringComparer.OrdinalIgnoreCase);
     // The host-fed project context per document ([V01.01.12.23], #259), snapshotted by script
     // completion and fed to the semantic engine; a document without one keeps the syntax-only
     // answers unchanged.
@@ -112,55 +103,6 @@ internal sealed class ViuLanguageService :
         }
     }
 
-    public void ConfigureUtilityStylesheet(
-        string documentUri,
-        string? stylesheetText)
-    {
-        ConfigureUtilityStylesheet(
-            documentUri,
-            stylesheetText,
-            documentUri + "#utility-css",
-            UtilityStylesheetReferenceGraph.Empty);
-    }
-
-    public void ConfigureUtilityStylesheet(
-        string documentUri,
-        string? stylesheetText,
-        string stylesheetIdentity,
-        UtilityStylesheetReferenceGraph referenceGraph)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
-        ArgumentException.ThrowIfNullOrWhiteSpace(stylesheetIdentity);
-        ArgumentNullException.ThrowIfNull(referenceGraph);
-
-        lock (synchronization)
-        {
-            // The server host reconfigures the stylesheet on every completion and hover request.
-            // Rebuilding the context re-parses the theme and recompiles the project stylesheet, so
-            // unchanged host inputs must not pay that cost once per keystroke.
-            if (utilityContexts.TryGetValue(documentUri, out var existing) &&
-                existing.Matches(stylesheetText, stylesheetIdentity, referenceGraph))
-            {
-                return;
-            }
-        }
-
-        // The context build (theme parse + project stylesheet compile) runs outside the lock so a
-        // reconfigure cannot stall document synchronization or concurrent reads. Two requests
-        // configuring the same document concurrently may build identical contexts; the store below
-        // is last-wins, and identical inputs produce identical contexts, so the duplicate compute
-        // is wasted CPU rather than incorrectness.
-        var context = UtilityStylesheetLanguageContext.Create(
-            stylesheetText,
-            stylesheetIdentity,
-            referenceGraph);
-
-        lock (synchronization)
-        {
-            utilityContexts[documentUri] = context;
-        }
-    }
-
     public void OpenDocument(string documentUri, string text, int? version)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
@@ -195,7 +137,6 @@ internal sealed class ViuLanguageService :
         scriptSemantics.CloseDocument(documentUri);
         lock (synchronization)
         {
-            utilityContexts.Remove(documentUri);
             projectContexts.Remove(documentUri);
             return documents.Close(documentUri);
         }
@@ -344,7 +285,7 @@ internal sealed class ViuLanguageService :
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (document, stylesheetContext) = CaptureSnapshot(documentUri);
+        var document = CaptureDocumentSnapshot(documentUri);
         if (document is null ||
             !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
         {
@@ -362,22 +303,16 @@ internal sealed class ViuLanguageService :
         }
 
         if (template is not null &&
-            UtilityClassCompletionContext.TryCreate(
+            TemplateClassValueContext.TryCreate(
                 template.Content,
                 template.ContentLocation.Start.Offset,
                 offset,
-                out var utilityContext))
+                out var classValueContext))
         {
-            var utilityCompletions = GetUtilityClassCompletions(
-                document.Text,
-                utilityContext,
-                stylesheetContext,
-                cancellationToken);
             return StyleClassCompletionProvider.Merge(
                 document.Text,
                 document.Syntax,
-                utilityContext,
-                utilityCompletions,
+                classValueContext,
                 cancellationToken);
         }
 
@@ -448,7 +383,7 @@ internal sealed class ViuLanguageService :
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (document, _) = CaptureSnapshot(documentUri);
+        var document = CaptureDocumentSnapshot(documentUri);
         var projectContext = CaptureProjectContext(documentUri);
         if (document is null ||
             projectContext is null ||
@@ -480,34 +415,13 @@ internal sealed class ViuLanguageService :
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Semantic script labels resolve first, from the engine's cached symbols for this
-        // document's most recent semantic completion ([V01.01.12.23], #259) — the same deferred-
-        // documentation contract the utility path below uses. C# identifiers and dash-separated
-        // utility candidates do not overlap in practice, and an unknown or stale label simply
-        // falls through to the utility resolution.
-        var semanticDocumentation = scriptSemantics.ResolveDocumentation(
+        // Semantic script labels resolve from the engine's cached symbols for this document's most
+        // recent semantic completion ([V01.01.12.23], #259). Unknown and stale labels return no
+        // documentation.
+        return scriptSemantics.ResolveDocumentation(
             documentUri,
             completionLabel,
             cancellationToken);
-        if (semanticDocumentation is not null)
-        {
-            return semanticDocumentation;
-        }
-
-        // Resolution needs only the per-document utility context, never the open document:
-        // the label is the complete candidate text, and recomputing against the current
-        // stylesheet context is the same one the hover path uses, so a stylesheet edit between
-        // completion and resolve can never serve stale documentation.
-        var (_, stylesheetContext) = CaptureSnapshot(documentUri);
-        var resolution = UtilityRegistry.Resolve(
-            completionLabel,
-            stylesheetContext.Theme,
-            cancellationToken);
-        var metadata = resolution.Metadata
-            ?? FindProjectRule(
-                stylesheetContext.Compile(completionLabel),
-                completionLabel);
-        return metadata is null ? null : GetUtilityDocumentation(metadata);
     }
 
     public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(
@@ -517,7 +431,7 @@ internal sealed class ViuLanguageService :
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (document, _) = CaptureSnapshot(documentUri);
+        var document = CaptureDocumentSnapshot(documentUri);
         if (document is null)
         {
             return Array.Empty<LanguageDocumentSymbol>();
@@ -546,7 +460,7 @@ internal sealed class ViuLanguageService :
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (document, _) = CaptureSnapshot(documentUri);
+        var document = CaptureDocumentSnapshot(documentUri);
         if (document is null)
         {
             return Array.Empty<LanguageFoldingRange>();
@@ -595,7 +509,7 @@ internal sealed class ViuLanguageService :
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (document, _) = CaptureSnapshot(documentUri);
+        var document = CaptureDocumentSnapshot(documentUri);
         if (document is null ||
             document.Syntax.Format != LanguageDocumentFormat.Vue)
         {
@@ -618,7 +532,7 @@ internal sealed class ViuLanguageService :
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (document, stylesheetContext) = CaptureSnapshot(documentUri);
+        var document = CaptureDocumentSnapshot(documentUri);
         if (document is null ||
             !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
         {
@@ -628,32 +542,16 @@ internal sealed class ViuLanguageService :
         var block = FindBlock(document.Syntax, offset);
         var template = block as SingleFileComponentTemplateBlock;
         if (template is not null &&
-            UtilityClassCompletionContext.TryCreate(
+            TemplateClassValueContext.TryCreate(
                 template.Content,
                 template.ContentLocation.Start.Offset,
                 offset,
-                out var utilityContext))
+                out var classValueContext))
         {
-            // Match completion precedence: a class authored in this component owns its name, while
-            // the utility registry remains the emitted-CSS fallback for undeclared class tokens.
-            var styleHover = StyleClassHoverProvider.GetHover(
+            return StyleClassHoverProvider.GetHover(
                 document,
-                utilityContext,
+                classValueContext,
                 cancellationToken);
-            if (styleHover is not null)
-            {
-                return styleHover;
-            }
-
-            var utilityHover = GetUtilityClassHover(
-                document.Text,
-                utilityContext,
-                stylesheetContext,
-                cancellationToken);
-            if (utilityHover is not null)
-            {
-                return utilityHover;
-            }
         }
 
         var projectContext = CaptureProjectContext(documentUri);
@@ -751,20 +649,17 @@ internal sealed class ViuLanguageService :
     }
 
     /// <summary>
-    /// Captures the immutable per-document state a read computes over. The lock is held only for
-    /// the two dictionary lookups; the compute runs outside it over the immutable
-    /// <see cref="LanguageDocument"/> and <see cref="UtilityStylesheetLanguageContext"/> values, so
-    /// document synchronization is never stalled by a long feature computation.
+    /// Captures the immutable document a read computes over. The lock is held only for the lookup;
+    /// the compute runs outside it, so document synchronization is never stalled by a long feature
+    /// computation.
     /// </summary>
-    private (LanguageDocument? Document, UtilityStylesheetLanguageContext UtilityContext) CaptureSnapshot(
-        string documentUri)
+    private LanguageDocument? CaptureDocumentSnapshot(string documentUri)
     {
         lock (synchronization)
         {
-            var document = documents.TryGet(documentUri, out var openDocument)
+            return documents.TryGet(documentUri, out var openDocument)
                 ? openDocument
                 : null;
-            return (document, GetUtilityContext(documentUri));
         }
     }
 
@@ -928,285 +823,6 @@ internal sealed class ViuLanguageService :
         var prefix = documentText.AsSpan(0, offset);
         return prefix.LastIndexOf("{{".AsSpan()) > prefix.LastIndexOf("}}".AsSpan());
     }
-
-    private static IReadOnlyList<LanguageCompletionItem> GetUtilityClassCompletions(
-        string documentText,
-        UtilityClassCompletionContext context,
-        UtilityStylesheetLanguageContext stylesheetContext,
-        CancellationToken cancellationToken)
-    {
-        var editRange = new LanguageRange(
-            TextCoordinateConverter.GetPosition(documentText, context.TokenStart),
-            TextCoordinateConverter.GetPosition(documentText, context.TokenEnd));
-        var metadataByCandidate =
-            new Dictionary<string, UtilityClassMetadata>(
-                StringComparer.Ordinal);
-        foreach (var metadata in UtilityRegistry.GetCompletions(
-                     context.Prefix,
-                     stylesheetContext.Theme))
-        {
-            metadataByCandidate[metadata.CandidateText] = metadata;
-        }
-
-        // The token is checked between candidate batches: each batch is bounded work, and a
-        // superseded keystroke's request should stop paying for project stylesheet compiles.
-        cancellationToken.ThrowIfCancellationRequested();
-        AddProjectUtilityCompletions(
-            context.Prefix,
-            stylesheetContext,
-            metadataByCandidate);
-        cancellationToken.ThrowIfCancellationRequested();
-        AddProjectVariantCompletions(
-            context.Prefix,
-            stylesheetContext,
-            metadataByCandidate);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var colorResolver = UtilityColorValueResolver.Create(stylesheetContext.Theme);
-        return metadataByCandidate.Values
-            .OrderBy(metadata => metadata.SortOrder)
-            .ThenBy(metadata => metadata.CandidateText, StringComparer.Ordinal)
-            .Take(LanguageCompletionLimits.MaximumItems)
-            .Select(
-                metadata => CreateUtilityCompletion(
-                    metadata,
-                    editRange,
-                    colorResolver))
-            .ToArray();
-    }
-
-    private static void AddProjectUtilityCompletions(
-        string typedPrefix,
-        UtilityStylesheetLanguageContext stylesheetContext,
-        IDictionary<string, UtilityClassMetadata> metadataByCandidate)
-    {
-        SplitCandidatePrefix(
-            typedPrefix,
-            out var variantPrefix,
-            out var baseFragment);
-        var candidates = new List<string>();
-        foreach (var definition in
-                 stylesheetContext.ProjectCompilation.Utilities)
-        {
-            var baseCandidate = definition.IsFunctional
-                ? definition.Name.Substring(
-                    0,
-                    definition.Name.Length - "-*".Length)
-                : definition.Name;
-            if (!baseCandidate.StartsWith(
-                    baseFragment,
-                    StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var candidate = ComposeProjectCandidate(
-                variantPrefix,
-                stylesheetContext.Theme.Prefix,
-                baseCandidate);
-            candidates.Add(candidate);
-        }
-
-        foreach (var metadata in
-                 stylesheetContext.Compile(candidates).Rules)
-        {
-            metadataByCandidate[metadata.CandidateText] = metadata;
-        }
-    }
-
-    private static void AddProjectVariantCompletions(
-        string typedPrefix,
-        UtilityStylesheetLanguageContext stylesheetContext,
-        IDictionary<string, UtilityClassMetadata> metadataByCandidate)
-    {
-        SplitCandidatePrefix(
-            typedPrefix,
-            out var variantPrefix,
-            out var baseFragment);
-        if (variantPrefix.Length == 0 ||
-            !ContainsProjectVariant(
-                variantPrefix,
-                stylesheetContext.ProjectCompilation.Variants))
-        {
-            return;
-        }
-
-        var themePrefix = stylesheetContext.Theme.Prefix;
-        if (!string.IsNullOrEmpty(themePrefix) &&
-            !variantPrefix.StartsWith(
-                themePrefix + ":",
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        var builtInLookupPrefix =
-            string.IsNullOrEmpty(themePrefix)
-                ? baseFragment
-                : themePrefix + ":" + baseFragment;
-        var candidates = new List<string>();
-        foreach (var builtIn in UtilityRegistry.GetCompletions(
-                     builtInLookupPrefix,
-                     stylesheetContext.Theme))
-        {
-            var baseCandidate = builtIn.CandidateText;
-            if (!string.IsNullOrEmpty(themePrefix))
-            {
-                baseCandidate = baseCandidate.Substring(
-                    themePrefix.Length + 1);
-            }
-
-            var candidate = variantPrefix + baseCandidate;
-            candidates.Add(candidate);
-        }
-
-        foreach (var metadata in
-                 stylesheetContext.Compile(candidates).Rules)
-        {
-            metadataByCandidate[metadata.CandidateText] = metadata;
-        }
-    }
-
-    private static LanguageCompletionItem CreateUtilityCompletion(
-        UtilityClassMetadata metadata,
-        LanguageRange editRange,
-        UtilityColorValueResolver colorResolver)
-    {
-        var colorValue = colorResolver.Resolve(metadata);
-        return new LanguageCompletionItem(
-            metadata.CandidateText,
-            colorValue is null
-                ? LanguageCompletionItemKind.Property
-                : LanguageCompletionItemKind.Color,
-            "Viu utility class",
-            // Utility documentation is deferred to ResolveCompletionDocumentation: interpolating
-            // and serializing up to 500 CSS bodies per keystroke dominated the completion payload
-            // while the editor renders documentation for one selected item at a time.
-            Documentation: string.Empty,
-            metadata.CandidateText,
-            IsSnippet: false,
-            SortText: $"{metadata.SortOrder:D5}:{metadata.CandidateText}",
-            EditRange: editRange,
-            FilterText: metadata.CandidateText,
-            ColorValue: colorValue);
-    }
-
-    private static UtilityClassMetadata? FindProjectRule(
-        UtilityProjectStylesheetCompilationResult compilation,
-        string candidate)
-    {
-        foreach (var rule in compilation.Rules)
-        {
-            if (string.Equals(
-                    rule.CandidateText,
-                    candidate,
-                    StringComparison.Ordinal))
-            {
-                return rule;
-            }
-        }
-
-        return null;
-    }
-
-    private static string ComposeProjectCandidate(
-        string variantPrefix,
-        string? themePrefix,
-        string baseCandidate)
-    {
-        if (variantPrefix.Length > 0)
-        {
-            return variantPrefix + baseCandidate;
-        }
-
-        return string.IsNullOrEmpty(themePrefix)
-            ? baseCandidate
-            : themePrefix + ":" + baseCandidate;
-    }
-
-    private static bool ContainsProjectVariant(
-        string variantPrefix,
-        UtilityCollection<UtilityCustomVariantDefinition> definitions)
-    {
-        var segments = variantPrefix.Split(':');
-        foreach (var segment in segments)
-        {
-            foreach (var definition in definitions)
-            {
-                if (string.Equals(
-                        segment,
-                        definition.Name,
-                        StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static void SplitCandidatePrefix(
-        string typedPrefix,
-        out string variantPrefix,
-        out string baseFragment)
-    {
-        var separator = typedPrefix.LastIndexOf(':');
-        if (separator < 0)
-        {
-            variantPrefix = string.Empty;
-            baseFragment = typedPrefix;
-            return;
-        }
-
-        variantPrefix = typedPrefix.Substring(0, separator + 1);
-        baseFragment = typedPrefix.Substring(separator + 1);
-    }
-
-    private static LanguageHover? GetUtilityClassHover(
-        string documentText,
-        UtilityClassCompletionContext context,
-        UtilityStylesheetLanguageContext stylesheetContext,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrEmpty(context.TokenText))
-        {
-            return null;
-        }
-
-        var resolution = UtilityRegistry.Resolve(
-            context.TokenText,
-            stylesheetContext.Theme,
-            cancellationToken);
-        var metadata = resolution.Metadata;
-        if (metadata is null)
-        {
-            metadata = FindProjectRule(
-                stylesheetContext.Compile(context.TokenText),
-                context.TokenText);
-            if (metadata is null)
-            {
-                return null;
-            }
-        }
-
-        return new LanguageHover(
-            GetUtilityDocumentation(metadata),
-            new LanguageRange(
-                TextCoordinateConverter.GetPosition(documentText, context.TokenStart),
-                TextCoordinateConverter.GetPosition(documentText, context.TokenEnd)));
-    }
-
-    private static string GetUtilityDocumentation(UtilityClassMetadata metadata)
-        => LanguageHoverMarkdown.CreateDescribed(
-            $"`{metadata.CandidateText}` — {metadata.Description}",
-            metadata.Css);
-
-    // Reads utilityContexts, so every caller must hold the synchronization lock.
-    private UtilityStylesheetLanguageContext GetUtilityContext(string documentUri)
-        => utilityContexts.TryGetValue(documentUri, out var context)
-            ? context
-            : UtilityStylesheetLanguageContext.Default;
 
     private IReadOnlyList<LanguageCompletionItem> GetScriptCompletions(
         string documentUri,

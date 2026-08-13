@@ -187,7 +187,7 @@ public sealed class HoverPublicationTests
     }
 
     [Fact]
-    public void GetHover_StyleBlockClassCollidingWithUtility_ReturnsAuthoredDeclarationAtTemplateToken()
+    public void GetHover_StyleBlockClass_ReturnsAuthoredDeclarationAtTemplateToken()
     {
         const string templateLine = "  <div class=\"flex\"></div>";
         const string declaration = ".flex { display: block; }";

@@ -572,10 +572,8 @@ internal sealed class LanguageServerHost
             result = await Task.Run(
                     () =>
                     {
-                        // The project-context probe (disk IO included) runs on the request task,
-                        // mirroring the utility-stylesheet configuration the compute methods
-                        // already perform, and its status notification is written below before
-                        // the reply.
+                        // The project-context probe (disk IO included) runs on the request task, and
+                        // its status notification is written below before the reply.
                         if (IsSemanticFeatureRequest(request.Method))
                         {
                             statusNotification = ConfigureProjectContext(
@@ -586,7 +584,6 @@ internal sealed class LanguageServerHost
 
                         return ComputeRequestResult(
                             request,
-                            documentState,
                             requestCancellation.Token);
                     },
                     requestCancellation.Token)
@@ -672,24 +669,20 @@ internal sealed class LanguageServerHost
 
     private JsonNode? ComputeRequestResult(
         LanguageServerPendingRequest request,
-        LanguageServerDocumentPublicationState? documentState,
         CancellationToken cancellationToken)
         => request.Method switch
         {
             "textDocument/completion" => ComputeCompletionResult(
                 request,
-                documentState!,
                 cancellationToken),
             "textDocument/hover" => ComputeHoverResult(
                 request,
-                documentState!,
                 cancellationToken),
             "textDocument/definition" => ComputeDefinitionResult(
                 request,
                 cancellationToken),
             "completionItem/resolve" => ComputeCompletionItemResolveResult(
                 request,
-                documentState!,
                 cancellationToken),
             "textDocument/documentSymbol" => ComputeDocumentSymbolResult(request, cancellationToken),
             "textDocument/foldingRange" => ComputeFoldingRangeResult(request, cancellationToken),
@@ -712,7 +705,6 @@ internal sealed class LanguageServerHost
         if (isSupported)
         {
             openSupportedDocuments.Add(documentUri);
-            ConfigureUtilityStylesheet(documentUri, cancellationToken);
             statusNotification = ConfigureProjectContext(documentUri, cancellationToken);
             languageService.OpenDocument(documentUri, text, version);
         }
@@ -808,15 +800,8 @@ internal sealed class LanguageServerHost
 
     private JsonObject ComputeCompletionResult(
         LanguageServerPendingRequest request,
-        LanguageServerDocumentPublicationState documentState,
         CancellationToken cancellationToken)
     {
-        // The stylesheet configuration (disk probing included) runs on the request task, mirroring
-        // the previous per-request configure-then-compute order without blocking the loop thread.
-        ConfigureUtilityStylesheet(
-            request.DocumentUri,
-            documentState,
-            cancellationToken);
         var completions = languageService.GetCompletions(
             request.DocumentUri,
             request.Position,
@@ -853,12 +838,12 @@ internal sealed class LanguageServerHost
             {
                 // CompletionItem.data is an opaque extension payload retained for a Viu-aware
                 // adapter. The standard Color kind selects stock client presentation; the computed
-                // value remains available without requiring an adapter to parse utility CSS.
+                // value remains available without requiring an adapter to parse CSS.
                 ((JsonObject)item["data"]!)["colorValue"] = completion.ColorValue;
             }
 
-            // Deferred documentation (utility items) is omitted entirely and computed by
-            // completionItem/resolve; inline one-liners keep shipping with the item.
+            // Deferred documentation is omitted entirely and computed by completionItem/resolve;
+            // inline one-liners keep shipping with the item.
             if (!string.IsNullOrEmpty(completion.Documentation))
             {
                 item["documentation"] = LanguageServerMarkupContent.Create(
@@ -883,8 +868,8 @@ internal sealed class LanguageServerHost
             items.Add((JsonNode)item);
         }
 
-        // A truncated utility result must be advertised as incomplete, otherwise the client filters
-        // its cached page instead of re-requesting and the narrower candidate is never offered.
+        // A truncated result must be advertised as incomplete, otherwise the client filters its
+        // cached page instead of re-requesting and the narrower candidate is never offered.
         return CreateCompletionList(
             items,
             completions.Count >= LanguageCompletionLimits.MaximumItems);
@@ -944,13 +929,8 @@ internal sealed class LanguageServerHost
 
     private JsonNode? ComputeHoverResult(
         LanguageServerPendingRequest request,
-        LanguageServerDocumentPublicationState documentState,
         CancellationToken cancellationToken)
     {
-        ConfigureUtilityStylesheet(
-            request.DocumentUri,
-            documentState,
-            cancellationToken);
         var hover = languageService.GetHover(
             request.DocumentUri,
             request.Position,
@@ -971,13 +951,8 @@ internal sealed class LanguageServerHost
 
     private JsonNode ComputeCompletionItemResolveResult(
         LanguageServerPendingRequest request,
-        LanguageServerDocumentPublicationState documentState,
         CancellationToken cancellationToken)
     {
-        ConfigureUtilityStylesheet(
-            request.DocumentUri,
-            documentState,
-            cancellationToken);
         var documentation = languageService.ResolveCompletionDocumentation(
             request.DocumentUri,
             request.CompletionLabel!,
@@ -1421,11 +1396,9 @@ internal sealed class LanguageServerHost
                 },
                 ["completionProvider"] = new JsonObject
                 {
-                    // Utility completion items defer their documentation bodies to
-                    // completionItem/resolve to keep the per-keystroke payload small.
                     ["resolveProvider"] = true,
-                    // The quote characters open the list on `class="` itself. Without them nothing
-                    // appears until the author types a `-`, which reads as a broken feature.
+                    // Quotes open component style-class completion at the start of a class value;
+                    // the hyphen re-triggers it for the common dash-separated class-name shape.
                     ["triggerCharacters"] = new JsonArray(
                         "@",
                         "<",
@@ -1434,8 +1407,6 @@ internal sealed class LanguageServerHost
                         "v",
                         " ",
                         "-",
-                        "[",
-                        "(",
                         "/",
                         "!",
                         "\"",
@@ -1581,68 +1552,6 @@ internal sealed class LanguageServerHost
             {
                 return true;
             }
-        }
-    }
-
-    private void ConfigureUtilityStylesheet(
-        string documentUri,
-        CancellationToken cancellationToken)
-    {
-        if (languageService is IUtilityCssLanguageService utilityCssLanguageService)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var configuration =
-                ViuUtilityStylesheetContext.ReadForDocument(documentUri);
-            cancellationToken.ThrowIfCancellationRequested();
-            ApplyUtilityStylesheetConfiguration(
-                utilityCssLanguageService,
-                documentUri,
-                configuration);
-        }
-    }
-
-    private void ConfigureUtilityStylesheet(
-        string documentUri,
-        LanguageServerDocumentPublicationState documentState,
-        CancellationToken cancellationToken)
-    {
-        if (languageService is not IUtilityCssLanguageService utilityCssLanguageService)
-        {
-            return;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var configuration = ViuUtilityStylesheetContext.ReadForDocument(documentUri);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!documentState.TryApplyFeatureRequest(
-                cancellationToken,
-                () => ApplyUtilityStylesheetConfiguration(
-                    utilityCssLanguageService,
-                    documentUri,
-                    configuration)))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-    }
-
-    private static void ApplyUtilityStylesheetConfiguration(
-        IUtilityCssLanguageService utilityCssLanguageService,
-        string documentUri,
-        ViuUtilityStylesheetConfiguration? configuration)
-    {
-        if (configuration is null)
-        {
-            utilityCssLanguageService.ConfigureUtilityStylesheet(
-                documentUri,
-                null);
-        }
-        else
-        {
-            utilityCssLanguageService.ConfigureUtilityStylesheet(
-                documentUri,
-                configuration.StylesheetText,
-                configuration.StylesheetIdentity,
-                configuration.ReferenceGraph);
         }
     }
 

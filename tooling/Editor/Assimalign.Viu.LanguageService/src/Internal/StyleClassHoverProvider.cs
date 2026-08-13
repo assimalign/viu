@@ -22,7 +22,7 @@ internal static class StyleClassHoverProvider
     /// <returns>The authored declaration hover, or <see langword="null"/> when none is declared.</returns>
     internal static LanguageHover? GetHover(
         LanguageDocument document,
-        UtilityClassCompletionContext context,
+        TemplateClassValueContext context,
         CancellationToken cancellationToken)
     {
         if (context.TokenText.Length == 0)

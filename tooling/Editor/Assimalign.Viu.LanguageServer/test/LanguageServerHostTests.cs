@@ -63,13 +63,7 @@ public class LanguageServerHostTests
             .EnumerateArray()
             .Select(item => item.GetString())
             .ToArray();
-        triggerCharacters.ShouldContain(" ");
-        triggerCharacters.ShouldContain("-");
-        triggerCharacters.ShouldContain("[");
-        triggerCharacters.ShouldContain("(");
-        triggerCharacters.ShouldContain(":");
-        triggerCharacters.ShouldContain("/");
-        triggerCharacters.ShouldContain("!");
+        triggerCharacters.ShouldBe(["@", "<", ":", ".", "v", " ", "-", "/", "!", "\"", "'"]);
 
         var diagnostics = messages[1].RootElement;
         diagnostics.GetProperty("method").GetString().ShouldBe("textDocument/publishDiagnostics");
@@ -102,7 +96,7 @@ public class LanguageServerHostTests
         var inputBytes = Encoding.UTF8.GetBytes(
             Frame(
                 """
-                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Counter.viu","languageId":"viu","version":1,"text":"<template>\n    <div class=\"hover:bg-red\"></div>\n</template>\n"}}}
+                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Counter.viu","languageId":"viu","version":1,"text":"<template>\n    <div class=\"card-sh\"></div>\n</template>\n"}}}
                 """) +
             Frame(
                 """
@@ -126,12 +120,12 @@ public class LanguageServerHostTests
         var item = messages[1].RootElement
             .GetProperty("result")
             .GetProperty("items")[0];
-        item.GetProperty("filterText").GetString().ShouldBe("hover:bg-red");
+        item.GetProperty("filterText").GetString().ShouldBe("card-sh");
         var edit = item.GetProperty("textEdit");
-        edit.GetProperty("newText").GetString().ShouldBe("hover:bg-red-500");
+        edit.GetProperty("newText").GetString().ShouldBe("card-shell");
         edit.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32().ShouldBe(1);
-        edit.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32().ShouldBe(8);
-        edit.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32().ShouldBe(20);
+        edit.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32().ShouldBe(16);
+        edit.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32().ShouldBe(23);
 
         foreach (var message in messages)
         {
@@ -161,7 +155,7 @@ public class LanguageServerHostTests
                 Path.Combine(vueDirectory, "VueApplication.csproj"),
                 "<Project Sdk=\"Microsoft.NET.Sdk\" />");
             var componentPath = Path.Combine(vueDirectory, "Card.vue");
-            const string source = "<template><div class=\"bg-red-500\"></div></template>";
+            const string source = "<template><div class=\"card-shell\"></div></template>";
             File.WriteAllText(componentPath, source);
             var documentUri = new Uri(componentPath).AbsoluteUri;
 
@@ -296,11 +290,11 @@ public class LanguageServerHostTests
                     method = "completionItem/resolve",
                     @params = new
                     {
-                        label = "bg-red-500",
+                        label = "card-shell",
                         data = new
                         {
                             documentUri,
-                            label = "bg-red-500",
+                            label = "card-shell",
                         },
                     },
                 });
@@ -374,7 +368,7 @@ public class LanguageServerHostTests
                 .GetProperty("result")
                 .GetProperty("label")
                 .GetString()
-                .ShouldBe("bg-red-500");
+                .ShouldBe("card-shell");
 
             foreach (var message in messages)
             {
@@ -388,38 +382,30 @@ public class LanguageServerHostTests
     }
 
     [Fact]
-    public async Task RunAsync_ProjectUtilityEntry_FeedsThemeAwareCompletion()
+    public async Task RunAsync_ComponentStyleClass_CompletesWithoutProjectStylesheetContext()
     {
         var directory = Path.Combine(
             Path.GetTempPath(),
-            "viu-language-server-project-theme-tests",
+            "viu-language-server-component-style-tests",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
         {
             File.WriteAllText(
                 Path.Combine(directory, "Application.csproj"),
-                """
-                <Project Sdk="Assimalign.Viu.Sdk.Browser">
-                  <ItemGroup>
-                    <ViuUtilityCss Include="Utilities.css" />
-                  </ItemGroup>
-                </Project>
-                """);
-            File.WriteAllText(
-                Path.Combine(directory, "Utilities.css"),
-                "@theme { --color-brand: #123456; }");
+                "<Project Sdk=\"Assimalign.Viu.Sdk.Browser\" />");
             const string templateLine =
-                "  <div class=\"bg-bra\"></div>";
+                "  <div class=\"brand-\"></div>";
             var source =
-                $"<template>\n{templateLine}\n</template>\n";
+                $"<template>\n{templateLine}\n</template>\n" +
+                "<style>.brand-card { color: #123456; }</style>\n";
             var componentPath = Path.Combine(directory, "Card.vue");
             File.WriteAllText(componentPath, source);
             var documentUri = new Uri(componentPath).AbsoluteUri;
             var character = templateLine.IndexOf(
-                    "bg-bra",
+                    "brand-",
                     StringComparison.Ordinal) +
-                "bg-bra".Length;
+                "brand-".Length;
             var openMessage = JsonSerializer.Serialize(
                 new
                 {
@@ -455,28 +441,9 @@ public class LanguageServerHostTests
                         },
                     },
                 });
-            // The resolve request round-trips exactly the data payload the completion item
-            // carries; the item's data is asserted below to match this payload.
-            var resolveMessage = JsonSerializer.Serialize(
-                new
-                {
-                    jsonrpc = "2.0",
-                    id = "resolve",
-                    method = "completionItem/resolve",
-                    @params = new
-                    {
-                        label = "bg-brand",
-                        data = new
-                        {
-                            documentUri,
-                            label = "bg-brand",
-                        },
-                    },
-                });
             var inputBytes = Encoding.UTF8.GetBytes(
                 Frame(openMessage) +
                 Frame(completionMessage) +
-                Frame(resolveMessage) +
                 Frame(
                     """
                     {"jsonrpc":"2.0","method":"exit"}
@@ -490,18 +457,16 @@ public class LanguageServerHostTests
 
             output.Position = 0;
             var messages = await ReadAllMessagesAsync(output);
-            // Four messages: the unrestored temporary project reports its once-only
+            // Three messages: the unrestored temporary project reports its once-only
             // project-context status ([V01.01.12.23], #259) alongside the diagnostics push and the
-            // two responses.
-            messages.Count.ShouldBe(4);
+            // completion response.
+            messages.Count.ShouldBe(3);
             messages
                 .Count(
                     message =>
                         message.RootElement.TryGetProperty("method", out var method) &&
                         method.GetString() == "window/logMessage")
                 .ShouldBe(1);
-            // Concurrent dispatch ([V01.01.12.23], #259) no longer defines the order between the
-            // completion and resolve responses, so each response is located by its identifier.
             var items = FindResponse(messages, "completion")
                 .GetProperty("result")
                 .GetProperty("items")
@@ -510,18 +475,14 @@ public class LanguageServerHostTests
             var brand = items.Single(
                 item =>
                     item.GetProperty("label").GetString() ==
-                    "bg-brand");
-            brand.TryGetProperty("documentation", out _).ShouldBeFalse();
+                    "brand-card");
+            brand.GetProperty("documentation")
+                .GetProperty("value")
+                .GetString()!
+                .ShouldContain(".brand-card");
             var data = brand.GetProperty("data");
             data.GetProperty("documentUri").GetString().ShouldBe(documentUri);
-            data.GetProperty("label").GetString().ShouldBe("bg-brand");
-
-            var resolved = FindResponse(messages, "resolve").GetProperty("result");
-            var documentation = resolved.GetProperty("documentation")
-                .GetProperty("value")
-                .GetString();
-            documentation.ShouldNotBeNull();
-            documentation!.ShouldContain("var(--color-brand)");
+            data.GetProperty("label").GetString().ShouldBe("brand-card");
 
             foreach (var message in messages)
             {
@@ -587,17 +548,17 @@ public class LanguageServerHostTests
             =>
             [
                 new LanguageCompletionItem(
-                    "hover:bg-red-500",
+                    "card-shell",
                     LanguageCompletionItemKind.Property,
-                    "Viu utility",
-                    "Sets the background color on hover.",
-                    "hover:bg-red-500",
+                    "Component style class",
+                    "Declared in this component's style block.",
+                    "card-shell",
                     IsSnippet: false,
                     SortText: "01",
                     EditRange: new LanguageRange(
-                        new LanguagePosition(1, 8),
-                        new LanguagePosition(1, 20)),
-                    FilterText: "hover:bg-red"),
+                        new LanguagePosition(1, 16),
+                        new LanguagePosition(1, 23)),
+                    FilterText: "card-sh"),
             ];
 
         public LanguageHover? GetHover(

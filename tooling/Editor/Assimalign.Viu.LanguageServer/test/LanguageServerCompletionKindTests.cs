@@ -19,9 +19,9 @@ namespace Assimalign.Viu.LanguageServer.Tests;
 /// already speaks the Language Server Protocol's <c>CompletionItemKind</c> numbering, and the host
 /// serializes that value verbatim. A namespace therefore reaches the editor as <c>Module</c> (9),
 /// the value editors render with the namespace glyph — Visual Studio draws it as <c>{}</c>. A
-/// utility color reaches it as <c>Color</c> (16) with the computed theme value in item data, so the
-/// value remains available to a Viu-aware client without parsing emitted CSS. Stock clients can use
-/// the standard color-category presentation without interpreting the opaque data
+/// generic color completion reaches it as <c>Color</c> (16) with its value in item data. This pins
+/// the dormant transport independently of any current completion producer. Stock clients can use
+/// the standard color-category presentation without interpreting the opaque data.
 /// Snippet insert text crosses unchanged to a client that advertised snippet support: an escaped
 /// dollar sign keeps the authored <c>$event</c> identifier literal while the numbered placeholder
 /// remains active. A client that advertised none receives the placeholder-free rendering instead,
@@ -33,7 +33,7 @@ namespace Assimalign.Viu.LanguageServer.Tests;
 public class LanguageServerCompletionKindTests
 {
     [Fact]
-    public async Task RunAsync_Completions_SerializeKindsColorPayloadAndSnippetEscape()
+    public async Task RunAsync_Completions_SerializeKindsDormantColorPayloadAndSnippetEscape()
     {
         var inputBytes = Encoding.UTF8.GetBytes(
             Frame(
@@ -66,10 +66,10 @@ public class LanguageServerCompletionKindTests
         var items = completion.RootElement.GetProperty("result").GetProperty("items");
         FindItem(items, "System")!.Value.GetProperty("kind").GetInt32().ShouldBe(9);
         FindItem(items, "String")!.Value.GetProperty("kind").GetInt32().ShouldBe(7);
-        var color = FindItem(items, "bg-blue-500")!.Value;
+        var color = FindItem(items, "BrandColor")!.Value;
         color.GetProperty("kind").GetInt32().ShouldBe(16);
         color.GetProperty("data").GetProperty("colorValue").GetString()
-            .ShouldBe("oklch(62.3% 0.214 259.815)");
+            .ShouldBe("#123456");
         // No initialize request ran, so the client advertised nothing and the snippet downgrades:
         // the escape resolves to the literal dollar sign the author wants and the tabstop is dropped.
         var eventLambda = FindItem(items, "$event lambda")!.Value;
@@ -185,14 +185,14 @@ public class LanguageServerCompletionKindTests
                     IsSnippet: false,
                     SortText: "01:String"),
                 new LanguageCompletionItem(
-                    "bg-blue-500",
+                    "BrandColor",
                     LanguageCompletionItemKind.Color,
-                    "Viu utility class",
+                    "CSS color completion",
                     Documentation: string.Empty,
-                    "bg-blue-500",
+                    "BrandColor",
                     IsSnippet: false,
-                    SortText: "02:bg-blue-500",
-                    ColorValue: "oklch(62.3% 0.214 259.815)"),
+                    SortText: "02:BrandColor",
+                    ColorValue: "#123456"),
                 new LanguageCompletionItem(
                     "$event lambda",
                     LanguageCompletionItemKind.Snippet,

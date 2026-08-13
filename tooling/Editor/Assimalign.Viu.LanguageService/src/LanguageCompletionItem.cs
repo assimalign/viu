@@ -10,8 +10,8 @@ namespace Assimalign.Viu.LanguageService;
 /// <param name="SortText">The stable key used to order the item.</param>
 /// <param name="EditRange">
 /// The document range replaced when the item is committed, or <see langword="null"/> to use the editor's
-/// default insertion range. Utility-class completion supplies this range so committing a suggestion
-/// replaces the complete partially typed candidate, including variant and modifier punctuation.
+/// default insertion range. Context-sensitive completion can supply this range so committing a
+/// suggestion replaces the complete partially typed token.
 /// </param>
 /// <param name="FilterText">
 /// The text the editor uses to filter the item, or <see langword="null"/> to filter by

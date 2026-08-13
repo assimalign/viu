@@ -20,6 +20,5 @@
   </PropertyGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.LanguageService" />
-    <ViuProjectReference Include="Assimalign.Viu.UtilityCss" />
   </ItemGroup>
 </Project>

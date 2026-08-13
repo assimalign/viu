@@ -540,8 +540,8 @@ internal static class TemplateCompletionProvider
         => char.IsLetterOrDigit(character) || character is '-' or '_' or '.' or ':' or '@' or '#';
 
     // An attribute value is either an expression the component binds or plain markup text. Only the
-    // directive and binding forms are expressions; a static class="..." is markup, and its utility
-    // candidates were already offered before this provider ran.
+    // directive and binding forms are expressions; a static class="..." is markup, and its
+    // component-style candidates were already offered before this provider ran.
     private static IReadOnlyList<LanguageCompletionItem> GetAttributeValueCompletions(
         LanguageDocument document,
         TemplateTagContext tagContext,

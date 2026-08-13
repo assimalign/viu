@@ -1,6 +1,6 @@
 namespace Assimalign.Viu.LanguageService;
 
-internal sealed record UtilityClassCompletionContext(
+internal sealed record TemplateClassValueContext(
     int TokenStart,
     int TokenEnd,
     string TokenText,
@@ -10,7 +10,7 @@ internal sealed record UtilityClassCompletionContext(
         string templateText,
         int templateStart,
         int documentOffset,
-        out UtilityClassCompletionContext context)
+        out TemplateClassValueContext context)
     {
         context = null!;
         if (templateText is null ||
@@ -30,7 +30,7 @@ internal sealed record UtilityClassCompletionContext(
             return false;
         }
 
-        context = new UtilityClassCompletionContext(
+        context = new TemplateClassValueContext(
             token.TokenStart,
             token.TokenEnd,
             token.TokenText,

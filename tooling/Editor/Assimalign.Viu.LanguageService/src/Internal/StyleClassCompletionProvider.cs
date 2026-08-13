@@ -9,20 +9,18 @@ using Assimalign.Viu.Syntax.Css;
 namespace Assimalign.Viu.LanguageService;
 
 /// <summary>
-/// Extracts authored class selectors from the component's style blocks and merges them with the
-/// shared utility registry's bounded completion result. [V01.01.12.07.13]
+/// Extracts authored class selectors from the component's style blocks. [V01.01.12.07.13]
 /// </summary>
 internal static class StyleClassCompletionProvider
 {
     /// <summary>
-    /// Adds matching component-local selectors before utility candidates, preserving first-wins
-    /// label deduplication and the language-service completion limit.
+    /// Returns matching component-local selectors with first-wins label deduplication and the
+    /// language-service completion limit.
     /// </summary>
     internal static IReadOnlyList<LanguageCompletionItem> Merge(
         string documentText,
         LanguageDocumentSyntax syntax,
-        UtilityClassCompletionContext context,
-        IReadOnlyList<LanguageCompletionItem> utilityCompletions,
+        TemplateClassValueContext context,
         CancellationToken cancellationToken)
     {
         var editRange = new LanguageRange(
@@ -52,20 +50,6 @@ internal static class StyleClassCompletionProvider
             if (completions.Count == LanguageCompletionLimits.MaximumItems)
             {
                 return completions;
-            }
-        }
-
-        foreach (var utility in utilityCompletions)
-        {
-            if (!seenLabels.Add(utility.Label))
-            {
-                continue;
-            }
-
-            completions.Add(utility);
-            if (completions.Count == LanguageCompletionLimits.MaximumItems)
-            {
-                break;
             }
         }
 

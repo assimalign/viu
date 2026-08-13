@@ -5,8 +5,7 @@ namespace Assimalign.Viu.LanguageService;
 /// script features ([V01.01.12.23], #259).
 /// </summary>
 /// <remarks>
-/// The <see cref="IUtilityCssLanguageService"/> precedent: the host owns every file-system probe,
-/// resolves the project's restore artifacts into an editor-neutral
+/// The host owns every file-system probe, resolves the project's restore artifacts into an editor-neutral
 /// <see cref="LanguageProjectContext"/>, and feeds it here; the service caches the context per
 /// document and serves features from the cache. A host that resolves nothing (a loose file, a
 /// project that has never been restored) passes <see langword="null"/> and the service falls back

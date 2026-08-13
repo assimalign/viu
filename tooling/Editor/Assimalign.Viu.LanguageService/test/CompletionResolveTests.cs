@@ -8,73 +8,65 @@ using Xunit;
 namespace Assimalign.Viu.LanguageService.Tests;
 
 /// <summary>
-/// Pins the deferred completion-documentation contract: utility completion items ship without
-/// documentation bodies, and <see cref="ILanguageService.ResolveCompletionDocumentation"/>
-/// recomputes the body on demand through the same path hover uses.
+/// Pins the deferred completion-documentation contract for semantic script symbols.
 /// </summary>
 public class CompletionResolveTests
 {
-    private const string DocumentUri = "file:///workspace/Counter.viu";
+    private const string DocumentUri = ScriptSemanticFixture.DocumentUri;
+
+    private const string Source =
+        "@script {\n" +
+        "/// <summary>Counts clicks.</summary>\n" +
+        "public int Count { get; set; }\n" +
+        "    \n" +
+        "}\n";
 
     [Fact]
-    public void GetCompletions_UtilityCandidate_DefersDocumentationToResolve()
+    public void GetCompletions_SemanticSymbol_DefersDocumentationToResolve()
     {
-        const string templateLine = "    <div class=\"gap-\"></div>";
-        var source = $"<template>\n{templateLine}\n</template>\n";
-        var candidateEnd =
-            templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
-        var service = LanguageServices.Create();
-        service.OpenDocument(DocumentUri, source, 1);
+        var service = CreateService();
 
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(1, candidateEnd));
+        var count = service.GetCompletions(DocumentUri, CompletionPosition())
+            .Single(item => item.Label == "Count");
 
-        var gap = completions.Single(item => item.Label == "gap-4");
-        gap.Documentation.ShouldBeEmpty();
+        count.Documentation.ShouldBeEmpty();
     }
 
     [Fact]
-    public void ResolveCompletionDocumentation_BuiltInUtilityCandidate_ReturnsCssBlockDocumentation()
+    public void ResolveCompletionDocumentation_SemanticSymbol_ReturnsSymbolDocumentation()
     {
-        var service = LanguageServices.Create();
+        var service = CreateService();
+        service.GetCompletions(DocumentUri, CompletionPosition());
 
-        var documentation = service.ResolveCompletionDocumentation(DocumentUri, "gap-4");
+        var documentation = service.ResolveCompletionDocumentation(DocumentUri, "Count");
 
         documentation.ShouldNotBeNull();
-        documentation.ShouldContain("gap: calc(var(--spacing) * 4);");
-    }
-
-    [Fact]
-    public void ResolveCompletionDocumentation_ProjectUtilityCandidate_UsesConfiguredStylesheet()
-    {
-        var service = LanguageServices.Create();
-        service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
-            .ConfigureUtilityStylesheet(
-                DocumentUri,
-                """
-                @utility brand-surface {
-                  background-color: rebeccapurple;
-                }
-                """);
-
-        var documentation = service.ResolveCompletionDocumentation(
-            DocumentUri,
-            "brand-surface");
-
-        documentation.ShouldNotBeNull();
-        documentation.ShouldContain("background-color: rebeccapurple;");
+        documentation.ShouldContain("int Count { get; set; }");
+        documentation.ShouldContain("Counts clicks.");
     }
 
     [Fact]
     public void ResolveCompletionDocumentation_UnknownLabel_ReturnsNull()
     {
-        var service = LanguageServices.Create();
+        var service = CreateService();
+        service.GetCompletions(DocumentUri, CompletionPosition());
 
-        // Catalog labels resolve nothing (their one-line documentation ships inline), and garbage
-        // resolves nothing.
-        service.ResolveCompletionDocumentation(DocumentUri, "@template").ShouldBeNull();
-        service.ResolveCompletionDocumentation(DocumentUri, "not-a-real-utility-candidate")
-            .ShouldBeNull();
+        service.ResolveCompletionDocumentation(DocumentUri, "UnknownSymbol").ShouldBeNull();
+    }
+
+    private static ILanguageService CreateService()
+    {
+        var service = LanguageServices.Create();
+        service.ShouldBeAssignableTo<IScriptSemanticLanguageService>()
+            .ConfigureProjectContext(DocumentUri, ScriptSemanticFixture.CreateContext());
+        service.OpenDocument(DocumentUri, Source, 1);
+        return service;
+    }
+
+    private static LanguagePosition CompletionPosition()
+    {
+        var marker = "set; }\n    ";
+        var offset = Source.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
+        return TextCoordinateConverter.GetPosition(Source, offset);
     }
 }

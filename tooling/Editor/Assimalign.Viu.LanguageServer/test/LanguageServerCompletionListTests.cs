@@ -15,9 +15,9 @@ using Assimalign.Viu.LanguageService;
 namespace Assimalign.Viu.LanguageServer.Tests;
 
 /// <summary>
-/// Pins the completion-list completeness flag. A truncated utility result reported as complete makes
-/// the client filter its cached page instead of re-requesting, so the narrower candidate the author
-/// is typing toward is never offered.
+/// Pins the completion-list completeness flag. A truncated result reported as complete makes the
+/// client filter its cached page instead of re-requesting, so a narrower candidate the author is
+/// typing toward is never offered.
 /// </summary>
 public class LanguageServerCompletionListTests
 {
@@ -116,11 +116,11 @@ public class LanguageServerCompletionListTests
             for (var index = 0; index < itemCount; index++)
             {
                 items[index] = new LanguageCompletionItem(
-                    $"gap-{index}",
+                    $"item-{index}",
                     LanguageCompletionItemKind.Property,
-                    "Viu utility class",
+                    "Synthetic completion",
                     "documentation",
-                    $"gap-{index}",
+                    $"item-{index}",
                     IsSnippet: false,
                     SortText: $"{index:D5}");
             }

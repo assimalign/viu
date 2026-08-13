@@ -8,8 +8,8 @@ using Xunit;
 namespace Assimalign.Viu.LanguageService.Tests;
 
 /// <summary>
-/// Pins the completion context model for template markup. Utility completion activates only in static
-/// class attributes and literal class-binding strings (docs/UTILITY-CSS-DESIGN.md section 10).
+/// Pins the completion context model for template markup. Component style-class completion activates
+/// only in static class attributes and literal class-binding strings.
 /// [V01.01.12.07.12] adds deliberately bounded C# completion for handler values and interpolations;
 /// every other expression value stays suppressed so markup names cannot leak into it.
 /// </summary>
@@ -105,22 +105,24 @@ public class TemplateExpressionContextTests
             .ShouldBeEmpty();
 
     [Fact]
-    public void GetCompletions_StaticClassAttribute_StillOffersUtilityCandidates()
+    public void GetCompletions_StaticClassValueWithoutStyleClasses_ReturnsNoAttributeNames()
     {
-        // The gate must sit after the utility branch, or every working case regresses.
-        var completions = CompleteAfter("    <div class=\"gap-\"></div>", "gap-");
+        var completions = CompleteAfter("    <div class=\"missing\"></div>", "miss");
 
-        completions.ShouldContain(item => item.Label == "gap-4");
+        // The class-value branch must pre-empt TemplateCompletionProvider even when there are no
+        // component style classes to return; the correct answer is empty, never attribute names.
+        completions.ShouldBeEmpty();
     }
 
     [Fact]
-    public void GetCompletions_BoundClassQuotedLiteral_StillOffersUtilityCandidates()
+    public void GetCompletions_BoundClassQuotedLiteral_OffersComponentStyleClass()
     {
-        var completions = CompleteAfter(
-            "    <div :class=\"['bg-blue-', Extra]\"></div>",
-            "'bg-blue-");
+        var completions = CompleteAfterWithStyle(
+            "    <div :class=\"['card-', Extra]\"></div>",
+            "'card-",
+            ".card-shell { display: block; }");
 
-        completions.ShouldContain(item => item.Label == "bg-blue-500");
+        completions.ShouldContain(item => item.Label == "card-shell");
     }
 
     [Fact]
@@ -159,6 +161,22 @@ public class TemplateExpressionContextTests
         var source =
             $"<template>\n{templateLine}\n</template>\n" +
             $"@script {{\n{scriptBody}\n}}\n";
+        var caret = templateLine.IndexOf(typedPrefix, StringComparison.Ordinal) + typedPrefix.Length;
+        caret.ShouldBeGreaterThan(typedPrefix.Length - 1, "the probe text must occur in the line");
+
+        var service = LanguageServices.Create();
+        service.OpenDocument(DocumentUri, source, 1);
+        return service.GetCompletions(DocumentUri, new LanguagePosition(1, caret));
+    }
+
+    private static System.Collections.Generic.IReadOnlyList<LanguageCompletionItem> CompleteAfterWithStyle(
+        string templateLine,
+        string typedPrefix,
+        string styleBody)
+    {
+        var source =
+            $"<template>\n{templateLine}\n</template>\n" +
+            $"<style>\n{styleBody}\n</style>\n";
         var caret = templateLine.IndexOf(typedPrefix, StringComparison.Ordinal) + typedPrefix.Length;
         caret.ShouldBeGreaterThan(typedPrefix.Length - 1, "the probe text must occur in the line");
 

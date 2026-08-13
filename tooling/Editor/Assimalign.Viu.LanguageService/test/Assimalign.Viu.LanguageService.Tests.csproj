@@ -11,7 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.LanguageService" />
-    <ViuProjectReference Include="Assimalign.Viu.UtilityCss" />
     <!-- The semantic engine tests ([V01.01.12.23], #259) bind the generated component
          bridge's Context property against the real runtime contract assembly: the fixture project
          context references the test runtime's own copy by path. Core and Reactivity join it because a

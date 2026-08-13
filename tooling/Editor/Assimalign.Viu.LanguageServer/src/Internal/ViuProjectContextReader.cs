@@ -11,8 +11,8 @@ namespace Assimalign.Viu.LanguageServer;
 /// Orchestrates project-context resolution for one document ([V01.01.12.23], #259):
 /// <see cref="ViuDocumentSupport.TryFindOwningViuProject"/> finds the owner,
 /// <see cref="ViuProjectAssetsReader"/> resolves the restore artifacts, and the source cone is
-/// read into an editor-neutral <see cref="LanguageProjectContext"/>. All file IO stays in the host
-/// (the <see cref="ViuUtilityStylesheetContext"/> precedent). Source text is cached per project
+/// read into an editor-neutral <see cref="LanguageProjectContext"/>. All file IO stays in the host.
+/// Source text is cached per project
 /// and re-validated by the assets reader's cheap-stat <see cref="ViuProjectAssets.CacheStamp"/> on
 /// every call, which also implements recovery on the next request without a file watcher.
 /// </summary>

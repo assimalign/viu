@@ -5,8 +5,6 @@ using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu.UtilityCss;
-
 namespace Assimalign.Viu.LanguageService.Tests;
 
 public class LanguageServiceTests
@@ -213,269 +211,25 @@ public class LanguageServiceTests
     }
 
     [Fact]
-    public void GetCompletions_StaticClassCandidate_UsesSharedUtilityRegistryAndExactEditRange()
+    public void GetCompletions_VueTemplateClass_UsesTagBasedDescriptorAndComponentStyle()
     {
-        const string templateLine = "    <div class=\"flex gap-\"></div>";
-        var source = $"<template>\n{templateLine}\n</template>\n";
-        var candidateStart = templateLine.IndexOf("gap-", StringComparison.Ordinal);
-        var service = LanguageServices.Create();
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(1, candidateStart + "gap-".Length));
-
-        var gap = completions.Single(item => item.Label == "gap-4");
-        gap.Detail.ShouldBe("Viu utility class");
-        gap.Documentation.ShouldBeEmpty();
-        service.ResolveCompletionDocumentation(DocumentUri, "gap-4")
-            .ShouldNotBeNull()
-            .ShouldContain("gap: calc(var(--spacing) * 4);");
-        gap.EditRange.ShouldBe(
-            new LanguageRange(
-                new LanguagePosition(1, candidateStart),
-                new LanguagePosition(1, candidateStart + "gap-".Length)));
-        gap.FilterText.ShouldBe("gap-4");
-    }
-
-    [Fact]
-    public void GetCompletions_ProjectTheme_OffersCustomTokenFromCompilerRegistry()
-    {
-        const string templateLine =
-            "    <section class=\"p-car\"></section>";
-        var source = $"<template>\n{templateLine}\n</template>\n";
-        var candidateStart = templateLine.IndexOf(
-            "p-car",
-            StringComparison.Ordinal);
-        var service = LanguageServices.Create();
-        var utilityCssLanguageService =
-            service.ShouldBeAssignableTo<IUtilityCssLanguageService>();
-        utilityCssLanguageService.ConfigureUtilityStylesheet(
-            DocumentUri,
-            "@theme { --spacing-card: 2.75rem; }");
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(
-                1,
-                candidateStart + "p-car".Length));
-
-        var customSpacing = completions.Single(
-            item => item.Label == "p-card");
-        customSpacing.Documentation.ShouldBeEmpty();
-        service.ResolveCompletionDocumentation(DocumentUri, "p-card")
-            .ShouldNotBeNull()
-            .ShouldContain("padding: var(--spacing-card);");
-    }
-
-    [Fact]
-    public void GetHover_ImportPrefixAndInlineTheme_UsesSharedCssFirstConfiguration()
-    {
-        const string candidate = "vu:bg-blue-500";
+        const string templateLine = "  <div class=\"card-\"></div>";
         var source =
-            $"<template>\n    <div class=\"{candidate}\"></div>\n</template>\n";
-        var service = LanguageServices.Create();
-        service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
-            .ConfigureUtilityStylesheet(
-                DocumentUri,
-                "@import \"viu-utilities\" prefix(vu) theme(inline) important;");
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var hover = service.GetHover(
-            DocumentUri,
-            new LanguagePosition(
-                1,
-                "    <div class=\"".Length + 4));
-
-        hover.ShouldNotBeNull();
-        hover.Markdown.ShouldContain("background-color:");
-        hover.Markdown.ShouldNotContain("var(--vu-color-blue-500)");
-        hover.Markdown.ShouldContain("!important");
-    }
-
-    [Fact]
-    public void GetCompletions_ProjectUtility_UsesExecutableCustomDefinition()
-    {
-        const string candidatePrefix = "brand-";
-        var source =
-            $"<template>\n    <div class=\"{candidatePrefix}\"></div>\n</template>\n";
-        var service = LanguageServices.Create();
-        service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
-            .ConfigureUtilityStylesheet(
-                DocumentUri,
-                """
-                @utility brand-surface {
-                  background-color: rebeccapurple;
-                }
-                """);
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(
-                1,
-                "    <div class=\"".Length + candidatePrefix.Length));
-
-        var custom = completions.Single(
-            item => item.Label == "brand-surface");
-        custom.Documentation.ShouldBeEmpty();
-        service.ResolveCompletionDocumentation(DocumentUri, "brand-surface")
-            .ShouldNotBeNull()
-            .ShouldContain("background-color: rebeccapurple;");
-    }
-
-    [Fact]
-    public void GetCompletions_ProjectVariant_CombinesWithBuiltInUtility()
-    {
-        const string candidatePrefix = "theme-midnight:bg-blue-";
-        var source =
-            $"<template>\n    <div class=\"{candidatePrefix}\"></div>\n</template>\n";
-        var service = LanguageServices.Create();
-        service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
-            .ConfigureUtilityStylesheet(
-                DocumentUri,
-                """
-                @custom-variant theme-midnight (&:where([data-theme="midnight"] *));
-                """);
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(
-                1,
-                "    <div class=\"".Length + candidatePrefix.Length));
-
-        var customVariant = completions.Single(
-            item => item.Label == "theme-midnight:bg-blue-500");
-        customVariant.Documentation.ShouldBeEmpty();
-        var documentation = service.ResolveCompletionDocumentation(
-                DocumentUri,
-                "theme-midnight:bg-blue-500")
-            .ShouldNotBeNull();
-        documentation.ShouldContain(
-            "&:where([data-theme=\"midnight\"] *)");
-        documentation.ShouldContain(
-            "background-color: var(--color-blue-500);");
-    }
-
-    [Fact]
-    public void GetCompletions_ReferencedProjectUtility_UsesResolvedEditorGraph()
-    {
-        const string candidatePrefix = "shared-";
-        var source =
-            $"<template>\n    <div class=\"{candidatePrefix}\"></div>\n</template>\n";
-        var graph = new UtilityStylesheetReferenceGraph(
-            new[]
-            {
-                new UtilityStylesheetReference(
-                    "application.css",
-                    "./shared.css",
-                    "shared.css",
-                    """
-                    @utility shared-card {
-                      border-color: rebeccapurple;
-                    }
-                    """),
-            });
-        var service = LanguageServices.Create();
-        service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
-            .ConfigureUtilityStylesheet(
-                DocumentUri,
-                "@reference \"./shared.css\";",
-                "application.css",
-                graph);
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(
-                1,
-                "    <div class=\"".Length + candidatePrefix.Length));
-
-        completions.Single(
-                item => item.Label == "shared-card")
-            .Documentation.ShouldBeEmpty();
-        service.ResolveCompletionDocumentation(DocumentUri, "shared-card")
-            .ShouldNotBeNull()
-            .ShouldContain("border-color: rebeccapurple;");
-    }
-
-    [Fact]
-    public void GetCompletions_BoundClassLiteral_OffersUtilityWithoutEvaluatingExpression()
-    {
-        const string templateLine =
-            "    <div :class=\"['bg-blue-', active ? 'flex' : 'hidden']\"></div>";
-        var source = $"<template>\n{templateLine}\n</template>\n";
-        var candidateStart = templateLine.IndexOf("bg-blue-", StringComparison.Ordinal);
-        var service = LanguageServices.Create();
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(1, candidateStart + "bg-blue-".Length));
-
-        completions.ShouldContain(item => item.Label == "bg-blue-500");
-        completions.ShouldNotContain(item => item.Label == "@script");
-    }
-
-    [Fact]
-    public void GetHover_UtilityClass_ReturnsCompilerCssFromSharedRegistry()
-    {
-        const string candidate = "hover:bg-blue-500";
-        var templateLine = $"    <button class=\"{candidate}\"></button>";
-        var source = $"<template>\n{templateLine}\n</template>\n";
-        var candidateStart = templateLine.IndexOf(candidate, StringComparison.Ordinal);
-        var service = LanguageServices.Create();
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var hover = service.GetHover(
-            DocumentUri,
-            new LanguagePosition(1, candidateStart + 8));
-
-        hover.ShouldNotBeNull();
-        hover!.Markdown.ShouldContain("@media (hover: hover)");
-        hover.Markdown.ShouldContain("background-color:");
-        hover.Range.ShouldBe(
-            new LanguageRange(
-                new LanguagePosition(1, candidateStart),
-                new LanguagePosition(1, candidateStart + candidate.Length)));
-    }
-
-    [Fact]
-    public void GetCompletions_TemplateTextOutsideClass_DoesNotOfferUtilityClasses()
-    {
-        const string templateLine = "    <p>gap-</p>";
-        var source = $"<template>\n{templateLine}\n</template>\n";
-        var candidateEnd = templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
-        var service = LanguageServices.Create();
-        service.OpenDocument(DocumentUri, source, 1);
-
-        var completions = service.GetCompletions(
-            DocumentUri,
-            new LanguagePosition(1, candidateEnd));
-
-        completions.ShouldNotContain(item => item.Label == "gap-4");
-    }
-
-    [Fact]
-    public void GetCompletions_VueTemplateClass_UsesTagBasedDescriptorAndUtilityRegistry()
-    {
-        const string templateLine = "  <div class=\"flex gap-\"></div>";
-        var source = $"<template>\n{templateLine}\n</template>\n";
-        var candidateStart = templateLine.IndexOf("gap-", StringComparison.Ordinal);
+            $"<template>\n{templateLine}\n</template>\n" +
+            "<style>.card-shell { display: block; }</style>\n";
+        var candidateStart = templateLine.IndexOf("card-", StringComparison.Ordinal);
         var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var completions = service.GetCompletions(
             VueDocumentUri,
-            new LanguagePosition(1, candidateStart + "gap-".Length));
+            new LanguagePosition(1, candidateStart + "card-".Length));
 
-        var gap = completions.Single(item => item.Label == "gap-4");
-        gap.EditRange.ShouldBe(
+        var componentClass = completions.Single(item => item.Label == "card-shell");
+        componentClass.EditRange.ShouldBe(
             new LanguageRange(
                 new LanguagePosition(1, candidateStart),
-                new LanguagePosition(1, candidateStart + "gap-".Length)));
+                new LanguagePosition(1, candidateStart + "card-".Length)));
     }
 
     [Fact]
