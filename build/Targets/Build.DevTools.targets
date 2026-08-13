@@ -23,7 +23,7 @@
     </ItemGroup>
     <PropertyGroup>
       <_ViuDevToolsWebAssetRoot Condition="Exists('$(MSBuildThisFileDirectory)../assets/Assimalign.Viu.DevTools/viu-devtools.js')">$(MSBuildThisFileDirectory)../assets/Assimalign.Viu.DevTools/</_ViuDevToolsWebAssetRoot>
-      <_ViuDevToolsWebAssetRoot Condition="'$(_ViuDevToolsWebAssetRoot)' == '' and '@(_ViuDevToolsProjectReference)' != '' and Exists('$(MSBuildThisFileDirectory)../../libraries/Assimalign.Viu.DevTools/src/wwwroot/viu-devtools.js')">$(MSBuildThisFileDirectory)../../libraries/Assimalign.Viu.DevTools/src/wwwroot/</_ViuDevToolsWebAssetRoot>
+      <_ViuDevToolsWebAssetRoot Condition="'$(_ViuDevToolsWebAssetRoot)' == '' and '@(_ViuDevToolsProjectReference)' != '' and Exists('$(MSBuildThisFileDirectory)../../libraries/DevTools/Assimalign.Viu.DevTools/src/wwwroot/viu-devtools.js')">$(MSBuildThisFileDirectory)../../libraries/DevTools/Assimalign.Viu.DevTools/src/wwwroot/</_ViuDevToolsWebAssetRoot>
     </PropertyGroup>
     <ItemGroup Condition="'$(_ViuDevToolsWebAssetRoot)' != ''">
       <_ViuDevToolsWebAsset Include="$(_ViuDevToolsWebAssetRoot)viu-devtools.js" />

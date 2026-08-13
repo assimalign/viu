@@ -2,7 +2,7 @@
   <!--
     Static-web-asset CSS bundling for canonical .viu and compatible .vue single-file components
     ([V01.01.12.12]/[V01.01.06.09]) — the MSBuild half that completes the RS1035 deferral recorded in
-    tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source generator emits C#, not content files;
+    libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source generator emits C#, not content files;
     this task does the I/O a generator cannot).
 
     Imported LATE (via build/Build.targets -> Directory.Build.targets), after the consuming csproj has set
@@ -121,15 +121,15 @@
        edge the ViuProjectReference transform cannot express — a netstandard2.0 task referenced with
        ReferenceOutputAssembly=false and UndefineProperties to cross the app's TFM/RID boundary, mirroring
        frameworks/Assimalign.Viu.App.Refs. -->
-  <ItemGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj')">
-    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj"
+  <ItemGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\src\Assimalign.Viu.Sdk.Tasks.csproj')">
+    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\src\Assimalign.Viu.Sdk.Tasks.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false"
                       PrivateAssets="all"
                       UndefineProperties="TargetFramework;RuntimeIdentifier" />
   </ItemGroup>
-  <ItemGroup Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj')">
-    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj"
+  <ItemGroup Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\src\Assimalign.Viu.Sdk.Browser.Tasks.csproj')">
+    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\src\Assimalign.Viu.Sdk.Browser.Tasks.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false"
                       PrivateAssets="all"

@@ -1,24 +1,19 @@
 # The one build recipe every generic Viu pipeline runs ([V01.01.12.02.02]): restore, build with
 # warnings as errors, and test. The workflows under .github/workflows stay thin (a path filter, a
-# matrix of project folder names, and a call to this action), so the build logic exists once
-# instead of once per area, and adding a project is a one-line matrix edit.
+# matrix of explicit project-folder paths, and a call to this action), so the build logic exists once
+# instead of once per area, and adding a project is one matrix-row edit.
 #
 # The repository checkout stays in the calling workflow: a local composite action cannot run before
 # the repository that contains it is checked out.
 name: Viu Build
 description: >-
-  Restores, builds (warnings as errors), and tests one Viu project from a code root.
+  Restores, builds (warnings as errors), and tests one Viu project folder.
 
 inputs:
-  area:
+  project-path:
     description: >-
-      The repository code root that holds the project set, such as 'libraries', 'tooling', or
-      'analyzers'. Each root uses the inverted <root>/<folder>/{src,test} layout.
-    required: true
-  project:
-    description: >-
-      The project folder under the code root. It is usually also the assembly id, but never assumed
-      to be: the shipping project and its tests are discovered inside the folder.
+      Repository-relative path to the project folder that owns src/ and test/. The explicit path
+      supports both direct code-root children and projects nested beneath an area folder.
     required: true
   repository-path:
     description: >-
@@ -46,16 +41,15 @@ runs:
         repository-path: ${{ inputs.repository-path }}
         install-wasm-tools: ${{ inputs.install-wasm-tools }}
 
-    - name: Resolve ${{ inputs.project }}
+    - name: Resolve ${{ inputs.project-path }}
       shell: pwsh
       env:
         VIU_REPOSITORY_PATH: ${{ inputs.repository-path }}
-        VIU_AREA: ${{ inputs.area }}
-        VIU_PROJECT: ${{ inputs.project }}
+        VIU_PROJECT_PATH: ${{ inputs.project-path }}
       run: |
-        $projectDirectory = Join-Path $env:VIU_REPOSITORY_PATH (Join-Path $env:VIU_AREA $env:VIU_PROJECT)
+        $projectDirectory = Join-Path $env:VIU_REPOSITORY_PATH $env:VIU_PROJECT_PATH
         if (-not (Test-Path -LiteralPath $projectDirectory -PathType Container)) {
-          throw "No project folder at $projectDirectory. A matrix entry that no longer exists is the failure mode the per-area workflows died of (MSB1009 on a renamed folder), so it fails loudly here."
+          throw "No project folder at $projectDirectory. A stale matrix path fails loudly here instead of surfacing later as MSB1009."
         }
 
         # The shipping project is DISCOVERED, never composed from the matrix entry. Folder name and
@@ -103,7 +97,7 @@ runs:
         Write-Host "Shipping project: $($sourceProject[0].FullName)"
         Write-Host "Test projects: $($testProject.Count) ($($runnableTestProject.Count) runnable)"
 
-    - name: Build ${{ inputs.project }} (warnings are errors)
+    - name: Build ${{ inputs.project-path }} (warnings are errors)
       shell: pwsh
       run: |
         $projects = @($env:VIU_SOURCE_PROJECT) +
@@ -115,7 +109,7 @@ runs:
           }
         }
 
-    - name: Test ${{ inputs.project }}
+    - name: Test ${{ inputs.project-path }}
       shell: pwsh
       run: |
         $projects = @($env:VIU_RUNNABLE_TEST_PROJECTS -split ';' | Where-Object { $_ })

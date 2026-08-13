@@ -43,7 +43,7 @@ $repositoryDirectory = [System.IO.Path]::GetFullPath(
 # The language-server project is named once, here, only so the shared target can be invoked on a
 # project that imports it. Every publish argument still comes from the target.
 $languageServerProject = Join-Path $repositoryDirectory `
-    'tooling\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj'
+    'tooling\Editor\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj'
 
 $publishRoot = Join-Path $repositoryDirectory `
     "_out\extensions\VisualStudioCode\$Configuration"

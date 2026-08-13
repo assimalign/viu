@@ -164,7 +164,7 @@ $browserReferenceProject = Join-Path $repositoryDirectory `
 Invoke-PackageBuild -Project $browserReferenceProject
 
 $sdkProject = Join-Path $repositoryDirectory `
-    'sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj'
+    'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
 Write-Host 'Cleaning the Viu SDK task closure' -ForegroundColor Green
 & dotnet clean $sdkProject --configuration $Configuration
 if ($LASTEXITCODE -ne 0) {
@@ -173,7 +173,7 @@ if ($LASTEXITCODE -ne 0) {
 Invoke-PackageBuild -Project $sdkProject
 
 $browserSdkProject = Join-Path $repositoryDirectory `
-    'sdks/Assimalign.Viu.Sdk.Browser/Tasks/Assimalign.Viu.Sdk.Browser.Tasks.csproj'
+    'sdks/Assimalign.Viu.Sdk.Browser/Tasks/src/Assimalign.Viu.Sdk.Browser.Tasks.csproj'
 Write-Host 'Cleaning the Viu Browser SDK task closure' -ForegroundColor Green
 & dotnet clean $browserSdkProject --configuration $Configuration
 if ($LASTEXITCODE -ne 0) {
@@ -182,7 +182,7 @@ if ($LASTEXITCODE -ne 0) {
 Invoke-PackageBuild -Project $browserSdkProject
 
 $templateProject = Join-Path $repositoryDirectory `
-    'templates/Assimalign.Viu.Templates/Assimalign.Viu.Templates.csproj'
+    'extensions/dotnet/Assimalign.Viu.Templates/Assimalign.Viu.Templates.csproj'
 Invoke-PackageBuild -Project $templateProject
 
 $packageIds = $libraryPackageIds + @(

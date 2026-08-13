@@ -11,10 +11,10 @@
              path: pack only recognises '/' as its separator on every host, and a
              backslash silently produces malformed entries off Windows (see
              CollectSdkTaskFiles). -->
-        <None Include="$(MSBuildProjectDirectory)\..\Sdk\**\*" Pack="true" PackagePath="Sdk/%(RecursiveDir)%(Filename)%(Extension)">
+        <None Include="$(MSBuildProjectDirectory)\..\..\Sdk\**\*" Pack="true" PackagePath="Sdk/%(RecursiveDir)%(Filename)%(Extension)">
             <Visible>false</Visible>
         </None>
-        <None Include="$(MSBuildProjectDirectory)\..\Targets\**\*" Pack="true" PackagePath="Targets/%(RecursiveDir)%(Filename)%(Extension)">
+        <None Include="$(MSBuildProjectDirectory)\..\..\Targets\**\*" Pack="true" PackagePath="Targets/%(RecursiveDir)%(Filename)%(Extension)">
             <Visible>false</Visible>
         </None>
 
@@ -50,7 +50,7 @@
             /_content/<id>/ URL shape the in-repo
             build/Targets/Build.StaticWebAssets.targets produces).
         -->
-        <None Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*"
+        <None Include="$(ViuRepositoryDirectory)libraries\Browser\Assimalign.Viu.Browser\src\wwwroot\**\*"
               Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               Pack="true" PackagePath="assets/Assimalign.Viu.Browser/%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
 
@@ -59,7 +59,7 @@
     <!-- #region Loose local-SDK layout copies under $(ViuOutputPathForSdk) -->
     <Target Name="CopyRootSdkFiles" AfterTargets="Build">
         <ItemGroup>
-            <_ViuSdkRootFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))\Sdk\*.*" />
+            <_ViuSdkRootFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))\Sdk\*.*" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkRootFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Sdk\" />
     </Target>
@@ -67,7 +67,7 @@
         <ItemGroup>
             <!-- Targets\*.* now covers the .viu generator wiring too - it lives
                  in Targets\ rather than a per-project build\ folder. -->
-            <_ViuSdkTargetsFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))\Targets\*.*" />
+            <_ViuSdkTargetsFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))\Targets\*.*" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkTargetsFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
@@ -80,7 +80,7 @@
               Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Browser.Css.HotReload.targets" />
         <ItemGroup>
-            <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*" Condition="'$(ViuSdkBrowserPackage)' == 'true'" />
+            <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Browser\Assimalign.Viu.Browser\src\wwwroot\**\*" Condition="'$(ViuSdkBrowserPackage)' == 'true'" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkAssetFile)"
               DestinationFiles="@(_ViuSdkAssetFile->'$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\assets\Assimalign.Viu.Browser\%(RecursiveDir)%(Filename)%(Extension)')" />

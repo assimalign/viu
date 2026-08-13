@@ -30,7 +30,7 @@
     <ViuSkipLanguageServerPublish Condition="'$(ViuSkipLanguageServerPublish)' == ''">false</ViuSkipLanguageServerPublish>
     <ViuSkipLanguageServerStalenessCheck Condition="'$(ViuSkipLanguageServerStalenessCheck)' == ''">false</ViuSkipLanguageServerStalenessCheck>
 
-    <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)tooling\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj</ViuLanguageServerProjectPath>
+    <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)tooling\Editor\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj</ViuLanguageServerProjectPath>
     <ViuLanguageServerPublishRoot Condition="'$(ViuLanguageServerPublishRoot)' == ''">$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)</ViuLanguageServerPublishRoot>
     <ViuLanguageServerPublishPath Condition="'$(ViuLanguageServerPublishPath)' == ''">$(ViuLanguageServerPublishRoot)\LanguageServer</ViuLanguageServerPublishPath>
 

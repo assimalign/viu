@@ -15,7 +15,7 @@
           Pack="true"
           PackagePath="assets\Assimalign.Viu.DevTools\viu-devtools.js"
           Visible="false" />
-    <None Include="..\..\..\build\Targets\Build.DevTools.targets"
+    <None Include="$(ViuRepositoryDirectory)build\Targets\Build.DevTools.targets"
           Pack="true"
           PackagePath="buildTransitive\Assimalign.Viu.DevTools.targets"
           Visible="false" />

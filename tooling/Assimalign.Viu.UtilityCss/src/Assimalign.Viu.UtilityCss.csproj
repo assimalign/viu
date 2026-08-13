@@ -12,8 +12,8 @@
   <ItemGroup>
     <!-- netstandard2.0 needs its own internal record/init shims. These linked paths are the
          repository's frozen shared-source locations. -->
-    <Compile Include="..\..\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
-    <Compile Include="..\..\Assimalign.Viu.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
+    <Compile Include="$(ViuRepositoryDirectory)libraries\Syntax\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
+    <Compile Include="$(ViuRepositoryDirectory)libraries\Syntax\Assimalign.Viu.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- The independently transformed v4.3.3 compatibility data carries the upstream MIT notice

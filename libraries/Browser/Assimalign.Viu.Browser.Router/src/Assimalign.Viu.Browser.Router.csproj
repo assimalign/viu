@@ -19,7 +19,7 @@
           Pack="true"
           PackagePath="assets\Assimalign.Viu.Browser.Router\viu-history.js"
           Visible="false" />
-    <None Include="..\..\..\build\Targets\Build.Browser.Router.targets"
+    <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Browser.Router.targets"
           Pack="true"
           PackagePath="buildTransitive\Assimalign.Viu.Browser.Router.targets"
           Visible="false" />

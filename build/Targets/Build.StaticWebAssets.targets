@@ -8,7 +8,7 @@
         referenced Razor-SDK class library's _content assets - measured on .NET SDK 10.0.10,
         it stops serving the app entirely when such a reference exists, and its only dev
         serving pattern maps the app's SOURCE wwwroot ([V01.01.04.01] decision, see
-        libraries/Assimalign.Viu.Browser/docs/DESIGN.md).
+        libraries/Browser/Assimalign.Viu.Browser/docs/DESIGN.md).
 
         This target therefore copies every direct project-referenced library's wwwroot/**
         into the consuming WebAssembly app's SOURCE wwwroot under _content/<AssemblyName>/...

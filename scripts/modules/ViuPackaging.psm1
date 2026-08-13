@@ -16,7 +16,8 @@
 Set-StrictMode -Version Latest
 
 # Every independently published Viu library, in dependency-safe order. A library
-# added here must exist at <root>/<id>/src/<id>.csproj under one of $script:ViuCodeRoot;
+# added here must exist at <root>/<id>/src/<id>.csproj or
+# <root>/<area>/<id>/src/<id>.csproj under one of $script:ViuCodeRoot;
 # a packable library that exists but is missing here fails Get-ViuLibraryProject.
 $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Reactivity',
@@ -33,10 +34,10 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Browser.Router'
 )
 
-# The repository's code roots that hold independently published libraries, each using the
-# inverted <root>/<assembly id>/{src,test} layout. libraries/ holds the runtime framework;
-# tooling/ holds developer tooling (the build-time cores, the language service, the language
-# server). Both are scanned so a new project in either is caught by the drift guard.
+# The repository's code roots that hold independently published libraries. Projects can be
+# direct children or grouped one level below an area folder; both shapes retain the inverted
+# <assembly id>/{src,test} layout. Both roots are scanned so a new project in either is caught
+# by the drift guard.
 $script:ViuCodeRoot = @('libraries', 'tooling')
 
 function Test-ViuProjectPackable {
@@ -105,8 +106,23 @@ function Get-ViuLibraryProject {
                 $candidates = @(
                     $script:ViuCodeRoot |
                         ForEach-Object {
-                            [System.IO.Path]::GetFullPath(
-                                (Join-Path $RepositoryDirectory "$_/$packageId/src/$packageId.csproj"))
+                            $codeRootDirectory = Join-Path $RepositoryDirectory $_
+                            $candidateProjectDirectories = @(
+                                Join-Path $codeRootDirectory $packageId
+                                Get-ChildItem `
+                                    -LiteralPath $codeRootDirectory `
+                                    -Directory `
+                                    -ErrorAction SilentlyContinue |
+                                    ForEach-Object {
+                                        Join-Path $_.FullName $packageId
+                                    }
+                            )
+
+                            $candidateProjectDirectories |
+                                ForEach-Object {
+                                    [System.IO.Path]::GetFullPath(
+                                        (Join-Path $_ "src/$packageId.csproj"))
+                                }
                         } |
                         Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
                 )
@@ -120,10 +136,18 @@ function Get-ViuLibraryProject {
     $discovered = @(
         $script:ViuCodeRoot |
             ForEach-Object {
+                $codeRootDirectory = Join-Path $RepositoryDirectory $_
                 Get-ChildItem `
-                    -LiteralPath (Join-Path $RepositoryDirectory $_) `
+                    -LiteralPath $codeRootDirectory `
                     -Directory `
                     -ErrorAction SilentlyContinue
+            } |
+            ForEach-Object {
+                @($_) + @(
+                    Get-ChildItem `
+                        -LiteralPath $_.FullName `
+                        -Directory `
+                        -ErrorAction SilentlyContinue)
             } |
             ForEach-Object {
                 Get-ChildItem `

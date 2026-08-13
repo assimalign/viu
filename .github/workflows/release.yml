@@ -12,6 +12,8 @@ on:
     paths:
       - 'extensions/VisualStudio/**'
       - 'tooling/**'
+      - 'libraries/Syntax/**'
+      - 'libraries/ServerRenderer/**'
   release:
     types: [published]
 
@@ -20,35 +22,35 @@ permissions:
 
 jobs:
   validate-release:
-    name: validate ${{ matrix.area }} / ${{ matrix.project }}
+    name: validate ${{ matrix.project }}
     if: github.event_name == 'release'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { area: libraries, project: Assimalign.Viu.Browser }
-          - { area: libraries, project: Assimalign.Viu.Browser.Router }
-          - { area: libraries, project: Assimalign.Viu.Components }
-          - { area: libraries, project: Assimalign.Viu.Core }
-          - { area: libraries, project: Assimalign.Viu.DevTools }
-          - { area: libraries, project: Assimalign.Viu.Reactivity }
-          - { area: libraries, project: Assimalign.Viu.Router }
-          - { area: libraries, project: Assimalign.Viu.ServerRenderer }
-          - { area: libraries, project: Assimalign.Viu.State }
-          - { area: libraries, project: Assimalign.Viu.Testing }
-          - { area: tooling, project: Assimalign.Viu.Compiler.Css }
-          - { area: tooling, project: Assimalign.Viu.Compiler.SingleFileComponent }
-          - { area: tooling, project: Assimalign.Viu.LanguageServer }
-          - { area: tooling, project: Assimalign.Viu.LanguageService }
-          - { area: tooling, project: Assimalign.Viu.Syntax }
-          - { area: tooling, project: Assimalign.Viu.Syntax.Css }
-          - { area: tooling, project: Assimalign.Viu.Syntax.Html }
-          - { area: tooling, project: Assimalign.Viu.Syntax.SingleFileComponent }
-          - { area: tooling, project: Assimalign.Viu.Syntax.Templates }
-          - { area: tooling, project: Assimalign.Viu.UtilityCss }
-          - { area: analyzers, project: Assimalign.Viu.Generators.Reactive }
-          - { area: analyzers, project: Assimalign.Viu.Generators.Syntax }
+          - { project: Assimalign.Viu.Browser, path: libraries/Browser/Assimalign.Viu.Browser }
+          - { project: Assimalign.Viu.Browser.Router, path: libraries/Browser/Assimalign.Viu.Browser.Router }
+          - { project: Assimalign.Viu.Components, path: libraries/Runtime/Assimalign.Viu.Components }
+          - { project: Assimalign.Viu.Core, path: libraries/Runtime/Assimalign.Viu.Core }
+          - { project: Assimalign.Viu.DevTools, path: libraries/DevTools/Assimalign.Viu.DevTools }
+          - { project: Assimalign.Viu.Reactivity, path: libraries/Runtime/Assimalign.Viu.Reactivity }
+          - { project: Assimalign.Viu.Router, path: libraries/Router/Assimalign.Viu.Router }
+          - { project: Assimalign.Viu.ServerRenderer, path: libraries/ServerRenderer/Assimalign.Viu.ServerRenderer }
+          - { project: Assimalign.Viu.State, path: libraries/Runtime/Assimalign.Viu.State }
+          - { project: Assimalign.Viu.Syntax, path: libraries/Syntax/Assimalign.Viu.Syntax }
+          - { project: Assimalign.Viu.Syntax.Css, path: libraries/Syntax/Assimalign.Viu.Syntax.Css }
+          - { project: Assimalign.Viu.Syntax.Html, path: libraries/Syntax/Assimalign.Viu.Syntax.Html }
+          - { project: Assimalign.Viu.Syntax.SingleFileComponent, path: libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent }
+          - { project: Assimalign.Viu.Syntax.Templates, path: libraries/Syntax/Assimalign.Viu.Syntax.Templates }
+          - { project: Assimalign.Viu.Testing, path: libraries/DevTools/Assimalign.Viu.Testing }
+          - { project: Assimalign.Viu.Compiler.Css, path: tooling/Compiler/Assimalign.Viu.Compiler.Css }
+          - { project: Assimalign.Viu.Compiler.SingleFileComponent, path: tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent }
+          - { project: Assimalign.Viu.LanguageServer, path: tooling/Editor/Assimalign.Viu.LanguageServer }
+          - { project: Assimalign.Viu.LanguageService, path: tooling/Editor/Assimalign.Viu.LanguageService }
+          - { project: Assimalign.Viu.UtilityCss, path: tooling/Assimalign.Viu.UtilityCss }
+          - { project: Assimalign.Viu.Generators.Reactive, path: analyzers/Assimalign.Viu.Generators.Reactive }
+          - { project: Assimalign.Viu.Generators.Syntax, path: analyzers/Assimalign.Viu.Generators.Syntax }
     steps:
       - name: Checkout release tag
         # actions/checkout v4
@@ -61,8 +63,7 @@ jobs:
       - name: Run canonical area build and tests
         uses: ./.github/actions/build
         with:
-          area: ${{ matrix.area }}
-          project: ${{ matrix.project }}
+          project-path: ${{ matrix.path }}
 
   pack-packages:
     name: pack all NuGet packages
@@ -109,7 +110,7 @@ jobs:
         env:
           VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj'
+          $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
           $canonicalVersion = (
             & dotnet msbuild $sdkProject -nologo -getProperty:ViuVersion
           ) -join [System.Environment]::NewLine
@@ -486,10 +487,10 @@ jobs:
       # build tasks cannot load under `dotnet`. Build.ps1 above packages it through Visual Studio's
       # MSBuild.
       - name: Test language service
-        run: dotnet test tooling/Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj --configuration Release
+        run: dotnet test tooling/Editor/Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj --configuration Release
 
       - name: Test language server
-        run: dotnet test tooling/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj --configuration Release
+        run: dotnet test tooling/Editor/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj --configuration Release
 
       - name: Test Visual Studio extension
         run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release

@@ -2,9 +2,9 @@
 # Assimalign.Viu.App targeting pack rather than as standalone NuGet packages, so this root never
 # publishes and the job keeps contents:read only.
 #
-# The matrix entries are FOLDER names, not assembly ids: analyzers/Assimalign.Viu.Generators.Reactive
-# holds Assimalign.Viu.Generators.Reactivity. The shared build action discovers the project inside
-# the folder instead of composing a path, so the two can differ without a special case here.
+# Matrix rows name the project and carry its explicit repository-relative folder path. The shared
+# build action discovers the shipping project inside that folder, so the Reactive folder can still
+# hold the Assimalign.Viu.Generators.Reactivity assembly without a special case.
 name: Analyzers
 
 on:
@@ -14,7 +14,7 @@ on:
             - "analyzers/**"
             # The reactivity generator compiles against the Reactivity runtime library; the syntax
             # generator is the composition root of the Syntax cluster and of the shared projection
-            # core under tooling/.
+            # core under libraries/Syntax and tooling/Compiler.
             - "libraries/**"
             - "tooling/**"
             - "build/**"
@@ -47,25 +47,24 @@ concurrency:
 
 jobs:
     build:
-        name: analyzers (${{ matrix.projects }})
+        name: analyzers (${{ matrix.project }})
         runs-on: ubuntu-24.04
         strategy:
             fail-fast: false
             matrix:
-                projects:
-                    [
-                        "Assimalign.Viu.Generators.Reactive",
-                        "Assimalign.Viu.Generators.Syntax"
-                    ]
+                include:
+                    - project: "Assimalign.Viu.Generators.Reactive"
+                      path: "analyzers/Assimalign.Viu.Generators.Reactive"
+                    - project: "Assimalign.Viu.Generators.Syntax"
+                      path: "analyzers/Assimalign.Viu.Generators.Syntax"
         steps:
-            - name: "Checkout: ${{ matrix.projects }}"
+            - name: "Checkout: ${{ matrix.project }}"
               # actions/checkout v4
               uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
               with:
                   persist-credentials: false
 
-            - name: "Build: ${{ matrix.projects }}"
+            - name: "Build: ${{ matrix.project }}"
               uses: ./.github/actions/build
               with:
-                  area: "analyzers"
-                  project: ${{ matrix.projects }}
+                  project-path: ${{ matrix.path }}

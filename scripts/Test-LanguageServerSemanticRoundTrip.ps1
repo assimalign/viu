@@ -68,7 +68,7 @@ $fixturePath = Join-Path $fixtureDirectory 'fixture.json'
 
 $env:VIU_PACKED_CONSUMER_FIXTURE = $fixturePath
 try {
-    dotnet test (Join-Path $repoRoot 'tooling\Assimalign.Viu.LanguageServer\test') `
+    dotnet test (Join-Path $repoRoot 'tooling\Editor\Assimalign.Viu.LanguageServer\test') `
         --filter 'FullyQualifiedName~LanguageServerPackedConsumerTests' `
         --logger 'console;verbosity=detailed'
     if ($LASTEXITCODE -ne 0) {

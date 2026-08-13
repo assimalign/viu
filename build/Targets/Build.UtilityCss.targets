@@ -62,8 +62,8 @@
     cannot express ReferenceOutputAssembly=false plus UndefineProperties across the app TFM/RID
     boundary. When component CSS is also enabled, its identical edge already supplies the order.
   -->
-  <ItemGroup Condition="'$(ViuBundleUtilityCss)' == 'true' and '$(ViuBundleSingleFileComponentCss)' != 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj')">
-    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj"
+  <ItemGroup Condition="'$(ViuBundleUtilityCss)' == 'true' and '$(ViuBundleSingleFileComponentCss)' != 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\src\Assimalign.Viu.Sdk.Browser.Tasks.csproj')">
+    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\src\Assimalign.Viu.Sdk.Browser.Tasks.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false"
                       PrivateAssets="all"

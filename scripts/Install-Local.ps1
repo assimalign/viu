@@ -166,7 +166,7 @@ if (-not $SkipLibraries) {
 
 if (-not $SkipSdk) {
     Write-Host '[sdk] Packing Assimalign.Viu.Sdk' -ForegroundColor Green
-    $sdkProject = Join-Path $repoRoot 'sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj'
+    $sdkProject = Join-Path $repoRoot 'sdks\Assimalign.Viu.Sdk\Tasks\src\Assimalign.Viu.Sdk.Tasks.csproj'
     # CollectSdkTaskFiles intentionally packages the complete task output
     # closure. Clean first so a same-worktree rename cannot leave an obsolete
     # assembly in the SDK package.
@@ -177,7 +177,7 @@ if (-not $SkipSdk) {
 
     if (-not $BaseOnly) {
         Write-Host '[sdk] Packing Assimalign.Viu.Sdk.Browser' -ForegroundColor Green
-        $browserSdkProject = Join-Path $repoRoot 'sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj'
+        $browserSdkProject = Join-Path $repoRoot 'sdks\Assimalign.Viu.Sdk.Browser\Tasks\src\Assimalign.Viu.Sdk.Browser.Tasks.csproj'
         dotnet clean $browserSdkProject --configuration $Configuration
         if ($LASTEXITCODE -ne 0) { throw 'Browser SDK clean failed.' }
 
@@ -217,7 +217,7 @@ if (-not $SkipFramework) {
 if (-not $BaseOnly) {
     Write-Host '[templates] Packing Assimalign.Viu.Templates' -ForegroundColor Green
     Invoke-ViuPack `
-        -Project (Join-Path $repoRoot 'templates\Assimalign.Viu.Templates\Assimalign.Viu.Templates.csproj')
+        -Project (Join-Path $repoRoot 'extensions\dotnet\Assimalign.Viu.Templates\Assimalign.Viu.Templates.csproj')
 }
 
 Write-Host "Done. Packages in $feed :" -ForegroundColor Cyan

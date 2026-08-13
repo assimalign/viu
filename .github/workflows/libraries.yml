@@ -1,7 +1,7 @@
-# Build+test lane for the runtime framework libraries ([V01.01.12.02.02]). One matrix entry per
+# Build+test lane for the runtime and syntax libraries ([V01.01.12.02.02]). One matrix entry per
 # project folder under libraries/ — the single list to maintain for this code root — each delegating
 # to the shared .github/actions/build recipe. A per-project job keeps a failure scoped to the project
-# that caused it instead of taking a whole area down, and adding a library is a one-line edit here.
+# that caused it instead of taking a whole area down, and adding a library is one matrix-row edit.
 name: Libraries
 
 on:
@@ -41,34 +41,51 @@ concurrency:
 
 jobs:
     build:
-        name: libraries (${{ matrix.projects }})
+        name: libraries (${{ matrix.project }})
         runs-on: ubuntu-24.04
         strategy:
-            # One broken project should not hide the state of the other nine.
+            # One broken project should not hide the state of the other projects.
             fail-fast: false
             matrix:
-                projects:
-                    [
-                        "Assimalign.Viu.Browser",
-                        "Assimalign.Viu.Browser.Router",
-                        "Assimalign.Viu.Components",
-                        "Assimalign.Viu.Core",
-                        "Assimalign.Viu.DevTools",
-                        "Assimalign.Viu.Reactivity",
-                        "Assimalign.Viu.Router",
-                        "Assimalign.Viu.ServerRenderer",
-                        "Assimalign.Viu.State",
-                        "Assimalign.Viu.Testing"
-                    ]
+                include:
+                    - project: "Assimalign.Viu.Browser"
+                      path: "libraries/Browser/Assimalign.Viu.Browser"
+                    - project: "Assimalign.Viu.Browser.Router"
+                      path: "libraries/Browser/Assimalign.Viu.Browser.Router"
+                    - project: "Assimalign.Viu.Components"
+                      path: "libraries/Runtime/Assimalign.Viu.Components"
+                    - project: "Assimalign.Viu.Core"
+                      path: "libraries/Runtime/Assimalign.Viu.Core"
+                    - project: "Assimalign.Viu.DevTools"
+                      path: "libraries/DevTools/Assimalign.Viu.DevTools"
+                    - project: "Assimalign.Viu.Reactivity"
+                      path: "libraries/Runtime/Assimalign.Viu.Reactivity"
+                    - project: "Assimalign.Viu.Router"
+                      path: "libraries/Router/Assimalign.Viu.Router"
+                    - project: "Assimalign.Viu.ServerRenderer"
+                      path: "libraries/ServerRenderer/Assimalign.Viu.ServerRenderer"
+                    - project: "Assimalign.Viu.State"
+                      path: "libraries/Runtime/Assimalign.Viu.State"
+                    - project: "Assimalign.Viu.Syntax"
+                      path: "libraries/Syntax/Assimalign.Viu.Syntax"
+                    - project: "Assimalign.Viu.Syntax.Css"
+                      path: "libraries/Syntax/Assimalign.Viu.Syntax.Css"
+                    - project: "Assimalign.Viu.Syntax.Html"
+                      path: "libraries/Syntax/Assimalign.Viu.Syntax.Html"
+                    - project: "Assimalign.Viu.Syntax.SingleFileComponent"
+                      path: "libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent"
+                    - project: "Assimalign.Viu.Syntax.Templates"
+                      path: "libraries/Syntax/Assimalign.Viu.Syntax.Templates"
+                    - project: "Assimalign.Viu.Testing"
+                      path: "libraries/DevTools/Assimalign.Viu.Testing"
         steps:
-            - name: "Checkout: ${{ matrix.projects }}"
+            - name: "Checkout: ${{ matrix.project }}"
               # actions/checkout v4
               uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
               with:
                   persist-credentials: false
 
-            - name: "Build: ${{ matrix.projects }}"
+            - name: "Build: ${{ matrix.project }}"
               uses: ./.github/actions/build
               with:
-                  area: "libraries"
-                  project: ${{ matrix.projects }}
+                  project-path: ${{ matrix.path }}

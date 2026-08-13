@@ -17,7 +17,8 @@ on:
       # ship inside the language-server payload, so any tooling change must re-verify the
       # extension build and the packaged VSIX.
       - 'tooling/**'
-      - 'tooling/Assimalign.Viu.Syntax*/**'
+      - 'libraries/Syntax/**'
+      - 'libraries/ServerRenderer/**'
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'
@@ -39,7 +40,8 @@ on:
     paths:
       - 'extensions/VisualStudio/**'
       - 'tooling/**'
-      - 'tooling/Assimalign.Viu.Syntax*/**'
+      - 'libraries/Syntax/**'
+      - 'libraries/ServerRenderer/**'
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'
@@ -99,10 +101,10 @@ jobs:
       # Visual Studio's MSBuild. The language service and language server are also built and tested
       # on Linux by tooling.yml; this run re-verifies them against the Windows payload.
       - name: Test language service
-        run: dotnet test tooling/Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj --configuration Release
+        run: dotnet test tooling/Editor/Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj --configuration Release
 
       - name: Test language server
-        run: dotnet test tooling/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj --configuration Release
+        run: dotnet test tooling/Editor/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj --configuration Release
 
       - name: Test Visual Studio extension
         run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release

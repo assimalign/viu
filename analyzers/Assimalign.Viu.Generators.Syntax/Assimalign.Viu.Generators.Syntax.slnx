@@ -2,6 +2,6 @@
 	<Project Path="src/Assimalign.Viu.Generators.Syntax.csproj" />
 	<Project Path="test/Assimalign.Viu.Generators.Syntax.Tests.csproj" />
 	<Project Path="test/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests.csproj" />
-	<Project Path="../../tooling/Assimalign.Viu.Compiler.SingleFileComponent/src/Assimalign.Viu.Compiler.SingleFileComponent.csproj" />
-	<Project Path="../../tooling/Assimalign.Viu.Compiler.SingleFileComponent/test/Assimalign.Viu.Compiler.SingleFileComponent.Tests.csproj" />
+	<Project Path="../../tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/src/Assimalign.Viu.Compiler.SingleFileComponent.csproj" />
+	<Project Path="../../tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/test/Assimalign.Viu.Compiler.SingleFileComponent.Tests.csproj" />
 </Solution>

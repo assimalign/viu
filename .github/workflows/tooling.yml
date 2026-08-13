@@ -1,6 +1,6 @@
-# Build+test lane for the developer-tooling libraries ([V01.01.12.02.02]): the Syntax parser cluster,
-# the shared .viu -> C# projection and CSS composition cores, the Viu Utilities engine, and the editor
-# pair (language service + language server). None ships into a Viu app's runtime. Only the Viu
+# Build+test lane for the developer-tooling libraries ([V01.01.12.02.02]): the shared .viu -> C#
+# projection and CSS composition cores, the Viu Utilities engine, and the editor pair (language
+# service + language server). None ships into a Viu app's runtime. Only the Viu
 # Utilities engine is independently packable; release.yml alone packs and publishes it.
 name: Tooling
 
@@ -43,33 +43,30 @@ concurrency:
 
 jobs:
     build:
-        name: tooling (${{ matrix.projects }})
+        name: tooling (${{ matrix.project }})
         runs-on: ubuntu-24.04
         strategy:
             fail-fast: false
             matrix:
-                projects:
-                    [
-                        "Assimalign.Viu.Compiler.Css",
-                        "Assimalign.Viu.Compiler.SingleFileComponent",
-                        "Assimalign.Viu.LanguageServer",
-                        "Assimalign.Viu.LanguageService",
-                        "Assimalign.Viu.Syntax",
-                        "Assimalign.Viu.Syntax.Css",
-                        "Assimalign.Viu.Syntax.Html",
-                        "Assimalign.Viu.Syntax.SingleFileComponent",
-                        "Assimalign.Viu.Syntax.Templates",
-                        "Assimalign.Viu.UtilityCss"
-                    ]
+                include:
+                    - project: "Assimalign.Viu.Compiler.Css"
+                      path: "tooling/Compiler/Assimalign.Viu.Compiler.Css"
+                    - project: "Assimalign.Viu.Compiler.SingleFileComponent"
+                      path: "tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent"
+                    - project: "Assimalign.Viu.LanguageServer"
+                      path: "tooling/Editor/Assimalign.Viu.LanguageServer"
+                    - project: "Assimalign.Viu.LanguageService"
+                      path: "tooling/Editor/Assimalign.Viu.LanguageService"
+                    - project: "Assimalign.Viu.UtilityCss"
+                      path: "tooling/Assimalign.Viu.UtilityCss"
         steps:
-            - name: "Checkout: ${{ matrix.projects }}"
+            - name: "Checkout: ${{ matrix.project }}"
               # actions/checkout v4
               uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
               with:
                   persist-credentials: false
 
-            - name: "Build: ${{ matrix.projects }}"
+            - name: "Build: ${{ matrix.project }}"
               uses: ./.github/actions/build
               with:
-                  area: "tooling"
-                  project: ${{ matrix.projects }}
+                  project-path: ${{ matrix.path }}

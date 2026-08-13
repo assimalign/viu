@@ -13,7 +13,7 @@ on:
     paths:
       - 'sdks/**'
       - 'frameworks/**'
-      - 'templates/**'
+      - 'extensions/dotnet/Assimalign.Viu.Templates/**'
       - 'scripts/**'
       - 'libraries/**'
       - 'tooling/**'
@@ -30,7 +30,7 @@ on:
     paths:
       - 'sdks/**'
       - 'frameworks/**'
-      - 'templates/**'
+      - 'extensions/dotnet/Assimalign.Viu.Templates/**'
       - 'scripts/**'
       - 'libraries/**'
       - 'tooling/**'
@@ -72,10 +72,10 @@ jobs:
       # Carried over from area-utility-css.yml: Install-Local.ps1 builds the SDK task host on its
       # way to packing it, but not with warnings as errors. This keeps that gate explicit.
       - name: Build base SDK task host (warnings are errors)
-        run: dotnet build sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj --configuration Release -warnaserror
+        run: dotnet build sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj --configuration Release -warnaserror
 
       - name: Build Browser SDK task host (warnings are errors)
-        run: dotnet build sdks/Assimalign.Viu.Sdk.Browser/Tasks/Assimalign.Viu.Sdk.Browser.Tasks.csproj --configuration Release -warnaserror
+        run: dotnet build sdks/Assimalign.Viu.Sdk.Browser/Tasks/src/Assimalign.Viu.Sdk.Browser.Tasks.csproj --configuration Release -warnaserror
 
       - name: Test Browser SDK CSS host-page injection
         run: dotnet test sdks/Assimalign.Viu.Sdk.Browser/Tasks/test/Assimalign.Viu.Sdk.Browser.Tasks.Tests.csproj --configuration Release -warnaserror
@@ -91,7 +91,7 @@ jobs:
       - name: Validate release package metadata, ranges, analyzers, and symbols
         shell: pwsh
         run: |
-          $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj'
+          $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
           $version = (& dotnet msbuild $sdkProject -nologo -getProperty:ViuVersion) -join "`n"
           if ($LASTEXITCODE -ne 0) {
             throw "Reading the canonical Viu version failed with exit code $LASTEXITCODE."
@@ -101,7 +101,7 @@ jobs:
       - name: Validate deterministic package payloads
         shell: pwsh
         run: |
-          $project = 'libraries/Assimalign.Viu.Components/src/Assimalign.Viu.Components.csproj'
+          $project = 'libraries/Runtime/Assimalign.Viu.Components/src/Assimalign.Viu.Components.csproj'
           $commit = (& git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0) {
             throw 'Resolving the repository commit failed.'
