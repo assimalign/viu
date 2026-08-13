@@ -14,7 +14,7 @@
 
 **Intellisense**
 1. [`Template Block`] Not sure if possible, but I want the actual color to show up next to UtilityCss class names that are color specific within the intellisense. ![no-color-shows-currently](../../assets/vs-enhancement-utilitycss-color-in-intellisense.png)
-2. [`Template Block`] Event handler bindings should have intellisense within the template. Currently nothing shows up  ![alt text](../../assets/vs-enhancement-event-handler-intellisense.png)
+2. [`Template Block`] Event handler bindings should have intellisense within the template. Currently nothing shows up ![alt text](../../assets/vs-enhancement-event-handler-intellisense.png)
 3. [`Template Block`] Template compiler is unable to differentiate between element tags and components that are of the same name. For example, having a template component called Button will render a `<button/>` element. ![alt text](../../assets/vs-enhancement-component-element-differentiation.png)
 4. [`Template/Styles Block`] Css classes defined in the `<styles></styles>` block should showup in intellisense. Currently they do not.
 5. [`Template Block`] Directives (`v-*`), Attribute Bindings (`:some-attribute="..."`), and Expression (`{{expression}}`) have no intellisense support. This needs to be added. ![alt text](../../assets/vs-enhancement-template-script-block-intellisense.png)
@@ -22,7 +22,7 @@
 7. [`Script/Template/Styles Block`] Intellisense should not showup in comment blocks. It shows up in all three blocks. ![alt text](../../assets/vs-enhancement-utilitycss-comments-has-intellisense.png)
 
 **Tags**
-1. No design time errors or warning tags for the
+1. No design time errors or warning squiggle tags under any of the code.
 
 **Hovering**
-1. No type info
+1. No info for any of the elements while hovering.
