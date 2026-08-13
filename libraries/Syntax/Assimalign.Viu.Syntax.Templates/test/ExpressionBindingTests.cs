@@ -12,7 +12,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 // prefixing, binding-metadata classification, ref unwrapping, v-for/v-slot scope, and expression validation.
 // Viu divergences (C# .Value unwrapping in read and write positions, _ctx member access, the strict
 // unresolved-identifier diagnostic) are pinned here and documented in
-// tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md.
+// libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md.
 public class ExpressionBindingTests
 {
     // ---- interpolation identifier rewriting ----

@@ -1,8 +1,8 @@
 # Assimalign.Viu.Testing.EndToEnd
 
 This test-only executable drives Viu exclusively from the browser side through Playwright .NET. It
-is under `tooling/` because browser orchestration, trace capture, startup measurement, and the
-loopback static server are developer tools rather than reusable runtime-testing APIs. It is never
+is under `benchmarks/` because browser orchestration, trace capture, startup measurement, and the
+loopback static server form Viu's executable performance and end-to-end verification harness. It is never
 packed and no shipping library references it. Purpose-built package-consumer applications remain
 under `scripts/fixtures/`, beside the script that stages them.
 
@@ -26,16 +26,14 @@ acknowledged by the reactive count, proving event dispatch and update readiness.
 the machine-readable input to the scheduled startup-budget lane. The separately exposed
 publish-only mode reuses exactly the same isolated package-consumer preparation for trimmed-size
 and AOT budget lanes. Its `-PackagedVuePublish` selection publishes a `.vue`-only Browser fixture
-through the installed SDK/framework packages, requires non-empty component and utility bundles,
+through the installed SDK/framework packages, requires a non-empty component-CSS bundle,
 and scans both generated sources and the published consumer assembly for absent Debug-only
 hot-reload metadata in Release and AOT output.
 
 The separate `-HotReload` mode stages one package-only Debug Browser application and starts it under
-an owned `dotnet watch` process. Its mounted root is a tag-based `.vue` component; an explicitly
-watched, non-served `.html` source contributes the utility candidate so utility class changes never
-enter Roslyn's single-file-component input graph. The Chromium scenario proves stylesheet replacement
-without document navigation, semantic no-op suppression without a managed or static-asset update, the
-marked zero-byte final-rule tombstone, and affected-component remount for accepted `.vue` template and
-C# script changes. The harness terminates the complete process tree it started and verifies that the
-CSS worker process did not survive. This opt-in mode never changes the ordinary
+an owned `dotnet watch` process. Its mounted root is a tag-based `.vue` component. The Chromium
+scenario proves component-stylesheet replacement without document navigation, semantic no-op
+suppression without a managed or static-asset update, and affected-component remount for accepted
+`.vue` template and C# script changes. The harness terminates the complete process tree it started
+and verifies that the CSS worker process did not survive. This opt-in mode never changes the ordinary
 three-scenario-per-engine matrix.

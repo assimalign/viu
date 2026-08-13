@@ -110,9 +110,9 @@ If PowerShell isn't available, follow the **manual recipe** in
 The repo's issue body standard is `## Summary` → `## Acceptance Criteria` → `### Standards and Compliance`.
 The script generates this skeleton; fill it with real, testable criteria. Where the item specifies or
 changes behavior covered by `docs/SPECIFICATION.md`, cite the clause id in *Standards and Compliance*;
-where the item serves a declared compatibility target (the `.vue` container format, Tailwind CSS
-v4.3.3) or DOM behavior, cite that format or the WHATWG/W3C spec; otherwise note that it is a Viu
-runtime-contract concern.
+where the item serves a declared compatibility target (the `.vue` container format or the Language
+Server Protocol) or DOM behavior, cite that format or the WHATWG/W3C spec; otherwise note that it is
+a Viu runtime-contract concern.
 
 ## Step 4 — Close every item from the PR
 

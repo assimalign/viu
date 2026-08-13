@@ -105,7 +105,7 @@ gh issue list --repo assimalign/viu --label scope-creep --state all --json numbe
 - The implementation remains trimming-safe and WASM/NativeAOT-compatible.
 
 ### Standards and Compliance
-- <docs/SPECIFICATION.md clause id, a declared compatibility target (.vue container format, Tailwind CSS v4.3.3), WHATWG/W3C spec for DOM behavior, or a note that it is a Viu runtime-contract concern>
+- <docs/SPECIFICATION.md clause id, a declared compatibility target (.vue container format or Language Server Protocol), WHATWG/W3C spec for DOM behavior, or a note that it is a Viu runtime-contract concern>
 ```
 
 ## Manual recipe (when not using the helper script)

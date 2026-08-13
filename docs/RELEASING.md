@@ -35,10 +35,13 @@ are explicitly release-only, so this path cannot stage or promote NuGet packages
 
 ## Package contract
 
-The [V01.01.10.01] release inventory is exactly 17 main packages and 12 symbol packages. It includes
-eleven independently consumable libraries, both SDKs, both targeting packs, the Browser runtime
-pack, and the template pack. `Assimalign.Viu.DevTools` is an opt-in library like Router: it is
-published on its own and is never included in `Assimalign.Viu.App` or
+The [V01.01.10.01] release inventory is exactly 16 main packages and 11 symbol packages, as enforced
+by [`scripts/Pack-Release.ps1`](../scripts/Pack-Release.ps1) and
+[`scripts/Test-Packages.ps1`](../scripts/Test-Packages.ps1). It includes ten independently published
+libraries, both SDKs, both targeting packs, the Browser runtime pack, and the template pack. The
+parked, non-packable utility-CSS engine is not part of this inventory. `Assimalign.Viu.DevTools` is
+an opt-in library like Router: it is published on its own and is never included in
+`Assimalign.Viu.App` or
 `Assimalign.Viu.App.Browser`.
 
 Shared build targets stamp every packable project with the repository URL and commit, embedded

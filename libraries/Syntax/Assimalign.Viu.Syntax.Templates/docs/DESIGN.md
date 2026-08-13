@@ -4,7 +4,7 @@ Why the template compiler front end is shaped the way it is, and the decisions C
 This document accumulates per feature; today it covers expression binding and scope
 analysis ([V01.01.05.04], issue #51) and render-function code generation ([V01.01.05.05], issue #52).
 The normative statements are `[SFC-6]`–`[SFC-8]` and `[SFC-CG-1]`–`[SFC-OPT-5]` in
-[`docs/SPECIFICATION.md`](../../../docs/SPECIFICATION.md).
+[`docs/SPECIFICATION.md`](../../../../docs/SPECIFICATION.md).
 
 ## Expression binding and scope analysis
 

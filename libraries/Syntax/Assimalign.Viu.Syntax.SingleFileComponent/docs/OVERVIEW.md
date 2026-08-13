@@ -1,6 +1,7 @@
 # Assimalign.Viu.Syntax.SingleFileComponent — overview
 
-The build-time parsers for Viu single-file components. `SingleFileComponentParser` owns the canonical
+The publicly consumable build-time parsers for Viu single-file components.
+`SingleFileComponentParser` owns the canonical
 `.viu` hybrid container ([V01.01.06.10]): tag-based `<template>`/`<style>` blocks plus
 the `@script { }` C# block and `@`-form custom blocks. The isolated [V01.01.06.09]
 `VueSingleFileComponentParser` compatibility entry point slices fully tag-based `.vue` containers
@@ -47,7 +48,8 @@ and bundle output. Visual Studio content-type routing remains a separate extensi
   `SingleFileComponentBlockOption`. Each block carries its raw content and exact-slice source spans.
 - **`SingleFileComponentSyntaxParser`** — the `AggregateSyntaxParser<SingleFileComponentBlock>`
   adapter (`ParseComponent`): same slicing, but each block is exposed to the registration seam as a
-  `SyntaxSource` so build tooling can attach the template/style/custom parsers.
+  `SyntaxSource` so Viu composition roots or developer-authored tooling can attach
+  template/style/custom parsers.
 - **`VueSingleFileComponentSyntaxParser`** — the equivalent aggregate adapter for tag-based `.vue`
   sources. It dispatches template, ordinary script, setup script, repeated style, and custom blocks
   through the same registered parser contracts while preserving their original block nodes and spans.
@@ -60,6 +62,7 @@ and bundle output. Visual Studio content-type routing remains a separate extensi
 
 - Roots on **`Assimalign.Viu.Syntax`** only; it never references the template, CSS, or any other
   language library — the composition root wires those in through the aggregate registration seam.
-- Build-time library: targets the netstandard2.0 analyzer TFM and runs inside Roslyn generator hosts;
-  `IsAotCompatible` does not apply (a documented deviation for this TFM).
+- Build-time library: targets the netstandard2.0 analyzer TFM so it can run inside Roslyn generator
+  hosts, language-server processes, and developer-authored tooling; `IsAotCompatible` does not apply
+  (a documented deviation for this TFM).
 - Design rationale and the divergences: [DESIGN.md](DESIGN.md).

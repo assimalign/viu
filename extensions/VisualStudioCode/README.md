@@ -13,15 +13,15 @@ tests, and its `version` is a placeholder. Do not treat the `publisher`/`name` p
 What is deliberately deferred:
 
 - Marketplace and Open VSX publication, and the release workflow that would drive them.
-- Semantic tokens. The container grammar is lexical; Viu Utilities class-value splitting, component
-  resolution, and `@script` semantic colorization belong to the language server and arrive as
-  semantic tokens rather than as TextMate guesses.
+- Semantic tokens. The container grammar is lexical; project-aware template classification,
+  component resolution, and `@script` semantic colorization belong to the language server and
+  arrive as semantic tokens rather than as TextMate guesses.
 - Per-region comment toggling. `language-configuration.json` is a single document-wide
   configuration, so <kbd>Ctrl</kbd>+<kbd>/</kbd> uses `<!-- -->` everywhere; making it produce `//`
   inside `@script` and `/* */` inside `<style>` needs a language-service contribution.
 - A multi-line `<template …>` or `<style …>` opening tag. A TextMate `begin` pattern is matched
   against one line, so an opening tag split across lines is not recognized as a block opener. The
-  container parser accepts it ([FORMAT.md §4](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)).
+  container parser accepts it ([FORMAT.md §4](../../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)).
 - Extension bundling. The client is compiled with `tsc` and ships its `node_modules` production
   dependency; there is no esbuild/webpack step yet.
 
@@ -44,11 +44,13 @@ yourself), and `viu.trace.server`.
 **This extension does not claim the `.vue` file extension or contribute a `.vue` language.** Viu
 compiles tag-based `.vue` containers as a shipping compatibility feature
 ([V01.01.06.09](https://github.com/assimalign/viu/issues/250)), and in Visual Studio that feature is
-surfaced as a `viu-vue` document type — Visual Studio's language-server contract requires a declared
-document type and cannot express an owning-project condition in that filter. Visual Studio Code has
-no such constraint, and the calculus there is different: `.vue` already has a mature ecosystem whose
-tooling owns that language id. A second extension declaring `contributes.languages` for `.vue` would
-fight it for grammar and language-configuration ownership, for every user, in every workspace.
+represented by the language server's `viu-vue` protocol document type. The current Visual Studio
+host does not claim or reach `.vue` buffers because Web Tools owns that extension. Visual Studio's
+language-server contract still requires a declared document type and cannot express an
+owning-project condition in that filter. Visual Studio Code has no such constraint, and the calculus
+there is different: `.vue` already has a mature ecosystem whose tooling owns that language id. A
+second extension declaring `contributes.languages` for `.vue` would fight it for grammar and
+language-configuration ownership, for every user, in every workspace.
 
 So the split is:
 
@@ -83,7 +85,7 @@ Two consequences:
    `punctuation.section.embedded.*.viu`.
 
 The block-slicing rules come from
-[`FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md), not from a
+[`FORMAT.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md), not from a
 generic HTML grammar. In particular `@script` ends at the **first later line whose first column is
 `}`** (§3.2) — the grammar anchors on `^\}` rather than balancing braces, because that is the
 container's actual termination rule. A top-level `<script>` tag is scoped `invalid.illegal`, matching

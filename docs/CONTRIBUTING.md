@@ -11,7 +11,7 @@ and complements [`.claude/rules/documentation.md`](../.claude/rules/documentatio
 Three rules decide where a Markdown file lives, and [`docs/README.md`](README.md) indexes the result:
 
 1. **Documentation scoped to one project** lives in `<project folder>/docs/` — under `libraries/`,
-   `tooling/`, `analyzers/`, `sdks/`, `frameworks/`, or `extensions/`.
+   `tooling/`, `analyzers/`, `sdks/`, `frameworks/`, `benchmarks/`, or `extensions/`.
 2. **`README.md` stays put.** Any folder may carry its own `README.md` as that folder's entry point.
 3. **Everything else** lives in the repository-root `docs/`.
 
@@ -24,7 +24,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 
 | Document | Location | What it holds |
 | --- | --- | --- |
-| Root `README.md` | repository root | The project mission, the repository map (every project under `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `frameworks/`), the external showcase link, and clone/build instructions. |
+| Root `README.md` | repository root | The project mission, the repository map (projects under `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `frameworks/`, `benchmarks/`, and `extensions/`), the external showcase link, and clone/build instructions. |
 | `docs/README.md` | [`docs/README.md`](README.md) | The index of repository-level documentation and the placement policy above. |
 | `SPECIFICATION.md` | [`docs/SPECIFICATION.md`](SPECIFICATION.md) | **Normative.** What Viu is and what it guarantees, in numbered clauses with stable ids. Highest authority for semantics; every other document below is subordinate to it and must not contradict it. |
 | `API-HARDENING-PLAN.md` | [`docs/API-HARDENING-PLAN.md`](API-HARDENING-PLAN.md) | The completion record for `[V01.01.14]`: public-surface decisions, terminal work disposition, gates, and deferred platform-segmentation trigger. |
@@ -33,7 +33,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 | `PLAN.md` | [`docs/PLAN.md`](PLAN.md) | The delivery narrative: the wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. The GitHub [Project #15](https://github.com/orgs/assimalign/projects/15) board is the authoritative *backlog*. |
 | `DEVELOPER-EXAMPLES.md` | [`docs/DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked package-consumer examples for Components, Reactivity, State, Core, and Browser. |
 | Getting-started guide | [`docs/guide/getting-started.md`](guide/getting-started.md) | The external-consumer walkthrough from manual project creation through browser execution and publish. |
-| `UTILITY-CSS-DESIGN.md` | [`docs/UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | The cross-project Viu Utilities design and its Tailwind CSS v4.3.3 compatibility boundary. |
+| `UTILITY-CSS-DESIGN.md` | [`docs/UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Parked, non-normative design history.** The former Viu Utilities integration and its Tailwind CSS v4.3.3 target, retained for a future add-on redesign under `libraries/Utilities/`. |
 | `NET-RESHAPE-PLAN.md` | [`docs/NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The dated historical record of the completed .NET reshape and its later supersession notes. |
 | `RELEASING.md` | [`docs/RELEASING.md`](RELEASING.md) | Package and extension release channels, credentials, validation, and publication sequence. |
 | Architecture decision records | [`docs/adr/`](adr/) | The append-only log of repo-wide, cross-cutting decisions (see [`adr/README.md`](adr/README.md)). Normative for *rationale*, not for current API shape. |
@@ -43,8 +43,8 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 | Per-project topic docs | `<project folder>/docs/*.md` | Focused specs or local ADRs (e.g. `FORMAT.md`, a library-local `ADR-000N-*.md`). |
 | XML doc comments | in source, on every public member | The API-level reference: what each member does, what it guarantees, and why its shape is what it is (see [`.claude/rules/documentation.md`](../.claude/rules/documentation.md)). |
 
-**Precedence.** `SPECIFICATION.md` → the normative delegates it names (the `.viu` `FORMAT.md`,
-`UTILITY-CSS-DESIGN.md`) → ADRs → library `DESIGN.md` → `PLAN.md`. A lower-precedence document that
+**Precedence.** `SPECIFICATION.md` → the normative delegates it names (currently the `.viu`
+`FORMAT.md`) → ADRs → library `DESIGN.md` → `PLAN.md`. A lower-precedence document that
 contradicts a higher one is wrong and must be corrected, not reconciled.
 
 ## What belongs in `OVERVIEW.md`
@@ -69,10 +69,12 @@ The rationale and the trade-offs — why the shape, not the shape itself.
 - **Design rationale** — the internal structure and the forces behind it (the interop budget, the
   AOT/trimming constraint, the single-threaded model, the incremental-generator caching contract).
 - **External compatibility targets** — where the library implements a documented foreign format
-  (the `.vue` single-file-component container, Tailwind CSS v4.3.3 for Viu Utilities, WHATWG HTML
-  serialization, the Language Server Protocol), name it and link a version-pinned reference. There
+  (the `.vue` single-file-component container, WHATWG HTML serialization, or the Language Server
+  Protocol), name it and link a version-pinned reference. There
   the citation *is* the requirement: it constrains a format Viu deliberately consumes, and it is not
-  an authority over Viu's own semantics.
+  an authority over Viu's own semantics. Tailwind CSS v4.3.3 is no longer a Viu compatibility
+  target; it remains only the target recorded for the parked, non-normative utility add-on in
+  [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md).
 - **Platform adaptations** — where a design that reads oddly is forced by the WASM/AOT/single-thread
   reality rather than chosen, say so and link the test that pins the chosen behavior. A repo-wide
   decision links its ADR under [`docs/adr/`](adr/); a library-local one is documented here.
@@ -98,11 +100,16 @@ The rationale and the trade-offs — why the shape, not the shape itself.
 
 ## Where new things go
 
-- **A new library** — `libraries/Assimalign.Viu.<Name>/{src,test,docs}` for runtime code or
-  `tooling/Assimalign.Viu.<Name>/{src,test,docs}` for compiler/build/editor code (folder name =
-  assembly id, no area wrapper folders). Seed `docs/OVERVIEW.md` and `docs/DESIGN.md` with the code. Wire the
-  csprojs per [`.claude/rules/build-system.md`](../.claude/rules/build-system.md) ("Adding a new
-  library") and add a row to the root `README.md` repository map.
+- **A new publicly consumable library** —
+  `libraries/<Area>/Assimalign.Viu.<Name>/{src,test,docs}`. This root contains both runtime packages
+  and the `netstandard2.0` Syntax parser cluster. The area folder expresses product ownership; the
+  assembly-id folder still owns the inverted `{src,test}` project layout.
+- **A new compiler or editor project** —
+  `tooling/<Area>/Assimalign.Viu.<Name>/{src,test,docs}`. The parked, non-packable
+  `tooling/Assimalign.Viu.UtilityCss` engine is the sole root-level exception pending a future
+  `libraries/Utilities/` add-on design. Seed `docs/OVERVIEW.md` and `docs/DESIGN.md` with the code,
+  wire the csprojs per [`.claude/rules/build-system.md`](../.claude/rules/build-system.md)
+  ("Adding a new library"), and add a row to the root `README.md` repository map.
 - **A new sample** — add it to
   [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples), where samples consume
   packaged Viu artifacts rather than project references. Update this repository's showcase link

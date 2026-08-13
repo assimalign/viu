@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Viu",
   "scopeName": "source.viu",
-  "comment": "The .viu hybrid container: tag-based <template>/<style>, the C# @script { } block, and the legacy @template/@style blocks kept during the migration window. The authority for this grammar is tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md; every rule below is traceable to a section of it. Block bodies delegate to source.cs and source.css rather than re-implementing token rules — the container grammar's job is to slice the file and to own the Viu-specific constructs (interpolations, directive attributes, component tags).",
+  "comment": "The .viu hybrid container: tag-based <template>/<style>, the C# @script { } block, and the legacy @template/@style blocks kept during the migration window. The authority for this grammar is libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md; every rule below is traceable to a section of it. Block bodies delegate to source.cs and source.css rather than re-implementing token rules — the container grammar's job is to slice the file and to own the Viu-specific constructs (interpolations, directive attributes, component tags).",
   "patterns": [
     { "include": "#container-comment" },
     { "include": "#script-block" },
@@ -291,7 +291,7 @@
     },
 
     "plain-attribute": {
-      "comment": "An ordinary attribute. 'class' is deliberately NOT split into utility variants and classes here: candidate validation and the generated-CSS preview are language-server features, delivered as semantic tokens and hover rather than guessed lexically.",
+      "comment": "An ordinary attribute. 'class' stays one lexical attribute value here; project-aware component-style class completion and authored-rule hover belong to the language server rather than the TextMate grammar.",
       "match": "([A-Za-z_][A-Za-z0-9_.:-]*)(?:[ \\t]*(=)[ \\t]*(\"[^\"]*\"|'[^']*'))?",
       "captures": {
         "1": { "name": "entity.other.attribute-name.viu" },

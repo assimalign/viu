@@ -19,7 +19,7 @@ namespace Assimalign.Viu.Sdk.Tasks;
 /// permitted) and re-runs the <em>same</em> shared <see cref="SingleFileComponentStyleBundler"/> over the
 /// <em>same</em> component inputs the generator sees as <c>AdditionalFiles</c>, so the bytes it writes are
 /// identical to the generator's <c>ExtractedStyles</c> constants — there is no second, divergent generation
-/// path (see <c>docs/UTILITY-CSS-DESIGN.md</c> §2.4). The paired targets register the bundle as a
+/// path (see <c>tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/DESIGN.md</c>). The paired targets register the bundle as a
 /// <c>StaticWebAsset</c> so <c>dotnet publish</c> ships it.
 /// <para>
 /// The task itself is incremental at two levels: the target that invokes it is gated by MSBuild

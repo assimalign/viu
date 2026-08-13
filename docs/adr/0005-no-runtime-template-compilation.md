@@ -56,7 +56,7 @@ generators; there is no runtime compilation path.**
   a warning-severity migration diagnostic during a transition window. The **markup inside the
   template container remains standard Vue template syntax** throughout; only the container framing
   differs. The container is specified in
-  [`Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md).
+  [`Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md).
 
 ## Consequences
 
@@ -65,7 +65,7 @@ generators; there is no runtime compilation path.**
   column — the tooling story reaches Razor-grade because it *is* a compiler.
 - The JavaScript-to-C# serialization divergences (no comma operator, no object literals with
   arbitrary keys, `.Value` unwrapping, `undefined`→`null`, …) are documented and test-pinned in
-  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md).
+  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md).
 - Compiler-informed patch flags, block trees, and static hoisting all fall out of build-time
   compilation and feed the interop budget ([ADR-0003](0003-batched-interop-dom-operations.md)).
 - Dynamic, string-sourced templates are unsupported by design.
@@ -80,7 +80,7 @@ generators; there is no runtime compilation path.**
 ## References
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decision 3.
-- [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md)
-  and [`Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md).
+- [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md)
+  and [`Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md).
 - Vue 3: [render functions](https://vuejs.org/guide/extras/render-function.html),
   [SFC spec](https://vuejs.org/api/sfc-spec.html).

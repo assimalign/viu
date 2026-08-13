@@ -29,9 +29,10 @@ namespace Assimalign.Viu.Compiler.Css;
 /// / <c>v-bind()</c> blocks (the canonical serializer emits <c>\n</c>) and preserve source newlines only for
 /// verbatim pass-through blocks — matching the generator's constant exactly.
 /// </para>
-/// This bundles opaque compiled-CSS strings; it embeds no utility-specific knowledge, so the future
-/// utility-first stylesheet ([V01.01.12.16]) plugs a second opaque CSS source into the same task without
-/// changing this contract (see <c>docs/UTILITY-CSS-DESIGN.md</c> §2.4).
+/// This bundles opaque compiled component-CSS strings and embeds no add-on-specific knowledge. The former
+/// utility integration ([V01.01.12.16]) was removed on 2026-08-13 and remains parked outside the SDK; any
+/// future add-on delivers its own assets without changing this contract (see
+/// <c>docs/UTILITY-CSS-DESIGN.md</c>, parked non-normative history).
 /// </summary>
 public static class SingleFileComponentStyleBundler
 {

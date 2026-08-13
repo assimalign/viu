@@ -54,7 +54,7 @@ Before creating, **search for an existing item** so you don't duplicate — reus
 ranks existing issues (open + closed) by title-word overlap:
 
 ```pwsh
-.Codex/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -Search "keyed diff lis moves"
+.agents/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -Search "keyed diff lis moves"
 ```
 
 If a strong match exists, add the work to it instead of creating a new item. You don't have to run `-Search`
@@ -70,22 +70,22 @@ sub-issue, and records the item in a per-branch manifest for PR close-out.
 
 ```pwsh
 # Scope-creep TASK on the current feature branch:
-.Codex/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -As task `
+.agents/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -As task `
   -Title "Guard against reentrant trigger during effect cleanup" `
   -Summary "Hardening discovered while wiring the dependency engine; outside the original feature scope." `
   -Acceptance "Reentrant triggers are deferred to the current flush.","Add targeted unit tests.","Trimming-safe and WASM/AOT-compatible." `
   -Status "In progress"
 
 # Out-of-feature → sibling FEATURE under the area epic:
-.Codex/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -As feature `
+.agents/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -As feature `
   -Title "Implement readonly shallow reactive views" -Wave W02 -Priority P003
 
 # Different area, explicit parent (issue number or WBS code of the area epic):
-.Codex/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -Parent V01.01.11 `
+.agents/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -Parent V01.01.11 `
   -Title "Add async flush assertion helpers to the test renderer"
 
 # Preview everything without creating (prints each gh command + the generated body):
-.Codex/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -Title "..." -DryRun
+.agents/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -Title "..." -DryRun
 ```
 
 Key options: `-Search "<keywords>"` (find existing items, then exit), `-As task|feature`,
@@ -110,9 +110,9 @@ If PowerShell isn't available, follow the **manual recipe** in
 The repo's issue body standard is `## Summary` → `## Acceptance Criteria` → `### Standards and Compliance`.
 The script generates this skeleton; fill it with real, testable criteria. Where the item specifies or
 changes behavior covered by `docs/SPECIFICATION.md`, cite the clause id in *Standards and Compliance*;
-where the item serves a declared compatibility target (the `.vue` container format, Tailwind CSS
-v4.3.3) or DOM behavior, cite that format or the WHATWG/W3C spec; otherwise note that it is a Viu
-runtime-contract concern.
+where the item serves a declared compatibility target (the `.vue` container format or the Language
+Server Protocol) or DOM behavior, cite that format or the WHATWG/W3C spec; otherwise note that it is
+a Viu runtime-contract concern.
 
 ## Step 4 — Close every item from the PR
 
@@ -122,7 +122,7 @@ it created on this branch (with its Origin); emit the block from the **same work
 (the manifest lives in `.git/viu/`, so it is per-worktree):
 
 ```pwsh
-.Codex/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -EmitClosesBlock
+.agents/skills/viu-work-items/scripts/New-ViuWorkItem.ps1 -EmitClosesBlock
 ```
 
 The output groups planned vs discovered work and tallies the creep — paste it into the PR description

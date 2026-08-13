@@ -19,7 +19,7 @@ serialize deterministically — must be run by **two build-time hosts**:
 If each host had its own copy of that logic, the generated constant and the physical file could drift. So the
 compilation lives **once**, here, and both hosts call it. Running the one deterministic implementation over
 the same `.viu` inputs is what makes the bundle **byte-identical** to the generated `ExtractedStyles`
-constant — the central design guarantee (`docs/UTILITY-CSS-DESIGN.md` §2.4). The generator was refactored to
+constant — the central component-CSS design guarantee. The generator was refactored to
 delegate to this core (it previously owned the logic in its `Internal/` folder); nothing about the compiled
 output changed, which the generator's existing style/caching tests pin.
 
@@ -77,12 +77,15 @@ blocks — matching the generator's constant exactly.
 
 ## Delivery boundary
 
-- **Utility-first CSS generation ([V01.01.12.13]+).** The utility engine is a separate producer with
-  its own `ViuBundleUtilityCss` task in the Browser SDK. It does not enter this component-style core;
-  the two deterministic stylesheets remain independent assets.
+- **Parked utility add-on history ([V01.01.12.13]+).** The former utility engine was a separate
+  producer with its own Browser SDK task, and never entered this component-style core. That SDK
+  integration was removed on 2026-08-13; the non-packable engine remains parked at
+  `tooling/Assimalign.Viu.UtilityCss` pending a redesign under `libraries/Utilities/`. Its historical,
+  non-normative contract remains in
+  [`docs/UTILITY-CSS-DESIGN.md`](../../../../docs/UTILITY-CSS-DESIGN.md).
 - **Browser delivery is not part of this compiler.** Static-web-asset registration, labeled endpoint
   resolution, component-library route flow, deterministic host-page link ordering, and gzip/brotli-safe
   injection are Browser SDK responsibilities. Their public contract and switches live in
-  [`sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md`](../../../sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md).
+  [`sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md`](../../../../sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md).
   This core guarantees the deterministic bytes from which those identities and fingerprints are derived;
   it does not choose a browser URL or mutate a host page.

@@ -13,24 +13,39 @@ Viu is a **standalone** C#/.NET WebAssembly UI framework. **[`docs/SPECIFICATION
 is the authority for Viu's semantics**, and behavior is pinned by tests in this repository — no
 external project's behavior, release, or roadmap is authoritative for Viu (decision of 2026-08-02).
 Where a type implements a documented **external compatibility target** — the `.vue`
-single-file-component container format ([V01.01.06.09], a shipping feature), Tailwind CSS v4.3.3
-(Viu Utilities), WHATWG HTML serialization, the Language Server Protocol — name and link that
-target. That is a compatibility *requirement* on a foreign format, not a semantic authority over
-Viu.
+single-file-component container format ([V01.01.06.09], a shipping feature), WHATWG HTML
+serialization, or the Language Server Protocol — name and link that target. That is a compatibility
+*requirement* on a foreign format, not a semantic authority over Viu. Tailwind CSS v4.3.3 is a target
+only of the parked utility-CSS add-on engine at `tooling/Assimalign.Viu.UtilityCss`; it is not a Viu
+core compatibility target (owner decision, 2026-08-13).
 
 ## Project layout
 
-- Inverted library layout: `libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name **is** the
-  assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
-  folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
-  `assimalign/viu`).
-- Compiler and editor libraries live under `tooling/Assimalign.Viu.<Name>/{src|test}` — the same
-  inverted layout and the same folder-name-is-the-assembly-id rule. The root, not a blanket
-  `Tooling.` assembly/namespace segment, carries the developer-tooling classification. It contains
-  the `Assimalign.Viu.Syntax*` parser cluster, the `Assimalign.Viu.Compiler.*` build-time composition
-  roots, `Assimalign.Viu.UtilityCss`, `Assimalign.Viu.LanguageService`, and
-  `Assimalign.Viu.LanguageServer`. None enters a Viu app's runtime; UtilityCss is the one independently
-  published tooling package.
+- Publicly consumable package surfaces use the area-based inverted layout
+  `libraries/<Area>/<AssemblyId>/{src,test}`. The areas are `Browser` (Browser, Browser.Router),
+  `DevTools` (DevTools, Testing), `Router`, `Runtime` (Components, Core, Reactivity, State),
+  `ServerRenderer`, and `Syntax` (Syntax plus Css, Html, SingleFileComponent, and Templates); the
+  assembly-id folder remains the package/project identity. `libraries/` therefore contains both
+  runtime libraries and the public netstandard2.0 build/editor-time parser cluster. The parsers are
+  deliberately consumable by developers and are the foundation for future extensible tooling;
+  `libraries/` does not mean runtime-only.
+- Compiler and editor implementation projects use the same area-based invariant under
+  `tooling/<Area>/<AssemblyId>/{src,test}`: `Compiler/` contains the two `Assimalign.Viu.Compiler.*`
+  composition roots and `Editor/` contains `Assimalign.Viu.LanguageService` and
+  `Assimalign.Viu.LanguageServer`. The location carries the developer-tooling classification without
+  adding a blanket `Tooling.` assembly/namespace segment. No tooling project is currently an
+  independently published package.
+- `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the single root-level exception. It is a parked,
+  non-packable add-on engine that remains built and tested by the tooling lane pending a fresh design
+  under `libraries/Utilities/`; that redesign must own its MSBuild props/targets and may own a
+  dedicated editor extension. Utility CSS is not integrated into the Viu SDK, hot reload, editors,
+  packaging, release train, or core specification. Component `<style>` CSS remains fully supported,
+  including scoping, bundling, and hot reload.
+- Ecosystem integration points live under `extensions/`: `VisualStudio/`, `VisualStudioCode/`, and
+  `dotnet/`. The dotnet templates project is
+  `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives at
+  `benchmarks/Assimalign.Viu.Testing.EndToEnd`, and SDK task projects use
+  `sdks/<SdkId>/Tasks/{src,test}`.
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
   `docs/`; the base and Browser consumer-facing MSBuild SDKs live in `sdks/`, and the
   `Assimalign.Viu.App` / `Assimalign.Viu.App.Browser` shared-framework pack producers live in
@@ -69,17 +84,19 @@ Viu.
   `Exception/`; they never appear in a namespace. Create a folder only when it will contain files.
 - Several projects link shared-source files through `<Compile Include>`, so their paths are frozen
   for this layout:
-  - Syntax siblings, `Assimalign.Viu.Compiler.Css`, `Assimalign.Viu.Compiler.SingleFileComponent`,
-    and `Assimalign.Viu.UtilityCss` link `Shims/IsExternalInit.cs` and
-    `Shims/RequiredMemberShims.cs` through
+  - Syntax siblings link `Shims/IsExternalInit.cs` and `Shims/RequiredMemberShims.cs` through
     `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`.
+  - `Assimalign.Viu.Compiler.Css`, `Assimalign.Viu.Compiler.SingleFileComponent`, and the parked
+    `Assimalign.Viu.UtilityCss` engine link those shims through
+    `$(ViuRepositoryDirectory)libraries\Syntax\Assimalign.Viu.Syntax\src\Shims\<File>`.
   - `Assimalign.Viu.Syntax.Templates` links `PatchFlags.cs` and `SlotStability.cs` from
-    `..\..\..\libraries\Assimalign.Viu.Components\src\`, and links `DomKnowledgeData.cs` from
-    `..\..\..\libraries\Assimalign.Viu.ServerRenderer\src\Internal\`.
+    `$(ViuRepositoryDirectory)libraries\Runtime\Assimalign.Viu.Components\src\`, and links
+    `DomKnowledgeData.cs` from
+    `$(ViuRepositoryDirectory)libraries\ServerRenderer\Assimalign.Viu.ServerRenderer\src\Internal\`.
   - The Visual Studio project links the external-init shim through
-    `$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs`; its source
-    and test projects link `Internal/DomKnowledgeData.cs` through
-    `$(ViuRepositoryDirectory)libraries\Assimalign.Viu.ServerRenderer\src\Internal\DomKnowledgeData.cs`.
+    `$(ViuRepositoryDirectory)libraries\Syntax\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs`;
+    its source and test projects link `Internal/DomKnowledgeData.cs` through
+    `$(ViuRepositoryDirectory)libraries\ServerRenderer\Assimalign.Viu.ServerRenderer\src\Internal\DomKnowledgeData.cs`.
   Moving any owner or consumer requires updating every linking csproj in the same change.
 
 ## Files and types

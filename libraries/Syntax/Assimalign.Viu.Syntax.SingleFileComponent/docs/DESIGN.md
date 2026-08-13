@@ -18,7 +18,7 @@ in Razor. The legacy `@template`/`@style` forms
 still parse through a Warning-severity migration window (1015/1016), and a top-level `<script>` tag
 is rejected with an error (1017) so its content can never silently skip compilation. Build-time-only
 compilation is one half of
-[ADR-0005](../../../docs/adr/0005-no-runtime-template-compilation.md); the full rule set is in
+[ADR-0005](../../../../docs/adr/0005-no-runtime-template-compilation.md); the full rule set is in
 [FORMAT.md](FORMAT.md).
 
 ## Tag-based `.vue` compatibility stays separate — but shares the scanner

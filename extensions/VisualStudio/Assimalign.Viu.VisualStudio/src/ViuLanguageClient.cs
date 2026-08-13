@@ -72,8 +72,8 @@ internal sealed class ViuLanguageClient :
     /// Gets the configuration sections the server reads through <c>workspace/configuration</c>.
     /// </summary>
     /// <remarks>
-    /// The server answers no configuration request and asks for none; its only settings input is the
-    /// project's own CSS-first Viu Utilities entry, which it reads from disk.
+    /// The server answers no configuration request and asks for none. Document synchronization and
+    /// the server's explicit project-artifact probe supply the inputs its language features consume.
     /// </remarks>
     public IEnumerable<string>? ConfigurationSections => null;
 

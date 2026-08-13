@@ -71,13 +71,13 @@ Visual Studio (devenv.exe)
                       -> Assimalign.Viu.LanguageService
                            -> Assimalign.Viu.Syntax.SingleFileComponent
                            -> Assimalign.Viu.Compiler.SingleFileComponent (the shared build/editor projection, [V01.01.06.11])
-                           -> Assimalign.Viu.UtilityCss
 ```
 
 `extensions/VisualStudio/` holds exactly one project, `Assimalign.Viu.VisualStudio`, and one build
 entry point, `Build.ps1`. Everything below the stdio boundary is editor-neutral developer tooling
-and lives under the repository's `tooling/` root (`tooling/Assimalign.Viu.LanguageServer`,
-`tooling/Assimalign.Viu.LanguageService`, and the build-time cores they consume).
+and lives under `tooling/Editor/` (`tooling/Editor/Assimalign.Viu.LanguageServer` and
+`tooling/Editor/Assimalign.Viu.LanguageService`) or `tooling/Compiler/` for the build-time cores.
+The publicly consumable parser libraries live under `libraries/Syntax/`.
 
 `Assimalign.Viu.VisualStudio` performs fast lexical classification with no server round trip. It
 lexes both container syntaxes of the hybrid `.viu` format ([V01.01.06.10]): tag-delimited top-level
@@ -99,17 +99,18 @@ completion catalogs, declaration-aware `@script` member completion ([V01.01.12.0
 syntax-only Roslyn parse of the script block, cached on the block text; no compilation, no
 workspace), semantic `@script` completion when the host feeds a restored project context
 ([V01.01.12.23] #259 — an artifact-fed `CSharpCompilation` answered through
-`SemanticModel.LookupSymbols`; still no workspace), shared utility-class completion,
-project-defined utilities and variants, and generated-CSS hover documentation. It never loads a
-Roslyn workspace.
+`SemanticModel.LookupSymbols`; still no workspace), and completion plus authored-rule hover for
+class selectors declared in the current component's `<style>` blocks. It never loads a Roslyn
+workspace.
 
-Color utility completions carry their computed CSS value in the Language Server Protocol item's
-opaque `data.colorValue`. The Visual Studio message middle layer captures the completed response,
-and a Viu-only Async Completion item-manager wrapper delegates filtering and sorting to the editor's
-default manager. It matches the complete candidate identity within one completion-source group,
-then changes only that candidate's icon. Custom images are registered on the UI thread through
-`IVsManagedImageService`, their handles remain alive with the catalog, and the current document path
-is read for every list so Save As cannot strand a response under an old path. [V01.01.12.07.13]
+`LanguageCompletionItem.ColorValue` and the Language Server Protocol `Color` completion kind remain
+as dormant, generic transport. If a future completion producer supplies a computed CSS value, the
+Visual Studio message middle layer can capture `data.colorValue`, and its Async Completion
+item-manager wrapper can replace only that candidate's icon while leaving filtering and sorting to
+the editor's default manager. Current component-style completions deliberately supply no color
+value. Custom images are registered on the UI thread through `IVsManagedImageService`, their handles
+remain alive with the catalog, and the current document path is read for every list so Save As
+cannot strand a response under an old path. [V01.01.12.07.13]
 
 ## The Viu color theme
 
@@ -171,13 +172,11 @@ component registry, and Viu's ordinal name resolution makes the authored spellin
 (specified by `[CMP-6]`), so a PascalCase or dotted tag name is a component and a lowercase one is an
 element.
 
-**Recorded user decision — a `class` value is one uninterrupted color.** `UtilityVariant` and
-`UtilityClass` both map to `viu.attribute.value`, so a list of utilities reads as a value rather than
-as a syntax exhibit. The lexer still separates each leading variant prefix (`hover:`, `md:` — the
-colon included) from the utility that follows, and a `[...]` arbitrary value is never split on its
-inner colons, so the utility stays one token. The language server and the Visual Studio Code grammar
-both act on that distinction; the Visual Studio editor simply does not color the parts apart.
-Candidate validation stays in the language server per the source boundaries below.
+**Recorded user decision — a `class` value is one uninterrupted color.** The lexer's internal
+`UtilityVariant` and `UtilityClass` names predate the utility add-on's removal; both still map to
+`viu.attribute.value`, so class text reads as one attribute value rather than as a syntax exhibit.
+That dormant naming does not advertise utility completion. Component-style class completion is a
+separate language-service feature backed by selectors declared in the document's `<style>` blocks.
 
 **Recorded decision — the method-position rule for binding values.** Binding-expression interiors run
 the C# token passes, and the method position has two halves. Call syntax — an identifier immediately
@@ -655,74 +654,38 @@ separate halves.**
   Studio is future work, worth doing only if it is demanded, and would need an activation path that
   coexists with Web Tools rather than replacing it.
 
-## Viu Utilities project context
+## Parked Viu Utilities integration (design history)
 
-`Assimalign.Viu.UtilityCss` is the single compiler/editor authority. Its contract is frozen
-to Tailwind CSS v4.3.3 by
+> **Parked add-on — non-normative.** The SDK, hot-reload, language-service, language-server, and
+> Visual Studio integration described in this section was removed on 2026-08-13. The engine remains
+> at `tooling/Assimalign.Viu.UtilityCss` as a non-packable prototype pending a fresh add-on design
+> under `libraries/Utilities/`. Its Tailwind CSS v4.3.3 compatibility target is not a Viu core or
+> current extension contract.
+
+Before removal, `Assimalign.Viu.UtilityCss` supplied one compiler/editor registry, pinned by
 [`compatibility-v4.3.3.json`](../../../../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json)
-and independently authored
+and
 [`golden-vectors-v4.3.3.json`](../../../../tooling/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json).
-The manifest enumerates 382 utility roots, 88 variants, 21 theme namespaces, value and modifier
-modes, source forms, directives, functions, and canonical ordering. The language service consumes
-that registry directly; completion detail and hover display executable compiler output.
+The language server located one literal project utility entry, loaded its recursive references and
+CSS-first configuration, and used the same compiler for completion detail, generated-CSS hover, and
+SDK output. Candidate discovery was deliberately limited to template class text and explicitly
+configured sources; script/style regions, ordinary C# strings, and runtime-built fragments were
+outside that former contract. This record is retained to inform the add-on redesign, not to promise
+that Viu or the VSIX currently consumes the parked engine.
 
-For each completion or hover request, the language-server host:
+## Current component-style source and update boundaries
 
-1. finds the nearest owning Viu project;
-2. reads exactly one literal `<ViuUtilityCss Include="...">` item;
-3. reloads the project stylesheet;
-4. builds its recursive relative `@reference` graph;
-5. parses the virtual import/source configuration and immutable theme;
-6. compiles local and referenced custom utility/variant definitions;
-7. resolves the authored candidate through the same built-in and project compilers used by the SDK.
+Component-style completion activates in static class attributes and literal class-binding strings.
+It reads class selectors from the current `.viu` or accepted `.vue` document's `<style>` blocks and
+offers the authored declarations; it does not consult the parked add-on or scan arbitrary C#.
 
-The CSS-first project entry supports:
-
-- `@import "viu-utilities"` with `source(<path>|none)`, `prefix(...)`,
-  `theme(inline|static)`, and `important`;
-- path and inline `@source` inclusion/exclusion, including brace expansion and numeric ranges;
-- normal, `inline`, `static`, `reference`, and `default` `@theme` declarations;
-- static, nested, negative, and functional `@utility`;
-- selector and block `@custom-variant`, authored `@variant`, and built-in/custom `@apply`;
-- `@reference` composition for shared theme, utility, and variant definitions;
-- `--value()`, `--modifier()`, `--default()`, `--spacing()`, and `--alpha()`.
-
-`"viu-utilities"` is a Viu compiler sentinel, not a package. The VSIX does not install, load,
-bundle, or coordinate with Tailwind CSS or Tailwind CSS IntelliSense. Viu Utilities is an
-independent Viu feature compatible with documented Tailwind CSS v4.3.3 behavior; it is not
-affiliated with or endorsed by Tailwind Labs.
-
-The pre-`MSBuildWorkspace` project lookup is intentionally conservative. Multiple utility entries,
-an MSBuild property or wildcard in `Include`, a missing file, or an unreadable reference falls back
-to the built-in registry and default theme. The service does not guess an evaluated path. Custom
-static utilities and theme-backed values are offered directly; functional definitions can expose
-their root, but completion does not invent project-specific functional values absent from the
-theme or authored source.
-
-## Source and update boundaries
-
-Utility IntelliSense activates only in static class attributes and literal class-binding strings.
-The container parser supplies only `.viu` or `.vue` `<template>` text (including the legacy `.viu`
-`@template` container during its migration window) to that context.
-Script and style regions, ordinary `.cs`, arbitrary C# strings, and runtime-built class fragments
-are never utility candidate sources. Complete alternatives must appear in template text or be
-included through `@source inline(...)`. Code-first utility discovery is a separate deferred
-feature.
-
-The `@source` forms above govern SDK build-time candidate discovery. The language server does not
-crawl configured source roots or convert inline source entries into completion suggestions; it
-uses the loaded configuration to resolve class text authored in the template being edited.
-
-The language server reads CSS-first configuration for editor semantics but does not write bundles
-or refresh the browser. In a Debug `dotnet watch` session, the packaged SDK launches one
-project-scoped CSS sidecar. It watches component files, the utility entry, explicit utility-source
-items, and supported automatically discovered markup; batches regeneration; and lets the .NET
-browser-refresh client replace the generated stylesheet links. A CSS file reached only through
-`@reference` is re-read on compilation but is not independently a watch trigger unless it is also
-an explicit `ViuUtilityCssSource`. This CSS-only update does not remount the Viu application or
-discard browser state. Visual Studio's ordinary Hot Reload command does not invoke that watch-list
-contract. Template/C# generation remains on the normal .NET build/Hot Reload path and remounts the
-affected component on .NET 10 browser WebAssembly.
+The language server does not write bundles or refresh the browser. In a Debug `dotnet watch`
+session, the packaged Browser SDK launches the component-CSS sidecar, batches regeneration for
+changed component files, and lets the .NET browser-refresh client replace the generated stylesheet
+links. A component-CSS-only update does not remount the Viu application or discard browser state.
+Visual Studio's ordinary Hot Reload command does not invoke that watch contract. Template/C#
+generation remains on the normal .NET build/Hot Reload path and remounts the affected component on
+.NET 10 browser WebAssembly.
 
 ## Semantic IntelliSense roadmap
 
@@ -731,7 +694,7 @@ Project-aware IntelliSense requires one authoritative `.viu`/`.vue` to C# projec
 1. **Delivered ([V01.01.06.11], #258).** The generator's component-name, script-region,
    generated-context, and source-mapping logic is extracted into the shared
    `Assimalign.Viu.Compiler.SingleFileComponent` library
-   (`tooling/Assimalign.Viu.Compiler.SingleFileComponent`, see its `docs/DESIGN.md`); the source
+   (`tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent`, see its `docs/DESIGN.md`); the source
    generator and this language service both consume it, and the two-host conformance test
    (`analyzers/Assimalign.Viu.Generators.Syntax/test/SingleFileComponentProjectionConformanceTests.cs`)
    pins ordinal-identical generated source, hint names, and diagnostics.
@@ -883,8 +846,8 @@ installed .NET SDK and the project's base or Browser Viu SDK package for complet
 functionality —
 in particular the Roslyn-workspace semantic features, whose project evaluation cannot be frozen
 into the VSIX because it must match the SDK the consumer's project builds with. The boundary is:
-baseline features (container parsing, diagnostics, utility IntelliSense) keep working with no
-machine prerequisites; semantic features may depend on local SDK state and must degrade gracefully
+baseline features (container parsing and diagnostics) keep working with no machine prerequisites;
+semantic features may depend on local SDK state and must degrade gracefully
 — never silently — when it is absent. An earlier revision of this section stated machine
 independence as a design guarantee; that overstated the intent. The VSIX layout is:
 

@@ -383,9 +383,9 @@ diff path. This matters more on WASM than in JavaScript: **every DOM mutation cr
 boundary**, so idiomatic Viu leans on compiled render functions and batched renderer updates rather
 than imperative DOM access ([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `VirtualNode`,
 its ten sealed node kinds, `IComponent`, `ComponentContext`, and registration vocabulary live in
-[`Assimalign.Viu.Components`](../../libraries/Assimalign.Viu.Components/docs/OVERVIEW.md); the
+[`Assimalign.Viu.Components`](../../libraries/Runtime/Assimalign.Viu.Components/docs/OVERVIEW.md); the
 browser `Application` facade and `BrowserApplication` host live in
-[`Assimalign.Viu.Browser`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a complete
+[`Assimalign.Viu.Browser`](../../libraries/Browser/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a complete
 application with props, emitted events, lifecycle hooks, routing, forms, state, and built-ins, read
 the external [`viu-examples` showcase](https://github.com/assimalign/viu-examples).
 
@@ -416,7 +416,7 @@ Three consequences worth internalizing up front:
 
 `[Reactive]` is what makes an ordinary object's properties participate in that graph, and it does so
 at build time (see [ADR-0002](../adr/0002-ref-first-reactivity.md) and the
-[Reactivity overview](../../libraries/Assimalign.Viu.Reactivity/docs/OVERVIEW.md)). The class must be
+[Reactivity overview](../../libraries/Runtime/Assimalign.Viu.Reactivity/docs/OVERVIEW.md)). The class must be
 `partial`, and every reactive property is declared `partial`:
 
 ```csharp
@@ -440,7 +440,7 @@ schedules a re-render — no reflection, fully trimming- and AOT-safe.
 
 Viu's canonical single-file component is the `.viu` file, using the hybrid container
 ([V01.01.06.10], #257): `<template>`/`<style>` tags plus the C# `@script { }` block (the exact grammar
-is in [`FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
+is in [`FORMAT.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
 `@template`/`@style` `@`-blocks still parse with a migration warning). A `.viu` with a
 `<template>`/`@script` compiles to a **mountable component** (see the note below,
 [#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **bundled CSS** unit.
@@ -568,8 +568,8 @@ That folder is a static site — host it on any static web host.
   and packaging project.
 - **Per-library overviews** — each library documents itself in `docs/OVERVIEW.md` (what it is) and
   `docs/DESIGN.md` (why it is shaped that way). Start with
-  [Core](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md) and
-  [Browser](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md).
+  [Core](../../libraries/Runtime/Assimalign.Viu.Core/docs/OVERVIEW.md) and
+  [Browser](../../libraries/Browser/Assimalign.Viu.Browser/docs/OVERVIEW.md).
 - **The sample app** — the external
   [`viu-examples` showcase](https://github.com/assimalign/viu-examples) consumes the packaged SDK
   and demonstrates components, routing, reactivity, state, browser directives, built-ins, and the

@@ -22,10 +22,14 @@ Components, Reactivity, State, and Core. The Browser SDK composes the Browser-on
 exists. Components, Reactivity, State, Core, and Browser are also packable libraries; D2/G1 requires
 each targeting pack to override its same-version standalone package assets.
 
-The Syntax, compiler, UtilityCss, language-service, and language-server assemblies are build/editor
-tooling, not runtime app references. ServerRenderer, Router, Browser.Router, and Testing remain
-opt-in packages. PublicAPI enforcement applies to every packable public project regardless of which
-delivery path exposes it.
+The `netstandard2.0` Syntax cluster is a publicly consumable parser surface under
+`libraries/Syntax/`, not a runtime app reference; its placement supports the planned extensible
+tooling surface for developers who parse CSS, templates, or single-file components directly. The
+compiler and language-service/server assemblies remain internal build/editor tooling under
+`tooling/Compiler/` and `tooling/Editor/`. The non-packable utility-CSS engine is parked at
+`tooling/Assimalign.Viu.UtilityCss` and is no longer integrated with Viu or included in its release
+train. ServerRenderer, Router, Browser.Router, and Testing remain opt-in packages. PublicAPI
+enforcement applies to every packable public project regardless of which delivery path exposes it.
 
 The runtime dependency direction relevant to this arc is:
 
@@ -43,7 +47,7 @@ Router <- Browser.Router
 |---|---|---|---|
 | D1 | Nothing has shipped publicly; use direct renames/deletions instead of compatibility shims. | 2026-08-05 | The first release remains the point at which compatibility policy changes. |
 | D2 | Publish framework libraries standalone and emit `data/PackageOverrides.txt`. | 2026-08-05 | Stock-SDK component libraries need package references, while Viu SDK apps must consume the framework copy rather than duplicate `lib/` assets. |
-| D3/D3a | Delete Syntax.JavaScript; retain Syntax.Html but do not publish it until its runtime dependency/TFM shape is settled. | 2026-08-05 | The retained parser is not yet a restorable runtime package. |
+| D3/D3a | Historical decision: delete Syntax.JavaScript and initially retain Syntax.Html without publication. Superseded on 2026-08-13 by placing the complete public parser cluster under `libraries/Syntax/` for the extensible-tooling direction. | 2026-08-05/13 | The original runtime-dependency concern no longer defines the Syntax cluster's architectural home; the parsers are build/editor-time libraries, not runtime app references. |
 | D4 | Track the arc through its area epic and this plan; create detailed feature items immediately before execution. | 2026-08-05 | Avoids speculative issue bodies drifting from the live surface. |
 | D5/D5a | Replace application plugins with build-time composition plus lifetime middleware; expose host start/stop and keep mounting host-specific. | 2026-08-05/06 | This is the landed application-lifetime model. |
 | D6 | Segment the SDK and framework by platform. | 2026-08-06 | The original SDK/framework were browser-coupled; D12 records the consumer topology that made the split immediately testable. |
@@ -185,7 +189,8 @@ the six decisions remains pending:
   handling, and component-test triggering. D11-C keeps the type and replaces its constructor's four
   Boolean modifiers with `RouterLinkModifiers` under `[RTR-1]` and `[RTR-7]`.
 - Browser `CreateRenderer` is not dead surface: it returns an owning disposable renderer lease.
-- Syntax.Html is intentionally retained but unpublished under D3a; `.vue` single-file-component
+- Syntax.Html is intentionally retained in the publicly consumable `libraries/Syntax/` cluster;
+  D3a's unpublished-tooling disposition is historical and superseded. `.vue` single-file-component
   parsing is a shipping compatibility feature and must not be removed.
 
 ## Arc completion and gates
@@ -196,7 +201,8 @@ baselines. The completing change reported its warning-as-error build, solution t
 analyzer, compiled-fixture, repository-state, and D8 scans in
 [#318](https://github.com/assimalign/viu/pull/318); the branch-local `.hardening` report was not
 retained in the repository. The 2026-08-08 documentation reconciliation independently reran the
-solution build and test inventory and records the result in [`.docs-reconcile.md`](../.docs-reconcile.md).
+solution build and test inventory and recorded the result in the branch-local `.docs-reconcile.md`;
+that report likewise was not retained in the repository.
 
 D8 is checked after every group: every `InternalsVisibleTo` target must be the owning library's test
 assembly. No production or cross-library grant is acceptable.

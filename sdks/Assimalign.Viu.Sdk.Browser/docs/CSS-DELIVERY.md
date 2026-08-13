@@ -65,9 +65,5 @@ Here the explicit `assets/application.css` wins and endpoint lookup is skipped.
 | `ViuSingleFileComponentCssBundleLinkHref` | `<PackageId>.viu.css` | Explicit application href. When authored, it overrides the fingerprint opt-in. |
 | `OverrideHtmlAssetPlaceholders` | WebAssembly SDK policy | Controls boot-placeholder rewriting only; it does not enable or disable Viu CSS delivery. |
 
-`ViuBundleUtilityCss` is independent. Its `<PackageId>.utilities.css` link uses the same
-compression-safe host-page registration path, but it does not change component bundle ordering or
-fingerprint policy.
-
 This contract implements [V01.01.12.12.01], [V01.01.12.12.03], [V01.01.12.12.04],
 [V01.01.12.12.05], [V01.01.12.12.06], and [V01.01.12.12.07].

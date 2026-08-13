@@ -1,20 +1,27 @@
-# Viu runtime libraries
+# Viu public libraries
 
-This directory contains Viu's shipping runtime libraries. Their documentation describes the
-installed `[V01.01.15]` component model and its current compiler/runtime contracts.
+This directory contains Viu's publicly consumable packages. Projects follow the area-based layout
+`libraries/<Area>/<AssemblyId>/{src,test,docs}`; the area groups related packages without changing
+their assembly ids or namespaces.
 
-The principal packages are:
+The areas are:
 
-- `Assimalign.Viu.Reactivity` — change tracking and reactive lifetimes;
-- `Assimalign.Viu.Components` — the closed `VirtualNode` algebra, authored component contract,
-  registration, bindings, and render plans;
-- `Assimalign.Viu.State` — the state-store convention attached through designed component seams;
-- `Assimalign.Viu.Core` — application composition, lifetime, renderer engine, and host operations;
-- `Assimalign.Viu.Browser` — the browser host and DOM interop;
-- `Assimalign.Viu.ServerRenderer` and `Assimalign.Viu.Testing` — one-shot server rendering and
-  in-memory testing hosts; and
-- `Assimalign.Viu.Router` plus `Assimalign.Viu.Browser.Router` — host-neutral navigation and the
-  browser history/click bridge.
+- `Runtime/` — `Assimalign.Viu.Components`, `Assimalign.Viu.Core`,
+  `Assimalign.Viu.Reactivity`, and `Assimalign.Viu.State`;
+- `Browser/` — `Assimalign.Viu.Browser` and the browser-specific router bridge;
+- `Router/` — the host-neutral `Assimalign.Viu.Router` package;
+- `ServerRenderer/` — DOM-free server rendering;
+- `DevTools/` — optional runtime inspection and the in-memory testing host; and
+- `Syntax/` — the five publicly consumable `netstandard2.0` parser packages for CSS, HTML,
+  templates, and canonical or compatible single-file-component containers.
+
+The Syntax cluster lives here deliberately. It is a public parsing surface for developers and
+future extensible-tooling work, even though those assemblies execute at build or editor time rather
+than in a Viu application's runtime. The `libraries/` boundary therefore means publicly consumable,
+not runtime-only.
+
+The runtime areas document the installed `[V01.01.15]` component model and its current
+compiler/runtime contracts.
 
 The application lifetime boundary is host-neutral. Core owns `IApplication`, the read-only
 application context, middleware, `ApplicationLifetime`, and the promoted `ApplicationState`.

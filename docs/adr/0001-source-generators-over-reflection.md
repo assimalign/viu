@@ -52,7 +52,7 @@ exception (see [`.claude/rules/deviations.md`](../../.claude/rules/deviations.md
   (see [ADR-0005](0005-no-runtime-template-compilation.md)).
 - Generator inputs and outputs must be **value-equatable** so the incremental-generator cache holds
   — this shapes the whole `Assimalign.Viu.Syntax.*` cluster (immutable records, `SyntaxList<T>`; see
-  [`Assimalign.Viu.Syntax/docs/DESIGN.md`](../../tooling/Assimalign.Viu.Syntax/docs/DESIGN.md)).
+  [`Assimalign.Viu.Syntax/docs/DESIGN.md`](../../libraries/Syntax/Assimalign.Viu.Syntax/docs/DESIGN.md)).
 - Generators run in netstandard2.0 analyzer hosts with no file/network I/O and are delivered to SDK
   consumers through the `Assimalign.Viu.App.Ref` targeting pack's `analyzers/dotnet/cs/` (see
   [`docs/PLAN.md`](../PLAN.md) founding decision 8).

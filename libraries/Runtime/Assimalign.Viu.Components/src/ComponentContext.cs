@@ -15,8 +15,9 @@ namespace Assimalign.Viu.Components;
 /// <see cref="Services"/> or the ambient reactive scope. No capability is discovered by casting
 /// this type. A consumer-derived context is inert: no runtime API accepts one, and the runtime
 /// only ever invokes <see cref="IComponent.Setup"/> with its own implementation.
-/// Deliberately absent: a style-scope identifier — scoped CSS is deferred until after the
-/// component-model arc; reintroduction is an additive member.
+/// Deliberately absent: a runtime-carried style-scope identifier. Scoped CSS is compiler-owned;
+/// generated render descriptions stamp the known scope identifier as an ordinary static attribute,
+/// so the mounted context requires no parallel state. Specified by <c>[STY-1]</c>.
 /// Specified by <c>[CMP-2]</c>, <c>[CMP-24]</c>, and <c>[CMP-33]</c>.
 /// </remarks>
 public abstract class ComponentContext

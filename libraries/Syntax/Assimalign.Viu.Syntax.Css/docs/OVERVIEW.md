@@ -25,14 +25,16 @@ ones.
   (declarations, qualified rules, `@media`/conditional-group at-rules, selectors) from code; the fluent
   `CssStylesheetBuilder` accumulates a stylesheet; `CssSyntheticLocation` marks and recognizes the
   synthetic `SourceLocation`s constructed nodes carry. Generic CSS construction only — it knows nothing of
-  utilities. Consumed by the build-time utility-first CSS engine ([V01.01.12.16]).
+  utilities. The parked utility add-on ([V01.01.12.16]) remains a historical consumer; the surface is
+  also available to developer-authored CSS tooling without taking a dependency on that add-on.
 - **`CssError` / `CssErrorCode`** — the Viu-defined recoverable-diagnostic catalog (2000-based).
 
 ## Boundary
 
 Roots on `Assimalign.Viu.Syntax` only. It never references the `SingleFileComponent` parser or any other
-language library; the composition root wires them together. Runtime projects never reference it — they see
-only the scope-id string in generated component metadata. Targets the netstandard2.0 analyzer TFM because
-it runs inside Roslyn generator hosts.
+language library; the composition root wires them together. Runtime framework projects do not reference it —
+they see only the scope-id string in generated component metadata — while developer tooling may consume the
+public parser directly. It targets the netstandard2.0 analyzer TFM so it can run inside Roslyn generator
+hosts and other build/editor-time processes.
 
 Rationale and deliberate divergences live in [DESIGN.md](DESIGN.md).

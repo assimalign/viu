@@ -21,7 +21,8 @@ namespace Assimalign.Viu.Compiler.Css;
 /// <c>Assimalign.Viu.Generators.Syntax</c>; it was lifted here unchanged so the generator and the
 /// <c>ViuBundleCss</c> MSBuild task run <em>one</em> deterministic implementation over the same inputs. That
 /// single-path design is what makes the emitted constant and the physical bundle byte-identical — there is no
-/// second, divergent generation path (see <c>docs/UTILITY-CSS-DESIGN.md</c> §2.4). No I/O, no reflection, no
+/// second, divergent generation path (see
+/// <c>tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/DESIGN.md</c>). No I/O, no reflection, no
 /// dynamic codegen; recoverable (malformed <c>v-bind()</c> surfaces as a diagnostic, never throws) — the only
 /// expected exception is <see cref="OperationCanceledException"/>.
 /// </para>

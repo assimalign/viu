@@ -540,7 +540,8 @@ public static class SingleFileComponentProjection
     /// core ([V01.01.12.12], <see cref="SingleFileComponentStyleCompiler"/>) — the SAME deterministic
     /// method the <c>ViuBundleCss</c> MSBuild task calls over the same <c>.viu</c> inputs, which is what
     /// keeps the emitted <c>ExtractedStyles</c> constant and the physical CSS bundle byte-identical
-    /// (docs/UTILITY-CSS-DESIGN.md §2.4). The projection layers the compile-only concerns on top: the
+    /// (see <c>tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/DESIGN.md</c>). The projection layers
+    /// the compile-only concerns on top: the
     /// template-facing module-name map ([V01.01.05.04.01]) and the [V01.01.06.06.01] binding-metadata
     /// rewrite of each <c>v-bind()</c> expression, whose diagnostics compose onto exact <c>.viu</c> style
     /// coordinates. The scope id is returned only when a <c>scoped</c> block is declared.

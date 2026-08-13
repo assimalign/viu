@@ -9,22 +9,34 @@ AOT/trimming territory, so reflection-based serialization and dynamic code gener
 **[`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) is the authority for Viu's semantics** — cite its
 clause ids (`[RND-KEY-3]`, `[CMP-4]`, …) rather than any external framework. Viu is not a port of and
 takes no semantics from any JavaScript framework. Two things are deliberately different:
-external **compatibility targets** (the `.vue` container format, Tailwind CSS v4.3.3, WHATWG HTML
-serialization) are real product features and are documented as such; and
+external **compatibility targets** (the `.vue` container format, WHATWG HTML serialization, and the
+Language Server Protocol) are real product features and are documented as such; and
 [`docs/PERFORMANCE-RESEARCH.md`](docs/PERFORMANCE-RESEARCH.md) is the non-normative channel for
 evaluating other frameworks' performance work — including Vue's — for possible replication.
+Tailwind CSS v4.3.3 is now only the target of the parked utility-CSS add-on engine at
+`tooling/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility target (owner decision,
+2026-08-13). Component `<style>` CSS remains fully supported, including scoping, bundling, and hot
+reload.
 
 ## Layout
 
-- `libraries/` — framework libraries, inverted layout: `libraries/Assimalign.Viu.<Name>/{src|test}`
-  (the folder name is the assembly/package id; `src/` holds the shipping project, `test/` its tests —
-  no area wrapper folders)
-- `tooling/` — compiler and editor libraries: the `Assimalign.Viu.Syntax*` parser cluster,
-  `Assimalign.Viu.Compiler.*` build-time composition roots, `Assimalign.Viu.UtilityCss`, and the
-  language service/server. Same inverted `{src|test}` layout, folder name = assembly id. The root
-  carries the tooling classification; assembly ids and namespaces do not use a blanket `Tooling.`
-  segment. These projects run in analyzer/MSBuild hosts or the editor and never enter a Viu app's
-  runtime; `Assimalign.Viu.UtilityCss` is the one independently published tooling package.
+- `libraries/` — publicly consumable package surfaces in the area-based inverted layout
+  `libraries/<Area>/<AssemblyId>/{src,test}`. Areas are `Browser` (Browser, Browser.Router),
+  `DevTools` (DevTools, Testing), `Router`, `Runtime` (Components, Core, Reactivity, State),
+  `ServerRenderer`, and `Syntax` (all five Syntax projects). The public netstandard2.0 build/editor-time
+  parser cluster is deliberately here so developers can parse CSS, templates, and single-file
+  components directly; `libraries/` no longer means runtime-only.
+- `tooling/` — implementation projects under `tooling/<Area>/<AssemblyId>/{src,test}`:
+  `Compiler/{Assimalign.Viu.Compiler.Css, Assimalign.Viu.Compiler.SingleFileComponent}` and
+  `Editor/{Assimalign.Viu.LanguageService, Assimalign.Viu.LanguageServer}`. No tooling project is
+  currently independently published. `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the parked,
+  non-packable root-level exception; it remains built and tested by the tooling lane pending a fresh
+  add-on design under `libraries/Utilities/` with add-on-owned MSBuild props/targets and, if needed,
+  its own editor extension.
+- `extensions/` — ecosystem integration points: `VisualStudio/`, `VisualStudioCode/`, and `dotnet/`;
+  templates live at `extensions/dotnet/Assimalign.Viu.Templates`.
+- `benchmarks/Assimalign.Viu.Testing.EndToEnd/` — real-browser end-to-end harness.
+- `sdks/<SdkId>/Tasks/{src,test}` — SDK task projects.
 - `../viu-examples/` — external packaged-consumer WASM showcase (separate repository)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
 - `.claude/rules/` — the canonical working conventions for this repo (auto-load by path):
@@ -35,7 +47,7 @@ evaluating other frameworks' performance work — including Vue's — for possib
 ## Build and test
 
 - `dotnet build Assimalign.Viu.slnx`
-- `dotnet test <project>/tests/`
+- `dotnet test <project>/test/`
 - Run the showcase from the sibling `viu-examples` repository after packing `_out/packages`
 
 ## Work tracking

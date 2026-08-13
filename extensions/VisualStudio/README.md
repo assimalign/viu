@@ -13,7 +13,8 @@ This area contains the end-to-end Visual Studio editing experience for Viu singl
 
 Only the extension lives under `extensions/VisualStudio/`. The language server and the language
 service are editor-neutral developer tooling and live at
-`tooling/Assimalign.Viu.LanguageServer` and `tooling/Assimalign.Viu.LanguageService`;
+`tooling/Editor/Assimalign.Viu.LanguageServer` and
+`tooling/Editor/Assimalign.Viu.LanguageService`;
 `Assimalign.Viu.VisualStudio.slnx` and `Build.ps1` drive all three together.
 
 The process boundary that matters is the server's, and it is intentional: Viu's parsers and Roslyn
@@ -96,7 +97,7 @@ extension ownership", for the editor-factory ladder and the mechanism.
 The standard `area-visual-studio` workflow only builds and tests. The official
 [`release`](../../.github/workflows/release.yml) workflow publishes a validated Marketplace preview
 after a pull request merges into `main`, and only when the extension or one of its packaged parser
-or utility-engine dependencies changed. It queries the existing listing to assign the next numeric
+or editor dependencies changed. It queries the existing listing to assign the next numeric
 VSIX revision, then builds, tests, validates, and publishes from the protected
 `visual-studio-marketplace` environment.
 
@@ -135,76 +136,29 @@ The complete repository and Marketplace setup is documented in
 - Full and incremental document synchronization
 - Completion for block headers and options, common template tags/directives/events, CSS properties,
   `Context.*`, and `Reactive.*`
-- Manifest-backed Viu Utilities completion and hover with the exact generated CSS preview inside
-  static and literal bound template `class` values
+- Completion and authored-rule hover for class selectors declared in the component's own
+  `<style>` blocks, inside static and literal-bound template `class` values
 - Hover documentation for core Viu concepts
-- Tag-based `.vue` document parsing, utility completion/hover, block completion, and explicit
+- Tag-based `.vue` document parsing, component-style completion/hover, block completion, and explicit
   diagnostics for non-C# scripts, with explicit C# ordinary and setup scripts sharing the generated
   partial-component contract in Viu SDK projects — a **language-server** capability, live for hosts
   that route `.vue` to it, and not reachable from Visual Studio today (see below)
 
-## Viu Utilities IntelliSense
+## Parked utility add-on
 
-The extension and SDK use the same `Assimalign.Viu.UtilityCss` parser, frozen
-Tailwind CSS v4.3.3-compatible registry, theme model, and project stylesheet compiler. The
-machine-readable compatibility contract is
-[`compatibility-v4.3.3.json`](../../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json):
-382 utility roots, 88 variants, 21 theme namespaces, supported value/modifier modes, and the
-CSS-first directive/function surface. Completion detail and hover are compiler output, not a
-separate editor approximation.
+The former Viu Utilities integration — including utility-class completion, generated-CSS hover,
+SDK delivery, and editor project configuration — was removed from Viu on 2026-08-13. The engine is
+parked at `tooling/Assimalign.Viu.UtilityCss` as a non-packable add-on prototype pending a fresh
+design under `libraries/Utilities/`; it is not a current Visual Studio feature. The former Tailwind
+CSS v4.3.3 compatibility target belongs only to that parked add-on.
 
-For each component document, the language server reads a singular literal project item:
+The generic `LanguageCompletionItem.ColorValue` and Language Server Protocol `Color` completion
+kind remain as dormant transport. The Visual Studio swatch adapter can present those values if a
+future completion producer supplies them, but no current component-style completion does so.
 
-```xml
-<ItemGroup>
-    <ViuUtilityCss Include="Utilities.css" />
-</ItemGroup>
-```
-
-That stylesheet may contain:
-
-- `@import "viu-utilities"` with `source(...)`, `prefix(...)`, `theme(inline|static)`, and
-  `important`;
-- `@source` path and inline inclusion/exclusion forms;
-- `@theme` normal, `inline`, `static`, `reference`, and `default` declarations;
-- static and functional `@utility` definitions;
-- selector and `@slot` `@custom-variant` definitions;
-- authored `@variant` and `@apply` composition;
-- recursive relative `@reference` graphs for shared theme, utility, and variant definitions.
-
-The `@source` forms govern SDK build-time candidate discovery. The language server does not crawl
-those roots or turn inline source entries into completion suggestions; IntelliSense proposes class
-text in the template being edited and uses the loaded configuration to resolve authored
-candidates.
-
-The server refreshes the entry and its reference graph before completion and hover requests.
-Project theme tokens, prefixes, global important mode, custom static utilities, referenced
-definitions, and custom variants therefore use the same executable semantics as the SDK build.
-Built-in arbitrary values/properties/variants, CSS-variable forms, negatives, fractions, modifiers,
-prefixes, and trailing important syntax are resolved on the authored candidate and shown on hover.
-
-IntelliSense activates only inside static `class="..."` text and literal portions of bound class
-values. For `.vue`, the utility engine scans and edits only `<template>` content; text in
-`<script>` and `<style>` is not a utility source. The same template-only boundary applies to the
-hybrid `.viu` container: `<template>` content is the only utility source, never `@script` or
-`<style>` (nor the legacy `@template`/`@style` blocks during their migration window).
-
-The project lookup is intentionally narrow: the `ViuUtilityCss` item must be one direct literal
-relative path. An MSBuild property, wildcard, multiple entries, missing file, or unreadable
-reference graph falls back to the built-in registry and default theme instead of guessing an
-evaluated project state. Completion can propose a functional custom utility root, but it does not
-invent project-specific values that are not present in the theme or source text.
-
-These completions are syntax-aware rather than Roslyn project-semantic. Ordinary `.cs` files,
-arbitrary C# strings, and runtime-built class fragments are not scanned. Code-first utility
-discovery is deliberately deferred. Roslyn-backed C# completion, component discovery,
-go-to-definition, rename, references, and source-mapped compiler diagnostics remain the next
-language-service layer; see
+Roslyn-backed C# completion, component discovery, go-to-definition, rename, references, and
+source-mapped compiler diagnostics remain the next language-service layer; see
 [Assimalign.Viu.VisualStudio/docs/DESIGN.md](Assimalign.Viu.VisualStudio/docs/DESIGN.md).
-
-Viu Utilities is an independent Viu feature compatible with documented Tailwind CSS v4.3.3
-behavior. It is not affiliated with or endorsed by Tailwind Labs. The extension does not install,
-bundle, or coordinate with Tailwind CSS IntelliSense.
 
 In Visual Studio the language client activates on the `viu` content type alone: opening a `.viu`
 buffer starts the server, canonical and loose files alike, with no solution scan and no project
@@ -225,8 +179,8 @@ probe fails closed instead of guessing. The gate is re-checked for open, change,
 diagnostics, completion, and hover on every document.
 
 Stylesheet regeneration is a Browser SDK `dotnet watch` feature, not a language-server side effect.
-During a Debug `dotnet watch` session, Viu's CSS sidecar rebuilds changed component and utility
-stylesheets and lets the .NET browser-refresh client replace their `<link>` URLs. That CSS-only
+During a Debug `dotnet watch` session, Viu's CSS sidecar rebuilds changed component stylesheets and
+lets the .NET browser-refresh client replace their `<link>` URLs. That CSS-only
 boundary preserves the mounted application and browser state. Visual Studio's ordinary Hot Reload
 command does not invoke the watch-list contract; launch through `dotnet watch` for automatic Viu
 stylesheet updates. Template/C# code generation continues through the normal .NET build and Hot

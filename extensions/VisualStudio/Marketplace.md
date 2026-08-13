@@ -24,9 +24,8 @@ One package: the `.viu` file association, the Viu color theme, and the Viu langu
 - Diagnostics for malformed single-file-component block structure
 - Completion for block headers and options, common template elements, directives, events, CSS
   properties, `Context.*`, and `Reactive.*`
-- Candidate-aware Viu Utilities completion and generated CSS hover previews inside template
-  `class` values, including custom tokens and prefixes from a directly included CSS-first project
-  utility entry
+- Completion and authored-rule hover for class selectors declared in the component's own
+  `<style>` blocks, inside template `class` values
 - Hover documentation for core Viu concepts
 - Full and incremental document synchronization through an isolated language-server process, so the
   Viu parsers and Roslyn never run inside Visual Studio itself
@@ -50,10 +49,6 @@ Viu also reads the tag-based `.vue` single-file-component container, and its lan
 `.vue` documents in Viu SDK projects. That capability is not surfaced by this Visual Studio package:
 Visual Studio's own Web Tools owns the `.vue` file extension, and displacing it is a separate
 decision. `.vue` editing support in Visual Studio may follow in a later release.
-
-The current preview exposes the frozen Viu Utilities v4.3.3 compatibility surface. Viu Utilities is an
-independent Viu feature compatible with documented Tailwind CSS v4.3.3 behavior. It is not
-affiliated with or endorsed by Tailwind Labs.
 
 Report problems and follow development in the
 [Viu repository](https://github.com/assimalign/viu).

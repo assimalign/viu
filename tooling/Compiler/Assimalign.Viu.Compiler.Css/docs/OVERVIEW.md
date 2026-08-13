@@ -10,8 +10,10 @@ drift. Area: `V01.01.12.12`.
 
 This is tooling / composition-root code, not a peer `Assimalign.Viu.Syntax.*` language library — the
 reason it is *allowed* to reference several language libraries. The rationale, the RS1035 / no-I/O
-constraint, and the byte-stable bundle layout are in [DESIGN.md](DESIGN.md); the broader utility-CSS
-plan is [`docs/UTILITY-CSS-DESIGN.md`](../../../docs/UTILITY-CSS-DESIGN.md).
+constraint, and the byte-stable component-style bundle layout are in [DESIGN.md](DESIGN.md). The
+former utility-CSS integration is retained only as parked, non-normative add-on history in
+[`docs/UTILITY-CSS-DESIGN.md`](../../../../docs/UTILITY-CSS-DESIGN.md); it no longer defines or
+participates in this component-CSS pipeline.
 
 ## Public surface
 

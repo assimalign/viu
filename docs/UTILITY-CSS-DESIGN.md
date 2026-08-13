@@ -1,3 +1,11 @@
+> **Status — parked add-on; non-normative (2026-08-13).** Viu Utilities is no longer part of Viu.
+> The SDK, hot-reload, editor, packaging, release-train, and CI integrations described below were
+> removed in commits `f952b19`, `7330f74`, and `b3f71f0`. The non-packable engine is parked at
+> `tooling/Assimalign.Viu.UtilityCss` pending a fresh add-on design under `libraries/Utilities/`,
+> with its own MSBuild integration and potentially its own Visual Studio extension. This document is
+> retained unchanged as design history for that redesign; its Tailwind CSS v4.3.3 target belongs to
+> the parked add-on, not to Viu's core compatibility contract.
+
 # Viu Utilities — standalone Tailwind CSS v4.3.3 compatibility design
 
 This document is the authoritative design for **Viu Utilities**, Viu's built-in utility-first CSS
@@ -50,9 +58,9 @@ The implementation and conformance vectors must cite the narrowest applicable of
 
 Repository architecture reused by this feature:
 
-- [`Assimalign.Viu.Syntax.Css` design](../tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md)
-- [`Assimalign.Viu.Compiler.Css` design](../tooling/Assimalign.Viu.Compiler.Css/docs/DESIGN.md)
-- [Viu `.viu` format](../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)
+- [`Assimalign.Viu.Syntax.Css` design](../libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md)
+- [`Assimalign.Viu.Compiler.Css` design](../tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/DESIGN.md)
+- [Viu `.viu` format](../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)
 - [Visual Studio language tooling design](../extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md)
 
 ## 1. Product contract

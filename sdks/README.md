@@ -77,8 +77,7 @@ work in Visual Studio, Rider, and the dotnet CLI with no installer and no admini
 | Component-library styles | The base SDK extracts `.viu.css` during pack and carries it with generated `buildTransitive` registration in the library package; it never registers browser static assets or writes `wwwroot` itself |
 | WASM browser app model and Browser runtime | The Browser SDK chains `Microsoft.NET.Sdk.WebAssembly` and adds `Assimalign.Viu.App.Browser`; its targeting and runtime packs add `Assimalign.Viu.Browser` |
 | Application and component-library CSS | The Browser SDK bundles the app's styles through `ViuBundleCss`, flows packed library styles to `_content/<PackageId>/`, and injects all links in deterministic library-before-application order before WebAssembly compression. Injection works with either value of `OverrideHtmlAssetPlaceholders`; the stable route is default and a labeled fingerprinted endpoint is opt-in ([V01.01.12.12.01], [V01.01.12.12.03], [V01.01.12.12.06]) |
-| Standalone utility CSS | The Browser SDK runs `ViuBundleUtilityCss` over `.viu`/`.vue` template regions and host `.html`/`.htm`, producing a separate `<PackageId>.utilities.css` asset with no Tailwind, Node, CLI, or PostCSS dependency |
-| CSS watch inputs and hot reload | The Browser SDK owns the project-scoped worker, watch graph, stable link replacement, and utility/component regeneration |
+| Component CSS watch inputs and hot reload | The Browser SDK owns the project-scoped worker, single-file-component watch graph, and stable component-stylesheet link replacement |
 | `viu-dom.js` interop bridge | The Browser SDK packs the asset and copies it to `wwwroot/_content/Assimalign.Viu.Browser/` at build |
 | Runtime inspection | An application explicitly references `Assimalign.Viu.DevTools` and sets `ViuEnableDevTools=true`; the base SDK fixes Core's linker feature switch and the package conditionally flows its postMessage asset |
 | Publish budgets | Browser-only publish hooks measure trimmed/AOT payload; base component libraries do not load them |
@@ -164,10 +163,6 @@ Opt out / pin independently:
     <!-- Browser SDK: use the labeled immutable endpoint (manifest-aware hosts only). -->
     <ViuUseFingerprintedSingleFileComponentCssBundleLink>true</ViuUseFingerprintedSingleFileComponentCssBundleLink>
     <EnableSingleFileComponentGeneration>false</EnableSingleFileComponentGeneration>
-    <!-- Utility CSS is independent from both switches above. -->
-    <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
-    <!-- Keep explicit @(ViuUtilityCssSource) items but disable automatic globs. -->
-    <ViuUtilityCssAutomaticSourceDiscovery>false</ViuUtilityCssAutomaticSourceDiscovery>
 </PropertyGroup>
 ```
 
@@ -175,120 +170,31 @@ Opt out / pin independently:
 the base property and keeps both segments coherent. The Browser auto-include property exists only on
 the Browser SDK path; disabling it does not disable the inherited base framework reference.
 
-Utility source inclusion and exclusion stay in MSBuild:
+## Parked utility add-on
 
-```xml
-<ItemGroup>
-    <!-- Optional singular CSS-first configuration entry; it is not scanned for class candidates. -->
-    <ViuUtilityCss Include="Utilities.css" />
-    <ViuUtilityCssSource Include="..\shared-markup\**\*.html" />
-    <ViuUtilityCssSourceExclude Include="Legacy\**\*" />
-</ItemGroup>
-```
+Viu Utilities was removed from the Viu SDK, build targets, hot-reload path, editor stack,
+packaging, release train, and product CI on 2026-08-13. Its non-packable engine remains parked at
+[`tooling/Assimalign.Viu.UtilityCss`](../tooling/Assimalign.Viu.UtilityCss) while a fresh add-on is
+designed for a possible `libraries/Utilities/` area with its own MSBuild and editor integration.
+Tailwind CSS v4.3.3 is a compatibility target of that parked add-on, not of Viu core. The retained
+[utility-CSS design](../docs/UTILITY-CSS-DESIGN.md) is non-normative design history.
 
-## Viu Utilities: frozen v4.3.3 surface
+## Component stylesheet hot reload
 
-Viu Utilities is pinned to Tailwind CSS **v4.3.3** behavior. The machine-readable
-[`compatibility-v4.3.3.json`](../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json)
-is the authority: it freezes 382 utility roots, 88 variants, 21 theme namespaces, the supported
-value and modifier modes, eight source forms, and the executable customization directives and
-functions. Independently authored
-[`golden-vectors-v4.3.3.json`](../tooling/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json)
-pins generated CSS and metadata ordering.
+In a Debug `dotnet watch` session, the Browser SDK starts one project-scoped CSS regeneration
+worker. It observes `.viu` and compatible `.vue` component inputs, coalesces an editor save, and
+invokes the deterministic component-style bundler once. The generated `<PackageId>.viu.css` file is
+registered with the .NET watch host as a static web asset. The host's browser-refresh client
+replaces its `<link>` with a cache-busted URL, so a style-only update does not remount the Viu
+application or discard browser state. A semantic no-op does not touch the bundle.
 
-`Utilities.css` is the singular CSS-first project entry. A complete entry can use the Viu-owned
-virtual import and configuration surface without installing Tailwind:
-
-```css
-@import "viu-utilities" source("../Components") prefix(vu) theme(inline) important;
-
-@source "../Shared";
-@source not "../Shared/Legacy";
-@source inline("vu:{block,grid}");
-@source not inline("vu:hidden");
-
-@theme {
-  --color-brand: oklch(0.63 0.19 260);
-  --spacing-18: 4.5rem;
-  --breakpoint-tablet: 52rem;
-}
-
-@reference "./shared-utilities.css";
-
-@utility content-auto {
-  content-visibility: auto;
-}
-
-@utility tab-* {
-  tab-size: --value(--tab-size-*, integer, [integer], --default(4));
-}
-
-@custom-variant theme-midnight (&:where([data-theme="midnight"] *));
-
-.card {
-  @apply vu:p-4 vu:bg-brand;
-
-  @variant hover {
-    outline: 2px solid currentColor;
-  }
-}
-```
-
-`"viu-utilities"` is a compiler sentinel, not a package name. Import modifiers support
-`source(<path>)`, `source(none)`, `prefix(...)`, `theme(inline)`, `theme(static)`, and `important`.
-The prefix is the first class variant (`vu:bg-brand`, `vu:tablet:p-18`), while theme custom
-properties remain unprefixed in authored `@theme` declarations.
-
-Source paths are resolved relative to `Utilities.css`. `@source` supports include and `not`
-exclusion paths plus inline inclusion/exclusion with brace expansion and numeric ranges.
-`@theme` supports normal, `inline`, `static`, `reference`, and `default` modes; overrides,
-namespace resets, full reset, and custom-property references use the same immutable theme as
-generation and editor resolution. The registry's default keyframes remain available, but
-project-authored `@keyframes` nested inside `@theme` are not yet parsed.
-
-The executable customization surface is:
-
-- `@utility` for static, nested, negative, and functional utilities;
-- `@custom-variant` for selector or `@slot` variants;
-- `@variant` for applying one or more variants inside authored CSS;
-- `@apply` for built-in or custom utility composition;
-- `@reference` for importing utility and variant definitions without copying the referenced
-  stylesheet's ordinary CSS;
-- `--value()`, `--modifier()`, `--default()`, `--spacing()`, and `--alpha()` inside functional
-  definitions and authored CSS.
-
-Candidate detection remains intentionally plain-text and markup-only. Automatic discovery scans
-`.viu` and `.vue` `<template>` content, and `.html`/`.htm`; it never scans
-`.viu`/`.vue` scripts, component style blocks, ordinary `.css`, or `.cs`. Runtime interpolation
-cannot create a discoverable class, so place every complete alternative in template text or add it
-with `@source inline(...)`. Code-first C# utility discovery is deferred to a separate feature.
-
-Viu Utilities is an independent Viu feature compatible with documented Tailwind CSS v4.3.3
-behavior. It is not affiliated with or endorsed by Tailwind Labs.
-
-### Stylesheet hot reload
-
-In a Debug `dotnet watch` session, the Browser SDK starts one project-scoped CSS regeneration worker.
-It observes `.viu`, `.vue`, the utility entry, explicit `@(ViuUtilityCssSource)` inputs, supported
-automatically discovered utility markup, transitive `@reference` stylesheets, and markup below
-CSS-first `source(...)`/`@source` roots, including external roots and add, delete, and rename
-changes. The compiler writes that resolved dependency graph to an intermediate manifest after
-each regeneration, so later configuration edits update the live watch set without scanning
-unrelated parent directories. It coalesces an editor save and invokes the deterministic component
-and utility bundlers once. The generated `<PackageId>.viu.css` and
-`<PackageId>.utilities.css` files are registered with the .NET watch host as static web assets.
-The host's browser-refresh client replaces their `<link>` elements with cache-busted URLs, so this
-CSS-only update does not remount the Viu application or discard browser state. A semantic no-op
-does not touch the bundle.
-
-Starting a watch session with no resolved utilities, or removing the final rule, emits one marked,
-zero-byte development bundle. This pre-registers the stable asset and link before the first utility
-appears and lets the browser unload the old stylesheet after the last utility disappears. A
-subsequent ordinary build or publish deletes that tombstone. The worker is a Browser SDK build tool
-only: it is disabled by default outside Debug and is never copied into the
-application, runtime framework, or publish output. Set
+Removing the final component style during a watch session emits one marked, zero-byte development
+bundle so the browser can unload the old stylesheet. A subsequent ordinary build or publish
+deletes that tombstone. The worker is a Browser SDK build tool only: it is disabled by default
+outside Debug and is never copied into the application, runtime framework, or publish output. Set
 `<ViuCssHotReloadEnabled>false</ViuCssHotReloadEnabled>` to disable it, or adjust the default
-100-millisecond quiet period with `<ViuCssHotReloadDebounceMilliseconds>...</ViuCssHotReloadDebounceMilliseconds>`.
+100-millisecond quiet period with
+`<ViuCssHotReloadDebounceMilliseconds>...</ViuCssHotReloadDebounceMilliseconds>`.
 
 This integration targets the `dotnet watch` watch-list contract. Visual Studio's ordinary Hot
 Reload command does not currently invoke that contract, so automatic Viu stylesheet regeneration

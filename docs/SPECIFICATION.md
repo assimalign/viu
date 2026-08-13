@@ -4,7 +4,9 @@
 
 **Status:** Draft — normative for implemented behavior and explicitly adopted migration standards.
 **Adopted:** 2026-08-02 (standalone-framework decision).
-**Applies to:** every `Assimalign.Viu.*` library, generator, SDK, and extension in this repository.
+**Applies to:** every active Viu `Assimalign.Viu.*` library, generator, SDK, and extension in this
+repository. The parked `tooling/Assimalign.Viu.UtilityCss` add-on engine is explicitly excluded
+pending its separate redesign.
 
 This document is the normative description of Viu's own semantics. Where an implementation and this
 document disagree, one of them is a defect; this document is the arbiter of intent.
@@ -18,9 +20,10 @@ Immediately, the thing that must not be lost from that statement:
 > ([V01.01.06.09], [#250](https://github.com/assimalign/viu/issues/250)). That feature deliberately
 > targets the Vue single-file-component container specification, because compatibility with a
 > documented external format *is* the feature's requirement. This is a **compatibility target**, in
-> the same category as Viu Utilities' Tailwind CSS v4.3.3 target and Viu's WHATWG HTML-serialization
-> target — not a claim of semantic derivation. It is specified in [§9](#9-vue-compatibility--a-shipping-feature)
-> as a first-class product surface.
+> the same category as Viu's WHATWG HTML-serialization target — not a claim of semantic derivation.
+> It is specified in [§9](#9-vue-compatibility--a-shipping-feature) as a first-class product surface.
+> Tailwind CSS v4.3.3 is no longer a Viu compatibility target; it belongs only to the parked,
+> non-normative utility add-on described by [§10.4](#104-viu-utilities).
 
 ### 0.1 Conformance language
 
@@ -89,12 +92,13 @@ The principal runtime, compiler, and editor assemblies and their responsibilitie
 | `Assimalign.Viu.Router` / `Assimalign.Viu.Browser.Router` | The DOM-free router core and its browser click, history, and scroll bridge |
 | `Assimalign.Viu.DevTools` | The opt-in, versioned runtime-inspection protocol and its transports |
 | `Assimalign.Viu.Testing` | The in-memory host and component test wrappers |
-| `Assimalign.Viu.Syntax*` | The build-time parser cluster: templates, `.viu`/`.vue` containers, CSS, and HTML |
+| `Assimalign.Viu.Syntax*` | The publicly consumable `netstandard2.0` parser cluster under `libraries/Syntax/`: templates, `.viu`/`.vue` containers, CSS, and HTML |
 | `Assimalign.Viu.Compiler.*` | Build-time composition roots for CSS and single-file-component projection |
-| `Assimalign.Viu.UtilityCss` | The independently published utility CSS compiler and compatibility engine |
+| `Assimalign.Viu.UtilityCss` | **Parked add-on, not a Viu product surface:** a non-packable engine retained at the root of `tooling/` pending a redesign under `libraries/Utilities/` |
 | `Assimalign.Viu.LanguageService` / `.LanguageServer` | Editor semantics and their Language Server Protocol process boundary |
 
-*Authority: `Assimalign.Viu.slnx`; `{libraries,tooling}/*/docs/OVERVIEW.md`; `global.json`.*
+*Authority: `Assimalign.Viu.slnx`; `{libraries,tooling}/*/*/docs/OVERVIEW.md` plus the documented
+root-level tooling exception; `global.json`.*
 
 ---
 
@@ -103,16 +107,16 @@ The principal runtime, compiler, and editor assemblies and their responsibilitie
 | Document | Role | Relationship to this specification |
 | --- | --- | --- |
 | `docs/SPECIFICATION.md` | **Normative.** What Viu is and what it guarantees. | Highest authority for semantics. |
-| `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` | **Normative for the `.viu` container grammar.** | [§8](#8-the-viu-container-and-the-compilation-pipeline) delegates to it rather than restating it. |
-| `docs/UTILITY-CSS-DESIGN.md` | **Normative for Viu Utilities' frozen Tailwind CSS v4.3.3 compatibility contract.** | [§10.4](#104-viu-utilities) delegates to it. |
+| `libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` | **Normative for the `.viu` container grammar.** | [§8](#8-the-viu-container-and-the-compilation-pipeline) delegates to it rather than restating it. |
+| `docs/UTILITY-CSS-DESIGN.md` | **Parked add-on design history; explicitly non-normative.** | Retained for a future `libraries/Utilities/` redesign. [§10.4](#104-viu-utilities) preserves the former clause id without imposing a Viu requirement. |
 | `docs/adr/*.md` | Decision records — why a choice was made. Append-only. | Normative for *rationale and constraint*, not for current API shape. A conflict means the ADR needs superseding. |
 | `{libraries,tooling}/**/docs/OVERVIEW.md` | What each library is; its public surface. | Non-normative elaboration. MUST NOT contradict this document. |
 | `{libraries,tooling}/**/docs/DESIGN.md` | Why each library is shaped that way; local deltas. | Non-normative rationale. |
 | `docs/PLAN.md` | Delivery narrative — waves, WBS map, sequencing. | Non-normative. Describes *when*, not *what*. Its "Founding design decisions" section is superseded by this document for anything semantic. |
 | `docs/PERFORMANCE-RESEARCH.md` | The external performance-research ledger. | **Explicitly non-normative by construction** ([§19](#19-performance-research-policy)). |
 
-`[DOC-1]` **Precedence.** `SPECIFICATION.md` → `FORMAT.md` / `UTILITY-CSS-DESIGN.md` (within their
-declared scopes) → ADRs → library `DESIGN.md` → `PLAN.md`. A lower-precedence document that
+`[DOC-1]` **Precedence.** `SPECIFICATION.md` → `FORMAT.md` (within its declared scope) → ADRs →
+library `DESIGN.md` → `PLAN.md`. A lower-precedence document that
 contradicts a higher one is wrong and MUST be corrected.
 
 `[DOC-2]` A specification clause MUST be traceable to code or to a normative delegate document. A
@@ -196,10 +200,10 @@ them back, and .NET purges its listener delegates in the same call.
 
 *Authority: `docs/adr/0001-source-generators-over-reflection.md`;
 `docs/adr/0003-batched-interop-dom-operations.md`;
-`libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md`;
-`libraries/Assimalign.Viu.Core/src/Scheduling/Scheduler.cs`;
-`libraries/Assimalign.Viu.Components/src/Activation/ComponentFactory.cs`;
-`libraries/Assimalign.Viu.Components/src/Components/ComponentRegistration.cs`.*
+`libraries/Browser/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Scheduling/Scheduler.cs`;
+`libraries/Runtime/Assimalign.Viu.Components/src/Activation/ComponentFactory.cs`;
+`libraries/Runtime/Assimalign.Viu.Components/src/Components/ComponentRegistration.cs`.*
 
 ---
 
@@ -526,15 +530,15 @@ reserved: generated glue MUST leave an authored member authoritative at its call
 context form remains available. A different signature is an ordinary overload. A collision therefore
 degrades to the behavior the component would have had without the root convenience.
 
-*Authority: `libraries/Assimalign.Viu.Components/src/Abstraction/{IComponent,IComponentFactory}.cs`;
-`libraries/Assimalign.Viu.Components/src/{ComponentContext,ComponentRenderFrame}.cs`;
-`libraries/Assimalign.Viu.Components/src/{Components,Tree,BuiltIns,Activation,Delegates,Optimization}/*.cs`;
-`libraries/Assimalign.Viu.Core/src/{Rendering,Internal,Abstraction}/*.cs`;
-`libraries/Assimalign.Viu.Core/src/Abstraction/{IApplication,IApplicationBuilder,IApplicationContext}.cs`;
-`libraries/Assimalign.Viu.Core/src/Delegates/{ApplicationDelegate,ApplicationMiddleware}.cs`;
-`libraries/Assimalign.Viu.Core/src/Application/{ApplicationContext,ApplicationOptions}.cs`;
-`libraries/Assimalign.Viu.Core/src/Extensions/ApplicationExtensions.cs`;
-`libraries/Assimalign.Viu.Browser/src/{BrowserApplication,BrowserApplicationBuilder}.cs`;
+*Authority: `libraries/Runtime/Assimalign.Viu.Components/src/Abstraction/{IComponent,IComponentFactory}.cs`;
+`libraries/Runtime/Assimalign.Viu.Components/src/{ComponentContext,ComponentRenderFrame}.cs`;
+`libraries/Runtime/Assimalign.Viu.Components/src/{Components,Tree,BuiltIns,Activation,Delegates,Optimization}/*.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/{Rendering,Internal,Abstraction}/*.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Abstraction/{IApplication,IApplicationBuilder,IApplicationContext}.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Delegates/{ApplicationDelegate,ApplicationMiddleware}.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Application/{ApplicationContext,ApplicationOptions}.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Extensions/ApplicationExtensions.cs`;
+`libraries/Browser/Assimalign.Viu.Browser/src/{BrowserApplication,BrowserApplicationBuilder}.cs`;
 `docs/COMPONENT-MODEL-PLAN.md` §§2, 8, 9.*
 
 ---
@@ -618,9 +622,9 @@ values after that scope stops; its cleanup is driven by its subscriber count.
 (`ApplicationWatchScheduler`), which routes watch callbacks into the scheduler's pre-flush phase
 ([§6.6](#66-the-scheduler)).
 
-*Authority: `libraries/Assimalign.Viu.Reactivity/src/{Reactive.cs,References/,Effects/,Watch/,Collections/,ReactiveObjects/,Abstraction/,Reactive/}`;
-`libraries/Assimalign.Viu.Reactivity/docs/DESIGN.md` (type model, interface naming, engine boundary);
-`libraries/Assimalign.Viu.Core/src/Scheduling/ApplicationWatchScheduler.cs`;
+*Authority: `libraries/Runtime/Assimalign.Viu.Reactivity/src/{Reactive.cs,References/,Effects/,Watch/,Collections/,ReactiveObjects/,Abstraction/,Reactive/}`;
+`libraries/Runtime/Assimalign.Viu.Reactivity/docs/DESIGN.md` (type model, interface naming, engine boundary);
+`libraries/Runtime/Assimalign.Viu.Core/src/Scheduling/ApplicationWatchScheduler.cs`;
 `docs/adr/0002-ref-first-reactivity.md` (rationale).*
 
 ---
@@ -705,7 +709,7 @@ compiled output to Core, defaults to `Stable`, and is consumed by the component-
 `[RND-FLAGS-6]` `PatchFlags.cs` and `SlotStability.cs` are `<Compile Include>`-linked into the
 `netstandard2.0` generator projects. **Their file paths are frozen**; moving them requires updating
 every linking csproj in the same change. The authoritative paths are
-`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotStability.cs}`.
+`libraries/Runtime/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotStability.cs}`.
 
 ### 6.3 The block tree
 
@@ -958,18 +962,18 @@ collide.
 `benchmarks/baselines/InteropCounts.json` records the expected counts and a delta fails CI
 ([§17](#17-conformance-and-how-behavior-is-pinned)).
 
-*Authority: `libraries/Assimalign.Viu.Core/src/Rendering/Renderer{TNode}.cs` (`Patch`, `Mount`,
+*Authority: `libraries/Runtime/Assimalign.Viu.Core/src/Rendering/Renderer{TNode}.cs` (`Patch`, `Mount`,
 `PatchElement`, `PatchFragment`, `TryPatchBlockChildren`, `PatchChildren`, `PatchUnkeyedChildren`,
 `PatchKeyedChildren`, `GetLongestIncreasingSubsequence`, `MountAttributes`, `PatchAttributes`,
 `PatchOptimizedAttributes`, `Move`, `MoveRange`, `Unmount`, `TryUnmountBlockChildren`,
 `RequiresUnmountVisit`, `IsSameComponentType`);
-`libraries/Assimalign.Viu.Core/src/Rendering/RendererOptions{TNode}.cs`;
-`libraries/Assimalign.Viu.Core/src/Internal/Mounted*.cs`;
-`libraries/Assimalign.Viu.Core/src/Scheduling/{Scheduler,SchedulerJob}.cs`;
-`libraries/Assimalign.Viu.Components/src/{PatchFlags,ShapeFlags,SlotStability}.cs`;
-`libraries/Assimalign.Viu.Components/src/Optimization/RenderPlan.cs`;
-`libraries/Assimalign.Viu.Browser/docs/{DESIGN.md,ADR-0001-interop-marshaling.md}`;
-`libraries/Assimalign.Viu.Components/src/{VirtualNode,ComponentRenderFrame}.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Rendering/RendererOptions{TNode}.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Internal/Mounted*.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Scheduling/{Scheduler,SchedulerJob}.cs`;
+`libraries/Runtime/Assimalign.Viu.Components/src/{PatchFlags,ShapeFlags,SlotStability}.cs`;
+`libraries/Runtime/Assimalign.Viu.Components/src/Optimization/RenderPlan.cs`;
+`libraries/Browser/Assimalign.Viu.Browser/docs/{DESIGN.md,ADR-0001-interop-marshaling.md}`;
+`libraries/Runtime/Assimalign.Viu.Components/src/{VirtualNode,ComponentRenderFrame}.cs`;
 `docs/COMPONENT-MODEL-PLAN.md` §§2, 9.*
 
 ---
@@ -1059,10 +1063,10 @@ server prefetch and Suspense. `AsynchronousComponents.Define(...)` is the public
 registration. `DynamicComponents.Resolve(...)` normalizes a selector and
 `DynamicComponents.Create(...)` creates its closed-algebra node.
 
-*Authority: `libraries/Assimalign.Viu.Components/src/{BuiltIns,Tree}/*.cs`;
-`libraries/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
-`libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.KeepAlive.cs,Renderer.Suspense.cs,Renderer.Hydration.cs}`;
-`libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions;
+*Authority: `libraries/Runtime/Assimalign.Viu.Components/src/{BuiltIns,Tree}/*.cs`;
+`libraries/Runtime/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Rendering/{Renderer.KeepAlive.cs,Renderer.Suspense.cs,Renderer.Hydration.cs}`;
+`libraries/Browser/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions;
 `docs/COMPONENT-MODEL-PLAN.md` §§2, 9.*
 
 ---
@@ -1085,7 +1089,7 @@ real `.viu` line **and column** [SFC-8].
 the component's C# in an `@script { }` block, and custom blocks in `@`-form.
 
 `[SFC-4]` The full grammar is **normative in
-[`FORMAT.md`](../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)** and is not
+[`FORMAT.md`](../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)** and is not
 restated here. This specification pins only the structural invariants a consumer must know:
 
 - **Column 0 is structural for opening a block.** A top-level line beginning with `@` opens an
@@ -1349,9 +1353,9 @@ argument-less `v-bind="…"` spread or dynamic `:[name]`, a non-literal bound ex
 attribute name, or an imperative `Parameters` collection whose contents are arbitrary C#. These
 argument-level bailouts do not suppress missing or ambiguous identity diagnostics [V01.01.05.11].
 
-*Authority: `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
-`tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
-`tooling/Assimalign.Viu.Compiler.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
+*Authority: `libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
+`libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
+`tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
 `analyzers/Assimalign.Viu.Generators.Syntax/src/{SingleFileComponentGenerator,Internal/ComponentSymbolCatalogReader}.cs`;
 `docs/adr/0005-no-runtime-template-compilation.md`.*
 
@@ -1362,9 +1366,10 @@ argument-level bailouts do not suppress missing or ambiguous identity diagnostic
 **This is a product feature, not a legacy reference.** [V01.01.06.09]
 ([#250](https://github.com/assimalign/viu/issues/250)) lets Vue single-file components compile under
 Viu. It targets the Vue single-file-component container specification because compatibility with
-that documented external format *is* the requirement — exactly as Viu Utilities targets Tailwind CSS
-v4.3.3 ([§10.4](#104-viu-utilities)) and the server renderer targets WHATWG HTML serialization
-([§11](#11-server-rendering-and-hydration)).
+that documented external format *is* the requirement — as the server renderer targets WHATWG HTML
+serialization ([§11](#11-server-rendering-and-hydration)). The parked utility add-on's historical
+Tailwind CSS v4.3.3 target is non-normative and is not part of Viu's compatibility surface
+([§10.4](#104-viu-utilities)).
 
 `[VUE-1]` `VueSingleFileComponentParser` is a **dedicated compatibility parser**. It projects
 `<template>`, `<script>`, `<script setup>`, `<style>`, and custom blocks into a
@@ -1407,16 +1412,16 @@ Viu SDK, and the Visual Studio language server re-checks the owning project befo
 compatibility document ([§15](#15-the-tooling-and-editor-contract)).
 
 `[VUE-9]` Everything downstream of the container parse is **shared with `.viu`**: template code
-generation, scoped styles, CSS Modules, `v-bind()` in CSS, `@reference`, `@apply`, source mapping,
-utility-candidate detection, and hot-reload metadata.
+generation, scoped styles, CSS Modules, `v-bind()` in CSS, source mapping, and component hot-reload
+metadata.
 
 `[VUE-10]` The implementation adds **no Vue JavaScript runtime and no dependency on Vue**.
 
-*Authority: `tooling/Assimalign.Viu.Syntax.SingleFileComponent/src/VueSingleFileComponent*.cs`;
+*Authority: `libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/src/VueSingleFileComponent*.cs`;
 `.../src/Internal/{VueSingleFileComponentParseEngine,SingleFileComponentTagScanner}.cs`;
-`tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md` §§"Tag-based `.vue`
-compatibility", "Generator compatibility contract"; `docs/UTILITY-CSS-DESIGN.md` §8.2;
-`sdks/README.md`; `build/Targets/Build.UtilityCss.targets`.*
+`libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md` §§"Tag-based `.vue`
+compatibility", "Generator compatibility contract"; `sdks/README.md`;
+`build/Targets/Build.Css.Bundling.targets`; `build/Targets/Build.Css.HotReload.targets`.*
 
 ---
 
@@ -1472,30 +1477,28 @@ with no render.
 
 ### 10.4 Viu Utilities
 
-`[STY-9]` Viu Utilities is a **build-time-only** utility-CSS engine whose compatibility contract is
-frozen to **Tailwind CSS v4.3.3** and is **normative in
-[`docs/UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md)**. This specification restates only the
-boundary:
+> **Parked add-on — non-normative pending the `libraries/Utilities/` redesign (2026-08-13).**
 
-- One immutable `UtilityCssRegistry` is the single source of truth, shared by the compiler and the
-  editor. Completion that does not generate CSS, or generation the editor cannot describe, is a
-  defect.
-- Output is a **separate** `<PackageId>.utilities.css` static web asset, independent of component
-  style bundling in both directions.
-- **No runtime CSS generation reaches the WebAssembly payload.** No utility parser, registry, theme
-  compiler, file watcher, or hot-reload transport is linked into an AOT release build; the browser
-  receives ordinary CSS through a `<link>`.
-- There is **no npm, Node, Tailwind executable, PostCSS or bundler plugin, JSON configuration, or
-  plugin ABI** dependency; the implementation is independently authored.
-- **Viu Utilities is an independent Viu feature compatible with documented Tailwind CSS v4.3.3
-  behavior. It is not affiliated with or endorsed by Tailwind Labs.**
+`[STY-9]` **PARKED AND SUPERSEDED.** Viu Utilities was a build-time utility-CSS design with a
+Tailwind CSS v4.3.3 compatibility target. Its SDK, build-target, hot-reload, editor, packaging,
+release-train, and CI integrations were removed on 2026-08-13 (`f952b19`, `7330f74`, `b3f71f0`). The
+non-packable engine remains parked at `tooling/Assimalign.Viu.UtilityCss`; it is not part of Viu.
+This clause retains its stable id and the former boundary as design history only. It imposes no
+normative Viu requirement pending a fresh add-on design under `libraries/Utilities/`:
 
-*Authority: `docs/UTILITY-CSS-DESIGN.md` (**normative** for §10.4);
-`tooling/Assimalign.Viu.Compiler.Css/docs/{OVERVIEW,DESIGN}.md`;
-`tooling/Assimalign.Viu.UtilityCss/docs/{OVERVIEW,DESIGN}.md`;
-`tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`;
-`tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md` §"CSS Modules accessors";
-`libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §"Component CSS variables".*
+- The historical design used one immutable `UtilityCssRegistry` as the source of truth shared by
+  the compiler and editor.
+- It emitted a separate `<PackageId>.utilities.css` static web asset, independent of component style
+  bundling in both directions.
+- It kept runtime CSS generation out of the WebAssembly payload and delivered ordinary CSS through
+  a `<link>`.
+- It used an independently authored implementation with no npm, Node, Tailwind executable, PostCSS
+  or bundler plugin, JSON configuration, or plugin ABI dependency.
+- Its compatibility statement identified documented Tailwind CSS v4.3.3 behavior and disclaimed
+  affiliation with or endorsement by Tailwind Labs.
+
+*Historical, non-normative sources: `docs/UTILITY-CSS-DESIGN.md`;
+`tooling/Assimalign.Viu.UtilityCss/docs/{OVERVIEW,DESIGN}.md`.*
 
 ---
 
@@ -1725,11 +1728,11 @@ no HTTP status, header, route, or framework policy.
 had started, allowing the downstream host to choose its response policy. Request cancellation
 propagates as `OperationCanceledException`; it is never converted into an ordinary failure result.
 
-*Authority: `libraries/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
-`libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;
-`libraries/Assimalign.Viu.Core/src/{Abstraction/IComponentRenderScope.cs,Rendering/ComponentHost.cs,Rendering/ComponentRenderRequest.cs}`;
-`libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Hydration;
-`libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md`;
+*Authority: `libraries/ServerRenderer/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;
+`libraries/Runtime/Assimalign.Viu.Core/src/{Abstraction/IComponentRenderScope.cs,Rendering/ComponentHost.cs,Rendering/ComponentRenderRequest.cs}`;
+`libraries/Browser/Assimalign.Viu.Browser/docs/DESIGN.md` §Hydration;
+`libraries/DevTools/Assimalign.Viu.Testing/docs/OVERVIEW.md`;
 `docs/COMPONENT-MODEL-PLAN.md` §8.2.*
 
 ---
@@ -1834,8 +1837,8 @@ offers a public linker-analyzable loader, `RouteComponentFactory` resolves an in
 `Task<ComponentNode>` source; it MUST NOT activate a type from a string or call an internal runtime
 hook.
 
-*Authority: `libraries/Assimalign.Viu.Router/docs/{OVERVIEW,DESIGN}.md`;
-`libraries/Assimalign.Viu.Browser.Router/docs/{OVERVIEW,DESIGN}.md`.*
+*Authority: `libraries/Router/Assimalign.Viu.Router/docs/{OVERVIEW,DESIGN}.md`;
+`libraries/Browser/Assimalign.Viu.Browser.Router/docs/{OVERVIEW,DESIGN}.md`.*
 
 ---
 
@@ -1889,7 +1892,7 @@ serializer. Restore applies immediately to an existing store or stages state unt
 request-local, ordinal strings, schema version 1 is strict, and normalized JSON is safe for the inert
 state island [SSR-7], [EXE-4].
 
-*Authority: `libraries/Assimalign.Viu.State/{src,docs/{OVERVIEW,DESIGN}.md}`;
+*Authority: `libraries/Runtime/Assimalign.Viu.State/{src,docs/{OVERVIEW,DESIGN}.md}`;
 `docs/COMPONENT-MODEL-PLAN.md` §2a.*
 
 ---
@@ -1942,8 +1945,8 @@ MUST pass one shared protocol-conformance suite.
 MAY register custom timeline-layer metadata. Timeline event capture and the inspection user
 interface are not part of [V01.01.10.01]; they remain [V01.01.10.02] and [V01.01.10.03].
 
-*Authority: `libraries/Assimalign.Viu.DevTools/docs/PROTOCOL.md`;
-`libraries/Assimalign.Viu.DevTools/{src,test}`.*
+*Authority: `libraries/DevTools/Assimalign.Viu.DevTools/docs/PROTOCOL.md`;
+`libraries/DevTools/Assimalign.Viu.DevTools/{src,test}`.*
 
 ---
 
@@ -1955,8 +1958,10 @@ process**. The client is in process in Visual Studio, because the editor surface
 IDE. Nothing semantic follows it in: the parsers and Roslyn stay behind the protocol boundary, in a
 process the IDE does not host. The chain is
 `Assimalign.Viu.VisualStudio → Assimalign.Viu.LanguageServer → Assimalign.Viu.LanguageService →
-{Assimalign.Viu.Syntax.SingleFileComponent, Assimalign.Viu.Compiler.SingleFileComponent,
-Assimalign.Viu.UtilityCss}`.
+{Assimalign.Viu.Syntax.SingleFileComponent, Assimalign.Viu.Compiler.SingleFileComponent}`. The
+parked `Assimalign.Viu.UtilityCss` engine is not in this chain. `LanguageCompletionItem.ColorValue`
+and the Color completion kind remain dormant, generic protocol transport rather than a utility-CSS
+feature.
 
 `[TOOL-2]` **The build/editor equality guarantee.** One projection, conformance-pinned, producing
 ordinal-identical generated source, hint names, and diagnostics for both hosts [SFC-PIPE-2]. The
@@ -1983,7 +1988,7 @@ project is not claimed, treats a literal `false` marker as an override, and **fa
 ownership is ambiguous. The check repeats for document changes, diagnostics, completion, and hover.
 
 *Authority: `extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md`;
-`tooling/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md`.*
+`tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md`.*
 
 ---
 
@@ -2018,16 +2023,16 @@ shared `AdditionalFiles` graph; the Browser SDK inherits it rather than duplicat
 SDK extracts `.viu.css` when a component library is packed and carries it with generated
 `buildTransitive` registration, but does not itself register browser static assets or write to
 `wwwroot`. The Browser SDK consumes that transitive registration as an additional browser static web
-asset and owns application bundling: `ViuBundleCss` writes the app's component stylesheet,
-`ViuBundleUtilityCss` writes the utility stylesheet, and a link-injection task splices referenced
-library component stylesheets in ordinal route order before the application component stylesheet.
+asset and owns application bundling: `ViuBundleCss` writes the app's component stylesheet, and a
+link-injection task splices referenced library component stylesheets in ordinal route order before
+the application component stylesheet.
 Injection works in Build and Publish with either value of `OverrideHtmlAssetPlaceholders`, runs
 **before** the WebAssembly SDK's compression pipeline, and is idempotent per `href`, so content
 negotiation stays intact without duplicate links. The application's stable plain route is the
 static-hosting default; manifest-aware deployments may opt into the actual static-web-asset endpoint
 labeled `<PackageId>.viu.css`, while an explicit application `LinkHref` takes precedence. Component
-and utility links can be opted out of independently. The Browser SDK also owns the CSS hot-reload
-worker and publish-budget hooks. Specified by [V01.01.12.12.04] through [V01.01.12.12.07].
+links can be opted out. The Browser SDK also owns the component-CSS hot-reload worker and
+publish-budget hooks. Specified by [V01.01.12.12.04] through [V01.01.12.12.07].
 
 `[PKG-5]` In-repo projects **dogfood via `ViuProjectReference`**; the two SDKs are the *external
 consumer* surfaces. The in-repo build deliberately does not consume either SDK, so the framework can
@@ -2056,13 +2061,16 @@ it move together.
 | `SingleFileComponentProjectionConformanceTests` | Build/editor projection equality [SFC-PIPE-2] |
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
 | `Assimalign.Viu.Sdk.Browser.Tasks.Tests` | Pure host-page stylesheet injection: close-tag placement, href idempotency, comment handling, newline preservation, and missing-head behavior |
-| `tooling/Assimalign.Viu.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
 | `Assimalign.Viu.DevTools.Tests` | Handshake/version handling, unknown-message tolerance, bounded post-flush batches, weak live-tree identity and keyed reorder, safe snapshots, custom inspectors/layers, and one corpus over both transports [DVT-2]–[DVT-7] |
 | `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; isolated Browser-SDK consumers pin library-only and library-before-app link delivery, both `OverrideHtmlAssetPlaceholders` states in Build and Publish, labeled fingerprint resolution plus explicit-href precedence, byte-equivalent identity/gzip/brotli outputs through trimmed and AOT publish, and complete removal of a disabled DevTools package and asset [DVT-1] |
-| `scripts/Test-EndToEnd.ps1`, `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance; the isolated Chromium watch lane uses an explicit non-served HTML utility input to pin CSS replacement, a no-write/no-managed-update semantic no-op, final-rule removal, and mounted `.vue` remount behavior [V01.01.12.05.02] |
+| `scripts/Test-EndToEnd.ps1`, `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance; the isolated Chromium watch lane pins component-stylesheet replacement, a no-write/no-managed-update semantic no-op, and mounted `.vue` remount behavior [V01.01.12.05.02] |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
-| `.github/workflows/area-*.yml` and `benchmarks.yml` | Live per-area CI plus the interop budget gate |
+| `.github/workflows/{libraries,tooling,analyzers}.yml` and `benchmarks.yml` | Live per-area CI plus the interop budget gate |
 | `.github/workflows/budget-gates.yml` | Live pull-request trimmed-publish/size and trim-warning checks, with scheduled/on-demand WebAssembly AOT and real-browser `boot-to-interactive` startup lanes |
+
+The frozen Tailwind CSS v4.3.3 vectors under
+`tooling/Assimalign.Viu.UtilityCss/conformance/` are preserved with the parked add-on as historical
+redesign input. They are non-normative and no longer a Viu conformance gate [STY-9].
 
 `[CONF-3]` Unit tests are **DOM-free by default**. The runtime is exercised through
 `Assimalign.Viu.Testing`'s in-memory host; real-browser coverage is a separate end-to-end harness.
@@ -2098,9 +2106,6 @@ correct-looking values.
 - **Not thread-safe.** Single-threaded by design [EXE-1].
 - **No JavaScript execution and no JavaScript compiler macros** [VUE-4].
 - **No web-framework dependency in any `Assimalign.Viu.*` library** [SSR-8].
-- **Viu Utilities:** no npm, Node, Tailwind executable, PostCSS/bundler plugin, JSON configuration or
-  safelist, plugin ABI, or runtime CSS generation; no automatic compatibility past v4.3.3; not
-  affiliated with or endorsed by Tailwind Labs [STY-9].
 
 ### 18.2 Current limits — implemented partially or not yet
 
@@ -2112,6 +2117,7 @@ correct-looking values.
 | Generalized handler caching | Deliberately dropped: syntax alone cannot prove a member-expression delegate has a stable receiver or infer every delegate arity; caching it could freeze mutable receiver state. Authors can supply an explicitly stable delegate when identity matters |
 | Slot/`v-for` destructuring | Deliberately unsupported: C# lambda parameters cannot represent generalized object/array destructuring without choosing new missing-member, null, and conversion semantics. A single valid C# identifier is accepted; other aliases report a located actionable template diagnostic and emit no invalid C# |
 | Server rendering | Compiler-informed server code generation, byte-oriented writer integration, static site generation, and directive-specific server properties are deferred |
+| Utility-CSS add-on | **Parked and non-normative.** The former Viu Utilities integration and Tailwind CSS v4.3.3 compatibility target were removed on 2026-08-13. The non-packable engine remains design input for a future `libraries/Utilities/` redesign [STY-9]. |
 
 ---
 
@@ -2157,8 +2163,8 @@ and does not carry provenance ([`.claude/rules/documentation.md`](../.claude/rul
 
 `[ART-2]` If any externally authored data table were ever transcribed rather than independently
 derived, the attribution is a licensing matter and belongs in a `THIRD-PARTY-NOTICES` file, not in
-doc comments. Viu Utilities already follows this pattern
-(`tooling/Assimalign.Viu.UtilityCss/docs/THIRD-PARTY-NOTICES.md`).
+doc comments. The parked, non-normative utility add-on's retained design history follows this
+pattern (`tooling/Assimalign.Viu.UtilityCss/docs/THIRD-PARTY-NOTICES.md`) [STY-9].
 
 ---
 
@@ -2181,5 +2187,5 @@ doc comments. Viu Utilities already follows this pattern
 | **reference** | A reactive cell: `Reference<T>`, `ShallowReference<T>`, `CustomReference<T>`, `Computed<T>` |
 | **projection** | The single `.viu`/`.vue` → C# model both the generator and the editor run [SFC-PIPE-2] |
 | **scaffold** | The generated partial-class source a projection emits |
-| **candidate** | A complete utility-class token the utility compiler can resolve |
+| **candidate** | Historical parked-add-on term for a complete utility-class token the utility compiler can resolve; not part of Viu's normative core vocabulary [STY-9] |
 | **handle** | An opaque host-node identity crossing the interop boundary as an `int` [EXE-12] |

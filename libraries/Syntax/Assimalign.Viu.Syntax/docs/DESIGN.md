@@ -14,9 +14,9 @@ to a container language's nodes (the `.viu` file being the canonical container).
 
 - **Language libraries never reference each other.** The single-file-component library does not know
   the template or CSS parsers exist; the *composition root* (a generator, a build task, a test)
-  constructs the aggregate options and registers whatever parsers the build embeds — including
-  Viu-owned tooling like utility-class style generation, or user-supplied parsers for custom
-  blocks.
+  constructs the aggregate options and registers whatever parsers it needs — including Viu's
+  component-style compiler or developer-supplied parsers for custom blocks. The parked utility
+  add-on is another possible consumer, not part of the Viu compiler contract.
 - **First matching registration wins**, in registration order, so specific predicates
   (`lang`-qualified) register before general ones. Unmatched nodes are simply not dispatched — a
   registration-free aggregate parse *is* the plain container parse, preserving the container
@@ -70,5 +70,5 @@ scheduling cost and no parallelism worth having; `AnalyzerTimeout` bounds the pa
   items land — the scaffolds exist to pin the pipeline seam, project shape, and caching contract, not
   to promise parsing. The Css scaffold's raw root was replaced by real rule-level parsing and the
   scoped-selector rewrite with scoped CSS [V01.01.06.04] (see
-  `tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`); it is the flagship consumer of the
+  `libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`); it is the flagship consumer of the
   registration seam — the generator composition root registers `CssSyntaxParser` for `@style` blocks.

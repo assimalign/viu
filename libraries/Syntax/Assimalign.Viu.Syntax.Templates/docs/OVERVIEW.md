@@ -4,10 +4,11 @@ The Viu template language front end: it tokenizes
 and parses template markup into a located AST, runs the transform pipeline (structural and
 directive transforms, expression binding, static optimization), and generates **C# render method
 bodies** for either the interactive virtual-node tree or direct server markup.
-The platform-neutral template language and its DOM directive set live in this one project.
-It is a build-time library that runs inside the source generator ([V01.01.05.05]/[V01.01.06.02]);
-there is no runtime compilation (`[SFC-1]`, and see
-[ADR-0005](../../../docs/adr/0005-no-runtime-template-compilation.md)). Area: `V01.01.05`.
+The platform-neutral template language and its DOM directive set live in this one publicly
+consumable project. It is a build-time library used by the source generator
+([V01.01.05.05]/[V01.01.06.02]) and available to developer-authored tooling; there is no runtime
+compilation (`[SFC-1]`, and see
+[ADR-0005](../../../../docs/adr/0005-no-runtime-template-compilation.md)). Area: `V01.01.05`.
 
 The rationale, the code-generation decisions C# forces, and the runtime-helper contract are
 detailed in [DESIGN.md](DESIGN.md); this page is the surface map.
@@ -49,7 +50,8 @@ they add lifetime or delegate-semantic risk without reducing host operations ([V
 - Roots on **`Assimalign.Viu.Syntax`** only. It does **not** reference the runtime: emitted render
   statements name the Components frame/node contracts, typed Browser operations, and public
   ServerRenderer serialization helpers directly, so the contract flows one way (see
-  [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../Assimalign.Viu.Core/docs/OVERVIEW.md)).
-- Build-time library on the netstandard2.0 analyzer TFM; runs in Roslyn generator hosts.
+  [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../../Runtime/Assimalign.Viu.Core/docs/OVERVIEW.md)).
+- Build-time library on the netstandard2.0 analyzer TFM; runs in Roslyn generator hosts and can be
+  consumed directly by other build/editor-time tooling.
 - Everything a parse or transform produces is value-equatable to preserve the incremental-generator
   caching contract.

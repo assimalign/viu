@@ -25,10 +25,12 @@
 - Issue bodies must carry enough architectural boundary guidance for a future session to implement
   without this conversation's context: the target `Assimalign.Viu.<Area>` project, allowed
   dependency direction, and any interop/AOT/source-generator boundaries.
-- Library layout is inverted: `libraries/Assimalign.Viu.<Name>/{src|test}` — folder name = assembly
-  id, no area wrapper folders. Compiler and editor tooling uses the same layout under
-  `tooling/Assimalign.Viu.<Name>/{src|test}`; the location carries the role without adding a blanket
-  `Tooling.` segment to the assembly id or namespace.
+- Library layout is area-based and inverted:
+  `libraries/<Area>/Assimalign.Viu.<Name>/{src,test}` for publicly consumable runtime and parser
+  projects, and `tooling/<Area>/Assimalign.Viu.<Name>/{src,test}` for compiler and editor
+  implementation projects. The area location carries the role without changing the assembly id or
+  namespace. `tooling/Assimalign.Viu.UtilityCss/{src,test}` is a parked, non-packable root-level
+  exception pending an add-on redesign under `libraries/Utilities/`.
 - Preserve later-wave requirements in planning notes even when implementing only current-wave scope.
   If a ticket needs prerequisite work from another ticket, call that out rather than silently
   reordering.
@@ -41,6 +43,8 @@
   calls, and always clean up JS-side handles and event listeners.
 - `docs/SPECIFICATION.md` is the authority for Viu's semantics: cite the clause id in the issue, code
   comment, or test that pins the behavior. An external project is authoritative only where the issue
-  names a declared compatibility target (the `.vue` container format, Tailwind CSS v4.3.3, a WHATWG
-  or W3C specification); performance ideas borrowed from other frameworks are recorded in
-  `docs/PERFORMANCE-RESEARCH.md` and never make that framework normative.
+  names a declared compatibility target (the `.vue` container format, the Language Server Protocol,
+  or a WHATWG/W3C specification); performance ideas borrowed from other frameworks are recorded in
+  `docs/PERFORMANCE-RESEARCH.md` and never make that framework normative. Tailwind CSS v4.3.3 may be
+  cited only by work explicitly scoped to the parked utility-CSS add-on or its future redesign, never
+  as a Viu core target.

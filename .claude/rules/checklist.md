@@ -16,6 +16,8 @@ is ❌, fix it before reporting completion, not after. Mark genuinely inapplicab
 - [ ] For runtime/interop changes, the sample WASM app still builds.
 
 ## Structure & naming
+- [ ] Projects follow `<root>/<Area>/<AssemblyId>/{src,test}`. The only root-level exception is the
+      parked, non-packable `tooling/Assimalign.Viu.UtilityCss` add-on engine.
 - [ ] Public interfaces are in `Abstraction/`; internal types (incl. internal interfaces) in `Internal/`;
       public non-interface types at `src/` root.
 - [ ] One public type per file; filename = type name; generics use `{T}` (no `OfT`).

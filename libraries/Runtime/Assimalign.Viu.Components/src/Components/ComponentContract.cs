@@ -8,9 +8,9 @@ namespace Assimalign.Viu.Components;
 /// activation. Carried by <see cref="ComponentRegistration"/>, never by the instance.
 /// </summary>
 /// <remarks>
-/// Deliberately absent: a style-scope identifier. Scoped CSS is deferred until after the
-/// component-model arc; reintroducing it is one additive member here plus serializer and
-/// compiler emission — no structural change.
+/// Deliberately absent: a runtime-carried style-scope identifier. Scoped CSS is compiler-owned;
+/// generated render descriptions stamp the known scope identifier as an ordinary static attribute,
+/// so the static contract requires no parallel state. Specified by <c>[STY-1]</c>.
 /// Parameters and events are immutable snapshots used before activation. Specified by
 /// <c>[CMP-1]</c>, <c>[CMP-4]</c>, <c>[CMP-12]</c>, and <c>[CMP-14]</c>.
 /// </remarks>

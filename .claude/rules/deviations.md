@@ -27,6 +27,8 @@ Rules that need especially explicit confirmation before deviating:
 - **Specified behavior** — diverging from a `docs/SPECIFICATION.md` clause means the clause is wrong or the
   code is: fix one of them. A deliberate change updates the clause in the same commit and is pinned by a
   test asserting the *chosen* behavior.
-- **External compatibility targets** — the `.vue` container format, Tailwind CSS v4.3.3, and the WHATWG/W3C
-  specifications Viu implements are contracts with outside consumers. A divergence there is a product
-  decision, documented in the owning area's `DESIGN.md` and pinned by a conformance test.
+- **External compatibility targets** — the `.vue` container format, WHATWG HTML serialization, the
+  Language Server Protocol, and the WHATWG/W3C specifications Viu implements are contracts with
+  outside consumers. A divergence there is a product decision, documented in the owning area's
+  `DESIGN.md` and pinned by a conformance test. Tailwind CSS v4.3.3 is only the parked utility-CSS
+  add-on's compatibility target and is not part of this Viu core list.

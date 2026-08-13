@@ -132,10 +132,11 @@ The parser turns CSS *text* into the record graph; `CssSyntaxFactory` (and the f
 `CssStylesheetBuilder`) build the **same** graph from code, so a build-time generator can synthesize rules
 from scratch and hand them to the same canonical serializer. Scoped CSS ([V01.01.06.04]) and the module /
 `v-bind()` rewrites all transform an *already-parsed* tree, so none of them ever needed to *create* a rule;
-the utility-first CSS engine ([V01.01.12.16]) generates rules from scratch and does. The surface is
+the now-parked utility add-on ([V01.01.12.16]) was its first rule-generating consumer. The surface is
 deliberately **language-agnostic generic CSS construction** — it knows nothing about utilities, variants, or
-themes — so `Assimalign.Viu.Syntax.Css` stays a leaf in the cluster (the utility grammar/theme/resolver live
-in Tooling, which may reference Css; Css never references back). `CssSyntaxFactory.QualifiedRule`,
+themes — so `Assimalign.Viu.Syntax.Css` stays a leaf in the cluster. The parked engine at
+`tooling/Assimalign.Viu.UtilityCss` may reference Css; Css never references back, and future developer
+tooling can consume the public construction surface independently. `CssSyntaxFactory.QualifiedRule`,
 `Declaration`, `Media`/`ConditionalGroupAtRule`, `Stylesheet`, and the selector builders
 (`SimpleSelector`/`Combinator`/`Pseudo`/`ComplexSelector`/`SelectorList`) mint the existing node types; a
 constructed rule renders its `Prelude` from its parts (via the internal `CssSelectorWriter`) so the node is
@@ -176,8 +177,8 @@ exact graph order and never reorders**:
 Determinism is therefore a property of **construction**: identical node lists serialize byte-for-byte
 identically, and construction converges on the same canonical text as parsing the equivalent source
 (pinned against a parsed graph in `CssConstructionTests`). The construction surface preserves the order it
-is given and applies no canonicalization of its own — so a consumer that needs a canonical ordering (e.g.
-the utility engine de-duplicating and ordering utilities for a byte-stable bundle) sorts **before**
+is given and applies no canonicalization of its own — so a consumer that needs a canonical ordering (the
+parked utility add-on is the historical example) sorts **before**
 constructing. Keeping ordering policy in the consumer is exactly what lets Css stay language-agnostic: it
 holds no opinion on how utilities, media queries, or properties "should" be ordered.
 
@@ -209,8 +210,9 @@ only the scope-id string.
   delegates to — over the same `.viu` inputs, so the physical bundle is byte-identical to
   `ExtractedStyles`. The base SDK packs the resulting `.viu.css` and a `buildTransitive`
   registration for component libraries; the Browser SDK registers application and transitive
-  library styles as static web assets. See that library's `docs/DESIGN.md` and
-  `docs/UTILITY-CSS-DESIGN.md` §2.4.
+  library styles as static web assets. See the
+  [`Assimalign.Viu.Compiler.Css` design](../../../../tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/DESIGN.md)
+  and the active [component-CSS delivery contract](../../../../sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md).
 - **Legacy deep combinators** `>>>` and `/deep/` — superseded by `:deep()`; not supported.
 - **Deep inside `:is()`/`:where()`/`:not()`** — splitting a selector around a nested `:deep()` and
   recursing into `:is`/`:where` arguments are not implemented; those functional pseudos are treated as
@@ -218,12 +220,15 @@ only the scope-id string.
   compound/complex/grouped scoping are covered.
 - **Comment preservation in scoped output.** Comments are tokenized (for exact spans) but dropped by the
   canonical serializer; scoped CSS is machine-generated.
-- **Tailwind / utility-class generation** — [#129] is a separate consumer of this library. It reuses the
-  tokenizer, tree, (for its own scoping) `CssScopedRewriter`, and the programmatic construction surface
-  added by [V01.01.12.11]; the utility grammar, theme, and resolver stay in Tooling, never here.
+- **Parked add-on history — utility-class generation.** [#129] introduced a separate consumer of this
+  library that reused the tokenizer, tree, `CssScopedRewriter`, and the programmatic construction surface
+  added by [V01.01.12.11]. Its Viu integration was removed on 2026-08-13; the engine is parked at
+  `tooling/Assimalign.Viu.UtilityCss` pending a fresh `libraries/Utilities/` add-on design. Tailwind CSS
+  v4.3.3 compatibility belongs only to that parked add-on. The retained, non-normative design history is
+  [`docs/UTILITY-CSS-DESIGN.md`](../../../../docs/UTILITY-CSS-DESIGN.md).
 - **Reserved functional pseudos, `@keyframes`, and statement at-rules are not *constructed*.** The
   [V01.01.12.11] factory builds ordinary selectors, declarations, qualified rules, and conditional-group
-  at-rules — what a utility generator needs. `:deep()`/`:slotted()`/`:global()` are *consumed* by the
-  scoped rewrite, not built from code (utilities emit unscoped global CSS); `@keyframes`/keyframe-rule and
+  at-rules — enough for a rule-generating add-on. `:deep()`/`:slotted()`/`:global()` are *consumed* by the
+  scoped rewrite, not built from code; `@keyframes`/keyframe-rule and
   `;`-terminated statement at-rules have no construction entry point yet. All are additive if a later
   consumer needs them, and the parser still produces every one of them.

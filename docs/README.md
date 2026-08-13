@@ -8,8 +8,8 @@ more than one project. Documentation scoped to a single project lives with that 
 1. **Project-scoped documentation** lives in `<project folder>/docs/` — the `OVERVIEW.md` (what it
    is) and `DESIGN.md` (why it is shaped that way) pair described in
    [`CONTRIBUTING.md`](CONTRIBUTING.md), plus focused topic docs and library-local ADRs. This applies
-   to every project folder: `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `frameworks/`, and
-   `extensions/`.
+   to every project folder: `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `frameworks/`,
+   `benchmarks/`, and `extensions/`.
 2. **`README.md` stays put.** Any folder may carry its own `README.md` as that folder's entry point.
 3. **Everything else lives here**, in the repository-root `docs/`.
 
@@ -31,7 +31,7 @@ nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Documentation conventions: where each kind of document lives, what belongs in it, and when it must be updated. |
 | [`guide/getting-started.md`](guide/getting-started.md) | The consumer-facing walkthrough — build, run, and publish a Viu app with the packaged `Assimalign.Viu.Sdk.Browser`. |
 | [`DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked consumption examples for the Components, Reactivity, State, Core, and Browser packages, written from the application developer's point of view. |
-| [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | The Viu Utilities design — the Tailwind CSS v4.3.3 compatibility target spanning the CSS parser, the build-time engine, the SDK pipeline, and editor IntelliSense. |
+| [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Parked, non-normative design history.** The former Viu Utilities integration was removed on 2026-08-13; its Tailwind CSS v4.3.3 target now belongs only to the parked add-on pending a redesign under `libraries/Utilities/`. |
 | [`PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md) | **Explicitly non-normative.** The ledger of optimization techniques observed in other rendering frameworks, measured against Viu's baselines before any are adopted. |
 | [`NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The historical record of Viu's .NET-native API reshape, with the arcs that have merged and the parts since superseded. |
 | [`RELEASING.md`](RELEASING.md) | Release channels, NuGet trusted publishing, GitHub Packages, and the Visual Studio Marketplace preview. |

@@ -79,7 +79,7 @@ runtime machinery — a poor fit for an AOT/trimming target and for C#'s type sy
 ## References
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decision 5.
-- [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md)
+- [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../libraries/Runtime/Assimalign.Viu.Core/docs/OVERVIEW.md)
   (formerly `Assimalign.Viu.RuntimeCore`, renamed in [V01.01.12.21]) and the current application
   options/context surface.
 - [`COMPONENT-MODEL-PLAN.md`](../COMPONENT-MODEL-PLAN.md) — adopted component-model seams and

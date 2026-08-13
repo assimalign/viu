@@ -10,21 +10,34 @@ reflection-based serialization and dynamic code generation are forbidden.
 
 `docs/SPECIFICATION.md` is the authority for Viu's semantics; no external project's behavior is
 (decision of 2026-08-02). Viu does ship a **`.vue` single-file-component compatibility parser** as a
-product feature ([V01.01.06.09], #250) — a compatibility target on a documented external format, in
-the same category as Viu Utilities' Tailwind CSS v4.3.3 target, specified in `SPECIFICATION.md` §9.
+product feature ([V01.01.06.09], #250), alongside WHATWG HTML serialization and Language Server
+Protocol compatibility. Tailwind CSS v4.3.3 is only the target of the parked utility-CSS add-on
+engine at `tooling/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility target (owner
+decision, 2026-08-13). Component `<style>` CSS remains fully supported, including scoping, bundling,
+and hot reload.
 
 ## Layout
 
-- `libraries/` — framework libraries, inverted layout: `libraries/Assimalign.Viu.<Name>/{src|test}`
-  (the folder name is the assembly/package id; `src/` holds the shipping project, `test/` its tests —
-  no area wrapper folders)
-- `tooling/` — compiler and editor libraries in the same inverted layout: the
-  `Assimalign.Viu.Syntax*` parser cluster, `Assimalign.Viu.Compiler.*` composition roots,
-  `Assimalign.Viu.UtilityCss`, and the language service/server. The root carries the tooling role;
-  assembly ids and namespaces do not add a blanket role prefix.
+- `libraries/` — publicly consumable package surfaces in the area-based inverted layout
+  `libraries/<Area>/<AssemblyId>/{src,test}`. Areas are `Browser` (Browser, Browser.Router),
+  `DevTools` (DevTools, Testing), `Router`, `Runtime` (Components, Core, Reactivity, State),
+  `ServerRenderer`, and `Syntax` (all five Syntax projects). The public netstandard2.0 build/editor-time
+  parser cluster is deliberately here so developers can parse CSS, templates, and single-file
+  components directly; `libraries/` no longer means runtime-only.
+- `tooling/` — implementation projects under `tooling/<Area>/<AssemblyId>/{src,test}`:
+  `Compiler/{Assimalign.Viu.Compiler.Css, Assimalign.Viu.Compiler.SingleFileComponent}` and
+  `Editor/{Assimalign.Viu.LanguageService, Assimalign.Viu.LanguageServer}`. No tooling project is
+  currently independently published. `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the parked,
+  non-packable root-level exception; it remains built and tested by the tooling lane pending a fresh
+  add-on design under `libraries/Utilities/` with add-on-owned MSBuild props/targets and, if needed,
+  its own editor extension.
+- `extensions/` — ecosystem integration points: `VisualStudio/`, `VisualStudioCode/`, and `dotnet/`;
+  templates live at `extensions/dotnet/Assimalign.Viu.Templates`.
+- `benchmarks/Assimalign.Viu.Testing.EndToEnd/` — real-browser end-to-end harness.
+- `sdks/<SdkId>/Tasks/{src,test}` — SDK task projects.
 - `../viu-examples/` — external packaged-consumer WASM showcase (separate repository)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
-- `.Codex/rules/` — the canonical working conventions for this repo (auto-load by path):
+- `.claude/rules/` — the canonical working conventions for this repo (auto-load by path):
   `general-rules` (C# style, Abstraction/Internal folders, whole-word naming, explicit usings, AOT),
   `build-system` (central `build/`, `ViuProjectReference`/`ViuPackageReference`), `testing`,
   `documentation`, `deviations`, `checklist`, and `workflow` (branches, WBS, scope creep)
@@ -32,14 +45,15 @@ the same category as Viu Utilities' Tailwind CSS v4.3.3 target, specified in `SP
 ## Build and test
 
 - `dotnet build Assimalign.Viu.slnx`
-- `dotnet test <project>/tests/`
+- `dotnet test <project>/test/`
 - Run the showcase from the sibling `viu-examples` repository after packing `_out/packages`
 
 ## Work tracking
 
 All development is tracked as WBS-coded work items (`[V01.01.NN...]` titles) in the org GitHub
 Project **#15 "Viu"**, mirroring the sibling Cohesion repo's model. Use the **viu-work-items**
-skill (`.Codex/skills/viu-work-items/`) to create, place, and link items — especially to capture
+skill (`.agents/skills/viu-work-items/`, mirrored under `.claude/skills/viu-work-items/`) to create,
+place, and link items — especially to capture
 scope creep discovered mid-branch. The GitHub issue body is the authoritative source of a work
 item's requirements. Project #15 is viu-only; if `assimalign/cohesion` items (`[Lxx...]` codes)
 ever appear on it, flag it (a project auto-add workflow may be re-adding them) and never modify
@@ -60,20 +74,38 @@ Viu is a **standalone** C#/.NET WebAssembly UI framework. **`docs/SPECIFICATION.
 for Viu's semantics**, and behavior is pinned by tests in this repository — no external project's
 behavior, release, or roadmap is authoritative for Viu (decision of 2026-08-02). Where a type
 implements a documented **external compatibility target** — the `.vue` single-file-component
-container format ([V01.01.06.09], a shipping feature), Tailwind CSS v4.3.3 (Viu Utilities), WHATWG
-HTML serialization, the Language Server Protocol — name and link that target. That is a compatibility
-*requirement* on a foreign format, not a semantic authority over Viu.
+container format ([V01.01.06.09], a shipping feature), WHATWG HTML serialization, or the Language
+Server Protocol — name and link that target. That is a compatibility *requirement* on a foreign
+format, not a semantic authority over Viu. Tailwind CSS v4.3.3 is only the target of the parked
+utility-CSS add-on engine at `tooling/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility
+target.
 
 ### Project layout
 
-- Inverted library layout: `libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name **is** the
-  assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
-  folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
-  `assimalign/viu`).
-- Compiler and editor libraries use the same layout under
-  `tooling/Assimalign.Viu.<Name>/{src|test}`. The location carries the developer-tooling role;
-  namespaces remain equal to their descriptive assembly ids (`Syntax.*`, `Compiler.*`, `UtilityCss`,
-  `LanguageService`, or `LanguageServer`).
+- Publicly consumable package surfaces use the area-based inverted layout
+  `libraries/<Area>/<AssemblyId>/{src,test}`. The areas are `Browser` (Browser, Browser.Router),
+  `DevTools` (DevTools, Testing), `Router`, `Runtime` (Components, Core, Reactivity, State),
+  `ServerRenderer`, and `Syntax` (Syntax plus Css, Html, SingleFileComponent, and Templates); the
+  assembly-id folder remains the package/project identity. `libraries/` therefore contains both
+  runtime libraries and the public netstandard2.0 build/editor-time parser cluster. The parsers are
+  deliberately consumable by developers and are the foundation for future extensible tooling;
+  `libraries/` does not mean runtime-only.
+- Compiler and editor implementation projects use the same area-based invariant under
+  `tooling/<Area>/<AssemblyId>/{src,test}`: `Compiler/` contains the two `Assimalign.Viu.Compiler.*`
+  composition roots and `Editor/` contains `Assimalign.Viu.LanguageService` and
+  `Assimalign.Viu.LanguageServer`. The location carries the developer-tooling classification without
+  adding a blanket `Tooling.` assembly/namespace segment. No tooling project is currently an
+  independently published package.
+- `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the single root-level exception. It is a parked,
+  non-packable add-on engine that remains built and tested by the tooling lane pending a fresh design
+  under `libraries/Utilities/`; that redesign must own its MSBuild props/targets and may own a
+  dedicated editor extension. Utility CSS is not integrated into the Viu SDK, hot reload, editors,
+  packaging, release train, or core specification. Component `<style>` CSS remains fully supported,
+  including scoping, bundling, and hot reload.
+- Ecosystem integrations use `extensions/{VisualStudio|VisualStudioCode|dotnet}`; templates live at
+  `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives at
+  `benchmarks/Assimalign.Viu.Testing.EndToEnd`, and SDK task projects use
+  `sdks/<SdkId>/Tasks/{src,test}`.
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
   `docs/`; the base and Browser consumer-facing MSBuild SDKs live in `sdks/`, and the
   `Assimalign.Viu.App` / `Assimalign.Viu.App.Browser` shared-framework pack producers live in
@@ -85,12 +117,11 @@ HTML serialization, the Language Server Protocol — name and link that target. 
 - **Namespace == assembly name**, flat. Every file in `Assimalign.Viu.Browser` declares
   `namespace Assimalign.Viu.Browser;` regardless of subfolder. `Abstraction/` and `Internal/` are
   **physical folders only** — they never appear in a namespace.
-- **Recorded exception ([V01.01.12.21], `docs/NET-RESHAPE-PLAN.md` R2):** `Assimalign.Viu.Core` — the
-  consolidated runtime core + reactivity — roots every type at the **`Assimalign.Viu`** namespace (set via
-  `<RootNamespace>Assimalign.Viu</RootNamespace>` on its `src` csproj), *not* `Assimalign.Viu.Core`,
-  because the core **is** the product and its primitives read best unprefixed (`Assimalign.Viu.Reference<T>`,
-  `Assimalign.Viu.VirtualNode`). This is the single deliberate deviation from the rule; every other library
-  keeps namespace == assembly id (the source-generator assemblies included).
+- **Recorded exception (origin [V01.01.12.21] R2; retained through the 2026-07 redesign, see
+  [V01.01.11.04.02] #251):** `Assimalign.Viu.Core` roots every type at the **`Assimalign.Viu`**
+  namespace. The R2 consolidation was superseded when Reactivity, Components, and State were re-split;
+  the root-namespace deviation survives for Core alone. Every other library keeps namespace ==
+  assembly id.
 
 ### Folders within `src/`
 
@@ -99,14 +130,22 @@ HTML serialization, the Language Server Protocol — name and link that target. 
 - **Delegates** (public delegate declarations) → `src/Delegates/`.
 - **Public non-interface types** group into **feature folders** (`Rendering/`, `Components/`, `Watch/`, `Blocks/`, …): one folder per coherent feature set. Types used across the whole library (the "currency" types — e.g. `VirtualNode`, the flag enums, a library's facade) stay at the `src/` root.
 - Folders are **physical only** — they never appear in a namespace. Create a folder only when it will contain files.
-- Linked shared-source paths are frozen. Syntax siblings and the compiler/UtilityCss projects link
-  Syntax shims through `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`;
-  `Assimalign.Viu.Syntax.Templates` links flag sources from
-  `..\..\..\libraries\Assimalign.Viu.Components\src\` and DOM data from
-  `..\..\..\libraries\Assimalign.Viu.ServerRenderer\src\Internal\`; the Visual Studio project uses
-  `$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs` plus the
-  the ServerRenderer `DomKnowledgeData.cs` path under `$(ViuRepositoryDirectory)libraries\`. Moving an owner or
-  consumer requires updating every linking csproj in the same change.
+- Several projects link shared-source files through `<Compile Include>`, so their paths are frozen
+  for this layout:
+  - Syntax siblings link `Shims/IsExternalInit.cs` and `Shims/RequiredMemberShims.cs` through
+    `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`.
+  - `Assimalign.Viu.Compiler.Css`, `Assimalign.Viu.Compiler.SingleFileComponent`, and the parked
+    `Assimalign.Viu.UtilityCss` engine link those shims through
+    `$(ViuRepositoryDirectory)libraries\Syntax\Assimalign.Viu.Syntax\src\Shims\<File>`.
+  - `Assimalign.Viu.Syntax.Templates` links `PatchFlags.cs` and `SlotStability.cs` from
+    `$(ViuRepositoryDirectory)libraries\Runtime\Assimalign.Viu.Components\src\`, and links
+    `DomKnowledgeData.cs` from
+    `$(ViuRepositoryDirectory)libraries\ServerRenderer\Assimalign.Viu.ServerRenderer\src\Internal\`.
+  - The Visual Studio project links the external-init shim through
+    `$(ViuRepositoryDirectory)libraries\Syntax\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs`;
+    its source and test projects link `Internal/DomKnowledgeData.cs` through
+    `$(ViuRepositoryDirectory)libraries\ServerRenderer\Assimalign.Viu.ServerRenderer\src\Internal\DomKnowledgeData.cs`.
+  Moving any owner or consumer requires updating every linking csproj in the same change.
 
 ### Files and types
 
@@ -209,7 +248,7 @@ test, or example csproj. Use the by-name item groups the build system resolves:
 
 ### csproj shapes
 
-Shipping library (`src/`):
+Shipping runtime library (`src/`):
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -257,9 +296,11 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 
 ### Adding a new library
 
-1. Use `libraries/Assimalign.Viu.<Name>/{src,test}` for runtime libraries or
-   `tooling/Assimalign.Viu.<Name>/{src,test}` for compiler/build/editor libraries. The tooling root,
-   not a blanket assembly-name segment, carries that role.
+1. Use `libraries/<Area>/Assimalign.Viu.<Name>/{src,test}` for a publicly consumable runtime or
+   parser library, or `tooling/<Area>/Assimalign.Viu.<Name>/{src,test}` for compiler/build/editor
+   implementation code. The area location carries the role without changing the assembly id or
+   namespace. The parked `tooling/Assimalign.Viu.UtilityCss` root is an existing exception, not a
+   template for new projects; a redesigned utility add-on belongs under `libraries/Utilities/`.
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
@@ -272,13 +313,17 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 External consumers use the SDK matching their topology — never `ViuProjectReference`, which is the
 **in-repo dogfooding** mechanism:
 
-- **`Assimalign.Viu.Sdk`** chains `Microsoft.NET.Sdk` for host-neutral component libraries. It owns
+- **`Assimalign.Viu.Sdk`** uses `sdks/Assimalign.Viu.Sdk/Tasks/{src,test}` for task source and tests;
+  its `Tasks/src` project produces the SDK, which chains `Microsoft.NET.Sdk` for host-neutral
+  component libraries. It owns
   `.viu`/`.vue` AdditionalFiles, Syntax/Reactivity generators, targeting-only
   `Assimalign.Viu.App`, and component-style packing (`.viu.css` plus generated `buildTransitive`
   registration). It has no Browser, WebAssembly workload, browser assets, or runtime pack.
-- **`Assimalign.Viu.Sdk.Browser`** imports and depends exactly on the base SDK, chains
+- **`Assimalign.Viu.Sdk.Browser`** uses `sdks/Assimalign.Viu.Sdk.Browser/Tasks/{src,test}` for task
+  source and tests; its `Tasks/src` project produces the SDK, which imports and depends exactly on the
+  base SDK and chains
   `Microsoft.NET.Sdk.WebAssembly`, registers `Assimalign.Viu.App.Browser`, and owns browser assets,
-  application CSS/utility bundling, hot reload, WebAssembly fixes, and publish-budget hooks.
+  application and component CSS bundling, hot reload, WebAssembly fixes, and publish-budget hooks.
 - **`frameworks/Assimalign.Viu.App.Refs`** produces `Assimalign.Viu.App.Ref`: Reactivity,
   Components, State, Core, four package overrides, and the generator/parser closure. It is
   targeting-only.
@@ -312,6 +357,8 @@ is ❌, fix it before reporting completion, not after. Mark genuinely inapplicab
 - [ ] For runtime/interop changes, the sample WASM app still builds.
 
 ### Structure & naming
+- [ ] Projects follow `<root>/<Area>/<AssemblyId>/{src,test}`. The only root-level exception is the
+      parked, non-packable `tooling/Assimalign.Viu.UtilityCss` add-on engine.
 - [ ] Public interfaces are in `Abstraction/`; internal types (incl. internal interfaces) in `Internal/`;
       public non-interface types at `src/` root.
 - [ ] One public type per file; filename = type name; generics use `{T}` (no `OfT`).
@@ -363,9 +410,11 @@ Rules that need especially explicit confirmation before deviating:
   issue must be intentional, documented (in the type's XML docs and, where relevant, a `DESIGN.md`
   non-goal), and pinned by a test that asserts the *chosen* behavior. A specification clause, the tests
   that pin it, and the XML docs that cite it move together.
-- **External compatibility targets** — the `.vue` single-file-component container format, Tailwind CSS
-  v4.3.3 (Viu Utilities), WHATWG HTML serialization, the Language Server Protocol. There conformance to
-  the foreign format *is* the requirement; a deliberate departure needs the same explicit confirmation.
+- **External compatibility targets** — the `.vue` single-file-component container format, WHATWG HTML
+  serialization, the Language Server Protocol, and the WHATWG/W3C specifications Viu implements. There
+  conformance to the foreign format *is* the requirement; a deliberate departure needs the same explicit
+  confirmation. Tailwind CSS v4.3.3 is only the parked utility-CSS add-on's compatibility target and is
+  not part of this Viu core list.
 
 
 
@@ -381,9 +430,11 @@ paths:
 - **xUnit v2 + Shouldly** are the sanctioned frameworks. Shouldly is the single assertion library — do not
   add FluentAssertions or lean on raw `Assert`. Package versions come centrally
   ([`.claude/rules/build-system.md`](.claude/rules/build-system.md)); the test csproj declares them by name via `ViuPackageReference`.
-- Each library has a sibling test project under its `libraries/Assimalign.Viu.<Name>/test/` or
-  `tooling/Assimalign.Viu.<Name>/test/` folder (`Assimalign.Viu.<Name>.Tests`), `IsPackable=false`,
-  referencing its `src` via `ViuProjectReference`.
+- Each library has a sibling test project under
+  `libraries/<Area>/Assimalign.Viu.<Name>/test/`, while compiler and editor tests use
+  `tooling/<Area>/Assimalign.Viu.<Name>/test/`. The parked utility-CSS add-on is the root-level
+  exception at `tooling/Assimalign.Viu.UtilityCss/test/`. Test projects are `IsPackable=false` and
+  reference their `src` via `ViuProjectReference`.
 - Class `{Feature}Tests`; method names describe `Method_Scenario_ExpectedBehavior` (or an equally explicit
   phrase). Arrange / Act / Assert.
 
@@ -399,9 +450,10 @@ paths:
   that specified it. Never cite another framework's source or documentation as the reason a value is
   what it is.
 - Where a test pins a documented **external compatibility target** — the `.vue` single-file-component
-  container format, Tailwind CSS v4.3.3 (Viu Utilities), WHATWG HTML serialization, the Language Server
-  Protocol — name and link that target. There the citation *is* the requirement: the test asserts
-  conformance to a foreign format Viu deliberately consumes.
+  container format, WHATWG HTML serialization, or the Language Server Protocol — name and link that
+  target. There the citation *is* the requirement: the test asserts conformance to a foreign format
+  Viu deliberately consumes. Tests inside the parked utility-CSS add-on may still cite Tailwind CSS
+  v4.3.3 as that add-on's target; this does not make Tailwind a Viu core compatibility target.
 - Cover exception paths (throwing effects/getters, teardown under error) and lifecycle edges (stop,
   dispose, scope teardown), not just the happy path.
 
@@ -409,7 +461,8 @@ paths:
 
 - Unit tests must not require a browser. Exercise the runtime through an in-memory adapter/renderer (the
   Core `FakeDomAdapter` today; the shipping `Assimalign.Viu.Testing` renderer once
-  [V01.01.11.01] lands). Real-browser coverage is the separate e2e harness ([V01.01.11.03]).
+  [V01.01.11.01] lands). Real-browser coverage is the separate
+  `benchmarks/Assimalign.Viu.Testing.EndToEnd` harness ([V01.01.11.03]).
 - Use `InternalsVisibleTo` (in `src/Properties/AssemblyInfo.cs`) for tests that probe internal engine
   state.
 
@@ -444,26 +497,36 @@ paths:
   ([V01.01.13.04]) resolves ids to anchors from one mapping. **Do not write a clause id the spec does
   not yet contain.**
 - **External links.** `<see href>` is for genuine external standards and for foreign formats Viu
-  consumes — W3C UI Events, WHATWG HTML, Tailwind's docs, the Language Server Protocol, and the
-  `.vue` single-file-component container format. It is never used to cite another framework as the
+  consumes — W3C UI Events, WHATWG HTML, the Language Server Protocol, and the `.vue`
+  single-file-component container format. It is never used to cite another framework as the
   authority for Viu's own behavior. Version-pin format-citation URLs and frame them explicitly, e.g.
-  *"Container-format reference for the input this parser accepts: `<see href=…>`"*.
+  *"Container-format reference for the input this parser accepts: `<see href=…>`"*. Tailwind URLs are
+  no longer authorized in Viu XML documentation; they may remain inside the parked utility-CSS add-on
+  tree as references for that add-on's v4.3.3 compatibility target.
 - **The `.vue` compatibility surface is a shipping feature, not a legacy reference.** [V01.01.06.09]
   (#250) parses the tag-based `.vue` container so Vue single-file components compile under Viu. Every
   mention of `.vue` files, `VueSingleFileComponent*` types, `SingleFileComponentFormat.Vue`, the
   `viu-vue` document type, `**/*.vue` globs, and `.vue`-format spec compatibility **must be
   preserved** — removing them misdescribes the product. The banned-phrase rules above govern *how
   Viu's own semantics are described*, not the naming of the foreign format Viu reads.
+- **Utility CSS is parked design history, not Viu specification.** `docs/UTILITY-CSS-DESIGN.md` is
+  non-normative after the 2026-08-13 removal of SDK, hot-reload, editor, packaging, release, and CI
+  integration. The engine at `tooling/Assimalign.Viu.UtilityCss` remains a non-packable add-on
+  candidate pending a redesign under `libraries/Utilities/` with add-on-owned MSBuild props/targets
+  and, if needed, its own editor extension; do not cite the design document or Tailwind CSS as
+  authority for Viu core behavior.
 - **Other frameworks are performance research, not specification.** Viu tracks other renderers'
   performance work as an input to its own optimization backlog. That tracking lives in
   `docs/PERFORMANCE-RESEARCH.md` and in the work items it spawns — never in doc comments, and never
   as a reason a Viu behavior is what it is. An adopted technique is documented in Viu's terms and
   pinned by a Viu benchmark; origin acknowledgement, if wanted, goes in `docs/SPECIFICATION.md`
   § "Prior art and influences", once, centrally.
-- Per-library design docs mature into `libraries/Assimalign.Viu.<Name>/docs/OVERVIEW.md` or
-  `tooling/Assimalign.Viu.<Name>/docs/OVERVIEW.md` (what it is) beside `docs/DESIGN.md` (why it is
-  shaped this way, WASM/AOT constraints, non-goals). Keep them current in the same change as the code —
-  a `DESIGN.md` that lags the code actively misleads.
+- Per-library design docs mature into
+  `libraries/<Area>/Assimalign.Viu.<Name>/docs/OVERVIEW.md` or
+  `tooling/<Area>/Assimalign.Viu.<Name>/docs/OVERVIEW.md` (what it is) beside `docs/DESIGN.md` (why it
+  is shaped this way, WASM/AOT constraints, non-goals). The parked
+  `tooling/Assimalign.Viu.UtilityCss/docs/` tree is the root-level historical exception. Keep them
+  current in the same change as the code — a `DESIGN.md` that lags the code actively misleads.
 - Repo-level planning lives in `docs/` — `docs/SPECIFICATION.md` is the authoritative statement of
   Viu's semantics; `docs/PLAN.md` is the authoritative delivery narrative (architecture map, founding
   decisions, waves); the GitHub Project **#15** board is the authoritative backlog.
@@ -498,8 +561,11 @@ paths:
 - Issue bodies must carry enough architectural boundary guidance for a future session to implement
   without this conversation's context: the target `Assimalign.Viu.<Area>` project, allowed
   dependency direction, and any interop/AOT/source-generator boundaries.
-- Library layout is inverted under both `libraries/Assimalign.Viu.<Name>/{src|test}` and
-  `tooling/Assimalign.Viu.<Name>/{src|test}` — folder name = assembly id, no area wrapper folders.
+- Library layout is area-based and inverted:
+  `libraries/<Area>/Assimalign.Viu.<Name>/{src,test}` for publicly consumable runtime and parser
+  projects, and `tooling/<Area>/Assimalign.Viu.<Name>/{src,test}` for compiler and editor
+  implementation projects. `tooling/Assimalign.Viu.UtilityCss/{src,test}` is a parked, non-packable
+  root-level exception pending an add-on redesign under `libraries/Utilities/`.
 - Preserve later-wave requirements in planning notes even when implementing only current-wave scope.
   If a ticket needs prerequisite work from another ticket, call that out rather than silently
   reordering.
@@ -512,6 +578,7 @@ paths:
   calls, and always clean up JS-side handles and event listeners.
 - `docs/SPECIFICATION.md` is the authority for Viu's semantics: cite the clause id in the issue, code
   comment, or test that pins the behavior, and never another framework's documentation. Where the
-  change implements a documented external compatibility target (the `.vue` container format, Tailwind
-  CSS v4.3.3, WHATWG HTML serialization, the Language Server Protocol), name and link that target —
-  there conformance to the foreign format *is* the requirement.
+  change implements a documented external compatibility target (the `.vue` container format, WHATWG
+  HTML serialization, or the Language Server Protocol), name and link that target — there conformance
+  to the foreign format *is* the requirement. Tailwind CSS v4.3.3 may be cited only by work explicitly
+  scoped to the parked utility-CSS add-on or its future redesign, never as a Viu core target.

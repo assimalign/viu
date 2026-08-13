@@ -13,8 +13,9 @@ object-proxy layer). State the current specified behavior the decision changes o
 the [`docs/SPECIFICATION.md`](../SPECIFICATION.md) clause id — Viu's own specification is the
 baseline, and no external project's behavior is authoritative here. Where the decision concerns a
 documented **external compatibility target** Viu deliberately consumes — the `.vue`
-single-file-component container format, Tailwind CSS v4.3.3, WHATWG HTML serialization, the Language
-Server Protocol — name and link that target: there the citation *is* the requirement.
+single-file-component container format, WHATWG HTML serialization, or the Language Server Protocol
+— name and link that target: there the citation *is* the requirement. Tailwind CSS v4.3.3 belongs
+only to the parked, non-normative utility add-on and is not a Viu core compatibility target.
 
 ## Decision
 

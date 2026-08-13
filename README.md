@@ -26,9 +26,9 @@ narrative — waves, the WBS map, and the founding decisions — lives in
 
 Viu also ships a **`.vue` single-file-component compatibility parser** as a product feature
 ([V01.01.06.09], [#250](https://github.com/assimalign/viu/issues/250)): tag-based `.vue` files
-compile under Viu alongside the canonical `.viu` container. That is a compatibility target on a
-documented external format — the same category as Viu Utilities' Tailwind CSS v4.3.3 target — and is
-specified in [§9 of the specification](docs/SPECIFICATION.md#9-vue-compatibility--a-shipping-feature).
+compile under Viu alongside the canonical `.viu` container. That compatibility target on a
+documented external format is specified in
+[§9 of the specification](docs/SPECIFICATION.md#9-vue-compatibility--a-shipping-feature).
 
 ## Status
 
@@ -45,49 +45,58 @@ limits). The packaged-consumer showcase lives in the separate
 
 ## Repository map
 
-Framework libraries use the inverted layout `libraries/Assimalign.Viu.<Name>/{src,test,docs}` — the
-folder name **is** the assembly and package id (no area wrapper folders). Each documented project
-carries a `docs/OVERVIEW.md` (what it is and its public surface) and, where the shape needs
-justifying, a `docs/DESIGN.md` (why it is built that way, the WASM/AOT constraints, and its
-non-goals). Neither may contradict [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
+Publicly consumable packages use the area-based layout
+`libraries/<Area>/<AssemblyId>/{src,test,docs}`. `libraries/` is not limited to application-runtime
+assemblies: it also contains the `netstandard2.0` Syntax parsers that developers may consume directly
+to parse CSS, templates, HTML, and single-file components. Each documented project carries a
+`docs/OVERVIEW.md` and, where its shape needs justification, a `docs/DESIGN.md`; neither may
+contradict [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
 
-Developer-tooling libraries use the same layout under `tooling/`. The split is what the code runs
-in, not who wrote it: `libraries/` is the runtime a Viu app ships, `tooling/` is the build-time and
-editor code that compiles and understands one.
+Developer tooling follows `tooling/<Area>/<AssemblyId>/{src,test,docs}` under the `Compiler/` and
+`Editor/` areas. The parked, non-packable utility-CSS engine is the one root-level exception. The
+`extensions/` root contains ecosystem integrations (`VisualStudio`, `VisualStudioCode`, and
+`dotnet`), while the Playwright end-to-end executable lives with the performance harnesses under
+[`benchmarks/Assimalign.Viu.Testing.EndToEnd`](benchmarks/Assimalign.Viu.Testing.EndToEnd).
 
-### Framework libraries (`libraries/`)
+### Public libraries (`libraries/`)
 
-| Library | Responsibility | Docs |
-| --- | --- | --- |
-| [`Assimalign.Viu.Components`](libraries/Assimalign.Viu.Components) | The immutable virtual-node vocabulary, component contracts, bindings, compiler/runtime flags, built-in node descriptions, and explicit activation registry | [OVERVIEW](libraries/Assimalign.Viu.Components/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Components/docs/DESIGN.md) |
-| [`Assimalign.Viu.Reactivity`](libraries/Assimalign.Viu.Reactivity) | The dependency engine and the reference primitives: `Reference<T>`, `ShallowReference<T>`, `CustomReference<T>`, `Computed<T>`, effects, effect scopes, `Watch`, and the reactive collections | [OVERVIEW](libraries/Assimalign.Viu.Reactivity/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Reactivity/docs/DESIGN.md) |
-| [`Assimalign.Viu.State`](libraries/Assimalign.Viu.State) | Store definitions (`StateStoreDefinition<TStore>`) and the `StateStoreRegistry` that owns their reactive lifetimes, plus the optional `StateStore<TState>` member model with `Patch`/`Reset`/`Subscribe`/`OnAction` ([V01.01.09]) | [OVERVIEW](libraries/Assimalign.Viu.State/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.State/docs/DESIGN.md) |
-| [`Assimalign.Viu.Core`](libraries/Assimalign.Viu.Core) | The host-neutral application lifetime, renderer, scheduler, normalization ABI, keyed reconciliation, hydration, and built-in runtime behavior. Rooted at the `Assimalign.Viu` namespace, because the core *is* the product | [OVERVIEW](libraries/Assimalign.Viu.Core/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Core/docs/DESIGN.md) · [KEEP-ALIVE](libraries/Assimalign.Viu.Core/docs/KEEP-ALIVE.md) · [ASYNC/DYNAMIC](libraries/Assimalign.Viu.Core/docs/ASYNCHRONOUS-AND-DYNAMIC-COMPONENTS.md) |
-| [`Assimalign.Viu.Browser`](libraries/Assimalign.Viu.Browser) | The browser host adapter: the batched JS-interop DOM bridge, attribute/property patching, event wiring, the `v-model`/`v-show` directives, and CSS transitions | [OVERVIEW](libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Browser/docs/DESIGN.md) · [ADR-0001](libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md) |
-| [`Assimalign.Viu.ServerRenderer`](libraries/Assimalign.Viu.ServerRenderer) | The DOM-free string/stream HTML renderer (WHATWG-exact escaping, attributes, class/style, slots, teleport buffering, `serverPrefetch`) and the hydration marker protocol; the compiler's server code generation and the server adaptor follow ([V01.01.07]) | [OVERVIEW](libraries/Assimalign.Viu.ServerRenderer/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.ServerRenderer/docs/DESIGN.md) |
-| [`Assimalign.Viu.Router`](libraries/Assimalign.Viu.Router) | The DOM-free route table and matcher, history integration (memory/web/hash), the `RouterView`/`RouterLink` components, and the asynchronous navigation-guard pipeline; lazy routes and scroll behavior follow ([V01.01.08]) | [OVERVIEW](libraries/Assimalign.Viu.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Router/docs/DESIGN.md) |
-| [`Assimalign.Viu.Browser.Router`](libraries/Assimalign.Viu.Browser.Router) | The browser bridge wiring the Browser host's click dispatch into `RouterLink` navigation, so the router core stays DOM-free; installed at bootstrap by router apps ([V01.01.08]) | [OVERVIEW](libraries/Assimalign.Viu.Browser.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Browser.Router/docs/DESIGN.md) |
-| [`Assimalign.Viu.Testing`](libraries/Assimalign.Viu.Testing) | The in-memory host (`TNode = TestNode`) and the component test wrappers, so the runtime is exercised without a browser | [OVERVIEW](libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Testing/docs/DESIGN.md) |
+| Area | Library | Responsibility | Docs |
+| --- | --- | --- | --- |
+| Runtime | [`Assimalign.Viu.Components`](libraries/Runtime/Assimalign.Viu.Components) | Immutable virtual-node vocabulary, component contracts, bindings, compiler/runtime flags, built-in node descriptions, and explicit activation registry | [OVERVIEW](libraries/Runtime/Assimalign.Viu.Components/docs/OVERVIEW.md) · [DESIGN](libraries/Runtime/Assimalign.Viu.Components/docs/DESIGN.md) |
+| Runtime | [`Assimalign.Viu.Reactivity`](libraries/Runtime/Assimalign.Viu.Reactivity) | Dependency engine and reference primitives: `Reference<T>`, `Computed<T>`, effects, scopes, watches, and reactive collections | [OVERVIEW](libraries/Runtime/Assimalign.Viu.Reactivity/docs/OVERVIEW.md) · [DESIGN](libraries/Runtime/Assimalign.Viu.Reactivity/docs/DESIGN.md) |
+| Runtime | [`Assimalign.Viu.State`](libraries/Runtime/Assimalign.Viu.State) | Store definitions, registry-owned reactive lifetimes, and the optional `StateStore<TState>` member model | [OVERVIEW](libraries/Runtime/Assimalign.Viu.State/docs/OVERVIEW.md) · [DESIGN](libraries/Runtime/Assimalign.Viu.State/docs/DESIGN.md) |
+| Runtime | [`Assimalign.Viu.Core`](libraries/Runtime/Assimalign.Viu.Core) | Host-neutral application lifetime, renderer, scheduler, normalization ABI, reconciliation, hydration, and built-in behavior | [OVERVIEW](libraries/Runtime/Assimalign.Viu.Core/docs/OVERVIEW.md) · [DESIGN](libraries/Runtime/Assimalign.Viu.Core/docs/DESIGN.md) · [KEEP-ALIVE](libraries/Runtime/Assimalign.Viu.Core/docs/KEEP-ALIVE.md) · [ASYNC/DYNAMIC](libraries/Runtime/Assimalign.Viu.Core/docs/ASYNCHRONOUS-AND-DYNAMIC-COMPONENTS.md) |
+| Browser | [`Assimalign.Viu.Browser`](libraries/Browser/Assimalign.Viu.Browser) | Browser host adapter, batched DOM interop, event wiring, browser directives, and CSS transitions | [OVERVIEW](libraries/Browser/Assimalign.Viu.Browser/docs/OVERVIEW.md) · [DESIGN](libraries/Browser/Assimalign.Viu.Browser/docs/DESIGN.md) · [ADR-0001](libraries/Browser/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md) |
+| Browser | [`Assimalign.Viu.Browser.Router`](libraries/Browser/Assimalign.Viu.Browser.Router) | Browser click/history bridge for the host-neutral router | [OVERVIEW](libraries/Browser/Assimalign.Viu.Browser.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Browser/Assimalign.Viu.Browser.Router/docs/DESIGN.md) |
+| Router | [`Assimalign.Viu.Router`](libraries/Router/Assimalign.Viu.Router) | DOM-free route matching, histories, components, and navigation guards | [OVERVIEW](libraries/Router/Assimalign.Viu.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Router/Assimalign.Viu.Router/docs/DESIGN.md) |
+| ServerRenderer | [`Assimalign.Viu.ServerRenderer`](libraries/ServerRenderer/Assimalign.Viu.ServerRenderer) | DOM-free HTML rendering and the hydration-marker protocol | [OVERVIEW](libraries/ServerRenderer/Assimalign.Viu.ServerRenderer/docs/OVERVIEW.md) · [DESIGN](libraries/ServerRenderer/Assimalign.Viu.ServerRenderer/docs/DESIGN.md) |
+| DevTools | [`Assimalign.Viu.DevTools`](libraries/DevTools/Assimalign.Viu.DevTools) | Optional runtime inspection protocol and browser bridge | [PROTOCOL](libraries/DevTools/Assimalign.Viu.DevTools/docs/PROTOCOL.md) |
+| DevTools | [`Assimalign.Viu.Testing`](libraries/DevTools/Assimalign.Viu.Testing) | In-memory host and component-test wrappers | [OVERVIEW](libraries/DevTools/Assimalign.Viu.Testing/docs/OVERVIEW.md) · [DESIGN](libraries/DevTools/Assimalign.Viu.Testing/docs/DESIGN.md) |
+| Syntax | [`Assimalign.Viu.Syntax`](libraries/Syntax/Assimalign.Viu.Syntax) | Shared located-node, diagnostic, and registration-based parser foundation | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax/docs/DESIGN.md) |
+| Syntax | [`Assimalign.Viu.Syntax.Templates`](libraries/Syntax/Assimalign.Viu.Syntax.Templates) | Template parsing, transformation, static analysis, patch inference, and render-source generation | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md) |
+| Syntax | [`Assimalign.Viu.Syntax.SingleFileComponent`](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent) | Canonical `.viu` and compatible `.vue` container parsers | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md) · [FORMAT](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md) |
+| Syntax | [`Assimalign.Viu.Syntax.Css`](libraries/Syntax/Assimalign.Viu.Syntax.Css) | CSS tokenizer, parser, and scoped-style rewrite | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md) |
+| Syntax | [`Assimalign.Viu.Syntax.Html`](libraries/Syntax/Assimalign.Viu.Syntax.Html) | HTML parser used for host-page build-time rewriting | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Html/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Html/docs/DESIGN.md) |
 
 ### Developer tooling (`tooling/`)
 
-Build-time and editor libraries, same inverted layout, folder name = assembly id. The `tooling/`
-location carries the role; assembly ids and namespaces do not add a blanket role prefix. None enters
-a Viu app's runtime. Syntax/compiler projects run inside Roslyn or MSBuild hosts, UtilityCss is the
-one independently published tooling package, and the last two projects form the editor stack.
+Compiler and editor projects are organized by host role. None enters a Viu application's runtime,
+and none is currently published as an independent tooling package.
 
 | Library | Responsibility | Docs |
 | --- | --- | --- |
-| [`Assimalign.Viu.Syntax`](tooling/Assimalign.Viu.Syntax) | The shared parser base: located node and diagnostic primitives, and the registration-based pipeline every language library roots on | [OVERVIEW](tooling/Assimalign.Viu.Syntax/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Syntax/docs/DESIGN.md) |
-| [`Assimalign.Viu.Syntax.Templates`](tooling/Assimalign.Viu.Syntax.Templates) | The template language front end — parse, transform, static analysis, patch-flag inference — and the C# render-method code generator | [OVERVIEW](tooling/Assimalign.Viu.Syntax.Templates/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md) |
-| [`Assimalign.Viu.Syntax.SingleFileComponent`](tooling/Assimalign.Viu.Syntax.SingleFileComponent) | Both container parsers over one shared tag scanner: the canonical `.viu` container, and the `.vue` compatibility parser that is a shipping feature ([V01.01.06.09], [#250](https://github.com/assimalign/viu/issues/250)) | [OVERVIEW](tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md) · [FORMAT](tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md) |
-| [`Assimalign.Viu.Syntax.Css`](tooling/Assimalign.Viu.Syntax.Css) | The CSS tokenizer, rule parser, and scoped-CSS rewrite behind `<style>` block compilation | [OVERVIEW](tooling/Assimalign.Viu.Syntax.Css/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md) |
-| [`Assimalign.Viu.Syntax.Html`](tooling/Assimalign.Viu.Syntax.Html) | The `.html` host-page language, for build-time rewriting of the boot page (scaffold) | [OVERVIEW](tooling/Assimalign.Viu.Syntax.Html/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Syntax.Html/docs/DESIGN.md) |
-| [`Assimalign.Viu.Compiler.Css`](tooling/Assimalign.Viu.Compiler.Css) | The build-time composition root for `<style>` compilation and bundling that both build-time hosts share | [OVERVIEW](tooling/Assimalign.Viu.Compiler.Css/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Compiler.Css/docs/DESIGN.md) |
-| [`Assimalign.Viu.Compiler.SingleFileComponent`](tooling/Assimalign.Viu.Compiler.SingleFileComponent) | The ONE `.viu`/`.vue` → C# projection (parse, `@script` analysis, render and source maps, diagnostics) that the source generator and the language service both run, so build output and editor understanding cannot drift ([V01.01.06.11]) | [OVERVIEW](tooling/Assimalign.Viu.Compiler.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md) |
-| [`Assimalign.Viu.UtilityCss`](tooling/Assimalign.Viu.UtilityCss) | The build-time engine for **Viu Utilities** — candidate scanning, the project candidate index, and utility generation — an independent C# implementation pinned to the Tailwind CSS v4.3.3 compatibility target | [OVERVIEW](tooling/Assimalign.Viu.UtilityCss/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.UtilityCss/docs/DESIGN.md) · [THIRD-PARTY-NOTICES](tooling/Assimalign.Viu.UtilityCss/docs/THIRD-PARTY-NOTICES.md) |
-| [`Assimalign.Viu.LanguageService`](tooling/Assimalign.Viu.LanguageService) | The editor-neutral language features — document state, completion, hover, symbols, folding, code actions, and the `@script` semantic engine — with no protocol or editor dependency | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
-| [`Assimalign.Viu.LanguageServer`](tooling/Assimalign.Viu.LanguageServer) | The standalone Language Server Protocol executable over the language service; published self-contained and single-file per runtime identifier, and shipped inside both editor extensions | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
+| [`Assimalign.Viu.Compiler.Css`](tooling/Compiler/Assimalign.Viu.Compiler.Css) | Build-time composition root for component `<style>` compilation and bundling | [OVERVIEW](tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/OVERVIEW.md) · [DESIGN](tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/DESIGN.md) |
+| [`Assimalign.Viu.Compiler.SingleFileComponent`](tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent) | Shared `.viu`/`.vue` to C# projection used by generation and editor analysis | [OVERVIEW](tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md) |
+| [`Assimalign.Viu.LanguageService`](tooling/Editor/Assimalign.Viu.LanguageService) | Editor-neutral document state, completion, hover, symbols, folding, code actions, and C# semantic analysis | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
+| [`Assimalign.Viu.LanguageServer`](tooling/Editor/Assimalign.Viu.LanguageServer) | Standalone Language Server Protocol executable used by both editor extensions | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
+
+**Parked add-on.** Viu Utilities is no longer part of Viu's SDK, editor, packaging, release, or CI
+product surface (decision of 2026-08-13: utility means add-on, not baked in). Its `IsPackable=false`
+engine remains parked at [`tooling/Assimalign.Viu.UtilityCss`](tooling/Assimalign.Viu.UtilityCss) and
+is still built and tested by the tooling lane. Tailwind CSS v4.3.3 is a compatibility target of that
+parked add-on only. A future redesign may move it under `libraries/Utilities/` with its own MSBuild
+integration and editor support. Component `<style>` CSS compilation, bundling, delivery, and hot
+reload remain active Viu features.
 
 ### Source generators and SDK build tools (`analyzers/`, `sdks/`)
 
@@ -100,21 +109,22 @@ happens here instead. They never ship in the runtime assemblies.
 | `Assimalign.Viu.Generators.Reactivity` | Emits the tracking/triggering property bodies for `[Reactive]`/`[ShallowReactive]` partial classes, so a plain object becomes reactive with no reflection and no runtime interception. |
 | `Assimalign.Viu.Generators.Syntax` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
 | `Assimalign.Viu.Sdk.Tasks` | The base SDK's host-neutral MSBuild tasks, including `ViuBundleCss`, which extracts physical `.viu.css` for component-library packages and Browser application bundles outside the analyzer sandbox. |
-| `Assimalign.Viu.Sdk.Browser.Tasks` | Browser-only MSBuild tasks for utility CSS, host-page link injection, and CSS hot-reload worker launch. |
-| `Assimalign.Viu.Sdk.CssHotReload` | The Browser SDK's internal Debug `dotnet watch` worker; it regenerates component and utility stylesheets and is never copied into the application or runtime framework. |
+| `Assimalign.Viu.Sdk.Browser.Tasks` | Browser-only MSBuild tasks for host-page component-CSS link injection and CSS hot-reload worker launch. Its projects use `Tasks/{src,test}`. |
+| `Assimalign.Viu.Sdk.CssHotReload` | The Browser SDK's internal Debug `dotnet watch` worker; it regenerates component stylesheets and is never copied into the application or runtime framework. |
 
 ### Editor extensions (`extensions/`)
 
 Both editor hosts are thin clients over the **same** editor-neutral language server
-(`tooling/Assimalign.Viu.LanguageServer`, a plain stdio LSP executable with no editor
+(`tooling/Editor/Assimalign.Viu.LanguageServer`, a plain stdio LSP executable with no editor
 coupling). [`build/Targets/Build.LanguageServer.targets`](build/Targets/Build.LanguageServer.targets)
 is the single publish recipe both use, so they cannot drift on trimming, single-file, or debug-type
 settings.
 
-| Extension | Host | Status |
+| Integration | Host | Status |
 | --- | --- | --- |
 | [`extensions/VisualStudio`](extensions/VisualStudio) | Visual Studio 2022 17.14+ / Visual Studio 2026 | Published to the Visual Studio Marketplace as a preview |
 | [`extensions/VisualStudioCode`](extensions/VisualStudioCode) | Visual Studio Code 1.85+ | Scaffold — compiles and packages, not published |
+| [`extensions/dotnet/Assimalign.Viu.Templates`](extensions/dotnet/Assimalign.Viu.Templates) | `dotnet new` | Packaged application and component-library templates |
 
 The two hosts differ in exactly one build property. The Visual Studio VSIX embeds `win-x64` and
 `win-arm64` only, because it ships every payload in one package and each is roughly 18 MB; Visual
@@ -190,7 +200,7 @@ dotnet build Assimalign.Viu.slnx
 Each library's tests live beside it under `test/`:
 
 ```sh
-dotnet test libraries/Assimalign.Viu.Core/test/
+dotnet test libraries/Runtime/Assimalign.Viu.Core/test/
 ```
 
 ### Run the showcase

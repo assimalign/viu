@@ -339,7 +339,7 @@ function New-BodyTemplate {
     [void]$sb.AppendLine('')
     [void]$sb.AppendLine('### Standards and Compliance')
     if ($Std) { foreach ($s in $Std) { [void]$sb.AppendLine("- $s") } }
-    else { [void]$sb.AppendLine('- <docs/SPECIFICATION.md clause id, a declared compatibility target (the .vue container format, Tailwind CSS v4.3.3), the WHATWG/W3C spec for DOM behavior, or a note that it is a Viu runtime-contract concern>') }
+    else { [void]$sb.AppendLine('- <docs/SPECIFICATION.md clause id, a declared compatibility target (the .vue container format or Language Server Protocol), the WHATWG/W3C spec for DOM behavior, or a note that it is a Viu runtime-contract concern>') }
     return $sb.ToString()
 }
 

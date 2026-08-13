@@ -42,13 +42,19 @@ authority for delivery status.
 
 ## Architecture: Viu library map
 
-Package boundaries map 1:1 to .NET class libraries using the inverted layout
-`{libraries,tooling}/Assimalign.Viu.<Name>/{src|test}`. Runtime projects live in `libraries/`,
-compiler/editor projects live in `tooling/`, and the folder name is the assembly/package identifier
-with no area wrapper folders. The following table is the exact shipping-library set under
-`libraries/`; the final column lists each consumer's direct Viu project dependencies.
+Library boundaries map 1:1 to .NET class-library projects using the area-based inverted layout
+`<root>/<Area>/<AssemblyId>/{src|test}`. `libraries/` contains publicly consumable libraries: both
+runtime packages and the `netstandard2.0` parser cluster under `libraries/Syntax/`. `tooling/`
+contains compiler composition roots and editor processes under `Compiler/` and `Editor/`. The area
+folder carries product ownership; the assembly-id folder still owns the `{src,test}` pair. The
+following table is the public-library set under `libraries/`; the final column lists each consumer's
+direct Viu project dependencies.
 
-| Area | Shipping library | Role | Direct Viu dependencies |
+The current library areas are `Browser/` (Browser and Browser.Router), `DevTools/` (DevTools and
+Testing), `Router/`, `Runtime/` (Components, Core, Reactivity, and State), `ServerRenderer/`, and
+`Syntax/` (the five Syntax libraries).
+
+| Area | Public library | Role | Direct Viu dependencies |
 | --- | --- | --- | --- |
 | Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` | Single-threaded dependency tracking, reference cells, effects, scopes, watch, and reactive collections; the runtime leaf | None |
 | Components (`V01.01.15`) | `Assimalign.Viu.Components` | The closed `VirtualNode` algebra, compiler/runtime flags, authored-component model, contracts, bindings, and activation registrations | Reactivity |
@@ -60,6 +66,7 @@ with no area wrapper folders. The following table is the exact shipping-library 
 | Router (`V01.01.08`) | `Assimalign.Viu.Router` | Host-free navigation convention: matching, memory history, lazy route requests, guards, and scroll policy | Components, Reactivity |
 | Browser router (`V01.01.08`) | `Assimalign.Viu.Browser.Router` | Leaf integration for Browser clicks, web/hash history, and post-render scroll effects | Core, Router, Browser |
 | Runtime inspection (`V01.01.10`) | `Assimalign.Viu.DevTools` | Opt-in versioned protocol, weak component registry, snapshots, inspectors, and postMessage/WebSocket transports | Components, Core, Reactivity |
+| Syntax (`V01.01.05`, `V01.01.06`) | `Assimalign.Viu.Syntax*` (five libraries) | Public `netstandard2.0` parser vocabulary for CSS, HTML, templates, and `.viu`/`.vue` containers; available to developers building extensible tooling | The four specialized parsers depend on the Syntax base |
 
 Vocabulary lives low, composition lives high, and optional conventions attach through designed
 seams. Reactivity is independent; Components owns descriptions and authored behavior; State and
@@ -68,12 +75,19 @@ Testing adapt that model to hosts; DevTools observes Core through a runtime-owne
 depends on diagnostics. The adopted rationale and complete dependency graph are recorded
 in [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md).
 
-The build/editor side contains exactly ten projects under `tooling/`: the `Assimalign.Viu.Syntax`
-base; its Templates, SingleFileComponent, Css, and Html language libraries; the Css and
-SingleFileComponent compiler composition roots; UtilityCss; LanguageService; and LanguageServer.
-The Reactivity and Syntax generators live under `analyzers/`. The single-file-component compiler is
-the shared `.viu`/`.vue` to C# projection used by both build and editor hosts, preserving the
-shipping `.vue` compatibility input while keeping Viu's runtime independent of JavaScript execution.
+The active build/editor implementation side contains four projects under `tooling/`: the Css and
+SingleFileComponent compiler composition roots in `tooling/Compiler/`, plus LanguageService and
+LanguageServer in `tooling/Editor/`. The non-packable utility-CSS engine is a parked root-level
+exception at `tooling/Assimalign.Viu.UtilityCss`; it is not integrated into Viu or its release train
+and awaits a fresh add-on design under `libraries/Utilities/`. The Reactivity and Syntax generators
+live under `analyzers/`. The single-file-component compiler is the shared `.viu`/`.vue` to C#
+projection used by both build and editor hosts, preserving the shipping `.vue` compatibility input
+while keeping Viu's runtime independent of JavaScript execution.
+
+Ecosystem integration points live under `extensions/`: Visual Studio, Visual Studio Code, and the
+`dotnet new` template pack at `extensions/dotnet/Assimalign.Viu.Templates`. SDK task projects keep
+their own `Tasks/{src,test}` shape. The real-browser end-to-end project lives with its consumers at
+`benchmarks/Assimalign.Viu.Testing.EndToEnd`.
 
 ## Founding design decisions (C#/WASM divergences)
 
@@ -105,7 +119,7 @@ These eight dated decisions define Viu's C# and WebAssembly architecture:
    `@style` @-block syntax canonical for every block — the earlier decision happened and is
    superseded, not erased: the legacy `@template`/`@style` containers still parse during a
    migration window with a Warning-severity diagnostic (the decision record and rules live in
-   `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
+   `libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
    explicitly scoped tag-based `.vue` compatibility input. Both containers feed the same Viu
    template compiler.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer
@@ -177,12 +191,12 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W02** | The component/application foundation, watch/reactive collections, keyed reconciliation, browser bootstrap, and test utilities are delivered; every planned feature row is closed | No planned feature row remains |
 | **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered; the deferred compiler optimization set has explicit implemented-or-dropped outcomes, and the size/startup budget gates are live against measured `EndToEndBrowserApp` baselines | Complete diagnostic source attribution |
 | **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; generated trees and compiled SSR share static scoped-style attributes; hosted fingerprint selection and deterministic component-library/application CSS delivery are complete | Close built-in edge cases, generated State/source-map work, and the deferred reactive scoped-CSS runtime |
-| **W05** | Host-neutral component-library and Browser SDK/framework segments, validated release packaging/staging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, explicit server-profile selection with reflection-free registration, installable `dotnet new` templates with an optional server host, editor hot-reload metadata, a working package-only `dotnet watch` CSS/component path with connected-browser conformance, the ordinary real-browser end-to-end harness, live size/startup budget gates, lazy route factories with Browser scroll restoration, and the opt-in runtime-inspection protocol exist | Finish compatibility/conformance gates and Cohesion hosting integration |
-| **W06** | Utility composition and semantic `@script` language-server work have begun | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
+| **W05** | Host-neutral component-library and Browser SDK/framework segments, validated release packaging/staging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, explicit server-profile selection with reflection-free registration, installable `dotnet new` templates with an optional server host, editor hot-reload metadata, a working package-only `dotnet watch` component-CSS and component-remount path with connected-browser conformance, the ordinary real-browser end-to-end harness, live size/startup budget gates, lazy route factories with Browser scroll restoration, and the opt-in runtime-inspection protocol exist | Finish compatibility/conformance gates and Cohesion hosting integration |
+| **W06** | Semantic `@script` language-server work has begun; the former utility-composition train was parked and superseded by the 2026-08-13 removal | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
 
-This snapshot reconciles the plan with live issue state on 2026-08-10. The budget-gate activation and
-scoped-CSS follow-ups are grouped with their closest delivery themes here; Project #15 remains
-authoritative for their Wave custom fields.
+This snapshot reconciles the plan with the 2026-08-13 area-layout and utility-removal decisions. The
+budget-gate activation and scoped-CSS follow-ups are grouped with their closest delivery themes here;
+Project #15 remains authoritative for their Wave custom fields.
 
 ### [V01.01.14] API hardening — complete
 
@@ -376,18 +390,25 @@ completed P0–P6 sequence, and verification record remain in
 | `V01.01.12.07.05` | Implement the tier-2 language-server surface: resolve, symbols, folding, honest hover format | W05 | P005 |
 | `V01.01.12.08` | Integrate Viu with the Cohesion platform (hosting; packaging landed via `.19`) | W05 | P004 |
 | `V01.01.12.09` | Modularize the library folder structure, whole-word naming | W03 | P002 |
-| `V01.01.12.10` | Scope the build-time utility-first CSS engine | W04 | P005 |
+| `V01.01.12.10` | ~~Scope the build-time utility-first CSS engine~~ — parked add-on design history; superseded by the 2026-08-13 removal | W04 | P005 |
 | `V01.01.12.11` | CSS construction/emission surface in Assimalign.Viu.Syntax.Css | W04 | P004 |
 | `V01.01.12.12` | ViuBundleCss MSBuild task for CSS bundling | W04 | P004 |
-| `V01.01.12.13` | Utility-class candidate grammar and variant model | W05 | P005 |
-| `V01.01.12.14` | CSS-first utility theme and design-token model | W05 | P005 |
-| `V01.01.12.15` | Plain-text utility source detection and extraction | W05 | P005 |
-| `V01.01.12.16` | Utility-to-CSS resolver and incremental pipeline | W05 | P005 |
-| `V01.01.12.17` | CSS-first utility directives and style composition | W06 | P006 |
+| `V01.01.12.13` | ~~Utility-class candidate grammar and variant model~~ — parked add-on; superseded by the 2026-08-13 removal | W05 | P005 |
+| `V01.01.12.14` | ~~CSS-first utility theme and design-token model~~ — parked add-on; superseded by the 2026-08-13 removal | W05 | P005 |
+| `V01.01.12.15` | ~~Plain-text utility source detection and extraction~~ — parked add-on; superseded by the 2026-08-13 removal | W05 | P005 |
+| `V01.01.12.16` | ~~Utility-to-CSS resolver and incremental pipeline~~ — parked add-on; superseded by the 2026-08-13 removal | W05 | P005 |
+| `V01.01.12.17` | ~~CSS-first utility directives and style composition~~ — parked add-on; superseded by the 2026-08-13 removal | W06 | P006 |
 | `V01.01.12.18` | Rename product naming from Vue/Vuecs to Viu repo-wide | W04 | P002 |
 | `V01.01.12.19` | Adopt Cohesion SDK/shared-framework packaging (Assimalign.Viu.Sdk + Assimalign.Viu.App) | W05 | P003 |
 | `V01.01.12.23` | Provide semantic C# IntelliSense in the @script block through a Roslyn workspace in the language server | W06 | P004 |
 | `V01.01.12.27` | Segment the SDK and shared framework into base and Browser packages | W05 | P003 |
+
+The utility-specific descendants `[V01.01.12.05.01]` (utility stylesheet watch),
+`[V01.01.12.07.01]` (utility IntelliSense), and `[V01.01.12.16.01]` (Tailwind CSS v4.3.3
+conformance) are likewise parked and superseded by the 2026-08-13 removal. Their completed work is
+retained as non-normative design history in [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) for the
+future `libraries/Utilities/` add-on redesign. Component CSS bundling, scoped styles, CSS Modules,
+and component-style hot reload remain active Viu features.
 
 ### [V01.01.13] Framework - Documentation (W02, P003)
 

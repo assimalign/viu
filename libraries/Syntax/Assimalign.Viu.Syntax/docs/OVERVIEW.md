@@ -1,7 +1,9 @@
 # Assimalign.Viu.Syntax — overview
 
-The shared base of the `Assimalign.Viu.Syntax.*` cluster: the primitives and the parser pipeline
-every language library roots on. It ships no language of its own.
+The publicly consumable base of the `Assimalign.Viu.Syntax.*` cluster under `libraries/Syntax/`:
+the primitives and parser pipeline every language library roots on. It ships no language of its
+own. Build/editor hosts consume the same packages that application developers can use directly to
+parse templates, CSS, and single-file-component containers.
 
 ## What it provides
 
@@ -26,8 +28,9 @@ every language library roots on. It ships no language of its own.
 | --- | --- |
 | `Assimalign.Viu.Syntax.Templates` | The Viu template language — HTML-flavored markup with directives and interpolation |
 | `Assimalign.Viu.Syntax.SingleFileComponent` | The `.viu` container, plus the `.vue` compatibility parser ([V01.01.06.09]) |
-| `Assimalign.Viu.Syntax.Css` | CSS (scaffold — raw stylesheet root today) |
+| `Assimalign.Viu.Syntax.Css` | Rule-level CSS parsing, scoped rewriting, and programmatic construction |
 | `Assimalign.Viu.Syntax.Html` | Plain HTML documents, e.g. the WASM host page (scaffold) |
 
-All of these run at build time inside netstandard2.0 Roslyn generator hosts
-([V01.01.05.05]/[V01.01.06.02]); see [DESIGN.md](DESIGN.md) for the constraints that follow.
+All target netstandard2.0 so they can run inside Roslyn generator hosts
+([V01.01.05.05]/[V01.01.06.02]), language-server processes, and developer-authored tooling without
+a runtime-framework dependency; see [DESIGN.md](DESIGN.md) for the constraints that follow.

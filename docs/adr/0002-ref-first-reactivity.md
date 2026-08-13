@@ -53,7 +53,7 @@ version-counter and doubly-linked-list dependency graph — all of which port to
   refs, a template that reads a ref must emit `.Value`, and — because `Ref<T>.Value` is a settable
   property — compound assignment and increment (`count++`, `count += 1`) rewrite cleanly to
   `count.Value …`. This is the expression-binding contract pinned in
-  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md);
+  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md);
   a change to `Ref<T>.Value` requires a matching change there.
 - No implicit deep reactivity: authors reach for `[Reactive]` classes or reactive collections
   explicitly, which is more predictable but less magical than a deep `Proxy`.
@@ -70,6 +70,6 @@ version-counter and doubly-linked-list dependency graph — all of which port to
 ## References
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decision 2.
-- [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md) — the reactive core (merged from the former `Assimalign.Viu.Reactivity` in [V01.01.12.21]).
+- [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../libraries/Runtime/Assimalign.Viu.Core/docs/OVERVIEW.md) — the reactive core (merged from the former `Assimalign.Viu.Reactivity` in [V01.01.12.21]).
 - Vue 3: [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity),
   [Reactivity API: Core](https://vuejs.org/api/reactivity-core.html).

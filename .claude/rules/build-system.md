@@ -33,8 +33,27 @@ next to a library's or analyzer's `src/` are not a third option:
 2. **`build/`** (repository root) — it supports this repository's own pipeline.
 
 A file that must reach consumers under a *different* packaged name stays in `build/` and is packed with
-an explicit `PackagePath` (the CSS bundling / utility / hot-reload targets do this). An analyzer project
-ships only source and its DLL.
+an explicit `PackagePath` (the component-CSS bundling and hot-reload targets do this). An analyzer
+project ships only source and its DLL.
+
+## Project locations
+
+- Publicly consumable package surfaces live at `libraries/<Area>/<AssemblyId>/{src,test}`. Runtime
+  libraries occupy `Browser`, `DevTools`, `Router`, `Runtime`, and `ServerRenderer`; the public
+  netstandard2.0 build/editor-time parser libraries occupy `Syntax` so developers can consume the
+  parsing APIs directly.
+- Compiler and editor implementation projects live at `tooling/<Area>/<AssemblyId>/{src,test}`, with
+  the `Compiler` and `Editor` areas carrying the role. No tooling project is currently independently
+  published.
+- The parked, non-packable utility-CSS add-on engine at
+  `tooling/Assimalign.Viu.UtilityCss/{src,test}` is the root-level exception. It remains in the tooling
+  build and test lane pending a redesign under `libraries/Utilities/`. That add-on must own its
+  MSBuild props/targets (and may own a dedicated editor extension); do not wire it back into a Viu SDK
+  or the release inventory as incidental shared build logic.
+- Ecosystem integrations live under `extensions/{VisualStudio|VisualStudioCode|dotnet}`; the templates
+  project is `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives under
+  `benchmarks/Assimalign.Viu.Testing.EndToEnd`. SDK task projects use
+  `sdks/<SdkId>/Tasks/{src,test}`.
 
 ## Reference projects and packages by name
 
@@ -70,7 +89,7 @@ test, or example csproj. Use the by-name item groups the build system resolves:
 
 ## csproj shapes
 
-Shipping library (`src/`):
+Shipping runtime library (`src/`):
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -118,11 +137,12 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 
 ## Adding a new library
 
-1. `libraries/Assimalign.Viu.<Name>/{src,test}` with the two csproj shapes above — or
-   `tooling/Assimalign.Viu.<Name>/{src,test}` for compiler, build-time, or editor code. The `tooling/`
-   location carries that role; do not add a blanket `Tooling.` segment to the assembly id or namespace.
-   Use the specific product role instead (`Syntax.*`, `Compiler.*`, `UtilityCss`, `LanguageService`,
-   or `LanguageServer`).
+1. Use `libraries/<Area>/Assimalign.Viu.<Name>/{src,test}` for a publicly consumable runtime or parser
+   library. Use `tooling/<Area>/Assimalign.Viu.<Name>/{src,test}` for compiler/build-time or editor
+   implementation code. The area location carries the role; do not add a blanket `Tooling.` segment
+   to the assembly id or namespace. The parked `tooling/Assimalign.Viu.UtilityCss` root is an existing
+   exception, not a template for new projects; a redesigned utility add-on belongs under
+   `libraries/Utilities/`.
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
@@ -132,7 +152,8 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
    Browser segment.
 6. If the library is packable, add its package id to `$script:ViuLibraryPackageIds` in
    `scripts/modules/ViuPackaging.psm1`; the drift guard scans both `libraries/` and `tooling/` and
-   fails the pack when a packable project is missing from the inventory.
+   fails the pack when a packable project is missing from the inventory. The tooling root currently
+   contributes no published package.
 
 ## SDK and shared-framework packaging ([V01.01.12.19], #174; [V01.01.12.27], #323)
 
@@ -154,17 +175,19 @@ External consumers use the SDK matching their topology — never `ViuProjectRefe
 - **`frameworks/Assimalign.Viu.App.targets`** remains the shared manifest writer and pack-layout
   implementation. Segment props select the assemblies, analyzers, framework name, and Ref/Runtime
   kind; do not duplicate the writer in the Browser segment.
-- **`sdks/Assimalign.Viu.Sdk/`** — the component-library SDK. Its `Tasks/` project produces
-  `Assimalign.Viu.Sdk`, `Sdk.props` chains `Microsoft.NET.Sdk`, and the SDK registers a
+- **`sdks/Assimalign.Viu.Sdk/`** — the component-library SDK. Its task source and tests use the
+  `Tasks/{src,test}` layout; the `Tasks/src` project produces `Assimalign.Viu.Sdk`, `Sdk.props` chains
+  `Microsoft.NET.Sdk`, and the SDK registers a
   targeting-only `FrameworkReference` to `Assimalign.Viu.App`. It owns `.viu`/`.vue`
   `AdditionalFiles`, Syntax/Reactivity generators, and component-style extraction. Packing a library
   carries its `.viu.css` plus generated `buildTransitive` registration; the base SDK never loads
   Browser, requires a WebAssembly workload, registers browser static assets, or writes `wwwroot`.
-- **`sdks/Assimalign.Viu.Sdk.Browser/`** — the application SDK. Its `Tasks/` project produces
-  `Assimalign.Viu.Sdk.Browser` with an exact-version dependency on the base SDK. Its SDK imports the
+- **`sdks/Assimalign.Viu.Sdk.Browser/`** — the application SDK. Its task source and tests use the
+  `Tasks/{src,test}` layout; the `Tasks/src` project produces `Assimalign.Viu.Sdk.Browser` with an
+  exact-version dependency on the base SDK. Its SDK imports the
   base, chains `Microsoft.NET.Sdk.WebAssembly`, registers `Assimalign.Viu.App.Browser`, consumes
   transitive component-library style registrations as browser static assets, and owns
-  `viu-dom.js`, application CSS/utility bundling and link injection, the CSS hot-reload worker,
+  `viu-dom.js`, application and component CSS bundling and link injection, the CSS hot-reload worker,
   WebAssembly fixes, and publish-budget hooks.
 - Both SDKs import the pack-time-frozen `Build.Version.props` snapshot. Shared authoring logic stays
   in the base SDK; browser-only logic stays in the Browser SDK.
