@@ -71,6 +71,21 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
     public string OutputPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets whether the versioned editor manifest and class catalog are emitted beside the
+    /// generated stylesheet. Disabling emission also removes sidecars left by an earlier build.
+    /// </summary>
+    public bool EmitEditorSidecar { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the maximum number of class-catalog entries. Generated bundle rules receive
+    /// priority within this budget before unused project-aware completions fill remaining slots.
+    /// The default is the engine completion budget of 500; a negative value makes
+    /// <see cref="Execute"/> log an error and fail without generating output.
+    /// </summary>
+    public int EditorCatalogMaximumItems { get; set; } =
+        UtilityClassCompletionQuery.DefaultMaximumItems;
+
+    /// <summary>
     /// Gets or sets the generated output path that exists after execution, or the empty string when
     /// no supported candidate resolved to CSS. The public setter is required for MSBuild output
     /// binding.
@@ -115,6 +130,18 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
         OutputExists = File.Exists(OutputPath);
         GeneratedOutputPath = OutputExists ? OutputPath : string.Empty;
         OutputWritten = false;
+
+        if (EmitEditorSidecar && EditorCatalogMaximumItems < 0)
+        {
+            Log.LogError(
+                "ViuGenerateUtilityCss: EditorCatalogMaximumItems cannot be negative.");
+            return false;
+        }
+
+        if (!EmitEditorSidecar && !DeleteEditorSidecars())
+        {
+            return false;
+        }
 
         if (!TryReadEntry(out var entry))
         {
@@ -299,7 +326,69 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
             designSystemCss,
             authoredSections.Body,
             utilityCss);
-        return WriteOutput(stylesheet);
+        UtilityClassCompletionResult? completionResult = null;
+        if (EmitEditorSidecar)
+        {
+            completionResult = UtilityProjectStylesheetCompiler.GetCompletions(
+                entry.Css,
+                UtilityClassCompletionQuery.Default with
+                {
+                    MaximumItems = EditorCatalogMaximumItems,
+                },
+                projectOptions,
+                _cancellation.Token);
+        }
+
+        if (!WriteOutput(stylesheet))
+        {
+            return false;
+        }
+
+        return completionResult is null ||
+            WriteEditorSidecars(
+                entry,
+                sourceFiles,
+                theme,
+                rules,
+                completionResult);
+    }
+
+    private bool WriteEditorSidecars(
+        UtilityStylesheetEntry entry,
+        IReadOnlyList<string> sourceFiles,
+        UtilityTheme theme,
+        IReadOnlyList<UtilityClassMetadata> rules,
+        UtilityClassCompletionResult completionResult)
+    {
+        try
+        {
+            var sidecarWritten = UtilityCssEditorSidecarWriter.Write(
+                OutputPath,
+                entry.SourceIdentity,
+                sourceFiles,
+                theme,
+                rules,
+                completionResult,
+                EditorCatalogMaximumItems);
+            Log.LogMessage(
+                sidecarWritten
+                    ? MessageImportance.Normal
+                    : MessageImportance.Low,
+                sidecarWritten
+                    ? "ViuGenerateUtilityCss: wrote editor sidecars beside {0}."
+                    : "ViuGenerateUtilityCss: editor sidecars unchanged; skipped writes beside {0}.",
+                OutputPath);
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  UnauthorizedAccessException or
+                  ArgumentException or
+                  NotSupportedException)
+        {
+            Log.LogErrorFromException(exception, showStackTrace: false);
+            return false;
+        }
     }
 
     private bool WriteOutput(string stylesheet)
@@ -1294,9 +1383,34 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
             GeneratedOutputPath = string.Empty;
             OutputExists = false;
             OutputWritten = false;
-            return true;
+            return DeleteEditorSidecars();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Log.LogErrorFromException(exception, showStackTrace: false);
+            return false;
+        }
+    }
+
+    private bool DeleteEditorSidecars()
+    {
+        try
+        {
+            if (UtilityCssEditorSidecarWriter.Delete(OutputPath))
+            {
+                Log.LogMessage(
+                    MessageImportance.Normal,
+                    "ViuGenerateUtilityCss: deleted obsolete editor sidecars beside {0}.",
+                    OutputPath);
+            }
+
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  UnauthorizedAccessException or
+                  ArgumentException or
+                  NotSupportedException)
         {
             Log.LogErrorFromException(exception, showStackTrace: false);
             return false;

@@ -242,7 +242,12 @@ internal static class UtilityProjectStylesheetCompileEngine
                         css,
                         2000 + Math.Max(
                             0,
-                            firstOrder));
+                            firstOrder))
+                    {
+                        ColorValue = UtilityColorMetadataResolver.ResolveProjectBody(
+                            body,
+                            options.Theme),
+                    };
             }
 
             return rulesByCandidate.Values
@@ -300,7 +305,10 @@ internal static class UtilityProjectStylesheetCompileEngine
                 " {\n" +
                 Indent(variantBody, 1) +
                 "\n}",
-                resolution.Metadata.SortOrder);
+                resolution.Metadata.SortOrder)
+            {
+                ColorValue = resolution.Metadata.ColorValue,
+            };
             return true;
         }
 

@@ -25,3 +25,11 @@ That build package needs no Viu SDK, runtime, Node, or JavaScript toolchain. An 
 | `@(ViuUtilityCss)` | Supplies the optional single CSS-first entry stylesheet. |
 | `@(ViuUtilityCssSource)` | Adds explicit markup sources. |
 | `@(ViuUtilityCssSourceExclude)` | Removes sources from discovery. |
+
+For editor catalogs, call `UtilityCssRegistry.GetCompletions(...)` with a
+`UtilityClassCompletionQuery`. The query defaults to a 500-item budget, and the returned
+`IsTruncated` value can drive an editor protocol's incomplete-list signal. Use
+`UtilityProjectStylesheetCompiler.GetCompletions(...)` when local or referenced `@utility` and
+`@custom-variant` definitions must participate. `UtilityProjectStylesheetCompiler.Resolve(...)`
+resolves one hover candidate across the same project, registry, and theme context.
+`UtilityClassMetadata.ColorValue` exposes color swatch data directly without parsing generated CSS.

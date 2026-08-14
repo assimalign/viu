@@ -203,11 +203,18 @@ internal static class UtilityResolutionEngine
             declarations.Select(
                 declaration =>
                     declaration.Property + ": " + declaration.Value + ";"));
+        var colorValue = UtilityColorMetadataResolver.Resolve(
+            candidate,
+            theme,
+            declarations);
         var metadata = new UtilityClassMetadata(
             candidate.RawText,
             definition.Description + " " + declarationPreview,
             css,
-            (definition.Order * 1000) + variantOrder);
+            (definition.Order * 1000) + variantOrder)
+        {
+            ColorValue = colorValue,
+        };
 
         return new UtilityClassResolutionResult(
             metadata,
@@ -5278,7 +5285,7 @@ internal static class UtilityResolutionEngine
         return theme.TryGetColor(candidate.Value.Text, out value);
     }
 
-    private static bool TryApplyColorModifier(
+    internal static bool TryApplyColorModifier(
         string color,
         UtilityModifier? modifier,
         out string? value)

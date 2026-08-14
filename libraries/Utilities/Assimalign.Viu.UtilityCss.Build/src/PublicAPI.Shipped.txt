@@ -1,6 +1,10 @@
 #nullable enable
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.Cancel() -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EditorCatalogMaximumItems.get -> int
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EditorCatalogMaximumItems.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EmitEditorSidecar.get -> bool
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EmitEditorSidecar.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedOutputPath.get -> string!
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedOutputPath.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputExists.get -> bool

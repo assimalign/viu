@@ -11,4 +11,13 @@ public sealed record UtilityClassMetadata(
     string CandidateText,
     string Description,
     string Css,
-    int SortOrder);
+    int SortOrder)
+{
+    /// <summary>
+    /// Gets the single unambiguous resolved CSS color value when the candidate is color-bearing, or
+    /// <see langword="null"/> when it has no color or yields multiple distinct color values. The
+    /// value is resolved from structured candidate and theme data so editor consumers never need
+    /// to infer colors by scanning <see cref="Css"/>.
+    /// </summary>
+    public string? ColorValue { get; init; }
+}

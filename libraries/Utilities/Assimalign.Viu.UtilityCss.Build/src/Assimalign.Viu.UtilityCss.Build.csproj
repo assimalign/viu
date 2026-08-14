@@ -32,6 +32,9 @@
     <None Include="..\build\Assimalign.Viu.UtilityCss.Build.targets"
           Pack="true"
           PackagePath="build/Assimalign.Viu.UtilityCss.Build.targets" />
+    <None Include="..\docs\EDITOR-SIDECAR.md"
+          Pack="true"
+          PackagePath="docs/EDITOR-SIDECAR.md" />
   </ItemGroup>
   <Target Name="CollectUtilityCssBuildTaskPayload" DependsOnTargets="Build">
     <ItemGroup>

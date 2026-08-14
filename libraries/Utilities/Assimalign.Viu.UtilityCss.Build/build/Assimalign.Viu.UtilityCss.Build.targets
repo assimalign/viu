@@ -5,10 +5,18 @@
     <ViuUtilityCssSourcePatterns Condition="'$(ViuUtilityCssSourcePatterns)' == ''">**/*.viu;**/*.vue;**/*.razor;**/*.cshtml;**/*.html;**/*.htm</ViuUtilityCssSourcePatterns>
     <ViuUtilityCssBundleName Condition="'$(ViuUtilityCssBundleName)' == ''">$(AssemblyName).utilities.css</ViuUtilityCssBundleName>
     <ViuUtilityCssCopyToOutput Condition="'$(ViuUtilityCssCopyToOutput)' == ''">true</ViuUtilityCssCopyToOutput>
+    <ViuUtilityCssEmitEditorSidecar Condition="'$(ViuUtilityCssEmitEditorSidecar)' == ''">true</ViuUtilityCssEmitEditorSidecar>
+    <ViuUtilityCssEditorCatalogMaximumItems Condition="'$(ViuUtilityCssEditorCatalogMaximumItems)' == ''">500</ViuUtilityCssEditorCatalogMaximumItems>
     <ViuUtilityCssSourceIdentifier Condition="'$(ViuUtilityCssSourceIdentifier)' == ''">$(AssemblyName)</ViuUtilityCssSourceIdentifier>
     <_ViuUtilityCssContentRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'utilitycss'))</_ViuUtilityCssContentRoot>
     <_ViuUtilityCssOutputPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', '$(ViuUtilityCssBundleName)'))</_ViuUtilityCssOutputPath>
+    <_ViuUtilityCssEditorManifestPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.manifest.v1.json'))</_ViuUtilityCssEditorManifestPath>
+    <_ViuUtilityCssEditorCatalogPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.catalog.v1.json'))</_ViuUtilityCssEditorCatalogPath>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(ViuUtilityCssEmitEditorSidecar)' == 'true'">
+    <ViuClassCatalog Include="$(_ViuUtilityCssEditorCatalogPath)" />
+  </ItemGroup>
 
   <PropertyGroup Condition="'$(ViuUtilityCssEnabled)' == 'true'">
     <CustomCollectWatchItems>$(CustomCollectWatchItems);_ViuCollectUtilityCssWatchItems</CustomCollectWatchItems>
@@ -55,7 +63,9 @@
     <ViuGenerateUtilityCss SourceFiles="@(_ViuUtilityCssResolvedSource)"
                            UtilityStylesheets="@(_ViuUtilityCssResolvedEntry)"
                            ProjectDirectory="$(MSBuildProjectDirectory)"
-                           OutputPath="$(_ViuUtilityCssOutputPath)">
+                           OutputPath="$(_ViuUtilityCssOutputPath)"
+                           EmitEditorSidecar="$(ViuUtilityCssEmitEditorSidecar)"
+                           EditorCatalogMaximumItems="$(ViuUtilityCssEditorCatalogMaximumItems)">
       <Output TaskParameter="GeneratedOutputPath" PropertyName="_ViuUtilityCssGeneratedOutputPath" />
       <Output TaskParameter="OutputWritten" PropertyName="_ViuUtilityCssOutputWritten" />
       <Output TaskParameter="OutputExists" PropertyName="_ViuUtilityCssOutputExists" />
@@ -66,6 +76,8 @@
     <ItemGroup>
       <FileWrites Include="$(_ViuUtilityCssOutputPath)"
                   Condition="'$(_ViuUtilityCssOutputExists)' == 'true' and Exists('$(_ViuUtilityCssOutputPath)')" />
+      <FileWrites Include="$(_ViuUtilityCssEditorManifestPath);$(_ViuUtilityCssEditorCatalogPath)"
+                  Condition="'$(ViuUtilityCssEmitEditorSidecar)' == 'true' and '$(_ViuUtilityCssOutputExists)' == 'true'" />
     </ItemGroup>
   </Target>
 

@@ -5,7 +5,8 @@
 .DESCRIPTION
     Packs the standalone engine and build-integration packages, stages Razor, plain-SDK, and
     package-only .viu consumers behind an isolated NuGet boundary, and verifies source discovery,
-    single-file-component slicing, both delivery paths, and byte-compare incremental behavior.
+    single-file-component slicing, editor sidecars, both delivery paths, and byte-compare
+    incremental behavior.
     Specified by [V01.01.12.30], issue #346.
 
 .PARAMETER SkipPack
@@ -180,6 +181,31 @@ function Get-JsonPropertyValue {
     return $property.Value.ToString()
 }
 
+function Get-RequiredJsonProperty {
+    param(
+        [Parameter(Mandatory)]
+        [object] $InputObject,
+
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $Description,
+
+        [switch] $AllowNull
+    )
+
+    $property = $InputObject.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        throw "$Description is missing the '$Name' property."
+    }
+    if ($null -eq $property.Value -and -not $AllowNull) {
+        throw "$Description has a null '$Name' property."
+    }
+
+    return $property.Value
+}
+
 function Resolve-ProjectPath {
     param(
         [Parameter(Mandatory)]
@@ -331,6 +357,279 @@ function Assert-UtilityCssBuildPackageLayout {
 
     Write-Host `
         'Build package layout passed: no lib/, two auto-imports, and exactly four task DLLs plus the notice.' `
+        -ForegroundColor Green
+}
+
+function Assert-UtilityCssEditorSidecar {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectPath,
+
+        [Parameter(Mandatory)]
+        [string] $ProjectDirectory,
+
+        [Parameter(Mandatory)]
+        [string] $BundlePath,
+
+        [Parameter(Mandatory)]
+        [string] $BundleName,
+
+        [Parameter(Mandatory)]
+        [string[]] $ExpectedSourceRelativePaths,
+
+        [Parameter(Mandatory)]
+        [string[]] $ExpectedCatalogClasses,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]] $ForbiddenCatalogClasses,
+
+        [Parameter(Mandatory)]
+        [string[]] $CommonProperties
+    )
+
+    $sidecarDirectory = [System.IO.Path]::GetDirectoryName($BundlePath)
+    $manifestPath = Join-Path $sidecarDirectory 'utilitycss.manifest.v1.json'
+    $catalogPath = Join-Path $sidecarDirectory 'utilitycss.catalog.v1.json'
+    foreach ($sidecarPath in @($manifestPath, $catalogPath)) {
+        if (-not [System.IO.File]::Exists($sidecarPath)) {
+            throw "The UtilityCss build did not emit the editor sidecar: $sidecarPath"
+        }
+    }
+
+    try {
+        $manifest = [System.IO.File]::ReadAllText($manifestPath) |
+            ConvertFrom-Json
+    }
+    catch {
+        throw "The UtilityCss editor manifest is not valid JSON: $manifestPath`n$($_.Exception.Message)"
+    }
+
+    $manifestDescription = 'The UtilityCss editor manifest'
+    $manifestSchemaVersion = Get-RequiredJsonProperty `
+        -InputObject $manifest `
+        -Name 'schemaVersion' `
+        -Description $manifestDescription
+    if ($manifestSchemaVersion -isnot [long] -and
+        $manifestSchemaVersion -isnot [int]) {
+        throw "$manifestDescription schemaVersion must be an integer."
+    }
+    if ([long]$manifestSchemaVersion -ne 1) {
+        throw "$manifestDescription schemaVersion was '$manifestSchemaVersion'; expected 1."
+    }
+
+    $engineVersion = Get-RequiredJsonProperty `
+        -InputObject $manifest `
+        -Name 'engineVersion' `
+        -Description $manifestDescription
+    if ([string]::IsNullOrWhiteSpace($engineVersion.ToString())) {
+        throw "$manifestDescription engineVersion must not be empty."
+    }
+
+    $entryStylesheetPath = Get-RequiredJsonProperty `
+        -InputObject $manifest `
+        -Name 'entryStylesheetPath' `
+        -Description $manifestDescription `
+        -AllowNull
+    if ($null -ne $entryStylesheetPath) {
+        $resolvedEntryStylesheetPath = $entryStylesheetPath.ToString()
+        if (-not [System.IO.Path]::IsPathRooted($resolvedEntryStylesheetPath) -or
+            -not [System.IO.File]::Exists($resolvedEntryStylesheetPath)) {
+            throw "$manifestDescription entryStylesheetPath is not an existing absolute file: $resolvedEntryStylesheetPath"
+        }
+    }
+
+    $sourceFiles = @(
+        Get-RequiredJsonProperty `
+            -InputObject $manifest `
+            -Name 'sourceFiles' `
+            -Description $manifestDescription |
+            ForEach-Object { $_.ToString() })
+    foreach ($sourceFile in $sourceFiles) {
+        if (-not [System.IO.Path]::IsPathRooted($sourceFile) -or
+            -not [System.IO.File]::Exists($sourceFile)) {
+            throw "$manifestDescription contains a source file that is not an existing absolute path: $sourceFile"
+        }
+    }
+    foreach ($expectedSourceRelativePath in $ExpectedSourceRelativePaths) {
+        $expectedSourcePath = [System.IO.Path]::GetFullPath(
+            (Join-Path $ProjectDirectory $expectedSourceRelativePath))
+        $matchingSourceFiles = @(
+            $sourceFiles |
+                Where-Object { $_.Equals($expectedSourcePath, $pathComparison) })
+        if ($matchingSourceFiles.Count -ne 1) {
+            throw "$manifestDescription does not contain the resolved fixture source $expectedSourcePath."
+        }
+    }
+
+    $themeContentHash = Get-RequiredJsonProperty `
+        -InputObject $manifest `
+        -Name 'themeContentHash' `
+        -Description $manifestDescription
+    if (-not $themeContentHash.ToString().Equals(
+            $themeContentHash.ToString().ToLowerInvariant(),
+            [System.StringComparison]::Ordinal) -or
+        $themeContentHash.ToString() -notmatch '^[0-9a-f]{64}$') {
+        throw "$manifestDescription themeContentHash is not a lowercase SHA-256 value."
+    }
+
+    $manifestBundle = Get-RequiredJsonProperty `
+        -InputObject $manifest `
+        -Name 'bundle' `
+        -Description $manifestDescription
+    $manifestBundlePath = Get-RequiredJsonProperty `
+        -InputObject $manifestBundle `
+        -Name 'path' `
+        -Description "$manifestDescription bundle"
+    $resolvedBundlePath = [System.IO.Path]::GetFullPath($BundlePath)
+    if (-not [System.IO.Path]::IsPathRooted($manifestBundlePath.ToString()) -or
+        -not $manifestBundlePath.ToString().Equals(
+            $resolvedBundlePath,
+            $pathComparison) -or
+        -not [System.IO.File]::Exists($manifestBundlePath.ToString())) {
+        throw "$manifestDescription does not reference the generated bundle at $resolvedBundlePath."
+    }
+    $manifestBundleName = Get-RequiredJsonProperty `
+        -InputObject $manifestBundle `
+        -Name 'name' `
+        -Description "$manifestDescription bundle"
+    if (-not $manifestBundleName.ToString().Equals(
+            $BundleName,
+            [System.StringComparison]::Ordinal)) {
+        throw "$manifestDescription bundle name was '$manifestBundleName'; expected '$BundleName'."
+    }
+
+    try {
+        $catalog = [System.IO.File]::ReadAllText($catalogPath) |
+            ConvertFrom-Json
+    }
+    catch {
+        throw "The UtilityCss class catalog is not valid JSON: $catalogPath`n$($_.Exception.Message)"
+    }
+
+    $catalogDescription = 'The UtilityCss class catalog'
+    $catalogSchemaVersion = Get-RequiredJsonProperty `
+        -InputObject $catalog `
+        -Name 'schemaVersion' `
+        -Description $catalogDescription
+    if ($catalogSchemaVersion -isnot [long] -and
+        $catalogSchemaVersion -isnot [int]) {
+        throw "$catalogDescription schemaVersion must be an integer."
+    }
+    if ([long]$catalogSchemaVersion -ne 1) {
+        throw "$catalogDescription schemaVersion was '$catalogSchemaVersion'; expected 1."
+    }
+
+    $catalogTruncated = Get-RequiredJsonProperty `
+        -InputObject $catalog `
+        -Name 'truncated' `
+        -Description $catalogDescription
+    if ($catalogTruncated -isnot [bool]) {
+        throw "$catalogDescription truncated signal must be Boolean."
+    }
+    if (-not $catalogTruncated) {
+        throw "$catalogDescription should be truncated at the default 500-item editor budget."
+    }
+
+    $catalogEntries = @(
+        Get-RequiredJsonProperty `
+            -InputObject $catalog `
+            -Name 'entries' `
+            -Description $catalogDescription)
+    if ($catalogEntries.Count -eq 0) {
+        throw "$catalogDescription contains no entries."
+    }
+    if ($catalogEntries.Count -gt 500) {
+        throw "$catalogDescription contains $($catalogEntries.Count) entries; expected at most 500."
+    }
+
+    foreach ($expectedCatalogClass in $ExpectedCatalogClasses) {
+        $matchingCatalogEntries = @(
+            $catalogEntries |
+                Where-Object {
+                    $classProperty = $_.PSObject.Properties['class']
+                    $null -ne $classProperty -and
+                        $null -ne $classProperty.Value -and
+                        $classProperty.Value.ToString().Equals(
+                            $expectedCatalogClass,
+                            [System.StringComparison]::Ordinal)
+                })
+        if ($matchingCatalogEntries.Count -ne 1) {
+            throw "$catalogDescription does not contain exactly one '$expectedCatalogClass' entry."
+        }
+        $matchingCatalogCss = Get-RequiredJsonProperty `
+            -InputObject $matchingCatalogEntries[0] `
+            -Name 'css' `
+            -Description "$catalogDescription '$expectedCatalogClass' entry"
+        if ([string]::IsNullOrWhiteSpace($matchingCatalogCss.ToString())) {
+            throw "$catalogDescription '$expectedCatalogClass' entry has empty CSS."
+        }
+    }
+
+    foreach ($forbiddenCatalogClass in $ForbiddenCatalogClasses) {
+        $forbiddenCatalogEntries = @(
+            $catalogEntries |
+                Where-Object {
+                    $classProperty = $_.PSObject.Properties['class']
+                    $null -ne $classProperty -and
+                        $null -ne $classProperty.Value -and
+                        $classProperty.Value.ToString().Equals(
+                            $forbiddenCatalogClass,
+                            [System.StringComparison]::Ordinal)
+                })
+        if ($forbiddenCatalogEntries.Count -ne 0) {
+            throw "$catalogDescription unexpectedly contains script-only class '$forbiddenCatalogClass'."
+        }
+    }
+
+    $catalogItemsResult = Invoke-DotNetForJson `
+        -Description 'Resolving the packaged ViuClassCatalog editor-discovery item' `
+        -Arguments (@(
+            'msbuild',
+            $ProjectPath,
+            '-nologo',
+            '-verbosity:quiet',
+            '-getItem:ViuClassCatalog',
+            '-property:Configuration=Release') + $CommonProperties)
+    $resultItemsProperty = $catalogItemsResult.PSObject.Properties['Items']
+    $catalogItemsProperty = if ($null -eq $resultItemsProperty -or
+        $null -eq $resultItemsProperty.Value) {
+        $null
+    }
+    else {
+        $resultItemsProperty.Value.PSObject.Properties['ViuClassCatalog']
+    }
+    $catalogItems = if ($null -eq $catalogItemsProperty) {
+        @()
+    }
+    else {
+        @($catalogItemsProperty.Value)
+    }
+    $matchingCatalogItems = @(
+        $catalogItems |
+            Where-Object {
+                $catalogItemPath = Get-JsonPropertyValue `
+                    -InputObject $_ `
+                    -Name 'FullPath'
+                if ([string]::IsNullOrWhiteSpace($catalogItemPath)) {
+                    $catalogItemPath = Get-JsonPropertyValue `
+                        -InputObject $_ `
+                        -Name 'Identity'
+                }
+
+                -not [string]::IsNullOrWhiteSpace($catalogItemPath) -and
+                    (Resolve-ProjectPath `
+                        -ProjectDirectory $ProjectDirectory `
+                        -Path $catalogItemPath).Equals(
+                            [System.IO.Path]::GetFullPath($catalogPath),
+                            $pathComparison)
+            })
+    if ($matchingCatalogItems.Count -ne 1) {
+        throw "The packaged targets did not expose exactly one ViuClassCatalog item for $catalogPath."
+    }
+
+    Write-Host `
+        "Editor manifest and bounded class catalog passed for $([System.IO.Path]::GetFileName($ProjectPath))." `
         -ForegroundColor Green
 }
 
@@ -655,6 +954,16 @@ function Test-UtilityCssFixture {
         }
     }
 
+    Assert-UtilityCssEditorSidecar `
+        -ProjectPath $projectPath `
+        -ProjectDirectory $projectDirectory `
+        -BundlePath $bundlePath `
+        -BundleName $bundleName `
+        -ExpectedSourceRelativePaths $Fixture.ExpectedSourceRelativePaths `
+        -ExpectedCatalogClasses $Fixture.ExpectedCatalogClasses `
+        -ForbiddenCatalogClasses $Fixture.ForbiddenCatalogClasses `
+        -CommonProperties $commonProperties
+
     $bundleItem = Get-Item -LiteralPath $bundlePath
     $firstBundleTimestamp = $bundleItem.LastWriteTimeUtc.Ticks
     $firstBundleHash = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash
@@ -754,7 +1063,7 @@ function Test-UtilityCssFixture {
     }
 
     Write-Host `
-        "$fixtureName passed source, delivery, package-isolation, and incremental checks." `
+        "$fixtureName passed source, editor-sidecar, delivery, package-isolation, and incremental checks." `
         -ForegroundColor Green
 }
 
@@ -842,27 +1151,44 @@ $fixtureDefinitions = @(
         Name = 'UtilityCssRazorConsumer'
         StaticWebAssets = $true
         RequiredText = @(
+            '.sr-only {'
             '.p-4 {'
             'padding: calc(var(--spacing) * 4);'
+            'width: 37px;'
             '.grid-cols-3 {'
             'grid-template-columns: repeat(3, minmax(0, 1fr));')
         ForbiddenText = @()
+        ExpectedSourceRelativePaths = @(
+            'UtilityProbe.razor'
+            'Views/UtilityProbe.cshtml')
+        ExpectedCatalogClasses = @('sr-only', 'p-4', 'w-[37px]')
+        ForbiddenCatalogClasses = @()
     },
     @{
         Name = 'UtilityCssPlainConsumer'
         StaticWebAssets = $false
         RequiredText = @(
+            '.sr-only {'
             '.rounded-lg {'
-            'border-radius: var(--radius-lg);')
+            'border-radius: var(--radius-lg);'
+            'height: 41px;')
         ForbiddenText = @()
+        ExpectedSourceRelativePaths = @('index.html')
+        ExpectedCatalogClasses = @('sr-only', 'rounded-lg', 'h-[41px]')
+        ForbiddenCatalogClasses = @()
     },
     @{
         Name = 'UtilityCssViuFileConsumer'
         StaticWebAssets = $false
         RequiredText = @(
+            '.sr-only {'
             '.bg-blue-500 {'
-            'background-color: var(--color-blue-500);')
-        ForbiddenText = @('.opacity-50 {')
+            'background-color: var(--color-blue-500);'
+            'opacity: 0.7654321;')
+        ForbiddenText = @('0.1234567')
+        ExpectedSourceRelativePaths = @('SlicingProbe.viu')
+        ExpectedCatalogClasses = @('sr-only', 'bg-blue-500', 'opacity-[0.7654321]')
+        ForbiddenCatalogClasses = @('opacity-[0.1234567]')
     })
 
 $previousNuGetPackages = [System.Environment]::GetEnvironmentVariable(
@@ -961,7 +1287,7 @@ try {
     }
 
     Write-Host `
-        'Standalone UtilityCss package consumers passed all Razor, plain-host, .viu slicing, delivery, and incremental checks.' `
+        'Standalone UtilityCss package consumers passed all Razor, plain-host, .viu slicing, editor-sidecar, delivery, and incremental checks.' `
         -ForegroundColor Green
 }
 finally {

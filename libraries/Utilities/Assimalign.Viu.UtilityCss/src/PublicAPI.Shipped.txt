@@ -1,4 +1,21 @@
 #nullable enable
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.<Clone>$() -> Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery!
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.Equals(Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery? other) -> bool
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.MaximumItems.get -> int
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.MaximumItems.init -> void
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.Prefix.get -> string?
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.Prefix.init -> void
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.UtilityClassCompletionQuery() -> void
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.<Clone>$() -> Assimalign.Viu.UtilityCss.UtilityClassCompletionResult!
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.Deconstruct(out Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityClassMetadata!> Items, out bool IsTruncated) -> void
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.Equals(Assimalign.Viu.UtilityCss.UtilityClassCompletionResult? other) -> bool
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.IsTruncated.get -> bool
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.IsTruncated.init -> void
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.Items.get -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityClassMetadata!>
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.Items.init -> void
+Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.UtilityClassCompletionResult(Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityClassMetadata!> Items, bool IsTruncated) -> void
 Assimalign.Viu.UtilityCss.UtilityCandidate
 Assimalign.Viu.UtilityCss.UtilityCandidate.<Clone>$() -> Assimalign.Viu.UtilityCss.UtilityCandidate!
 Assimalign.Viu.UtilityCss.UtilityCandidate.CanonicalText.get -> string!
@@ -165,6 +182,8 @@ Assimalign.Viu.UtilityCss.UtilityClassMetadata
 Assimalign.Viu.UtilityCss.UtilityClassMetadata.<Clone>$() -> Assimalign.Viu.UtilityCss.UtilityClassMetadata!
 Assimalign.Viu.UtilityCss.UtilityClassMetadata.CandidateText.get -> string!
 Assimalign.Viu.UtilityCss.UtilityClassMetadata.CandidateText.init -> void
+Assimalign.Viu.UtilityCss.UtilityClassMetadata.ColorValue.get -> string?
+Assimalign.Viu.UtilityCss.UtilityClassMetadata.ColorValue.init -> void
 Assimalign.Viu.UtilityCss.UtilityClassMetadata.Css.get -> string!
 Assimalign.Viu.UtilityCss.UtilityClassMetadata.Css.init -> void
 Assimalign.Viu.UtilityCss.UtilityClassMetadata.Deconstruct(out string! CandidateText, out string! Description, out string! Css, out int SortOrder) -> void
@@ -271,6 +290,8 @@ Assimalign.Viu.UtilityCss.UtilityCssLayerEmitter
 Assimalign.Viu.UtilityCss.UtilityCssRegistry
 Assimalign.Viu.UtilityCss.UtilityCssRegistry.CompletionItems.get -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityClassMetadata!>
 Assimalign.Viu.UtilityCss.UtilityCssRegistry.Definitions.get -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityDefinition!>
+Assimalign.Viu.UtilityCss.UtilityCssRegistry.GetCompletions(Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery! query) -> Assimalign.Viu.UtilityCss.UtilityClassCompletionResult!
+Assimalign.Viu.UtilityCss.UtilityCssRegistry.GetCompletions(Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery! query, Assimalign.Viu.UtilityCss.UtilityTheme! theme, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Assimalign.Viu.UtilityCss.UtilityClassCompletionResult!
 Assimalign.Viu.UtilityCss.UtilityCssRegistry.GetCompletions(string? prefix) -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityClassMetadata!>
 Assimalign.Viu.UtilityCss.UtilityCssRegistry.GetCompletions(string? prefix, Assimalign.Viu.UtilityCss.UtilityTheme! theme) -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityClassMetadata!>
 Assimalign.Viu.UtilityCss.UtilityCssRegistry.Resolve(string! candidateText) -> Assimalign.Viu.UtilityCss.UtilityClassResolutionResult!
@@ -409,6 +430,20 @@ Assimalign.Viu.UtilityCss.UtilityModifierKind.Arbitrary = 1 -> Assimalign.Viu.Ut
 Assimalign.Viu.UtilityCss.UtilityModifierKind.CssVariable = 2 -> Assimalign.Viu.UtilityCss.UtilityModifierKind
 Assimalign.Viu.UtilityCss.UtilityModifierKind.Named = 0 -> Assimalign.Viu.UtilityCss.UtilityModifierKind
 Assimalign.Viu.UtilityCss.UtilityPreflight
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.<Clone>$() -> Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult!
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.Deconstruct(out Assimalign.Viu.UtilityCss.UtilityClassMetadata? Metadata, out Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityCssDiagnostic!> UtilityDiagnostics, out Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityDirectiveDiagnostic!> DirectiveDiagnostics, out Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic!> ProjectDiagnostics) -> void
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.DirectiveDiagnostics.get -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityDirectiveDiagnostic!>
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.DirectiveDiagnostics.init -> void
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.Equals(Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult? other) -> bool
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.IsSuccess.get -> bool
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.Metadata.get -> Assimalign.Viu.UtilityCss.UtilityClassMetadata?
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.Metadata.init -> void
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.ProjectDiagnostics.get -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic!>
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.ProjectDiagnostics.init -> void
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.UtilityDiagnostics.get -> Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityCssDiagnostic!>
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.UtilityDiagnostics.init -> void
+Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.UtilityProjectClassResolutionResult(Assimalign.Viu.UtilityCss.UtilityClassMetadata? Metadata, Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityCssDiagnostic!> UtilityDiagnostics, Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityDirectiveDiagnostic!> DirectiveDiagnostics, Assimalign.Viu.UtilityCss.UtilityCollection<Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic!> ProjectDiagnostics) -> void
 Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationOptions
 Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationOptions.ReferenceGraph.get -> Assimalign.Viu.UtilityCss.UtilityStylesheetReferenceGraph!
 Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationOptions.ReferenceGraph.set -> void
@@ -850,6 +885,7 @@ Assimalign.Viu.UtilityCss.UtilityVariantValue.RawText.init -> void
 Assimalign.Viu.UtilityCss.UtilityVariantValue.Text.get -> string!
 Assimalign.Viu.UtilityCss.UtilityVariantValue.Text.init -> void
 Assimalign.Viu.UtilityCss.UtilityVariantValue.UtilityVariantValue(Assimalign.Viu.UtilityCss.UtilityValueKind Kind, string! Text, string! RawText) -> void
+const Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.DefaultMaximumItems = 500 -> int
 const Assimalign.Viu.UtilityCss.UtilityCssLayerEmitter.LayerOrder = "@layer theme, base, components, utilities;\n" -> string!
 const Assimalign.Viu.UtilityCss.UtilityThemeNamespaceNames.Animation = "animate" -> string!
 const Assimalign.Viu.UtilityCss.UtilityThemeNamespaceNames.AspectRatio = "aspect" -> string!
@@ -902,6 +938,12 @@ override Assimalign.Viu.UtilityCss.UtilityCandidateSourceSpan.ToString() -> stri
 override Assimalign.Viu.UtilityCss.UtilityCandidateToken.Equals(object? obj) -> bool
 override Assimalign.Viu.UtilityCss.UtilityCandidateToken.GetHashCode() -> int
 override Assimalign.Viu.UtilityCss.UtilityCandidateToken.ToString() -> string!
+override Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.Equals(object? obj) -> bool
+override Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.GetHashCode() -> int
+override Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.ToString() -> string!
+override Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.Equals(object? obj) -> bool
+override Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.GetHashCode() -> int
+override Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.ToString() -> string!
 override Assimalign.Viu.UtilityCss.UtilityClassMetadata.Equals(object? obj) -> bool
 override Assimalign.Viu.UtilityCss.UtilityClassMetadata.GetHashCode() -> int
 override Assimalign.Viu.UtilityCss.UtilityClassMetadata.ToString() -> string!
@@ -940,6 +982,9 @@ override Assimalign.Viu.UtilityCss.UtilityDirectiveDiagnostic.ToString() -> stri
 override Assimalign.Viu.UtilityCss.UtilityModifier.Equals(object? obj) -> bool
 override Assimalign.Viu.UtilityCss.UtilityModifier.GetHashCode() -> int
 override Assimalign.Viu.UtilityCss.UtilityModifier.ToString() -> string!
+override Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.Equals(object? obj) -> bool
+override Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.GetHashCode() -> int
+override Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.ToString() -> string!
 override Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult.Equals(object? obj) -> bool
 override Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult.GetHashCode() -> int
 override Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult.ToString() -> string!
@@ -1046,6 +1091,11 @@ static Assimalign.Viu.UtilityCss.UtilityClassMetadata.operator !=(Assimalign.Viu
 static Assimalign.Viu.UtilityCss.UtilityClassMetadata.operator ==(Assimalign.Viu.UtilityCss.UtilityClassMetadata? left, Assimalign.Viu.UtilityCss.UtilityClassMetadata? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityClassResolutionResult.operator !=(Assimalign.Viu.UtilityCss.UtilityClassResolutionResult? left, Assimalign.Viu.UtilityCss.UtilityClassResolutionResult? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityClassResolutionResult.operator ==(Assimalign.Viu.UtilityCss.UtilityClassResolutionResult? left, Assimalign.Viu.UtilityCss.UtilityClassResolutionResult? right) -> bool
+static Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.Default.get -> Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery!
+static Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.operator !=(Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery? left, Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery? right) -> bool
+static Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.operator ==(Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery? left, Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery? right) -> bool
+static Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.operator !=(Assimalign.Viu.UtilityCss.UtilityClassCompletionResult? left, Assimalign.Viu.UtilityCss.UtilityClassCompletionResult? right) -> bool
+static Assimalign.Viu.UtilityCss.UtilityClassCompletionResult.operator ==(Assimalign.Viu.UtilityCss.UtilityClassCompletionResult? left, Assimalign.Viu.UtilityCss.UtilityClassCompletionResult? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityCollection<T>.Empty.get -> Assimalign.Viu.UtilityCss.UtilityCollection<T>
 static Assimalign.Viu.UtilityCss.UtilityCollection<T>.operator !=(Assimalign.Viu.UtilityCss.UtilityCollection<T> left, Assimalign.Viu.UtilityCss.UtilityCollection<T> right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityCollection<T>.operator ==(Assimalign.Viu.UtilityCss.UtilityCollection<T> left, Assimalign.Viu.UtilityCss.UtilityCollection<T> right) -> bool
@@ -1081,10 +1131,14 @@ static Assimalign.Viu.UtilityCss.UtilityModifier.operator !=(Assimalign.Viu.Util
 static Assimalign.Viu.UtilityCss.UtilityModifier.operator ==(Assimalign.Viu.UtilityCss.UtilityModifier? left, Assimalign.Viu.UtilityCss.UtilityModifier? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityPreflight.DefaultCss.get -> string!
 static Assimalign.Viu.UtilityCss.UtilityPreflight.Emit(Assimalign.Viu.UtilityCss.UtilityTheme! theme, System.Threading.CancellationToken cancellationToken) -> string!
+static Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.operator !=(Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult? left, Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult? right) -> bool
+static Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult.operator ==(Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult? left, Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult.operator !=(Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult? left, Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult.operator ==(Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult? left, Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompiler.Compile(string? css, System.Collections.Generic.IEnumerable<string!>! candidateTexts) -> Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult!
 static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompiler.Compile(string? css, System.Collections.Generic.IEnumerable<string!>! candidateTexts, Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationOptions? options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationResult!
+static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompiler.GetCompletions(string? css, Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery! query, Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Assimalign.Viu.UtilityCss.UtilityClassCompletionResult!
+static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompiler.Resolve(string? css, string! candidateText, Assimalign.Viu.UtilityCss.UtilityProjectStylesheetCompilationOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Assimalign.Viu.UtilityCss.UtilityProjectClassResolutionResult!
 static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic.operator !=(Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic? left, Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic.operator ==(Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic? left, Assimalign.Viu.UtilityCss.UtilityProjectStylesheetDiagnostic? right) -> bool
 static Assimalign.Viu.UtilityCss.UtilitySourceConfiguration.operator !=(Assimalign.Viu.UtilityCss.UtilitySourceConfiguration? left, Assimalign.Viu.UtilityCss.UtilitySourceConfiguration? right) -> bool

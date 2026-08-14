@@ -1,8 +1,8 @@
 # Assimalign.Viu.UtilityCss
 
-`Assimalign.Viu.UtilityCss` is the shared, build-time engine for **Viu Utilities**. The
-source generator, SDK tasks, and Visual Studio language service consume this one assembly so parsing,
-generation, completion, and hover do not maintain separate utility vocabularies.
+`Assimalign.Viu.UtilityCss` is the shared, build-time engine for **Viu Utilities**. Build and editor
+hosts consume this one assembly so parsing, generation, completion, and hover do not maintain
+separate utility vocabularies.
 
 The assembly targets the repository's analyzer framework because it must load in a Roslyn host. It
 is deterministic, I/O-free, reflection-free, and absent from the browser runtime framework.
@@ -60,3 +60,29 @@ selector and `@slot` custom variants; and calculates `--spacing()` and `--alpha(
 custom utility and variant definitions exactly once without copying referenced ordinary CSS or
 allowing the pure compiler to access the filesystem. The result keeps rewritten authored CSS and
 generated custom utility rules separate for deterministic SDK layer assembly.
+
+## Editor-facing registry contract
+
+The editor API introduced for [V01.01.12.30] (#346) remains an engine contract rather than a
+language-server implementation. `UtilityClassCompletionQuery` carries the typed candidate prefix
+and a nonnegative `MaximumItems` budget. Its default budget is 500 items, which bounds serialization
+even when the active theme expands beyond one hundred thousand candidates.
+`UtilityClassCompletionResult.IsTruncated` reports whether another matching item exists, including
+when the budget is zero, so a protocol host can project an incomplete-list signal without counting
+or expanding the catalog itself.
+
+`UtilityCssRegistry.GetCompletions(UtilityClassCompletionQuery, UtilityTheme, ...)` composes a
+configured prefix and any built-in variant chain with base candidates before resolving through the
+normal parser and registry. `UtilityProjectStylesheetCompiler.GetCompletions(...)` extends the same
+operation across local and referenced `@utility` and `@custom-variant` definitions. A functional
+utility contributes its bare stem only when that stem generates declarations, such as through a
+`--default(...)` value. Both entry points return `UtilityClassMetadata` in deterministic compiler
+order.
+
+`UtilityProjectStylesheetCompiler.Resolve(...)` is the single-candidate hover primitive. It gives
+project utilities and project-variant compositions their normal compilation semantics, then falls
+back to the active built-in registry and theme, returning the generated rule and diagnostics in one
+result. `UtilityClassMetadata.ColorValue` is derived from structured candidate, declaration, and
+theme data. It contains the resolved CSS color for a color-bearing rule and remains null for a
+non-color rule, even when the emitted CSS happens to contain text equal to a color token. Editor
+consumers therefore never need to parse or substring-scan `UtilityClassMetadata.Css`.

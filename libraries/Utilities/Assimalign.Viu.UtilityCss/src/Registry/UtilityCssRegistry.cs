@@ -186,10 +186,170 @@ public sealed class UtilityCssRegistry
                     StringComparison.Ordinal)));
     }
 
+    /// <summary>
+    /// Gets a bounded default-theme completion result. Built-in variant chains in the query prefix
+    /// are composed with base candidates and resolved before the result is returned.
+    /// </summary>
+    /// <param name="query">The immutable prefix and result budget.</param>
+    /// <returns>Matching metadata and whether the result was truncated.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <see cref="UtilityClassCompletionQuery.MaximumItems"/> is negative.
+    /// </exception>
+    public UtilityClassCompletionResult GetCompletions(
+        UtilityClassCompletionQuery query) =>
+        GetCompletions(
+            query,
+            UtilityTheme.Default,
+            CancellationToken.None);
+
+    /// <summary>
+    /// Gets a bounded completion result resolved against an explicit CSS-first theme. Any built-in
+    /// variant chain and configured theme prefix already present in the query prefix are composed
+    /// with base candidates through the same parser and resolver used by compilation.
+    /// </summary>
+    /// <param name="query">The immutable prefix and result budget.</param>
+    /// <param name="theme">The immutable project theme.</param>
+    /// <param name="cancellationToken">The editor or build cancellation boundary.</param>
+    /// <returns>Matching metadata in compiler order and whether more matches exist.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="query"/> or <paramref name="theme"/> is null.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <see cref="UtilityClassCompletionQuery.MaximumItems"/> is negative.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken"/> was canceled.
+    /// </exception>
+    public UtilityClassCompletionResult GetCompletions(
+        UtilityClassCompletionQuery query,
+        UtilityTheme theme,
+        CancellationToken cancellationToken = default)
+    {
+        if (query is null)
+        {
+            throw new ArgumentNullException(nameof(query));
+        }
+
+        if (theme is null)
+        {
+            throw new ArgumentNullException(nameof(theme));
+        }
+
+        if (query.MaximumItems < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query.MaximumItems),
+                query.MaximumItems,
+                "The completion item budget cannot be negative.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        UtilityCompletionPrefix.Split(
+            query.Prefix,
+            out var variantPrefix,
+            out var baseFragment);
+        if (variantPrefix.Length > 0 &&
+            !UtilityCompletionPrefix.HasConfiguredPrefix(
+                variantPrefix,
+                theme.Prefix))
+        {
+            return new UtilityClassCompletionResult(
+                UtilityCollection<UtilityClassMetadata>.Empty,
+                false);
+        }
+
+        var matches = new List<UtilityClassMetadata>(
+            Math.Min(
+                query.MaximumItems,
+                UtilityClassCompletionQuery.DefaultMaximumItems));
+        var matchedCandidateTexts = new HashSet<string>(StringComparer.Ordinal);
+        var isTruncated = false;
+        foreach (var completionItem in GetCompletionItems(theme))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (completionItem.CandidateText.StartsWith(
+                    query.Prefix ?? string.Empty,
+                    StringComparison.Ordinal) &&
+                matchedCandidateTexts.Add(completionItem.CandidateText))
+            {
+                if (matches.Count == query.MaximumItems)
+                {
+                    isTruncated = true;
+                    break;
+                }
+
+                matches.Add(completionItem);
+            }
+
+            if (variantPrefix.Length == 0)
+            {
+                continue;
+            }
+
+            var baseCandidate = UtilityCompletionPrefix.RemoveConfiguredPrefix(
+                completionItem.CandidateText,
+                theme.Prefix);
+            if (UtilityCompletionPrefix.HasVariant(baseCandidate) ||
+                !baseCandidate.StartsWith(
+                    baseFragment,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var candidateText = UtilityCompletionPrefix.Compose(
+                variantPrefix,
+                theme.Prefix,
+                baseCandidate);
+            if (matchedCandidateTexts.Contains(candidateText))
+            {
+                continue;
+            }
+
+            var resolution = Resolve(
+                candidateText,
+                theme,
+                cancellationToken);
+            var match = resolution.IsSuccess
+                ? resolution.Metadata
+                : null;
+            if (match is null ||
+                !matchedCandidateTexts.Add(match.CandidateText))
+            {
+                continue;
+            }
+
+            if (matches.Count == query.MaximumItems)
+            {
+                isTruncated = true;
+                break;
+            }
+
+            matches.Add(match);
+        }
+
+        return new UtilityClassCompletionResult(
+            matches.Count == 0
+                ? UtilityCollection<UtilityClassMetadata>.Empty
+                : new UtilityCollection<UtilityClassMetadata>(matches),
+            isTruncated);
+    }
+
     internal bool TryGetRegistration(
         string root,
         out UtilityRegisteredDefinition? registration) =>
         definitionsByRoot.TryGetValue(root, out registration);
+
+    internal UtilityCollection<UtilityClassMetadata> GetCompletionItems(
+        UtilityTheme theme) =>
+        ReferenceEquals(theme, UtilityTheme.Default)
+            ? CompletionItems
+            : completionItemsByTheme
+                .GetValue(theme, createCompletionItemsForTheme)
+                .Value;
 
     private UtilityCollection<UtilityClassMetadata> CreateCompletionItems(
         UtilityTheme theme)
