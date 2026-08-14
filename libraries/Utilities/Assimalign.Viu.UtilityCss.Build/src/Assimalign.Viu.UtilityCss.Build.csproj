@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Deviates from the repo shipping-library IsAotCompatible rule per [V01.01.12.30]: this
+         assembly loads inside MSBuild, uses the shared netstandard2.0 build-host alias, and never
+         enters a Viu application's runtime or AOT closure. -->
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <ViuContainerPackage>true</ViuContainerPackage>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- Deviates from the repo central package README rule per [V01.01.12.30]:
+         the one-reference MSBuild integration requires a package-specific consumer quickstart. -->
+    <ViuPackageReadmeSource>$(MSBuildProjectDirectory)\..\README.md</ViuPackageReadmeSource>
+    <Description>Standalone MSBuild integration that generates deterministic utility CSS from HTML-based project sources.</Description>
+    <PackageTags>CSS;MSBuild;UtilityCss;Viu;Build</PackageTags>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectUtilityCssBuildTaskPayload</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPrivateProjectReference Include="Assimalign.Viu.UtilityCss" />
+    <ViuPrivateProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+    <ViuPrivateProjectReference Include="Assimalign.Viu.Syntax" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.Build.Utilities.Core" />
+    <ViuPackageReference Include="Microsoft.Build.Framework" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\build\Assimalign.Viu.UtilityCss.Build.props"
+          Pack="true"
+          PackagePath="build/Assimalign.Viu.UtilityCss.Build.props" />
+    <None Include="..\build\Assimalign.Viu.UtilityCss.Build.targets"
+          Pack="true"
+          PackagePath="build/Assimalign.Viu.UtilityCss.Build.targets" />
+  </ItemGroup>
+  <Target Name="CollectUtilityCssBuildTaskPayload" DependsOnTargets="Build">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetPath)">
+        <PackagePath>tasks/netstandard2.0/$(TargetFileName)</PackagePath>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(TargetDir)Assimalign.Viu.UtilityCss.dll">
+        <PackagePath>tasks/netstandard2.0/Assimalign.Viu.UtilityCss.dll</PackagePath>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(TargetDir)Assimalign.Viu.Syntax.SingleFileComponent.dll">
+        <PackagePath>tasks/netstandard2.0/Assimalign.Viu.Syntax.SingleFileComponent.dll</PackagePath>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(TargetDir)Assimalign.Viu.Syntax.dll">
+        <PackagePath>tasks/netstandard2.0/Assimalign.Viu.Syntax.dll</PackagePath>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(TargetDir)Assimalign.Viu.UtilityCss.THIRD-PARTY-NOTICES.md">
+        <PackagePath>tasks/netstandard2.0/Assimalign.Viu.UtilityCss.THIRD-PARTY-NOTICES.md</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+</Project>

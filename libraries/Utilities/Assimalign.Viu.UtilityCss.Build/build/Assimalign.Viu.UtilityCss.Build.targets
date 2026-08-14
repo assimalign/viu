@@ -1,0 +1,142 @@
+<Project>
+  <PropertyGroup>
+    <ViuUtilityCssEnabled Condition="'$(ViuUtilityCssEnabled)' == ''">true</ViuUtilityCssEnabled>
+    <ViuUtilityCssAutomaticSourceDiscovery Condition="'$(ViuUtilityCssAutomaticSourceDiscovery)' == ''">true</ViuUtilityCssAutomaticSourceDiscovery>
+    <ViuUtilityCssSourcePatterns Condition="'$(ViuUtilityCssSourcePatterns)' == ''">**/*.viu;**/*.vue;**/*.razor;**/*.cshtml;**/*.html;**/*.htm</ViuUtilityCssSourcePatterns>
+    <ViuUtilityCssBundleName Condition="'$(ViuUtilityCssBundleName)' == ''">$(AssemblyName).utilities.css</ViuUtilityCssBundleName>
+    <ViuUtilityCssCopyToOutput Condition="'$(ViuUtilityCssCopyToOutput)' == ''">true</ViuUtilityCssCopyToOutput>
+    <ViuUtilityCssSourceIdentifier Condition="'$(ViuUtilityCssSourceIdentifier)' == ''">$(AssemblyName)</ViuUtilityCssSourceIdentifier>
+    <_ViuUtilityCssContentRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'utilitycss'))</_ViuUtilityCssContentRoot>
+    <_ViuUtilityCssOutputPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', '$(ViuUtilityCssBundleName)'))</_ViuUtilityCssOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ViuUtilityCssEnabled)' == 'true'">
+    <CustomCollectWatchItems>$(CustomCollectWatchItems);_ViuCollectUtilityCssWatchItems</CustomCollectWatchItems>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(UsingMicrosoftNETSdkStaticWebAssets)' == 'true'">
+    <ResolveStaticWebAssetsInputsDependsOn>$(ResolveStaticWebAssetsInputsDependsOn);_ViuResolveUtilityCssStaticWebAssets</ResolveStaticWebAssetsInputsDependsOn>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss"
+             AssemblyFile="$(MSBuildThisFileDirectory)..\tasks\netstandard2.0\Assimalign.Viu.UtilityCss.Build.dll"
+             Condition="'$(ViuUtilityCssEnabled)' == 'true'" />
+
+  <Target Name="_ViuResolveUtilityCssInputs"
+          Condition="'$(ViuUtilityCssEnabled)' == 'true'">
+    <ItemGroup>
+      <_ViuUtilityCssResolvedEntry Remove="@(_ViuUtilityCssResolvedEntry)" />
+      <_ViuUtilityCssSourceCandidate Remove="@(_ViuUtilityCssSourceCandidate)" />
+      <_ViuUtilityCssResolvedSource Remove="@(_ViuUtilityCssResolvedSource)" />
+
+      <_ViuUtilityCssResolvedEntry Include="@(ViuUtilityCss)" KeepDuplicates="false" />
+
+      <_ViuUtilityCssSourceCandidate Include="@(ViuUtilityCssSource)">
+        <ViuUtilityCssDiscovery>Explicit</ViuUtilityCssDiscovery>
+      </_ViuUtilityCssSourceCandidate>
+      <_ViuUtilityCssSourceCandidate Include="$(ViuUtilityCssSourcePatterns)"
+                                     Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)"
+                                     Condition="'$(ViuUtilityCssAutomaticSourceDiscovery)' == 'true'">
+        <ViuUtilityCssDiscovery>Automatic</ViuUtilityCssDiscovery>
+      </_ViuUtilityCssSourceCandidate>
+      <_ViuUtilityCssSourceCandidate Remove="@(ViuUtilityCssSourceExclude)" />
+      <_ViuUtilityCssResolvedSource Include="@(_ViuUtilityCssSourceCandidate)" KeepDuplicates="false" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_ViuGenerateUtilityCss"
+          DependsOnTargets="_ViuResolveUtilityCssInputs"
+          Condition="'$(ViuUtilityCssEnabled)' == 'true'">
+    <PropertyGroup>
+      <_ViuUtilityCssOutputExistedBeforeGeneration Condition="Exists('$(_ViuUtilityCssOutputPath)')">true</_ViuUtilityCssOutputExistedBeforeGeneration>
+      <_ViuUtilityCssOutputExistedBeforeGeneration Condition="!Exists('$(_ViuUtilityCssOutputPath)')">false</_ViuUtilityCssOutputExistedBeforeGeneration>
+      <_ViuUtilityCssOutputRemoved>false</_ViuUtilityCssOutputRemoved>
+    </PropertyGroup>
+    <ViuGenerateUtilityCss SourceFiles="@(_ViuUtilityCssResolvedSource)"
+                           UtilityStylesheets="@(_ViuUtilityCssResolvedEntry)"
+                           ProjectDirectory="$(MSBuildProjectDirectory)"
+                           OutputPath="$(_ViuUtilityCssOutputPath)">
+      <Output TaskParameter="GeneratedOutputPath" PropertyName="_ViuUtilityCssGeneratedOutputPath" />
+      <Output TaskParameter="OutputWritten" PropertyName="_ViuUtilityCssOutputWritten" />
+      <Output TaskParameter="OutputExists" PropertyName="_ViuUtilityCssOutputExists" />
+    </ViuGenerateUtilityCss>
+    <PropertyGroup>
+      <_ViuUtilityCssOutputRemoved Condition="'$(_ViuUtilityCssOutputExistedBeforeGeneration)' == 'true' and '$(_ViuUtilityCssOutputExists)' != 'true'">true</_ViuUtilityCssOutputRemoved>
+    </PropertyGroup>
+    <ItemGroup>
+      <FileWrites Include="$(_ViuUtilityCssOutputPath)"
+                  Condition="'$(_ViuUtilityCssOutputExists)' == 'true' and Exists('$(_ViuUtilityCssOutputPath)')" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_ViuResolveUtilityCssStaticWebAssets"
+          DependsOnTargets="ResolveStaticWebAssetsConfiguration;_ViuGenerateUtilityCss"
+          Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(UsingMicrosoftNETSdkStaticWebAssets)' == 'true'">
+    <!-- The Static Web Assets SDK does not rewrite or delete its development manifest when the
+         current graph becomes empty, and PreserveNewest cannot retire a prior runtime copy without
+         a source item. Invalidate only on this package's output-removal transition; the SDK recreates
+         and copies both manifests later in the build when unrelated assets remain. -->
+    <Delete Files="$(StaticWebAssetDevelopmentManifestPath);$(OutDir)$(TargetName).staticwebassets.runtime.json"
+            Condition="'$(_ViuUtilityCssOutputRemoved)' == 'true'" />
+    <ItemGroup>
+      <_ViuUtilityCssStaticWebAssetCandidate Remove="@(_ViuUtilityCssStaticWebAssetCandidate)" />
+      <_ViuUtilityCssStaticWebAsset Remove="@(_ViuUtilityCssStaticWebAsset)" />
+      <_ViuUtilityCssStaticWebAssetEndpoint Remove="@(_ViuUtilityCssStaticWebAssetEndpoint)" />
+      <_ViuUtilityCssStaticWebAssetCandidate Include="$(_ViuUtilityCssOutputPath)"
+                                              Condition="'$(_ViuUtilityCssOutputExists)' == 'true' and Exists('$(_ViuUtilityCssOutputPath)')">
+        <RelativePath>$(ViuUtilityCssBundleName)</RelativePath>
+      </_ViuUtilityCssStaticWebAssetCandidate>
+    </ItemGroup>
+
+    <DefineStaticWebAssets Condition="'@(_ViuUtilityCssStaticWebAssetCandidate)' != ''"
+                           CandidateAssets="@(_ViuUtilityCssStaticWebAssetCandidate)"
+                           SourceType="Computed"
+                           SourceId="$(ViuUtilityCssSourceIdentifier)"
+                           ContentRoot="$(_ViuUtilityCssContentRoot)"
+                           BasePath="$(StaticWebAssetBasePath)"
+                           AssetKind="All"
+                           AssetMode="CurrentProject"
+                           AssetRole="Primary"
+                           CopyToOutputDirectory="Never"
+                           CopyToPublishDirectory="PreserveNewest">
+      <Output TaskParameter="Assets" ItemName="_ViuUtilityCssStaticWebAsset" />
+    </DefineStaticWebAssets>
+
+    <DefineStaticWebAssetEndpoints Condition="'@(_ViuUtilityCssStaticWebAsset)' != ''"
+                                   CandidateAssets="@(_ViuUtilityCssStaticWebAsset)"
+                                   ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_ViuUtilityCssStaticWebAssetEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+
+    <ItemGroup>
+      <StaticWebAsset Include="@(_ViuUtilityCssStaticWebAsset)" />
+      <StaticWebAssetEndpoint Include="@(_ViuUtilityCssStaticWebAssetEndpoint)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_ViuPrepareUtilityCssContent"
+          BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="_ViuGenerateUtilityCss"
+          Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(UsingMicrosoftNETSdkStaticWebAssets)' != 'true'">
+    <Delete Files="$(OutDir)$(ViuUtilityCssBundleName)"
+            Condition="'$(_ViuUtilityCssOutputRemoved)' == 'true' and Exists('$(OutDir)$(ViuUtilityCssBundleName)')" />
+    <ItemGroup Condition="'$(ViuUtilityCssCopyToOutput)' == 'true' and '$(_ViuUtilityCssOutputExists)' == 'true' and Exists('$(_ViuUtilityCssOutputPath)')">
+      <Content Remove="$(_ViuUtilityCssOutputPath)" />
+      <Content Include="$(_ViuUtilityCssOutputPath)">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <TargetPath>$(ViuUtilityCssBundleName)</TargetPath>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_ViuCollectUtilityCssWatchItems"
+          DependsOnTargets="_ViuResolveUtilityCssInputs"
+          Condition="'$(ViuUtilityCssEnabled)' == 'true'">
+    <ItemGroup>
+      <Watch Include="%(_ViuUtilityCssResolvedSource.FullPath)"
+             Condition="'%(_ViuUtilityCssResolvedSource.Watch)' != 'false'" />
+      <Watch Include="%(_ViuUtilityCssResolvedEntry.FullPath)"
+             Condition="'%(_ViuUtilityCssResolvedEntry.Watch)' != 'false'" />
+    </ItemGroup>
+  </Target>
+</Project>

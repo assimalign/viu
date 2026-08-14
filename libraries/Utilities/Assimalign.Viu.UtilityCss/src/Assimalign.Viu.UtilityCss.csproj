@@ -5,6 +5,9 @@
          never a hardcoded framework, exactly like Assimalign.Viu.Compiler.Css. The net10.0 test
          project references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- Deviates from the repo central package README rule per [V01.01.12.30]:
+         programmatic UtilityCss consumers require a package-specific quickstart. -->
+    <ViuPackageReadmeSource>$(MSBuildProjectDirectory)\..\README.md</ViuPackageReadmeSource>
     <!-- IsAotCompatible is intentionally not set: its analyzers require net8.0 or later. This
          assembly runs only at build/editor time and emits no runtime code. Its implementation
          remains reflection-free, deterministic, and I/O-free. -->

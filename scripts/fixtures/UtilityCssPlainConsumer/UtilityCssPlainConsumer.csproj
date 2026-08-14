@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>UtilityCssPlainConsumer</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Assimalign.Viu.UtilityCss.Build"
+                      Version="$(ViuConsumerVersion)"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

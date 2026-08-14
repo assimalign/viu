@@ -1,0 +1,19 @@
+#nullable enable
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.Cancel() -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedOutputPath.get -> string!
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedOutputPath.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputExists.get -> bool
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputExists.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputPath.get -> string!
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputPath.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputWritten.get -> bool
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputWritten.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.ProjectDirectory.get -> string!
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.ProjectDirectory.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.SourceFiles.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.SourceFiles.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.UtilityStylesheets.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.UtilityStylesheets.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.ViuGenerateUtilityCss() -> void
+override Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.Execute() -> bool

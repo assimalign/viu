@@ -222,7 +222,10 @@
         <ViuPackageReference Update="@(_ViuPackage)" Version="%(_ViuPackage.Version)">
             <PrivateAssets Condition="'%(_ViuPackage.PrivateAssets)' != ''">%(_ViuPackage.PrivateAssets)</PrivateAssets>
             <IncludeAssets Condition="'%(_ViuPackage.IncludeAssets)' != ''">%(_ViuPackage.IncludeAssets)</IncludeAssets>
-            <ExcludeAssets Condition="'%(_ViuPackage.ExcludeAssets)' != ''">%(_ViuPackage.ExcludeAssets)</ExcludeAssets>
+            <!-- MSBuild task projects compile against host-provided assemblies and therefore inherit
+                 ExcludeAssets=runtime from the catalog. Direct task test projects are the narrow
+                 exception: the test host is not MSBuild, so it must copy those runtime assemblies. -->
+            <ExcludeAssets Condition="'%(_ViuPackage.ExcludeAssets)' != '' and '%(ViuPackageReference.IncludeRuntimeAssets)' != 'true'">%(_ViuPackage.ExcludeAssets)</ExcludeAssets>
         </ViuPackageReference>
         <PackageReference Include="@(ViuPackageReference)" />
         <ViuPackageReference Remove="@(ViuPackageReference)" />

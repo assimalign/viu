@@ -141,6 +141,10 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-PackagedVueConsumer.ps1 -SkipPack
 
+      - name: Validate standalone UtilityCss package consumers
+        shell: pwsh
+        run: ./scripts/Test-UtilityCssPackage.ps1 -SkipPack
+
       - name: Verify no Node toolchain boundary
         shell: pwsh
         run: >-
@@ -157,6 +161,7 @@ jobs:
             'Assimalign.Viu.App.Ref.*.nupkg',
             'Assimalign.Viu.App.Browser.Ref.*.nupkg',
             'Assimalign.Viu.App.Browser.Runtime.browser-wasm.*.nupkg',
+            'Assimalign.Viu.UtilityCss.Build.*.nupkg',
             'Assimalign.Viu.Templates.*.nupkg'
           )
           foreach ($pattern in $expected) {

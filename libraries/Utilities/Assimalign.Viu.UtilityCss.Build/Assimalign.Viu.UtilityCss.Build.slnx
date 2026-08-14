@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Assimalign.Viu.UtilityCss.Build.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Assimalign.Viu.UtilityCss.Build.Tests.csproj" />
+  </Folder>
+</Solution>

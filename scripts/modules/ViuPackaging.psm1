@@ -26,6 +26,7 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.State',
     'Assimalign.Viu.Router',
     'Assimalign.Viu.UtilityCss',
+    'Assimalign.Viu.UtilityCss.Build',
     'Assimalign.Viu.Core',
     # [V01.01.10.01] is an opt-in package and deliberately stays outside both App frameworks.
     'Assimalign.Viu.DevTools',
@@ -203,7 +204,7 @@ function Test-ViuPackageContainsManagedAssembly {
     .DESCRIPTION
         Executable library/runtime packages with managed assemblies normally require a portable-PDB
         symbol package. Content-only packages contain no managed payload, while the release validator
-        separately names the deliberate Ref/SDK container exceptions. This helper reports archive
+        separately names the deliberate targeting, SDK, and MSBuild-task container exceptions. This helper reports archive
         content only; it does not decide the symbol-package policy.
     #>
     [CmdletBinding()]
@@ -237,7 +238,7 @@ function Test-ViuPackageRequiresSymbolPackage {
     .DESCRIPTION
         Applies Viu's symbol-publication policy to the physical main package. Executable
         library/runtime packages with managed assemblies require symbols. The two targeting packs
-        and two SDK distribution containers deliberately do not publish implementation symbols.
+        and the SDK/MSBuild-task distribution containers deliberately do not publish implementation symbols.
 
     .PARAMETER PackageId
         Package id whose distribution role selects any explicit container exception.
@@ -258,7 +259,8 @@ function Test-ViuPackageRequiresSymbolPackage {
         'Assimalign.Viu.App.Ref',
         'Assimalign.Viu.App.Browser.Ref',
         'Assimalign.Viu.Sdk',
-        'Assimalign.Viu.Sdk.Browser')
+        'Assimalign.Viu.Sdk.Browser',
+        'Assimalign.Viu.UtilityCss.Build')
     if ($packageIdWithoutSymbolPackage -contains $PackageId) {
         return $false
     }

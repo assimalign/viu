@@ -1,0 +1,7 @@
+<template>
+    <div class="bg-blue-500">Template utility candidate</div>
+</template>
+
+@script {
+    private const string Decoy = "<span class=\"opacity-50\"></span>";
+}

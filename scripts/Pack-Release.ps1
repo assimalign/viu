@@ -208,8 +208,8 @@ $expectedSymbolPackageFiles = @(
         } |
         ForEach-Object { "$_.$Version.snupkg" }
 )
-# [V01.01.12.30] restores the standalone UtilityCss library to the 17-main/12-symbol release set.
-$expectedMainPackageCount = 17
+# [V01.01.12.30] adds the standalone UtilityCss packages to the 18-main/12-symbol release set.
+$expectedMainPackageCount = 18
 $expectedSymbolPackageCount = 12
 if ($expectedPackageFiles.Count -ne $expectedMainPackageCount) {
     throw "The release contract requires $expectedMainPackageCount main packages, but the configured inventory contains $($expectedPackageFiles.Count)."
