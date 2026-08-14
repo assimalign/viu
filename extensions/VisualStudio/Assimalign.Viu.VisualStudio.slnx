@@ -2,6 +2,7 @@
   <Folder Name="/Visual Studio/">
     <File Path="README.md" />
     <File Path="Build.ps1" />
+    <File Path="Assimalign.Viu.VisualStudio/Build.ps1" />
   </Folder>
   <!-- The language service and server are developer tooling and live under the repository's
        tooling/ root; this solution still carries them because they are built, debugged, and

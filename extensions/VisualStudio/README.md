@@ -1,21 +1,28 @@
-# Viu for Visual Studio
+# Viu Visual Studio extensions
 
-This area contains the end-to-end Visual Studio editing experience for Viu single-file components:
+This area contains two independently installable classic in-process VSSDK extensions:
 
-- `Assimalign.Viu.VisualStudio` is a classic **in-process** VSSDK extension — one VSIX. It
-  contributes the `viu` content type, the `.pkgdef` that claims the `.viu` file extension, the Viu
-  color theme (its own classification types and their format definitions), and the language client
-  that starts and connects the language server.
-- `Assimalign.Viu.LanguageServer` is an editor-neutral Language Server Protocol executable
-  that runs in its **own process**.
-- `Assimalign.Viu.LanguageService` owns document state and Viu language features without
-  depending on Visual Studio.
+- `Assimalign.Viu.VisualStudio` contributes the `viu` content type, the `.pkgdef` that claims the
+  `.viu` file extension, the Viu color theme, and the language client that starts the Viu language
+  server.
+- `Assimalign.Viu.UtilityCss.VisualStudio` contributes only an `ILanguageClient` for the modern
+  Visual Studio HTML editor. It starts the standalone UtilityCss language server and leaves content
+  types, file ownership, and all LSP presentation with Visual Studio. Its exact scope and Razor
+  follow-up are documented in
+  [its README](Assimalign.Viu.UtilityCss.VisualStudio/README.md).
 
-Only the extension lives under `extensions/VisualStudio/`. The language server and the language
-service are editor-neutral developer tooling and live at
+The clients launch editor-neutral language servers in separate processes.
+`Assimalign.Viu.LanguageService` owns Viu document state and language features without depending on
+Visual Studio; the standalone UtilityCss server consumes only the UtilityCss engine and syntax
+parsers.
+
+Only the thin Visual Studio clients live under `extensions/VisualStudio/`. The Viu language server
+and language service are editor-neutral developer tooling and live at
 `tooling/Editor/Assimalign.Viu.LanguageServer` and
 `tooling/Editor/Assimalign.Viu.LanguageService`;
-`Assimalign.Viu.VisualStudio.slnx` and `Build.ps1` drive all three together.
+the standalone UtilityCss server lives at
+`libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer`. The two extension solutions keep
+their F5 deployment loops independent, while the root `Build.ps1` builds both sequentially.
 
 The process boundary that matters is the server's, and it is intentional: Viu's parsers and Roslyn
 stay outside `devenv.exe`, and the same server binary already serves the Visual Studio Code
@@ -30,11 +37,11 @@ the earlier out-of-process client was abandoned and what would justify going bac
 - Visual Studio 2022 17.14 or newer, or Visual Studio 2026
 - The **Visual Studio extension development** workload
 
-The extension targets `net48` — a classic VSSDK package loads inside `devenv.exe` and so lives on
+Both extensions target `net48` — a classic VSSDK package loads inside `devenv.exe` and so lives on
 the .NET Framework line — and compiles against the 17.14 editor and language-client contracts, which
 Visual Studio itself supplies at run time.
 
-## Build the complete extension
+## Build both extensions
 
 From the Viu repository root:
 
@@ -42,36 +49,39 @@ From the Viu repository root:
 powershell -ExecutionPolicy Bypass -File .\extensions\VisualStudio\Build.ps1
 ```
 
-The script publishes self-contained, single-file language servers for both `win-x64` and
-`win-arm64`, packages the extension through **Visual Studio's** MSBuild (located with `vswhere`,
+The script publishes each self-contained, single-file language server for both `win-x64` and
+`win-arm64`, packages both extensions through **Visual Studio's** MSBuild (located with `vswhere`,
 because the VSSDK build tasks are .NET Framework MSBuild tasks that cannot load under
-`dotnet build`), verifies the resulting container, and writes the installable package to:
+`dotnet build`), verifies both containers, and writes the installable packages to:
 
 ```text
 _out/extensions/VisualStudio/Debug/Assimalign.Viu.VisualStudio.vsix
+_out/extensions/VisualStudio/Debug/Assimalign.Viu.UtilityCss.VisualStudio.vsix
 ```
 
-Pass `-Configuration Release` for a release build. The verification step is not cosmetic: it asserts
-that the manifest, the MEF assembly, the `.pkgdef`, `language-server.json`, and both architecture
-payloads actually reached the archive, and that the manifest still declares both the MEF component
-and the VsPackage asset. A direct host build also fails with an actionable error when either
-architecture payload is absent, rather than producing an incomplete VSIX.
+Pass `-Configuration Release` for a release build. Validation requires each manifest, MEF assembly,
+configuration, and both architecture payloads; keeps the Viu pkgdef/VsPackage requirement; rejects
+either registry asset from the UtilityCss VSIX; proves the UtilityCss dependency manifests are
+Roslyn-free; reports each package size; and fails above the 50 MB Marketplace budget.
 
-For the same .NET Framework MSBuild reason, `Assimalign.Viu.VisualStudio.csproj` is **not** in
-`Assimalign.Viu.slnx` — that solution is gated by `dotnet build`. Its test project is, and CI names
-the test projects individually instead of handing over a solution `dotnet` can no longer build.
+For the same .NET Framework MSBuild reason, neither VSIX csproj is in `Assimalign.Viu.slnx` — that
+solution is gated by `dotnet build`. Their editor-free test projects are, and CI names the Visual
+Studio projects individually rather than handing either VSSDK solution to `dotnet`.
 
 ### Working on the extension in Visual Studio
 
-Open `extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx`. Run `Build.ps1` once for the active
-configuration first, so the standalone server publish directory exists and is picked up by
-subsequent in-IDE builds.
+Open the solution for the package being developed:
 
-Building the project produces the `.vsix` but deliberately **does not** install it into an
-experimental hive: the project sets `DeployExtension=false`, so no build — command line or in-IDE —
-writes into a hive as a side effect. The supported loop is to install the packaged VSIX (double-click
-it, or run `VSIXInstaller.exe` against it) and restart Visual Studio. A developer who wants the
-classic F5-into-the-experimental-instance loop opts in per build with `-p:DeployExtension=true`.
+- `extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx`
+- `extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio.slnx`
+
+Run the root `Build.ps1` once for the active configuration first, so both standalone server publish
+directories exist and are picked up by subsequent in-IDE builds.
+
+Command-line builds produce the `.vsix` without installing it into an experimental hive. Inside
+Visual Studio, each extension solution's `<Deploy />` entry and host-split `DeployExtension`
+property preserve the classic F5-into-the-experimental-instance loop for that VSIX alone. A
+command-line build can opt into deployment explicitly with `-p:DeployExtension=true`.
 
 The installed extension does not require a separately installed .NET runtime for the language
 server. It chooses the server matching the Visual Studio process architecture at startup.
@@ -146,11 +156,12 @@ The complete repository and Marketplace setup is documented in
 
 ## Standalone utility add-on
 
-The former Viu Utilities integration — including utility-class completion, generated-CSS hover,
-SDK delivery, and editor project configuration — was removed from Viu on 2026-08-13. The engine is
-independently published from `libraries/Utilities/Assimalign.Viu.UtilityCss`, but it remains outside
-the Viu SDK and is not a current Visual Studio feature. Consumer MSBuild integration arrives
-separately through #346. The Tailwind CSS v4.3.3 compatibility target belongs only to that add-on.
+The standalone engine is independently published from
+`libraries/Utilities/Assimalign.Viu.UtilityCss` and remains outside the Viu SDK. Its separate Visual
+Studio VSIX supplies completion, generated-CSS hover, and standard LSP document colors for the
+modern HTML editor. It does not attach to `.viu`: the Viu language service consumes build-emitted
+class catalogs there, preserving one language client per document. The Tailwind CSS v4.3.3
+compatibility target belongs only to the add-on.
 
 The generic `LanguageCompletionItem.ColorValue` and Language Server Protocol `Color` completion
 kind remain as dormant transport. The Visual Studio swatch adapter can present those values if a

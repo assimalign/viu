@@ -1,5 +1,5 @@
-# Windows-only build and test for the in-process Visual Studio client and its editor-neutral,
-# out-of-process Viu language server. Publishing belongs to release.yml.
+# Windows-only build and test for the in-process Visual Studio clients and their editor-neutral,
+# out-of-process language servers. Publishing belongs to release.yml.
 #
 # This root deliberately does NOT use .github/actions/build ([V01.01.12.02.02]): the extension is a
 # classic in-process VSSDK package whose build tasks are .NET Framework MSBuild tasks and cannot load
@@ -18,6 +18,7 @@ on:
       - 'tooling/**'
       - 'libraries/Syntax/**'
       - 'libraries/ServerRenderer/**'
+      - 'libraries/Utilities/**'
       - 'build/**'
       - 'scripts/Test-NoNodeToolchain.ps1'
       # The packed-consumer round trip consumes the Install-Local feed (SDK + framework packs), so
@@ -40,6 +41,7 @@ on:
       - 'tooling/**'
       - 'libraries/Syntax/**'
       - 'libraries/ServerRenderer/**'
+      - 'libraries/Utilities/**'
       - 'build/**'
       - 'scripts/Test-NoNodeToolchain.ps1'
       - 'scripts/Install-Local.ps1'
@@ -63,7 +65,7 @@ concurrency:
 
 jobs:
   build-test:
-    name: visual-studio (extension)
+    name: visual-studio (extensions)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -75,7 +77,7 @@ jobs:
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm
 
-      - name: Build extension
+      - name: Build extensions
         shell: pwsh
         run: ./extensions/VisualStudio/Build.ps1 -Configuration Release
 
@@ -103,72 +105,100 @@ jobs:
       - name: Test language server
         run: dotnet test tooling/Editor/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj --configuration Release
 
+      - name: Test Utility CSS language server
+        run: dotnet test libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/test/Assimalign.Viu.UtilityCss.LanguageServer.Tests.csproj --configuration Release
+
       - name: Test Visual Studio extension
         run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release
 
-      - name: Inspect packaged VSIX
+      - name: Test Utility CSS Visual Studio extension
+        run: dotnet test extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/Assimalign.Viu.UtilityCss.VisualStudio.Tests.csproj --configuration Release
+
+      - name: Inspect packaged VSIX files
         shell: pwsh
         run: |
-          $extensionPath = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
-          $extensionFile = Get-Item -LiteralPath $extensionPath
-          $maximumPackageSize = 50MB
-          if ($extensionFile.Length -gt $maximumPackageSize) {
-            throw "The VSIX is $($extensionFile.Length) bytes; Marketplace packages must remain at or below $maximumPackageSize bytes."
-          }
+          $extensions = @(
+            [pscustomobject]@{
+              Name = 'Assimalign.Viu.VisualStudio'
+              Path = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
+              Identity = 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c'
+            },
+            [pscustomobject]@{
+              Name = 'Assimalign.Viu.UtilityCss.VisualStudio'
+              Path = '_out/extensions/VisualStudio/Release/Assimalign.Viu.UtilityCss.VisualStudio.vsix'
+              Identity = 'Assimalign.Viu.UtilityCss.VisualStudio.8fcd5c9a-f62f-467c-8655-b7791c41775b'
+            }
+          )
 
+          $maximumPackageSize = 50MB
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead(
-            $extensionFile.FullName)
-          try {
-            $manifestEntry = $extensionArchive.GetEntry('extension.vsixmanifest')
-            if ($null -eq $manifestEntry) {
-              throw 'The VSIX does not contain extension.vsixmanifest.'
+          foreach ($extension in $extensions) {
+            $extensionFile = Get-Item -LiteralPath $extension.Path
+            if ($extensionFile.Length -gt $maximumPackageSize) {
+              throw "$($extension.Name) is $($extensionFile.Length) bytes; Marketplace packages must remain at or below $maximumPackageSize bytes."
             }
 
-            $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
+            $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead(
+              $extensionFile.FullName)
             try {
-              [xml] $manifest = $manifestReader.ReadToEnd()
+              $manifestEntry = $extensionArchive.GetEntry('extension.vsixmanifest')
+              if ($null -eq $manifestEntry) {
+                throw "$($extension.Name) does not contain extension.vsixmanifest."
+              }
+
+              $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
+              try {
+                [xml] $manifest = $manifestReader.ReadToEnd()
+              }
+              finally {
+                $manifestReader.Dispose()
+              }
+
+              $namespaceManager = [System.Xml.XmlNamespaceManager]::new(
+                $manifest.NameTable)
+              $namespaceManager.AddNamespace(
+                'vsix',
+                'http://schemas.microsoft.com/developer/vsx-schema/2011')
+              $identity = $manifest.SelectSingleNode(
+                '/vsix:PackageManifest/vsix:Metadata/vsix:Identity',
+                $namespaceManager)
+              $preview = $manifest.SelectSingleNode(
+                '/vsix:PackageManifest/vsix:Metadata/vsix:Preview',
+                $namespaceManager)
+              if ($null -eq $identity) {
+                throw "$($extension.Name) manifest does not contain an Identity element."
+              }
+              if ($identity.Id -ne $extension.Identity) {
+                throw "Unexpected $($extension.Name) VSIX identity: $($identity.Id)."
+              }
+              if ($identity.Publisher -ne 'Assimalign') {
+                throw "Unexpected $($extension.Name) VSIX publisher: $($identity.Publisher)."
+              }
+              if ($null -eq $preview -or $preview.InnerText -ne 'true') {
+                throw "$($extension.Name) must remain a Marketplace preview."
+              }
             }
             finally {
-              $manifestReader.Dispose()
+              $extensionArchive.Dispose()
             }
 
-            $namespaceManager = [System.Xml.XmlNamespaceManager]::new(
-              $manifest.NameTable)
-            $namespaceManager.AddNamespace(
-              'vsix',
-              'http://schemas.microsoft.com/developer/vsx-schema/2011')
-            $identity = $manifest.SelectSingleNode(
-              '/vsix:PackageManifest/vsix:Metadata/vsix:Identity',
-              $namespaceManager)
-            $preview = $manifest.SelectSingleNode(
-              '/vsix:PackageManifest/vsix:Metadata/vsix:Preview',
-              $namespaceManager)
-            if ($null -eq $identity) {
-              throw 'The VSIX manifest does not contain an Identity element.'
-            }
-            if ($identity.Id -ne 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c') {
-              throw "Unexpected VSIX identity: $($identity.Id)."
-            }
-            if ($identity.Publisher -ne 'Assimalign') {
-              throw "Unexpected VSIX publisher: $($identity.Publisher)."
-            }
-            if ($null -eq $preview -or $preview.InnerText -ne 'true') {
-              throw 'The Visual Studio extension must remain a Marketplace preview.'
-            }
+            $extensionHash = Get-FileHash -LiteralPath $extension.Path -Algorithm SHA256
+            $packageSizeInMegabytes = $extensionFile.Length / 1MB
+            Write-Host ("Validated {0} {1}, {2:N2} MB ({3} bytes), SHA256 {4}." -f `
+              $extension.Name,
+              $identity.Version,
+              $packageSizeInMegabytes,
+              $extensionFile.Length,
+              $extensionHash.Hash)
           }
-          finally {
-            $extensionArchive.Dispose()
-          }
-
-          $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
-          Write-Host "Validated VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
 
       - name: Verify no Node toolchain boundary
         shell: pwsh
-        run: >-
-          ./scripts/Test-NoNodeToolchain.ps1
-          -Artifact _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
+        run: |
+          ./scripts/Test-NoNodeToolchain.ps1 -Artifact @(
+            '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix',
+            '_out/extensions/VisualStudio/Release/Assimalign.Viu.UtilityCss.VisualStudio.vsix'
+          )
 
       - name: Upload VSIX build artifact
         # actions/upload-artifact v4
@@ -176,5 +206,14 @@ jobs:
         with:
           name: Assimalign.Viu.VisualStudio
           path: _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Utility CSS VSIX build artifact
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Assimalign.Viu.UtilityCss.VisualStudio
+          path: _out/extensions/VisualStudio/Release/Assimalign.Viu.UtilityCss.VisualStudio.vsix
           if-no-files-found: error
           retention-days: 7

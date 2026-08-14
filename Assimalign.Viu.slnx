@@ -185,21 +185,28 @@
 	</Folder>
 	<Folder Name="/viu/extensions/VisualStudio/">
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx" />
+		<File Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio.slnx" />
 		<File Path="extensions/VisualStudio/Build.ps1" />
 		<File Path="extensions/VisualStudio/README.md" />
 	</Folder>
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/">
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md" />
 	</Folder>
-	<!-- extensions/VisualStudio/Assimalign.Viu.VisualStudio/src is deliberately absent: it is a
-	     classic in-process VSSDK package whose build tasks are .NET Framework MSBuild tasks, and
-	     this solution is gated by `dotnet build`. It lives in
-	     extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx and is built by
-	     extensions/VisualStudio/Build.ps1 through Visual Studio's MSBuild. Its test project stays
-	     here, because it compiles the editor-free sources through <Compile Include> links rather
-	     than referencing the package. -->
+	<!-- Both extensions/VisualStudio/*/src projects are deliberately absent: they are classic
+	     in-process VSSDK packages whose build tasks are .NET Framework MSBuild tasks, and this
+	     solution is gated by `dotnet build`. Each lives in its own Visual Studio slnx and both are
+	     built by extensions/VisualStudio/Build.ps1 through Visual Studio's MSBuild. Their test
+	     projects stay here because they compile editor-free sources through <Compile Include> links
+	     rather than referencing the packages. -->
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/">
 		<Project Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj" />
+	</Folder>
+	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/">
+		<File Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/README.md" />
+		<File Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/Marketplace.md" />
+	</Folder>
+	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/">
+		<Project Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/Assimalign.Viu.UtilityCss.VisualStudio.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/tooling/Editor/Assimalign.Viu.LanguageService/" />
 	<Folder Name="/viu/tooling/Editor/Assimalign.Viu.LanguageService/src/">

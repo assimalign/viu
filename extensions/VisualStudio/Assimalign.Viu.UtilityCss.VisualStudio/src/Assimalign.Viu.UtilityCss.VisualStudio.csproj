@@ -1,0 +1,92 @@
+<!--
+  The Viu Utilities Visual Studio extension: a classic, in-process MEF language client whose
+  utility-CSS language server remains a separate stdio process.
+
+  This VSIX deliberately contributes no content type, file-extension mapping, classifier, custom
+  completion manager, or pkgdef. It attaches the standard Visual Studio LSP client to HTML content
+  type the installed Web Tools editor already owns. That keeps language ownership, completion
+  presentation, hover presentation, and document-color presentation with Visual Studio.
+
+  The Sdk attribute is spelled out as explicit Sdk.props/Sdk.targets imports because
+  Microsoft.VsSDK.targets must be imported AFTER the .NET SDK targets. Microsoft.VSSDK.BuildTools
+  supplies $(VSToolsPath); the classic VSIX packaging targets are imported explicitly, matching the
+  Assimalign.Viu.VisualStudio project.
+
+  This project is deliberately absent from Assimalign.Viu.slnx. VSSDK packaging uses .NET Framework
+  MSBuild tasks that cannot load under `dotnet build`. It has its own Visual Studio solution and is
+  built through extensions\VisualStudio\Build.ps1. The test project compiles the editor-free payload
+  configuration source through a Compile link rather than referencing this project.
+-->
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForVisualStudioClassicExtensions)</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <NeutralLanguage>en-US</NeutralLanguage>
+
+    <!-- Reuse the repository's single publish, incrementality, packaging, and validation target.
+         The whole publish root is extension-specific so this server cannot share a freshness stamp
+         or a payload sweep with the Roslyn-bearing Viu language server. -->
+    <ViuLanguageServerPublishEnabled>true</ViuLanguageServerPublishEnabled>
+    <ViuLanguageServerProjectPath>$(ViuRepositoryDirectory)libraries\Utilities\Assimalign.Viu.UtilityCss.LanguageServer\src\Assimalign.Viu.UtilityCss.LanguageServer.csproj</ViuLanguageServerProjectPath>
+    <ViuLanguageServerExecutableBaseName>Assimalign.Viu.UtilityCss.LanguageServer</ViuLanguageServerExecutableBaseName>
+    <ViuLanguageServerPublishRoot>$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)\Assimalign.Viu.UtilityCss.VisualStudio</ViuLanguageServerPublishRoot>
+
+    <!-- A target produces the payload, so the design-time build cannot describe the real inputs to
+         Visual Studio's fast up-to-date check. Always reaching MSBuild is cheaper than deploying a
+         stale language server. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <DeployExtension Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</DeployExtension>
+    <!-- There is no VSPackage class and no registry entry: HTML and Razor file ownership remains
+         entirely with Visual Studio. -->
+    <GeneratePkgDefFile>false</GeneratePkgDefFile>
+    <IncludeCopyLocalReferencesInVSIXContainer>false</IncludeCopyLocalReferencesInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Visual Studio supplies these assemblies in process; all references are compile-only through
+         the central package catalog. -->
+    <ViuPackageReference Include="Microsoft.VSSDK.BuildTools" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.CoreUtility" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Telemetry" />
+    <!-- Explicitly pins the language-client package's minimum dependency through the central
+         catalog, avoiding NuGet's approximate-version warning without shipping editor binaries. -->
+    <ViuPackageReference Include="Microsoft.VisualStudio.Text.Logic" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Threading" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Utilities" />
+    <ViuPackageReference Include="System.Text.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.ComponentModel.Composition" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="source.extension.vsixmanifest" />
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+    <Content Include="language-server.json">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- The manifest version follows VersionPrefix, so the root Build.ps1 -Version argument drives
+       both Visual Studio VSIX identities through the repository's central version properties. -->
+  <Target Name="GetVsixVersion" Returns="$(_ViuUtilityCssExtensionVsixVersion)">
+    <PropertyGroup>
+      <_ViuUtilityCssExtensionVsixVersion>$(VersionPrefix)</_ViuUtilityCssExtensionVsixVersion>
+    </PropertyGroup>
+  </Target>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
+</Project>

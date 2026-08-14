@@ -1,0 +1,27 @@
+<!--
+  Editor-free tests for the classic Visual Studio extension. The VSIX project cannot be referenced
+  from a dotnet-built test because its .NET Framework VSSDK tasks require Visual Studio's MSBuild.
+  The content-type-routing and payload-resolution sources touch no editor API, so they are compiled
+  here through links and tested on the repository library target framework. The VSIX build remains
+  the compile gate for the actual ILanguageClient MEF export.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\src\Internal\UtilityCssContentTypes.cs"
+             Link="Internal\UtilityCssContentTypes.cs" />
+    <Compile Include="..\src\Internal\UtilityCssLanguageServerConfiguration.cs"
+             Link="Internal\UtilityCssLanguageServerConfiguration.cs" />
+  </ItemGroup>
+</Project>
