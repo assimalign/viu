@@ -11,7 +11,7 @@
     <_ViuUtilityCssContentRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'utilitycss'))</_ViuUtilityCssContentRoot>
     <_ViuUtilityCssOutputPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', '$(ViuUtilityCssBundleName)'))</_ViuUtilityCssOutputPath>
     <_ViuUtilityCssEditorManifestPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.manifest.v1.json'))</_ViuUtilityCssEditorManifestPath>
-    <_ViuUtilityCssEditorCatalogPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.catalog.v1.json'))</_ViuUtilityCssEditorCatalogPath>
+    <_ViuUtilityCssEditorCatalogPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.classcatalog.v1.json'))</_ViuUtilityCssEditorCatalogPath>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(ViuUtilityCssEmitEditorSidecar)' == 'true'">

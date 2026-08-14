@@ -127,6 +127,30 @@ public interface ILanguageService
         LanguagePosition position,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Gets context-sensitive completion items together with the source-set truncation state.
+    /// </summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <param name="position">The zero-based editor position.</param>
+    /// <param name="cancellationToken">
+    /// The token that cancels the computation. Cancellation is cooperative; a canceled call throws
+    /// <see cref="System.OperationCanceledException"/> and leaves no service state modified.
+    /// </param>
+    /// <returns>
+    /// The bounded completion list. Implementations retaining this default are considered
+    /// incomplete when they fill the shared maximum, preserving the historical host behavior.
+    /// </returns>
+    LanguageCompletionList GetCompletionList(
+        string documentUri,
+        LanguagePosition position,
+        CancellationToken cancellationToken = default)
+    {
+        var items = GetCompletions(documentUri, position, cancellationToken);
+        return new LanguageCompletionList(
+            items,
+            items.Count >= LanguageCompletionLimits.MaximumItems);
+    }
+
     /// <summary>Gets documentation for the language token at a document position.</summary>
     /// <param name="documentUri">The document URI used by the editor.</param>
     /// <param name="position">The zero-based editor position.</param>

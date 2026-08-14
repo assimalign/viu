@@ -14,6 +14,10 @@ internal sealed class LanguageServerDocumentPublicationState
     private CancellationTokenSource? currentCancellation;
     private int activeFeatureRequests;
     private TaskCompletionSource? featureRequestsCompleted;
+    private long nextProjectContextGeneration;
+    private long appliedProjectContextGeneration;
+    private long nextClassCatalogGeneration;
+    private long appliedClassCatalogGeneration;
 
     /// <summary>Serializes the document's classification and diagnostic notification pair.</summary>
     internal SemaphoreSlim WriteGate { get; } = new(1, 1);
@@ -136,14 +140,36 @@ internal sealed class LanguageServerDocumentPublicationState
         }
     }
 
-    /// <summary>
-    /// Applies a short feature-request mutation only while its document request remains live.
-    /// Closing the document uses the same gate, so a mutation that wins the race is evicted by
-    /// close and a mutation that loses the race observes cancellation before it can repopulate.
-    /// </summary>
-    internal bool TryApplyFeatureRequest(CancellationToken cancellationToken, Action apply)
+    /// <summary>Reserves independent ordering generations for the inputs this feature discovers.</summary>
+    internal (long? ProjectContext, long? ClassCatalog) BeginFeatureConfiguration(
+        bool includesProjectContext,
+        bool includesClassCatalog)
     {
-        ArgumentNullException.ThrowIfNull(apply);
+        lock (synchronization)
+        {
+            var projectContext = includesProjectContext
+                ? ++nextProjectContextGeneration
+                : (long?)null;
+            var classCatalog = includesClassCatalog
+                ? ++nextClassCatalogGeneration
+                : (long?)null;
+            return (projectContext, classCatalog);
+        }
+    }
+
+    /// <summary>
+    /// Applies each discovered input only while its document request remains live and no later
+    /// discovery in the same input channel has already applied. Closing the document uses the same
+    /// gate, so a mutation that wins the race is evicted by close and a mutation that loses the
+    /// race observes cancellation before it can repopulate.
+    /// </summary>
+    internal bool TryApplyFeatureRequest(
+        long? projectContextGeneration,
+        Action? applyProjectContext,
+        long? classCatalogGeneration,
+        Action? applyClassCatalog,
+        CancellationToken cancellationToken)
+    {
         lock (synchronization)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -151,8 +177,26 @@ internal sealed class LanguageServerDocumentPublicationState
                 return false;
             }
 
-            apply();
-            return true;
+            var applied = false;
+            if (projectContextGeneration is long projectGeneration &&
+                projectGeneration >= appliedProjectContextGeneration)
+            {
+                ArgumentNullException.ThrowIfNull(applyProjectContext);
+                applyProjectContext();
+                appliedProjectContextGeneration = projectGeneration;
+                applied = true;
+            }
+
+            if (classCatalogGeneration is long catalogGeneration &&
+                catalogGeneration >= appliedClassCatalogGeneration)
+            {
+                ArgumentNullException.ThrowIfNull(applyClassCatalog);
+                applyClassCatalog();
+                appliedClassCatalogGeneration = catalogGeneration;
+                applied = true;
+            }
+
+            return applied;
         }
     }
 

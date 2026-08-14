@@ -12,8 +12,9 @@ namespace Assimalign.Viu.UtilityCss.Build;
 
 internal static class UtilityCssEditorSidecarWriter
 {
-    internal const string CatalogFileName = "utilitycss.catalog.v1.json";
+    internal const string CatalogFileName = "utilitycss.classcatalog.v1.json";
     internal const string ManifestFileName = "utilitycss.manifest.v1.json";
+    private const string PreviousCatalogFileName = "utilitycss.catalog.v1.json";
 
     private static readonly UTF8Encoding Utf8Encoding = new(
         encoderShouldEmitUTF8Identifier: false);
@@ -58,13 +59,15 @@ internal static class UtilityCssEditorSidecarWriter
             catalog.IsTruncated);
         var directory = GetSidecarDirectory(bundlePath);
         Directory.CreateDirectory(directory);
+        var previousCatalogDeleted = DeleteIfExists(
+            Path.Combine(directory, PreviousCatalogFileName));
         var manifestWritten = WriteIfChanged(
             Path.Combine(directory, ManifestFileName),
             manifest);
         var catalogWritten = WriteIfChanged(
             Path.Combine(directory, CatalogFileName),
             catalogJson);
-        return manifestWritten || catalogWritten;
+        return previousCatalogDeleted || manifestWritten || catalogWritten;
     }
 
     private static EditorCatalog CreateCatalog(
@@ -172,7 +175,7 @@ internal static class UtilityCssEditorSidecarWriter
         bool isTruncated)
     {
         var result = new StringBuilder();
-        result.Append("{\n  \"schemaVersion\": 1,\n  \"truncated\": ");
+        result.Append("{\n  \"version\": 1,\n  \"truncated\": ");
         result.Append(isTruncated ? "true" : "false");
         result.Append(",\n  \"entries\": [");
         for (var index = 0; index < items.Count; index++)
@@ -299,7 +302,19 @@ internal static class UtilityCssEditorSidecarWriter
         {
             Path.Combine(directory, ManifestFileName),
             Path.Combine(directory, CatalogFileName),
+            Path.Combine(directory, PreviousCatalogFileName),
         };
+    }
+
+    private static bool DeleteIfExists(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        File.Delete(path);
+        return true;
     }
 
     private static string GetSidecarDirectory(string bundlePath) =>

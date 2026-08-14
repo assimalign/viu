@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 using Assimalign.Viu.Syntax;
@@ -11,6 +12,7 @@ namespace Assimalign.Viu.LanguageService;
 
 internal sealed class ViuLanguageService :
     ILanguageService,
+    IClassCatalogLanguageService,
     IScriptSemanticLanguageService
 {
     private static readonly IReadOnlyDictionary<string, string> HoverDocumentation =
@@ -66,12 +68,20 @@ internal sealed class ViuLanguageService :
     // The artifact-fed semantic engine ([V01.01.12.23], #259) likewise computes outside the
     // service lock under its own gate; the service only snapshots the per-document context here.
     private readonly ScriptSemanticEngine scriptSemantics = new();
+    // Host snapshots are reused by reference while the discovered catalog files are unchanged.
+    // Parsed sets key off that identity so every document in a project shares one load, while an
+    // invalidated snapshot becomes collectible after the last document releases it.
+    private readonly ConditionalWeakTable<LanguageClassCatalogConfiguration, ClassCatalogSet>
+        loadedClassCatalogs = new();
+    private readonly Dictionary<string, LanguageClassCatalogConfiguration>
+        classCatalogConfigurations = new(StringComparer.OrdinalIgnoreCase);
     // The host-fed project context per document ([V01.01.12.23], #259), snapshotted by script
     // completion and fed to the semantic engine; a document without one keeps the syntax-only
     // answers unchanged.
     private readonly Dictionary<string, LanguageProjectContext> projectContexts =
         new(StringComparer.OrdinalIgnoreCase);
     private int standaloneDocumentProjectionBuildCount;
+    private int classCatalogLoadCount;
 
     /// <summary>Gets all component projections built by this workspace.</summary>
     internal int ComponentProjectionBuildCount
@@ -83,6 +93,31 @@ internal sealed class ViuLanguageService :
 
     /// <summary>Gets how many project-scoped semantic states this workspace built.</summary>
     internal int ProjectStateBuildCount => scriptSemantics.ProjectStateBuildCount;
+
+    /// <summary>Gets how many distinct class-catalog snapshots this workspace loaded.</summary>
+    internal int ClassCatalogLoadCount => Volatile.Read(ref classCatalogLoadCount);
+
+    public void ConfigureClassCatalogs(
+        string documentUri,
+        LanguageClassCatalogConfiguration? configuration)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+
+        lock (synchronization)
+        {
+            if (configuration is null)
+            {
+                classCatalogConfigurations.Remove(documentUri);
+            }
+            else if (!classCatalogConfigurations.TryGetValue(
+                         documentUri,
+                         out var existing) ||
+                     !ReferenceEquals(existing, configuration))
+            {
+                classCatalogConfigurations[documentUri] = configuration;
+            }
+        }
+    }
 
     public void ConfigureProjectContext(
         string documentUri,
@@ -137,6 +172,7 @@ internal sealed class ViuLanguageService :
         scriptSemantics.CloseDocument(documentUri);
         lock (synchronization)
         {
+            classCatalogConfigurations.Remove(documentUri);
             projectContexts.Remove(documentUri);
             return documents.Close(documentUri);
         }
@@ -281,15 +317,21 @@ internal sealed class ViuLanguageService :
         string documentUri,
         LanguagePosition position,
         CancellationToken cancellationToken = default)
+        => GetCompletionList(documentUri, position, cancellationToken).Items;
+
+    public LanguageCompletionList GetCompletionList(
+        string documentUri,
+        LanguagePosition position,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var document = CaptureDocumentSnapshot(documentUri);
+        var (document, catalogs) = CaptureDocumentAndClassCatalogSnapshot(documentUri);
         if (document is null ||
             !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
         {
-            return Array.Empty<LanguageCompletionItem>();
+            return Complete(Array.Empty<LanguageCompletionItem>());
         }
 
         var block = FindBlock(document.Syntax, offset);
@@ -299,7 +341,7 @@ internal sealed class ViuLanguageService :
                 template.Content,
                 offset - template.ContentLocation.Start.Offset))
         {
-            return Array.Empty<LanguageCompletionItem>();
+            return Complete(Array.Empty<LanguageCompletionItem>());
         }
 
         if (template is not null &&
@@ -313,6 +355,7 @@ internal sealed class ViuLanguageService :
                 document.Text,
                 document.Syntax,
                 classValueContext,
+                catalogs,
                 cancellationToken);
         }
 
@@ -330,7 +373,7 @@ internal sealed class ViuLanguageService :
                 cancellationToken);
             if (contextualCompletions is not null)
             {
-                return contextualCompletions;
+                return Complete(contextualCompletions);
             }
         }
 
@@ -339,7 +382,7 @@ internal sealed class ViuLanguageService :
                 styleBlock.Content,
                 offset - styleBlock.ContentLocation.Start.Offset))
         {
-            return Array.Empty<LanguageCompletionItem>();
+            return Complete(Array.Empty<LanguageCompletionItem>());
         }
 
         var linePrefix = TextCoordinateConverter.GetLinePrefix(document.Text, offset);
@@ -353,26 +396,27 @@ internal sealed class ViuLanguageService :
                 document.Syntax.Format);
             if (headerCompletions.Count > 0)
             {
-                return headerCompletions;
+                return Complete(headerCompletions);
             }
         }
 
-        return block switch
-        {
-            SingleFileComponentTemplateBlock => GetTemplateCompletions(
-                document.Text,
-                offset,
-                linePrefix),
-            SingleFileComponentScriptBlock scriptBlock => GetScriptCompletions(
-                documentUri,
-                document,
-                scriptBlock,
-                offset,
-                linePrefix,
-                cancellationToken),
-            SingleFileComponentStyleBlock => ViuCompletionCatalog.StyleProperties,
-            _ => GetRootCompletions(document.Syntax),
-        };
+        return Complete(
+            block switch
+            {
+                SingleFileComponentTemplateBlock => GetTemplateCompletions(
+                    document.Text,
+                    offset,
+                    linePrefix),
+                SingleFileComponentScriptBlock scriptBlock => GetScriptCompletions(
+                    documentUri,
+                    document,
+                    scriptBlock,
+                    offset,
+                    linePrefix,
+                    cancellationToken),
+                SingleFileComponentStyleBlock => ViuCompletionCatalog.StyleProperties,
+                _ => GetRootCompletions(document.Syntax),
+            });
     }
 
     public IReadOnlyList<LanguageLocation> GetDefinition(
@@ -532,7 +576,7 @@ internal sealed class ViuLanguageService :
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var document = CaptureDocumentSnapshot(documentUri);
+        var (document, catalogs) = CaptureDocumentAndClassCatalogSnapshot(documentUri);
         if (document is null ||
             !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
         {
@@ -548,10 +592,15 @@ internal sealed class ViuLanguageService :
                 offset,
                 out var classValueContext))
         {
-            return StyleClassHoverProvider.GetHover(
+            var componentStyleHover = StyleClassHoverProvider.GetHover(
                 document,
                 classValueContext,
                 cancellationToken);
+            return componentStyleHover ??
+                ClassCatalogHoverProvider.GetHover(
+                    document,
+                    classValueContext,
+                    catalogs);
         }
 
         var projectContext = CaptureProjectContext(documentUri);
@@ -663,6 +712,40 @@ internal sealed class ViuLanguageService :
         }
     }
 
+    /// <summary>
+    /// Captures the immutable document and host configuration under one lock, then loads the
+    /// catalog set outside it so JSON parsing never stalls document synchronization.
+    /// </summary>
+    private (LanguageDocument? Document, ClassCatalogSet Catalogs)
+        CaptureDocumentAndClassCatalogSnapshot(string documentUri)
+    {
+        LanguageDocument? document;
+        LanguageClassCatalogConfiguration? configuration;
+        lock (synchronization)
+        {
+            document = documents.TryGet(documentUri, out var openDocument)
+                ? openDocument
+                : null;
+            configuration = classCatalogConfigurations.TryGetValue(
+                documentUri,
+                out var configured)
+                    ? configured
+                    : null;
+        }
+
+        var catalogs = configuration is null
+            ? ClassCatalogSet.Empty
+            : loadedClassCatalogs.GetValue(configuration, LoadClassCatalogs);
+        return (document, catalogs);
+    }
+
+    private ClassCatalogSet LoadClassCatalogs(
+        LanguageClassCatalogConfiguration configuration)
+    {
+        Interlocked.Increment(ref classCatalogLoadCount);
+        return ClassCatalogSet.Load(configuration);
+    }
+
     private LanguageProjectContext? CaptureProjectContext(string documentUri)
     {
         lock (synchronization)
@@ -672,6 +755,12 @@ internal sealed class ViuLanguageService :
                 : null;
         }
     }
+
+    private static LanguageCompletionList Complete(
+        IReadOnlyList<LanguageCompletionItem> items)
+        => new(
+            items,
+            items.Count >= LanguageCompletionLimits.MaximumItems);
 
     private static IReadOnlyList<LanguageCompletionItem> GetRootCompletions(
         LanguageDocumentSyntax syntax)

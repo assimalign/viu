@@ -185,7 +185,7 @@ public sealed class ViuGenerateUtilityCssTests
             using var catalog = JsonDocument.Parse(
                 File.ReadAllBytes(GetCatalogPath(outputPath)));
             var catalogRoot = catalog.RootElement;
-            catalogRoot.GetProperty("schemaVersion").GetInt32().ShouldBe(1);
+            catalogRoot.GetProperty("version").GetInt32().ShouldBe(1);
             catalogRoot.GetProperty("truncated").GetBoolean().ShouldBeTrue();
             var entries = catalogRoot.GetProperty("entries");
             var colorEntry = FindCatalogEntry(entries, "bg-brand");
@@ -354,6 +354,33 @@ public sealed class ViuGenerateUtilityCssTests
         }
     }
 
+    [Fact]
+    public void Execute_EditorSidecarEnabled_DeletesPreviousCatalogFilename()
+    {
+        var projectDirectory = CreateProjectDirectory();
+        try
+        {
+            var sourcePath = Path.Combine(projectDirectory, "index.html");
+            var outputPath = Path.Combine(projectDirectory, "obj", "project.utilities.css");
+            var previousCatalogPath = Path.Combine(
+                Path.GetDirectoryName(outputPath)!,
+                "utilitycss.catalog.v1.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+            File.WriteAllText(sourcePath, "<div class=\"flex\"></div>");
+            File.WriteAllText(previousCatalogPath, "{}");
+
+            var task = CreateTask(projectDirectory, outputPath, sourcePath);
+
+            task.Execute().ShouldBeTrue();
+            File.Exists(previousCatalogPath).ShouldBeFalse();
+            File.Exists(GetCatalogPath(outputPath)).ShouldBeTrue();
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
     private static ViuGenerateUtilityCss CreateTask(
         string projectDirectory,
         string outputPath,
@@ -386,7 +413,7 @@ public sealed class ViuGenerateUtilityCssTests
     private static string GetCatalogPath(string outputPath) =>
         Path.Combine(
             Path.GetDirectoryName(outputPath)!,
-            "utilitycss.catalog.v1.json");
+            "utilitycss.classcatalog.v1.json");
 
     private static JsonElement FindCatalogEntry(
         JsonElement entries,

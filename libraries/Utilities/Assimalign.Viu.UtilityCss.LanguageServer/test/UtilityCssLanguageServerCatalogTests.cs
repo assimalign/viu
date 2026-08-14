@@ -33,7 +33,7 @@ public sealed class UtilityCssLanguageServerCatalogTests
                 "utilitycss.manifest.v1.json");
             var catalogPath = Path.Combine(
                 sidecarDirectory,
-                "utilitycss.catalog.v1.json");
+                "utilitycss.classcatalog.v1.json");
             Directory.CreateDirectory(sidecarDirectory);
             File.WriteAllText(projectPath, "<Project Sdk=\"Microsoft.NET.Sdk\" />");
 
@@ -57,7 +57,7 @@ public sealed class UtilityCssLanguageServerCatalogTests
             const string Candidate = "bg-[#123456]";
             var catalog = new JsonObject
             {
-                ["schemaVersion"] = 1,
+                ["version"] = 1,
                 ["truncated"] = true,
                 ["entries"] = new JsonArray
                 {

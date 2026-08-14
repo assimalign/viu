@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 
@@ -14,13 +15,15 @@ namespace Assimalign.Viu.LanguageService;
 internal static class StyleClassCompletionProvider
 {
     /// <summary>
-    /// Returns matching component-local selectors with first-wins label deduplication and the
-    /// language-service completion limit.
+    /// Returns matching component-local selectors followed by build-contributed catalog entries.
+    /// Component selectors own colliding names, and the language-service completion limit is
+    /// applied once to the merged result.
     /// </summary>
-    internal static IReadOnlyList<LanguageCompletionItem> Merge(
+    internal static LanguageCompletionList Merge(
         string documentText,
         LanguageDocumentSyntax syntax,
         TemplateClassValueContext context,
+        ClassCatalogSet catalogs,
         CancellationToken cancellationToken)
     {
         var editRange = new LanguageRange(
@@ -28,8 +31,10 @@ internal static class StyleClassCompletionProvider
             TextCoordinateConverter.GetPosition(documentText, context.TokenEnd));
         var completions = new List<LanguageCompletionItem>();
         var seenLabels = new HashSet<string>(StringComparer.Ordinal);
+        var componentClassNames = ExtractClassNames(syntax, cancellationToken);
+        var isIncomplete = catalogs.IsTruncated;
 
-        foreach (var className in ExtractClassNames(syntax, cancellationToken))
+        foreach (var className in componentClassNames)
         {
             if (!className.StartsWith(context.Prefix, StringComparison.Ordinal) ||
                 !seenLabels.Add(className))
@@ -49,11 +54,41 @@ internal static class StyleClassCompletionProvider
                 FilterText: className));
             if (completions.Count == LanguageCompletionLimits.MaximumItems)
             {
-                return completions;
+                return new LanguageCompletionList(completions, IsIncomplete: true);
             }
         }
 
-        return completions;
+        foreach (var entry in catalogs.Entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!entry.ClassName.StartsWith(context.Prefix, StringComparison.Ordinal) ||
+                !seenLabels.Add(entry.ClassName))
+            {
+                continue;
+            }
+
+            var catalogSortText = entry.SortText ??
+                entry.Order.ToString("D8", CultureInfo.InvariantCulture);
+            completions.Add(new LanguageCompletionItem(
+                entry.ClassName,
+                entry.ColorValue is null
+                    ? LanguageCompletionItemKind.Property
+                    : LanguageCompletionItemKind.Color,
+                "Build-contributed class",
+                Documentation: string.Empty,
+                entry.ClassName,
+                IsSnippet: false,
+                SortText: "10000:class-catalog:" + catalogSortText + ":" + entry.ClassName,
+                EditRange: editRange,
+                FilterText: entry.ClassName,
+                ColorValue: entry.ColorValue));
+            if (completions.Count == LanguageCompletionLimits.MaximumItems)
+            {
+                return new LanguageCompletionList(completions, IsIncomplete: true);
+            }
+        }
+
+        return new LanguageCompletionList(completions, isIncomplete);
     }
 
     /// <summary>Returns whether the cursor is within a CSS block comment in a style block.</summary>

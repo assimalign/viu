@@ -29,6 +29,7 @@ internal sealed class LanguageServerHost
     private readonly HashSet<string> openSupportedDocuments =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ViuProjectContextReader projectContextReader = new();
+    private readonly ViuClassCatalogReader classCatalogReader = new();
     // The status transition ledger ([V01.01.12.23], #259): project file path -> the last reported
     // state signature. A status is reported only when its signature differs from the project's
     // last reported one — never once per keystroke, and never merely once ever: recovery
@@ -579,6 +580,7 @@ internal sealed class LanguageServerHost
                             statusNotification = ConfigureProjectContext(
                                 request.DocumentUri,
                                 documentState!,
+                                IsClassCatalogFeatureRequest(request.Method),
                                 requestCancellation.Token);
                         }
 
@@ -802,10 +804,11 @@ internal sealed class LanguageServerHost
         LanguageServerPendingRequest request,
         CancellationToken cancellationToken)
     {
-        var completions = languageService.GetCompletions(
+        var completionList = languageService.GetCompletionList(
             request.DocumentUri,
             request.Position,
             cancellationToken);
+        var completions = completionList.Items;
         var items = new JsonArray();
         var supportsSnippets = request.ClientCapabilities.CompletionSupportsSnippets;
         foreach (var completion in completions)
@@ -872,7 +875,7 @@ internal sealed class LanguageServerHost
         // cached page instead of re-requesting and the narrower candidate is never offered.
         return CreateCompletionList(
             items,
-            completions.Count >= LanguageCompletionLimits.MaximumItems);
+            completionList.IsIncomplete);
     }
 
     /// <summary>
@@ -1430,7 +1433,7 @@ internal sealed class LanguageServerHost
             },
         };
 
-    // Semantic script features consume the project context, so the probe runs on document open,
+    // Semantic features consume host-provided project inputs, so the probes run on document open,
     // inside each debounced publication, and on the completion, hover, resolve, and semantic-token
     // request tasks ([V01.01.12.23], #259).
     private static bool IsSemanticFeatureRequest(string method)
@@ -1440,9 +1443,16 @@ internal sealed class LanguageServerHost
             "completionItem/resolve" or
             "textDocument/semanticTokens/full";
 
+    // Catalog discovery performs an obj-tree walk only for the features that consume catalog
+    // entries. Other semantic requests retain the existing project-context-only path.
+    private static bool IsClassCatalogFeatureRequest(string method)
+        => method is
+            "textDocument/completion" or
+            "textDocument/hover";
+
     /// <summary>
-    /// Probes the document's project context, feeds it to the language service, and composes the
-    /// <c>window/logMessage</c> payload the caller writes before its reply — or
+    /// Probes the document's host-provided project inputs, feeds them to the language service, and
+    /// composes the <c>window/logMessage</c> payload the caller writes before its reply — or
     /// <see langword="null"/> when the status is silent or unchanged since the project's last
     /// reported state.
     /// </summary>
@@ -1464,25 +1474,54 @@ internal sealed class LanguageServerHost
     private JsonObject? ConfigureProjectContext(
         string documentUri,
         LanguageServerDocumentPublicationState documentState,
+        bool includeClassCatalogs,
         CancellationToken cancellationToken)
     {
-        if (languageService is not IScriptSemanticLanguageService scriptSemanticLanguageService)
+        var scriptSemanticLanguageService = languageService as IScriptSemanticLanguageService;
+        var classCatalogLanguageService = includeClassCatalogs
+            ? languageService as IClassCatalogLanguageService
+            : null;
+        if (scriptSemanticLanguageService is null && classCatalogLanguageService is null)
         {
             return null;
         }
 
-        var (context, status) = projectContextReader.Read(documentUri, cancellationToken);
+        var configurationGeneration = documentState.BeginFeatureConfiguration(
+            scriptSemanticLanguageService is not null,
+            classCatalogLanguageService is not null);
+
+        LanguageProjectContext? context = null;
+        ViuProjectContextStatus? status = null;
+        if (scriptSemanticLanguageService is not null)
+        {
+            (context, status) = projectContextReader.Read(documentUri, cancellationToken);
+        }
+
+        var classCatalogConfiguration = classCatalogLanguageService is null
+            ? null
+            : classCatalogReader.Read(documentUri, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!documentState.TryApplyFeatureRequest(
-                cancellationToken,
-                () => scriptSemanticLanguageService.ConfigureProjectContext(documentUri, context)))
+                configurationGeneration.ProjectContext,
+                scriptSemanticLanguageService is null
+                    ? null
+                    : () => scriptSemanticLanguageService.ConfigureProjectContext(
+                        documentUri,
+                        context),
+                configurationGeneration.ClassCatalog,
+                classCatalogLanguageService is null
+                    ? null
+                    : () => classCatalogLanguageService.ConfigureClassCatalogs(
+                        documentUri,
+                        classCatalogConfiguration),
+                cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             return null;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return CreateProjectContextStatusNotification(status);
+        return status is null ? null : CreateProjectContextStatusNotification(status);
     }
 
     private (bool IsCurrent, ViuProjectContextStatus? Status) ConfigureCurrentProjectContext(

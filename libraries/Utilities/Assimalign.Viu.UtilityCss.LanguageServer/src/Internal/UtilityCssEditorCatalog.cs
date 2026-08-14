@@ -7,7 +7,7 @@ namespace Assimalign.Viu.UtilityCss.LanguageServer;
 
 internal sealed class UtilityCssEditorCatalog
 {
-    internal const string FileName = "utilitycss.catalog.v1.json";
+    internal const string FileName = "utilitycss.classcatalog.v1.json";
 
     internal static UtilityCssEditorCatalog Empty { get; } =
         new(Array.Empty<UtilityCssEditorCatalogEntry>(), false);
@@ -31,8 +31,8 @@ internal sealed class UtilityCssEditorCatalog
             using var document = JsonDocument.Parse(File.ReadAllText(path));
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
-                !root.TryGetProperty("schemaVersion", out var schemaVersion) ||
-                !schemaVersion.TryGetInt32(out var version) ||
+                !root.TryGetProperty("version", out var versionElement) ||
+                !versionElement.TryGetInt32(out var version) ||
                 version != 1 ||
                 !root.TryGetProperty("truncated", out var truncated) ||
                 truncated.ValueKind is not JsonValueKind.True and not JsonValueKind.False ||

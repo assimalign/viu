@@ -58,6 +58,15 @@ internal static class LanguageHoverMarkdown
             : description + "\n\n" + CreateFence(CssLanguage, declaration);
     }
 
+    /// <summary>Formats a CSS declaration without explanatory prose.</summary>
+    /// <param name="declaration">The declaration, which may span lines.</param>
+    /// <returns>The fenced CSS hover Markdown.</returns>
+    internal static string CreateCss(string declaration)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        return CreateFence(CssLanguage, declaration);
+    }
+
     private static string CreateFence(string language, string declaration)
         => "```" + language + "\n" + declaration.TrimEnd('\n', '\r') + "\n```";
 }

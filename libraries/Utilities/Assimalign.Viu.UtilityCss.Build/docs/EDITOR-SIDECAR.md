@@ -2,7 +2,7 @@
 
 `Assimalign.Viu.UtilityCss.Build` writes two UTF-8 JSON files beside a successfully generated utility CSS bundle. Both files use stable ordinal ordering and byte-compare no-op writes. If the bundle becomes empty, or `ViuUtilityCssEmitEditorSidecar` is `false`, stale sidecars are removed.
 
-The files are a discovery and class-data contract for project systems and language services. Additive fields may be introduced within version 1. Removing a field, changing a field's meaning, or otherwise making a breaking format change requires a version 2 filename rather than rewriting the version 1 contract.
+The manifest is the UtilityCss-owned discovery contract. Additive manifest fields may be introduced within version 1. Removing a manifest field, changing a field's meaning, or otherwise making a breaking manifest change requires a version 2 filename rather than rewriting the version 1 contract. The class catalog follows Viu's generic [class-catalog contract](https://github.com/assimalign/viu/blob/main/tooling/Editor/Assimalign.Viu.LanguageService/docs/CLASS-CATALOGS.md); that document is the format authority for the catalog payload.
 
 ## Manifest
 
@@ -30,11 +30,11 @@ The files are a discovery and class-data contract for project systems and langua
 
 ## Class catalog
 
-`utilitycss.catalog.v1.json` has this shape:
+`utilitycss.classcatalog.v1.json` has this shape:
 
 ```json
 {
-  "schemaVersion": 1,
+  "version": 1,
   "truncated": true,
   "entries": [
     {

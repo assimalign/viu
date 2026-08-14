@@ -5,8 +5,8 @@
 .DESCRIPTION
     Packs the standalone engine and build-integration packages, stages Razor, plain-SDK, and
     package-only .viu consumers behind an isolated NuGet boundary, and verifies source discovery,
-    single-file-component slicing, editor sidecars, both delivery paths, and byte-compare
-    incremental behavior.
+    single-file-component slicing, editor sidecars, Viu class-catalog completion over a real
+    language-server process, both delivery paths, and byte-compare incremental behavior.
     Specified by [V01.01.12.30], issue #346.
 
 .PARAMETER SkipPack
@@ -390,7 +390,7 @@ function Assert-UtilityCssEditorSidecar {
 
     $sidecarDirectory = [System.IO.Path]::GetDirectoryName($BundlePath)
     $manifestPath = Join-Path $sidecarDirectory 'utilitycss.manifest.v1.json'
-    $catalogPath = Join-Path $sidecarDirectory 'utilitycss.catalog.v1.json'
+    $catalogPath = Join-Path $sidecarDirectory 'utilitycss.classcatalog.v1.json'
     foreach ($sidecarPath in @($manifestPath, $catalogPath)) {
         if (-not [System.IO.File]::Exists($sidecarPath)) {
             throw "The UtilityCss build did not emit the editor sidecar: $sidecarPath"
@@ -508,16 +508,16 @@ function Assert-UtilityCssEditorSidecar {
     }
 
     $catalogDescription = 'The UtilityCss class catalog'
-    $catalogSchemaVersion = Get-RequiredJsonProperty `
+    $catalogVersion = Get-RequiredJsonProperty `
         -InputObject $catalog `
-        -Name 'schemaVersion' `
+        -Name 'version' `
         -Description $catalogDescription
-    if ($catalogSchemaVersion -isnot [long] -and
-        $catalogSchemaVersion -isnot [int]) {
-        throw "$catalogDescription schemaVersion must be an integer."
+    if ($catalogVersion -isnot [long] -and
+        $catalogVersion -isnot [int]) {
+        throw "$catalogDescription version must be an integer."
     }
-    if ([long]$catalogSchemaVersion -ne 1) {
-        throw "$catalogDescription schemaVersion was '$catalogSchemaVersion'; expected 1."
+    if ([long]$catalogVersion -ne 1) {
+        throw "$catalogDescription version was '$catalogVersion'; expected 1."
     }
 
     $catalogTruncated = Get-RequiredJsonProperty `
@@ -835,6 +835,107 @@ function Assert-UtilityCssPlainOutputRemoval {
         -ForegroundColor Green
 }
 
+function Assert-ViuClassCatalogCompletion {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectDirectory,
+
+        [Parameter(Mandatory)]
+        [string] $CatalogPath,
+
+        [Parameter(Mandatory)]
+        [string] $DocumentPath,
+
+        [Parameter(Mandatory)]
+        [string] $ClassName,
+
+        [Parameter(Mandatory)]
+        [string] $CompletionPrefix,
+
+        [Parameter(Mandatory)]
+        [string] $LanguageServerExecutable,
+
+        [Parameter(Mandatory)]
+        [string] $LanguageServerTestProjectPath
+    )
+
+    try {
+        $catalog = [System.IO.File]::ReadAllText($CatalogPath) |
+            ConvertFrom-Json
+    }
+    catch {
+        throw "The class catalog is not valid JSON: $CatalogPath`n$($_.Exception.Message)"
+    }
+
+    $matchingEntries = @(
+        $catalog.entries |
+            Where-Object {
+                $classProperty = $_.PSObject.Properties['class']
+                $null -ne $classProperty -and
+                    $null -ne $classProperty.Value -and
+                    $classProperty.Value.ToString().Equals(
+                        $ClassName,
+                        [System.StringComparison]::Ordinal)
+            })
+    if ($matchingEntries.Count -ne 1) {
+        throw "The class-catalog language-server probe expected one '$ClassName' entry."
+    }
+
+    $colorValue = Get-RequiredJsonProperty `
+        -InputObject $matchingEntries[0] `
+        -Name 'colorValue' `
+        -Description "The '$ClassName' class-catalog entry"
+    if ([string]::IsNullOrWhiteSpace($colorValue.ToString())) {
+        throw "The '$ClassName' class-catalog entry has no colorValue."
+    }
+
+    $fixturePath = Join-Path `
+        (Join-Path $ProjectDirectory 'obj') `
+        'viu-class-catalog-process-fixture.json'
+    @{
+        serverExecutable = $LanguageServerExecutable
+        documentPath = $DocumentPath
+        className = $ClassName
+        completionPrefix = $CompletionPrefix
+        colorValue = $colorValue.ToString()
+    } | ConvertTo-Json | Set-Content -LiteralPath $fixturePath -Encoding utf8
+
+    $previousFixture = [System.Environment]::GetEnvironmentVariable(
+        'VIU_CLASS_CATALOG_FIXTURE',
+        [System.EnvironmentVariableTarget]::Process)
+    [System.Environment]::SetEnvironmentVariable(
+        'VIU_CLASS_CATALOG_FIXTURE',
+        $fixturePath,
+        [System.EnvironmentVariableTarget]::Process)
+    try {
+        Invoke-DotNet `
+            -Description 'Running the build-catalog-to-Viu-completion process proof' `
+            -Arguments @(
+                'test',
+                $LanguageServerTestProjectPath,
+                '--configuration',
+                'Release',
+                '--no-build',
+                '--no-restore',
+                '--filter',
+                'FullyQualifiedName~LanguageServerClassCatalogProcessTests',
+                '--blame-hang-timeout',
+                '2m',
+                '--logger',
+                'console;verbosity=detailed')
+    }
+    finally {
+        [System.Environment]::SetEnvironmentVariable(
+            'VIU_CLASS_CATALOG_FIXTURE',
+            $previousFixture,
+            [System.EnvironmentVariableTarget]::Process)
+    }
+
+    Write-Host `
+        "Viu completion received '$ClassName' with colorValue '$colorValue' from the build catalog." `
+        -ForegroundColor Green
+}
+
 function Test-UtilityCssFixture {
     param(
         [Parameter(Mandatory)]
@@ -847,7 +948,13 @@ function Test-UtilityCssFixture {
         [string] $NuGetConfigurationPath,
 
         [Parameter(Mandatory)]
-        [string] $Version
+        [string] $Version,
+
+        [Parameter(Mandatory)]
+        [string] $LanguageServerExecutable,
+
+        [Parameter(Mandatory)]
+        [string] $LanguageServerTestProjectPath
     )
 
     $fixtureName = $Fixture.Name
@@ -963,6 +1070,19 @@ function Test-UtilityCssFixture {
         -ExpectedCatalogClasses $Fixture.ExpectedCatalogClasses `
         -ForbiddenCatalogClasses $Fixture.ForbiddenCatalogClasses `
         -CommonProperties $commonProperties
+
+    if ($Fixture.ContainsKey('ClassCatalogCompletionClass')) {
+        Assert-ViuClassCatalogCompletion `
+            -ProjectDirectory $projectDirectory `
+            -CatalogPath (Join-Path `
+                ([System.IO.Path]::GetDirectoryName($bundlePath)) `
+                'utilitycss.classcatalog.v1.json') `
+            -DocumentPath (Join-Path $projectDirectory 'SlicingProbe.viu') `
+            -ClassName $Fixture.ClassCatalogCompletionClass `
+            -CompletionPrefix $Fixture.ClassCatalogCompletionPrefix `
+            -LanguageServerExecutable $LanguageServerExecutable `
+            -LanguageServerTestProjectPath $LanguageServerTestProjectPath
+    }
 
     $bundleItem = Get-Item -LiteralPath $bundlePath
     $firstBundleTimestamp = $bundleItem.LastWriteTimeUtc.Ticks
@@ -1125,6 +1245,51 @@ Assert-UtilityCssBuildPackageLayout `
         $packageDirectoryPath `
         "Assimalign.Viu.UtilityCss.Build.$viuVersion.nupkg")
 
+$languageServerProjectPath = Join-Path `
+    $repositoryRootPath `
+    'tooling/Editor/Assimalign.Viu.LanguageServer/src/Assimalign.Viu.LanguageServer.csproj'
+$languageServerTestProjectPath = Join-Path `
+    $repositoryRootPath `
+    'tooling/Editor/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj'
+Invoke-DotNet `
+    -Description 'Building the in-repository Viu language server and process proof' `
+    -Arguments @(
+        'build',
+        $languageServerTestProjectPath,
+        '--configuration',
+        'Release',
+        '-warnaserror')
+$languageServerPropertyResult = Invoke-DotNetForJson `
+    -Description 'Resolving the in-repository Viu language-server executable' `
+    -Arguments @(
+        'msbuild',
+        $languageServerProjectPath,
+        '-nologo',
+        '-verbosity:quiet',
+        '-getProperty:TargetDir;TargetName',
+        '-property:Configuration=Release')
+if ($null -eq $languageServerPropertyResult.Properties) {
+    throw 'MSBuild returned no property set for the Viu language server.'
+}
+$languageServerTargetDirectory = Get-JsonPropertyValue `
+    -InputObject $languageServerPropertyResult.Properties `
+    -Name 'TargetDir'
+$languageServerTargetName = Get-JsonPropertyValue `
+    -InputObject $languageServerPropertyResult.Properties `
+    -Name 'TargetName'
+$languageServerExecutableName = if ([System.OperatingSystem]::IsWindows()) {
+    "$languageServerTargetName.exe"
+}
+else {
+    $languageServerTargetName
+}
+$languageServerExecutablePath = Join-Path `
+    $languageServerTargetDirectory `
+    $languageServerExecutableName
+if (-not [System.IO.File]::Exists($languageServerExecutablePath)) {
+    throw "The in-repository Viu language-server executable was not built: $languageServerExecutablePath"
+}
+
 $scratchRootPath = Resolve-RepositoryOutputChild `
     -Path $ScratchRoot `
     -Description 'ScratchRoot'
@@ -1189,6 +1354,8 @@ $fixtureDefinitions = @(
         ExpectedSourceRelativePaths = @('SlicingProbe.viu')
         ExpectedCatalogClasses = @('sr-only', 'bg-blue-500', 'opacity-[0.7654321]')
         ForbiddenCatalogClasses = @('opacity-[0.1234567]')
+        ClassCatalogCompletionClass = 'bg-blue-500'
+        ClassCatalogCompletionPrefix = 'bg-blue-'
     })
 
 $previousNuGetPackages = [System.Environment]::GetEnvironmentVariable(
@@ -1283,11 +1450,13 @@ try {
             -Fixture $fixture `
             -StagingRoot $temporaryRootPath `
             -NuGetConfigurationPath $nugetConfigurationPath `
-            -Version $viuVersion
+            -Version $viuVersion `
+            -LanguageServerExecutable $languageServerExecutablePath `
+            -LanguageServerTestProjectPath $languageServerTestProjectPath
     }
 
     Write-Host `
-        'Standalone UtilityCss package consumers passed all Razor, plain-host, .viu slicing, editor-sidecar, delivery, and incremental checks.' `
+        'Standalone UtilityCss package consumers passed Razor, plain-host, .viu slicing, editor-sidecar, Viu completion, delivery, and incremental checks.' `
         -ForegroundColor Green
 }
 finally {
