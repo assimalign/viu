@@ -58,7 +58,8 @@
       single VSIX past the Marketplace size gate.
 
       A caller opts into the full set with ViuLanguageServerPublishAllRuntimeIdentifiers=true (see
-      extensions\VisualStudioCode\Build.ps1), or narrows to an explicit subset by
+      extensions\VisualStudioCode\Build.ps1, which delegates to packages\viu\Build.ps1), or narrows
+      to an explicit subset by
       passing ViuLanguageServerRuntimeIdentifiers directly. The list lives here so no script owns a
       second copy of it.
     -->

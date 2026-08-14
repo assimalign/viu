@@ -1,12 +1,18 @@
-# npm install output
+# The repository-wide ignore file treats every packages/* directory as a NuGet restore folder.
+# This area contains source packages, so re-include them before applying the shared output rules.
+!packages/
+!packages/*/
+
+# npm install output for each extension package
 node_modules/
 
-# TypeScript compiler output
+# TypeScript compiler output for each extension package
 out/
 
-# Language-server payloads staged by Build.ps1. These are ~18 MB per runtime identifier and are
-# reproduced from tooling/Editor/Assimalign.Viu.LanguageServer; they are never committed.
+# Language-server payloads staged by package Build.ps1 scripts. These are ~18 MB per runtime
+# identifier and are reproduced from tooling/Editor/Assimalign.Viu.LanguageServer; they are never
+# committed.
 server/
 
-# vsce package output
+# vsce package output for each extension package
 *.vsix

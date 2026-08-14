@@ -122,7 +122,7 @@ settings.
 | Integration | Host | Status |
 | --- | --- | --- |
 | [`extensions/VisualStudio`](extensions/VisualStudio) | Visual Studio 2022 17.14+ / Visual Studio 2026 | Published to the Visual Studio Marketplace as a preview |
-| [`extensions/VisualStudioCode`](extensions/VisualStudioCode) | Visual Studio Code 1.85+ | Scaffold — compiles and packages, not published |
+| [`extensions/VisualStudioCode/packages/viu`](extensions/VisualStudioCode/packages/viu) | Visual Studio Code 1.85+ | Scaffold — compiles and packages, not published |
 | [`extensions/dotnet/Assimalign.Viu.Templates`](extensions/dotnet/Assimalign.Viu.Templates) | `dotnet new` | Packaged application and component-library templates |
 
 The two hosts differ in exactly one build property. The Visual Studio VSIX embeds `win-x64` and
@@ -137,8 +137,9 @@ Neither extension project is in `Assimalign.Viu.slnx`, for different reasons. Th
 extension is a classic **in-process** VSSDK package whose build tasks are .NET Framework MSBuild
 tasks and cannot load under `dotnet build`; it is packaged by
 [its own `Build.ps1`](extensions/VisualStudio/Build.ps1) through Visual Studio's MSBuild, and only
-its test project is in the solution. The Visual Studio Code extension is a TypeScript/npm package
-built by [its own `Build.ps1`](extensions/VisualStudioCode/Build.ps1).
+its test project is in the solution. The Visual Studio Code extensions are TypeScript/npm packages
+built through the [area orchestrator](extensions/VisualStudioCode/Build.ps1); the current
+[`viu` package](extensions/VisualStudioCode/packages/viu) owns its package-specific build.
 
 The Visual Studio client runs in process because the editor surfaces a Viu palette needs — a content
 type Viu owns, its own classification types, and the format definitions that color them — exist only

@@ -1,11 +1,12 @@
 # Type-check lane for the Visual Studio Code extension client ([V01.01.12.02.02]).
 #
 # NEW COVERAGE: none of the fifteen retired per-area workflows watched
-# extensions/VisualStudioCode at all, so its TypeScript client could break without CI
-# noticing. This is deliberately the cheap half of Build.ps1 — `npm ci` plus the project's own
-# `check` script (tsc --noEmit). The expensive half, publishing the language-server payload for five
-# runtime identifiers, is already proven by the Visual Studio lane, which drives the SAME shared
-# ViuPublishLanguageServer target; duplicating it here would buy minutes of runtime and no signal.
+# extensions/VisualStudioCode at all, so a package's TypeScript client could break without CI
+# noticing. This is deliberately the cheap half of each package Build.ps1 — `npm ci` plus the
+# package's own `check` script (tsc --noEmit). The expensive half, publishing the language-server
+# payload for five runtime identifiers, is already proven by the Visual Studio lane, which drives
+# the SAME shared ViuPublishLanguageServer target; duplicating it here would buy minutes of runtime
+# and no signal.
 #
 # Node comes preinstalled on the GitHub-hosted runner image, so this lane pins no third-party action
 # beyond the checkout.
@@ -32,11 +33,14 @@ concurrency:
 
 jobs:
     build:
-        name: visual-studio-code (client)
+        name: ${{ matrix.package }} (client)
         runs-on: ubuntu-24.04
-        defaults:
-            run:
-                working-directory: extensions/VisualStudioCode
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - package: viu
+                      path: extensions/VisualStudioCode/packages/viu
         steps:
             - name: Checkout
               # actions/checkout v4
@@ -46,6 +50,8 @@ jobs:
 
             - name: Install client dependencies
               run: npm ci
+              working-directory: ${{ matrix.path }}
 
             - name: Type-check client
               run: npm run check
+              working-directory: ${{ matrix.path }}
