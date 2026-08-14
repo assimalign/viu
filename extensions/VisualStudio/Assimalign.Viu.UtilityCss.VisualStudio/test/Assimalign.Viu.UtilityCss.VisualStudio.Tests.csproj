@@ -21,6 +21,8 @@
   <ItemGroup>
     <Compile Include="..\src\Internal\UtilityCssContentTypes.cs"
              Link="Internal\UtilityCssContentTypes.cs" />
+    <Compile Include="..\src\Internal\UtilityCssDocumentMessageFilter.cs"
+             Link="Internal\UtilityCssDocumentMessageFilter.cs" />
     <Compile Include="..\src\Internal\UtilityCssLanguageServerConfiguration.cs"
              Link="Internal\UtilityCssLanguageServerConfiguration.cs" />
   </ItemGroup>

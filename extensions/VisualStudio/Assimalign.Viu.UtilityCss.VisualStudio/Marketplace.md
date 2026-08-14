@@ -24,14 +24,16 @@ Viu `.viu` files remain owned by **Viu for Visual Studio**. Utility results ther
 extension's build-contributed class catalogs, so installing this VSIX does not start a second server
 for the same document.
 
-Razor `.razor` files are not registered in this release because compatibility with Razor's cohosted
-tooling has not been verified. Classic `HTML` and legacy `.cshtml` are deferred with that probe:
-Visual Studio matches base content types, and both legacy types sit in the same hierarchy used by
-legacy Razor. Registering the shared base would also activate this client for `.razor`.
+Standalone `.html` and `.htm` files use Visual Studio's `HTML` content type at default settings. The
+extension also registers Web Tools' `html-delegation` type for projected HTML and installations with
+the HTML LSP feature enabled. Legacy Razor derives from `HTML`, so the client may activate for a
+legacy `.cshtml` or `.razor` buffer; a URI-filtering middle layer drops those host-document messages
+while allowing `.html`, `.htm`, and Razor-projected `__virtual.html` documents.
 
 ## Requirements
 
 - Visual Studio 2022 17.14 or newer, or Visual Studio 2026
+- The **ASP.NET and web development** component group
 - An x64 or ARM64 Windows installation
 
 The matching language server is included; no separate .NET runtime is required.

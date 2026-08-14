@@ -12,7 +12,10 @@ namespace Assimalign.Viu.UtilityCss.LanguageServer.Tests;
 
 internal static class UtilityCssLanguageServerTestProtocol
 {
-    internal static async Task<(int ExitCode, List<JsonDocument> Messages)> RunAsync(
+    internal static async Task<(
+        int ExitCode,
+        List<JsonDocument> Messages,
+        string Diagnostics)> RunAsync(
         params string[] payloads)
     {
         var framedMessages = new StringBuilder();
@@ -24,43 +27,57 @@ internal static class UtilityCssLanguageServerTestProtocol
         await using var input = new MemoryStream(
             Encoding.UTF8.GetBytes(framedMessages.ToString()));
         await using var output = new MemoryStream();
-        var host = new LanguageServerHost();
+        using var diagnostics = new StringWriter();
+        var host = new LanguageServerHost(diagnostics);
 
         var exitCode = await host.RunAsync(input, output);
 
         output.Position = 0;
-        return (exitCode, await ReadAllMessagesAsync(output));
+        return (
+            exitCode,
+            await ReadAllMessagesAsync(output),
+            diagnostics.ToString());
     }
 
-    internal static string InitializeRequest(string identifier) =>
-        new JsonObject
+    internal static string InitializeRequest(
+        string identifier,
+        string? rootUri = null)
+    {
+        var parameters = new JsonObject
+        {
+            ["capabilities"] = new JsonObject
+            {
+                ["textDocument"] = new JsonObject
+                {
+                    ["completion"] = new JsonObject
+                    {
+                        ["completionItem"] = new JsonObject
+                        {
+                            ["documentationFormat"] = new JsonArray(
+                                JsonValue.Create("markdown")),
+                        },
+                    },
+                    ["hover"] = new JsonObject
+                    {
+                        ["contentFormat"] = new JsonArray(
+                            JsonValue.Create("markdown")),
+                    },
+                },
+            },
+        };
+        if (rootUri is not null)
+        {
+            parameters["rootUri"] = rootUri;
+        }
+
+        return new JsonObject
         {
             ["jsonrpc"] = "2.0",
             ["id"] = identifier,
             ["method"] = "initialize",
-            ["params"] = new JsonObject
-            {
-                ["capabilities"] = new JsonObject
-                {
-                    ["textDocument"] = new JsonObject
-                    {
-                        ["completion"] = new JsonObject
-                        {
-                            ["completionItem"] = new JsonObject
-                            {
-                                ["documentationFormat"] = new JsonArray(
-                                    JsonValue.Create("markdown")),
-                            },
-                        },
-                        ["hover"] = new JsonObject
-                        {
-                            ["contentFormat"] = new JsonArray(
-                                JsonValue.Create("markdown")),
-                        },
-                    },
-                },
-            },
+            ["params"] = parameters,
         }.ToJsonString();
+    }
 
     internal static string InitializedNotification() =>
         new JsonObject

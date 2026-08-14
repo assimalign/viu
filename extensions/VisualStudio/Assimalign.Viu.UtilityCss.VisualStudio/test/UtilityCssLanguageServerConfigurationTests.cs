@@ -125,7 +125,7 @@ public sealed class UtilityCssLanguageServerConfigurationTests
     }
 
     [Fact]
-    public void CreateProcessStartInformation_ConfiguredArguments_RedirectsProtocolStreamsOnly()
+    public void CreateProcessStartInformation_ConfiguredArguments_RedirectsProtocolAndDiagnosticStreams()
     {
         string extensionDirectory = Path.Combine(
             Path.GetTempPath(),
@@ -156,7 +156,7 @@ public sealed class UtilityCssLanguageServerConfigurationTests
             startInformation.WorkingDirectory.ShouldBe(Path.GetDirectoryName(executablePath));
             startInformation.RedirectStandardInput.ShouldBeTrue();
             startInformation.RedirectStandardOutput.ShouldBeTrue();
-            startInformation.RedirectStandardError.ShouldBeFalse();
+            startInformation.RedirectStandardError.ShouldBeTrue();
             startInformation.UseShellExecute.ShouldBeFalse();
             startInformation.CreateNoWindow.ShouldBeTrue();
         }

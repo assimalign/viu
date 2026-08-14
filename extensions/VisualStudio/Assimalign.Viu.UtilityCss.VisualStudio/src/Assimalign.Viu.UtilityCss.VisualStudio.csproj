@@ -55,6 +55,7 @@
     <ViuPackageReference Include="Microsoft.VSSDK.BuildTools" />
     <ViuPackageReference Include="Microsoft.VisualStudio.CoreUtility" />
     <ViuPackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Shell.Framework" />
     <ViuPackageReference Include="Microsoft.VisualStudio.Telemetry" />
     <!-- Explicitly pins the language-client package's minimum dependency through the central
          catalog, avoiding NuGet's approximate-version warning without shipping editor binaries. -->

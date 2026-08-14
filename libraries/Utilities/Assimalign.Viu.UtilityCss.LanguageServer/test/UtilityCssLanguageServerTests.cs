@@ -16,8 +16,9 @@ public sealed class UtilityCssLanguageServerTests
     [Fact]
     public async Task RunAsync_InitializeHandshake_AdvertisesUtilityCssCapabilitiesAndExitsCleanly()
     {
+        var rootUri = new Uri(Path.GetTempPath()).AbsoluteUri;
         var run = await UtilityCssLanguageServerTestProtocol.RunAsync(
-            UtilityCssLanguageServerTestProtocol.InitializeRequest("initialize"),
+            UtilityCssLanguageServerTestProtocol.InitializeRequest("initialize", rootUri),
             UtilityCssLanguageServerTestProtocol.InitializedNotification(),
             UtilityCssLanguageServerTestProtocol.ShutdownRequest("shutdown"),
             UtilityCssLanguageServerTestProtocol.ExitNotification());
@@ -27,9 +28,8 @@ public sealed class UtilityCssLanguageServerTests
             var initialize = UtilityCssLanguageServerTestProtocol.FindResponse(
                 run.Messages,
                 "initialize");
-            var capabilities = initialize
-                .GetProperty("result")
-                .GetProperty("capabilities");
+            var initializeResult = initialize.GetProperty("result");
+            var capabilities = initializeResult.GetProperty("capabilities");
 
             capabilities.GetProperty("positionEncoding").GetString().ShouldBe("utf-16");
             var synchronization = capabilities.GetProperty("textDocumentSync");
@@ -51,6 +51,83 @@ public sealed class UtilityCssLanguageServerTests
                     "shutdown")
                 .GetProperty("result")
                 .ValueKind.ShouldBe(JsonValueKind.Null);
+            var serverVersion = initializeResult
+                .GetProperty("serverInfo")
+                .GetProperty("version")
+                .GetString();
+            run.Diagnostics.ShouldContain($"Version: {serverVersion}");
+            run.Diagnostics.ShouldContain($"Root: '{rootUri}'");
+        }
+        finally
+        {
+            UtilityCssLanguageServerTestProtocol.DisposeMessages(run.Messages);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_RequestsForUnsupportedFileType_ReturnEmptyResults()
+    {
+        const string Candidate = "bg-blue-500";
+        const string Source = "<div class=\"bg-blue-500\"></div>\n";
+        var candidateStart = Source.IndexOf(Candidate, StringComparison.Ordinal);
+        var candidateEnd = candidateStart + Candidate.Length;
+        var documentUri = CreateDocumentUri(".txt");
+
+        var run = await UtilityCssLanguageServerTestProtocol.RunAsync(
+            UtilityCssLanguageServerTestProtocol.InitializeRequest("initialize"),
+            UtilityCssLanguageServerTestProtocol.InitializedNotification(),
+            UtilityCssLanguageServerTestProtocol.DidOpenNotification(
+                documentUri,
+                "plaintext",
+                Source),
+            UtilityCssLanguageServerTestProtocol.CompletionRequest(
+                "completion",
+                documentUri,
+                Source,
+                candidateEnd),
+            UtilityCssLanguageServerTestProtocol.HoverRequest(
+                "hover",
+                documentUri,
+                Source,
+                candidateStart),
+            UtilityCssLanguageServerTestProtocol.DocumentColorRequest(
+                "document-color",
+                documentUri),
+            UtilityCssLanguageServerTestProtocol.ColorPresentationRequest(
+                "color-presentation",
+                documentUri,
+                Source,
+                candidateStart,
+                candidateEnd,
+                0d,
+                0d,
+                0d,
+                1d),
+            UtilityCssLanguageServerTestProtocol.ShutdownRequest("shutdown"),
+            UtilityCssLanguageServerTestProtocol.ExitNotification());
+        try
+        {
+            var completion = UtilityCssLanguageServerTestProtocol.FindResponse(
+                    run.Messages,
+                    "completion")
+                .GetProperty("result");
+            completion.GetProperty("items").GetArrayLength().ShouldBe(0);
+            completion.GetProperty("isIncomplete").GetBoolean().ShouldBeFalse();
+            UtilityCssLanguageServerTestProtocol.FindResponse(run.Messages, "hover")
+                .GetProperty("result")
+                .ValueKind.ShouldBe(JsonValueKind.Null);
+            UtilityCssLanguageServerTestProtocol.FindResponse(
+                    run.Messages,
+                    "document-color")
+                .GetProperty("result")
+                .GetArrayLength()
+                .ShouldBe(0);
+            UtilityCssLanguageServerTestProtocol.FindResponse(
+                    run.Messages,
+                    "color-presentation")
+                .GetProperty("result")
+                .GetArrayLength()
+                .ShouldBe(0);
         }
         finally
         {
@@ -386,6 +463,125 @@ public sealed class UtilityCssLanguageServerTests
                 documentation.ShouldContain(".editor-surface");
                 documentation.ShouldContain(
                     "background-color: var(--color-editor-brand);");
+                run.Diagnostics.ShouldContain("sidecar manifest found");
+                run.Diagnostics.ShouldContain(manifestPath);
+            }
+            finally
+            {
+                UtilityCssLanguageServerTestProtocol.DisposeMessages(run.Messages);
+            }
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_ProjectWithoutSidecar_ReportsMissingManifestOnce()
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "viu-utility-css-language-server-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(projectDirectory);
+        try
+        {
+            var projectPath = Path.Combine(projectDirectory, "Application.csproj");
+            var documentPath = Path.Combine(projectDirectory, "Index.html");
+            File.WriteAllText(projectPath, "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+
+            const string Candidate = "bg-blue-500";
+            const string Source = "<div class=\"bg-blue-500\"></div>\n";
+            File.WriteAllText(documentPath, Source);
+            var candidateStart = Source.IndexOf(Candidate, StringComparison.Ordinal);
+            var documentUri = new Uri(documentPath).AbsoluteUri;
+
+            var run = await UtilityCssLanguageServerTestProtocol.RunAsync(
+                UtilityCssLanguageServerTestProtocol.InitializeRequest("initialize"),
+                UtilityCssLanguageServerTestProtocol.InitializedNotification(),
+                UtilityCssLanguageServerTestProtocol.DidOpenNotification(
+                    documentUri,
+                    "html",
+                    Source),
+                UtilityCssLanguageServerTestProtocol.CompletionRequest(
+                    "completion",
+                    documentUri,
+                    Source,
+                    candidateStart + Candidate.Length),
+                UtilityCssLanguageServerTestProtocol.HoverRequest(
+                    "hover",
+                    documentUri,
+                    Source,
+                    candidateStart),
+                UtilityCssLanguageServerTestProtocol.ShutdownRequest("shutdown"),
+                UtilityCssLanguageServerTestProtocol.ExitNotification());
+            try
+            {
+                run.Diagnostics.ShouldContain("sidecar manifest missing");
+                run.Diagnostics.ShouldContain(projectDirectory);
+                run.Diagnostics
+                    .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+                    .Count(line => line.Contains(
+                        "sidecar manifest missing",
+                        StringComparison.Ordinal))
+                    .ShouldBe(1);
+            }
+            finally
+            {
+                UtilityCssLanguageServerTestProtocol.DisposeMessages(run.Messages);
+            }
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_ProjectWithInvalidSidecar_ReportsInvalidManifest()
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "viu-utility-css-language-server-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(projectDirectory);
+        try
+        {
+            var projectPath = Path.Combine(projectDirectory, "Application.csproj");
+            var documentPath = Path.Combine(projectDirectory, "Index.html");
+            var sidecarDirectory = Path.Combine(
+                projectDirectory,
+                "obj",
+                "Debug",
+                "net10.0",
+                "utilitycss");
+            var manifestPath = Path.Combine(
+                sidecarDirectory,
+                "utilitycss.manifest.v1.json");
+            Directory.CreateDirectory(sidecarDirectory);
+            File.WriteAllText(projectPath, "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+            File.WriteAllText(manifestPath, "{");
+
+            const string Candidate = "bg-blue-500";
+            const string Source = "<div class=\"bg-blue-500\"></div>\n";
+            File.WriteAllText(documentPath, Source);
+            var cursor = Source.IndexOf(Candidate, StringComparison.Ordinal) + Candidate.Length;
+            var documentUri = new Uri(documentPath).AbsoluteUri;
+
+            var run = await RunDocumentRequestAsync(
+                documentUri,
+                "html",
+                Source,
+                UtilityCssLanguageServerTestProtocol.CompletionRequest(
+                    "completion",
+                    documentUri,
+                    Source,
+                    cursor));
+            try
+            {
+                run.Diagnostics.ShouldContain("sidecar manifest invalid");
+                run.Diagnostics.ShouldContain(manifestPath);
             }
             finally
             {
@@ -429,7 +625,10 @@ public sealed class UtilityCssLanguageServerTests
         }
     }
 
-    private static async Task<(int ExitCode, List<JsonDocument> Messages)> RunDocumentRequestAsync(
+    private static async Task<(
+        int ExitCode,
+        List<JsonDocument> Messages,
+        string Diagnostics)> RunDocumentRequestAsync(
         string documentUri,
         string languageIdentifier,
         string source,

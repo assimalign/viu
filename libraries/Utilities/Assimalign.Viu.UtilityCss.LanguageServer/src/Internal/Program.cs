@@ -9,7 +9,7 @@ internal static class Program
     {
         await using var input = Console.OpenStandardInput();
         await using var output = Console.OpenStandardOutput();
-        var host = new LanguageServerHost();
+        var host = new LanguageServerHost(Console.Error);
         return await host.RunAsync(input, output).ConfigureAwait(false);
     }
 }

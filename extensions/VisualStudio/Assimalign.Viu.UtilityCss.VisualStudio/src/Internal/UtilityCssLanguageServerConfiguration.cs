@@ -128,7 +128,7 @@ internal sealed class UtilityCssLanguageServerConfiguration
         return executablePath;
     }
 
-    /// <summary>Creates a hidden process with only the protocol input and output redirected.</summary>
+    /// <summary>Creates a hidden process with protocol streams and diagnostic output redirected.</summary>
     internal ProcessStartInfo CreateProcessStartInformation(
         string executablePath,
         string extensionDirectory)
@@ -144,6 +144,7 @@ internal sealed class UtilityCssLanguageServerConfiguration
                     : executableDirectory,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
+            RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };

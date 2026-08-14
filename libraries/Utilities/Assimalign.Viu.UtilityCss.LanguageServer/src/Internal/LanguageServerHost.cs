@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -20,9 +21,25 @@ internal sealed class LanguageServerHost
     private const int InvalidParametersCode = -32602;
     private const int InternalErrorCode = -32603;
 
+    private static readonly string ServerVersion =
+        typeof(LanguageServerHost).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ??
+        typeof(LanguageServerHost).Assembly.GetName().Version?.ToString() ??
+        "unknown";
+
+    private readonly TextWriter diagnosticOutput;
     private readonly UtilityCssLanguageDocumentStore documentStore = new();
-    private readonly UtilityCssProjectContextProvider projectContextProvider = new();
+    private readonly UtilityCssProjectContextProvider projectContextProvider;
     private bool shutdownRequested;
+
+    internal LanguageServerHost(TextWriter diagnosticOutput)
+    {
+        ArgumentNullException.ThrowIfNull(diagnosticOutput);
+
+        this.diagnosticOutput = diagnosticOutput;
+        this.projectContextProvider = new UtilityCssProjectContextProvider(this.WriteDiagnostic);
+    }
 
     // Message framing, lifecycle ordering, document snapshots, and UTF-16 coordinate conversion
     // intentionally duplicate the established Viu server patterns. Sharing them is a later design
@@ -108,6 +125,9 @@ internal sealed class LanguageServerHost
             switch (method)
             {
                 case "initialize":
+                    this.WriteDiagnostic(
+                        "Viu Utility CSS language server started. " +
+                        $"Version: {ServerVersion}. Root: '{GetInitializeRoot(parameters)}'.");
                     await WriteResultAsync(
                             writer,
                             RequireIdentifier(hasIdentifier, identifier),
@@ -622,9 +642,59 @@ internal sealed class LanguageServerHost
             ["serverInfo"] = new JsonObject
             {
                 ["name"] = "Assimalign.Viu.UtilityCss.LanguageServer",
-                ["version"] = "0.1.0",
+                ["version"] = ServerVersion,
             },
         };
+
+    private static string GetInitializeRoot(JsonElement parameters)
+    {
+        if (parameters.ValueKind != JsonValueKind.Object)
+        {
+            return "not provided";
+        }
+
+        if (parameters.TryGetProperty("workspaceFolders", out var workspaceFolders) &&
+            workspaceFolders.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var workspaceFolder in workspaceFolders.EnumerateArray())
+            {
+                if (workspaceFolder.ValueKind == JsonValueKind.Object &&
+                    workspaceFolder.TryGetProperty("uri", out var workspaceFolderUri) &&
+                    workspaceFolderUri.ValueKind == JsonValueKind.String)
+                {
+                    return workspaceFolderUri.GetString()!;
+                }
+            }
+        }
+
+        if (parameters.TryGetProperty("rootUri", out var rootUri) &&
+            rootUri.ValueKind == JsonValueKind.String)
+        {
+            return rootUri.GetString()!;
+        }
+
+        if (parameters.TryGetProperty("rootPath", out var rootPath) &&
+            rootPath.ValueKind == JsonValueKind.String)
+        {
+            return rootPath.GetString()!;
+        }
+
+        return "not provided";
+    }
+
+    private void WriteDiagnostic(string message)
+    {
+        try
+        {
+            this.diagnosticOutput.WriteLine(message);
+            this.diagnosticOutput.Flush();
+        }
+        catch (Exception exception)
+            when (exception is IOException or ObjectDisposedException)
+        {
+            // Diagnostics are best-effort and must never interrupt the protocol stream.
+        }
+    }
 
     private static JsonObject CreateCompletionList(
         JsonArray items,

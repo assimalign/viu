@@ -13,6 +13,8 @@ using Microsoft.VisualStudio.LanguageServer.Client;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.VisualStudio.Utilities;
 
+using StreamJsonRpc;
+
 namespace Assimalign.Viu.UtilityCss.VisualStudio;
 
 /// <summary>
@@ -20,17 +22,24 @@ namespace Assimalign.Viu.UtilityCss.VisualStudio;
 /// server over standard input and output.
 /// </summary>
 /// <remarks>
-/// The export attaches only to Visual Studio-owned top-level HTML content types. It contributes no
-/// grammar, content type, classifier, completion manager, hover adapter, or document-color adapter;
-/// all presentation remains the editor's standard Language Server Protocol behavior.
+/// The export attaches only to Visual Studio-owned HTML content types. Its middle layer rejects
+/// non-HTML document messages inherited through the legacy Razor content-type hierarchy. It
+/// contributes no grammar, content type, classifier, completion manager, hover adapter, or
+/// document-color adapter; all presentation remains the editor's standard Language Server Protocol
+/// behavior.
 /// </remarks>
 [Export(typeof(ILanguageClient))]
+[ContentType(UtilityCssContentTypes.Html)]
 [ContentType(UtilityCssContentTypes.HtmlDelegation)]
-internal sealed class UtilityCssLanguageClient : ILanguageClient, IDisposable
+internal sealed class UtilityCssLanguageClient :
+    ILanguageClient,
+    ILanguageClientCustomMessage2,
+    IDisposable
 {
     private static readonly object ServerInitializationOptions = new();
 
     private readonly object serverProcessGate = new();
+    private readonly UtilityCssLanguageClientMiddleLayer middleLayer = new();
     private Process? serverProcess;
     private string? activationFailureMessage;
     private bool disposed;
@@ -43,6 +52,12 @@ internal sealed class UtilityCssLanguageClient : ILanguageClient, IDisposable
 
     /// <inheritdoc />
     public object InitializationOptions => ServerInitializationOptions;
+
+    /// <inheritdoc />
+    public object MiddleLayer => this.middleLayer;
+
+    /// <inheritdoc />
+    public object? CustomMessageTarget => null;
 
     /// <inheritdoc />
     public IEnumerable<string>? FilesToWatch => null;
@@ -97,6 +112,7 @@ internal sealed class UtilityCssLanguageClient : ILanguageClient, IDisposable
                 executablePath,
                 extensionDirectory),
         };
+        process.ErrorDataReceived += this.OnServerStandardError;
 
         try
         {
@@ -106,6 +122,8 @@ internal sealed class UtilityCssLanguageClient : ILanguageClient, IDisposable
                 return this.FailActivationAsync(
                     $"The Viu Utilities language server at '{executablePath}' did not start.");
             }
+
+            process.BeginErrorReadLine();
         }
         catch (Exception exception) when (
             exception is Win32Exception or InvalidOperationException or
@@ -143,6 +161,9 @@ internal sealed class UtilityCssLanguageClient : ILanguageClient, IDisposable
 
     /// <inheritdoc />
     public Task OnServerInitializedAsync() => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task AttachForCustomMessageAsync(JsonRpc rpc) => Task.CompletedTask;
 
     /// <inheritdoc />
     public Task<InitializationFailureContext?> OnServerInitializeFailedAsync(
@@ -189,7 +210,16 @@ internal sealed class UtilityCssLanguageClient : ILanguageClient, IDisposable
         }
 
         process.Exited -= this.OnServerProcessExited;
+        process.ErrorDataReceived -= this.OnServerStandardError;
         process.Dispose();
+    }
+
+    private void OnServerStandardError(object sender, DataReceivedEventArgs arguments)
+    {
+        if (!string.IsNullOrWhiteSpace(arguments.Data))
+        {
+            UtilityCssLanguageClientLog.WriteServerStandardError(arguments.Data);
+        }
     }
 
     private void TerminateCurrentServerProcess()
@@ -202,11 +232,14 @@ internal sealed class UtilityCssLanguageClient : ILanguageClient, IDisposable
 
         this.serverProcess = null;
         process.Exited -= this.OnServerProcessExited;
+        process.ErrorDataReceived -= this.OnServerStandardError;
         TerminateServerProcess(process);
     }
 
-    private static void TerminateServerProcess(Process process)
+    private void TerminateServerProcess(Process process)
     {
+        process.ErrorDataReceived -= this.OnServerStandardError;
+
         try
         {
             if (!process.HasExited)

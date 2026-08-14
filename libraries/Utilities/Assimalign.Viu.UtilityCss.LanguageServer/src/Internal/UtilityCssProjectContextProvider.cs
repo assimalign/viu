@@ -13,8 +13,17 @@ internal sealed class UtilityCssProjectContextProvider
 {
     private const string ManifestFileName = "utilitycss.manifest.v1.json";
 
+    private readonly Action<string> reportDiagnostic;
     private readonly Dictionary<string, UtilityCssProjectContextCacheEntry> cache =
         new(GetPathComparer());
+    private readonly Dictionary<string, string> reportedManifestStates =
+        new(GetPathComparer());
+
+    internal UtilityCssProjectContextProvider(Action<string> reportDiagnostic)
+    {
+        ArgumentNullException.ThrowIfNull(reportDiagnostic);
+        this.reportDiagnostic = reportDiagnostic;
+    }
 
     // Version 1 intentionally polls file modification times at request boundaries. It avoids a
     // watcher per project, remains deterministic in tests and remote workspaces, and refreshes the
@@ -25,10 +34,32 @@ internal sealed class UtilityCssProjectContextProvider
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!TryGetDocumentPath(documentUri, out var documentPath) ||
-            !TryFindProjectDirectory(documentPath, out var projectDirectory) ||
-            !TryFindNewestManifest(projectDirectory, out var manifestPath))
+        if (!TryGetDocumentPath(documentUri, out var documentPath))
         {
+            return UtilityCssProjectContext.Default;
+        }
+
+        if (!TryFindProjectDirectory(documentPath, out var projectDirectory))
+        {
+            var documentDirectory = Path.GetDirectoryName(documentPath) ?? documentPath;
+            this.ReportManifestStatus(
+                documentDirectory,
+                "missing-project",
+                "Utility CSS sidecar manifest missing for " +
+                $"'{documentPath}': no containing C# project was found. " +
+                "Using built-in defaults.");
+            return UtilityCssProjectContext.Default;
+        }
+
+        if (!TryFindNewestManifest(projectDirectory, out var manifestPath))
+        {
+            this.cache.Remove(projectDirectory);
+            this.ReportManifestStatus(
+                projectDirectory,
+                "missing",
+                "Utility CSS sidecar manifest missing under project root " +
+                $"'{projectDirectory}'. Build the project to generate it; " +
+                "using built-in defaults.");
             return UtilityCssProjectContext.Default;
         }
 
@@ -43,20 +74,45 @@ internal sealed class UtilityCssProjectContextProvider
         var context = LoadContext(
             manifestPath,
             dependencyStates,
+            out var invalidReason,
             cancellationToken);
         cache[projectDirectory] = new UtilityCssProjectContextCacheEntry(
             manifestPath,
             manifestState,
             dependencyStates,
             context);
+        if (invalidReason is null)
+        {
+            this.ReportManifestStatus(
+                projectDirectory,
+                "found|" + manifestPath,
+                $"Utility CSS sidecar manifest found: '{manifestPath}'.");
+        }
+        else
+        {
+            this.ReportManifestStatus(
+                projectDirectory,
+                "invalid|" +
+                manifestPath +
+                "|" +
+                manifestState.LastWriteTimeUtcTicks +
+                "|" +
+                manifestState.Length,
+                $"Utility CSS sidecar manifest invalid: '{manifestPath}'. " +
+                invalidReason +
+                " Using built-in defaults.");
+        }
+
         return context;
     }
 
     private static UtilityCssProjectContext LoadContext(
         string manifestPath,
         ICollection<WatchedFileState> dependencyStates,
+        out string? invalidReason,
         CancellationToken cancellationToken)
     {
+        invalidReason = null;
         var catalogPath = Path.Combine(
             Path.GetDirectoryName(manifestPath) ?? string.Empty,
             UtilityCssEditorCatalog.FileName);
@@ -74,6 +130,8 @@ internal sealed class UtilityCssProjectContextProvider
                 version != 1 ||
                 !root.TryGetProperty("entryStylesheetPath", out var entryPathElement))
             {
+                invalidReason =
+                    "Expected a schema-version 1 object with an entryStylesheetPath member.";
                 return UtilityCssProjectContext.Default;
             }
 
@@ -81,7 +139,8 @@ internal sealed class UtilityCssProjectContextProvider
             {
                 JsonValueKind.String => entryPathElement.GetString(),
                 JsonValueKind.Null => null,
-                _ => null,
+                _ => throw new JsonException(
+                    "The entryStylesheetPath member must be a string or null."),
             };
         }
         catch (Exception exception)
@@ -91,6 +150,8 @@ internal sealed class UtilityCssProjectContextProvider
                   ArgumentException or
                   NotSupportedException)
         {
+            invalidReason = "The manifest could not be read: " +
+                NormalizeDiagnosticDetail(exception.Message);
             return UtilityCssProjectContext.Default;
         }
 
@@ -109,6 +170,8 @@ internal sealed class UtilityCssProjectContextProvider
                   NotSupportedException or
                   PathTooLongException)
         {
+            invalidReason = "The entry stylesheet path is invalid: " +
+                NormalizeDiagnosticDetail(exception.Message);
             return CreateDefaultContext(editorCatalog);
         }
 
@@ -121,6 +184,8 @@ internal sealed class UtilityCssProjectContextProvider
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            invalidReason = "The entry stylesheet could not be read: " +
+                NormalizeDiagnosticDetail(exception.Message);
             return CreateDefaultContext(editorCatalog);
         }
 
@@ -452,4 +517,22 @@ internal sealed class UtilityCssProjectContextProvider
         => Path.DirectorySeparatorChar == '\\'
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
+
+    private void ReportManifestStatus(
+        string statusKey,
+        string stateSignature,
+        string message)
+    {
+        if (this.reportedManifestStates.TryGetValue(statusKey, out var reportedState) &&
+            string.Equals(reportedState, stateSignature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        this.reportedManifestStates[statusKey] = stateSignature;
+        this.reportDiagnostic(message);
+    }
+
+    private static string NormalizeDiagnosticDetail(string detail)
+        => detail.Replace('\r', ' ').Replace('\n', ' ').Trim();
 }
