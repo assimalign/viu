@@ -3,10 +3,9 @@
 # NEW COVERAGE: none of the fifteen retired per-area workflows watched
 # extensions/VisualStudioCode at all, so a package's TypeScript client could break without CI
 # noticing. This is deliberately the cheap half of each package Build.ps1 — `npm ci` plus the
-# package's own `check` script (tsc --noEmit). The expensive half, publishing the language-server
-# payload for five runtime identifiers, is already proven by the Visual Studio lane, which drives
-# the SAME shared ViuPublishLanguageServer target; duplicating it here would buy minutes of runtime
-# and no signal.
+# package's own `check` script (tsc --noEmit). Publishing self-contained language-server payloads
+# for five runtime identifiers remains in the extension build/release gates; duplicating it in this
+# client lane would add minutes of runtime without improving TypeScript coverage.
 #
 # Node comes preinstalled on the GitHub-hosted runner image, so this lane pins no third-party action
 # beyond the checkout.
@@ -41,6 +40,8 @@ jobs:
                 include:
                     - package: viu
                       path: extensions/VisualStudioCode/packages/viu
+                    - package: viu-utilitycss
+                      path: extensions/VisualStudioCode/packages/viu-utilitycss
         steps:
             - name: Checkout
               # actions/checkout v4

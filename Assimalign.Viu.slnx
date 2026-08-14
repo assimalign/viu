@@ -275,6 +275,13 @@
 	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss.Build/test/">
 		<Project Path="libraries/Utilities/Assimalign.Viu.UtilityCss.Build/test/Assimalign.Viu.UtilityCss.Build.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/" />
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/src/">
+		<Project Path="libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/src/Assimalign.Viu.UtilityCss.LanguageServer.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/test/">
+		<Project Path="libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/test/Assimalign.Viu.UtilityCss.LanguageServer.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/libraries/Syntax/Assimalign.Viu.Syntax/">
 		<File Path="libraries/Syntax/Assimalign.Viu.Syntax/Assimalign.Viu.Syntax.slnx" />
 	</Folder>

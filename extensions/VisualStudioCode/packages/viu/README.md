@@ -107,12 +107,16 @@ the same shared target the Visual Studio extension uses.
 powershell -ExecutionPolicy Bypass -File .\extensions\VisualStudioCode\Build.ps1
 ```
 
-The root orchestrator delegates to this package's `Build.ps1`, which:
+This package's `Build.ps1`:
 
 1. publishes the server for every packaged runtime identifier, into
    `_out/extensions/VisualStudioCode/viu/<configuration>/LanguageServer/<rid>/`;
 2. stages each payload into `extensions/VisualStudioCode/packages/viu/server/<rid>/`;
 3. runs `npm install` and `npm run compile`.
+
+The root orchestrator invokes that package build once per requested runtime identifier and then
+creates the corresponding platform-specific VSIX. With no runtime filter it produces the complete
+set under `_out/extensions/VisualStudioCode/<configuration>/Vsix/`.
 
 Useful switches:
 
@@ -120,6 +124,7 @@ Useful switches:
 - `-RuntimeIdentifier linux-x64` — publish and stage a subset. This is the normal preparation for a
   platform-specific package, because `vsce` has no per-target payload filtering of its own.
 - `-SkipNodeBuild` — publish and stage only; skip `npm`.
+- `-SkipVsix` — root-orchestrator switch that runs the package builds without invoking `vsce`.
 
 Or run the pieces by hand:
 
@@ -143,20 +148,13 @@ Only Windows runtimes carry an `.exe` suffix; a Linux or macOS payload is
 
 ### Packaging
 
-Package one VSIX per platform, staging only that platform's payload first, so a user downloads one
-server rather than five. From the repository root:
+The root orchestrator packages one VSIX per platform, staging only that platform's payload first,
+so a user downloads one server rather than five:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\extensions\VisualStudioCode\Build.ps1 `
     -Configuration Release `
     -RuntimeIdentifier linux-x64
-Push-Location .\extensions\VisualStudioCode\packages\viu
-try {
-    npx @vscode/vsce package --target linux-x64
-}
-finally {
-    Pop-Location
-}
 ```
 
 | `vsce --target` | Runtime identifier |
@@ -170,5 +168,5 @@ finally {
 A VSIX built on Windows carries no POSIX file mode, so the staged Linux and macOS payloads arrive
 without the executable bit. The client restores it (`chmod 0755`) before spawning the server.
 
-`vsce` is intentionally **not** invoked by `Build.ps1`: publication is a release decision, and this
-extension has not been released.
+The package-local `Build.ps1` intentionally stops after payload staging and client compilation;
+the root `Build.ps1` owns `vsce` invocation for both Visual Studio Code packages.

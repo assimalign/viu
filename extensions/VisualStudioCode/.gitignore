@@ -9,9 +9,8 @@ node_modules/
 # TypeScript compiler output for each extension package
 out/
 
-# Language-server payloads staged by package Build.ps1 scripts. These are ~18 MB per runtime
-# identifier and are reproduced from tooling/Editor/Assimalign.Viu.LanguageServer; they are never
-# committed.
+# Language-server payloads staged by package Build.ps1 scripts. They are reproduced from each
+# package's .NET server project and are never committed.
 server/
 
 # vsce package output for each extension package

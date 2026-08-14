@@ -82,6 +82,8 @@ jobs:
                       path: "libraries/Utilities/Assimalign.Viu.UtilityCss"
                     - project: "Assimalign.Viu.UtilityCss.Build"
                       path: "libraries/Utilities/Assimalign.Viu.UtilityCss.Build"
+                    - project: "Assimalign.Viu.UtilityCss.LanguageServer"
+                      path: "libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer"
         steps:
             - name: "Checkout: ${{ matrix.project }}"
               # actions/checkout v4

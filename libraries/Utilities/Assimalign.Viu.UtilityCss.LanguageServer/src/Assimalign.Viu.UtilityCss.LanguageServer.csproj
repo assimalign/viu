@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$(TargetFrameworkForLanguageServers)</TargetFramework>
+    <AssemblyName>Assimalign.Viu.UtilityCss.LanguageServer</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!-- The VS Code package publishes this executable once per supported runtime identifier. -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.UtilityCss" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax" />
+  </ItemGroup>
+</Project>

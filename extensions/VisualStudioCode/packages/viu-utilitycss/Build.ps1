@@ -1,21 +1,15 @@
 <#
 .SYNOPSIS
-    Publishes the standalone Viu language server for every packaged runtime identifier, stages the
-    payloads into this extension's server/ folder, and compiles the TypeScript client.
+    Publishes the standalone Viu Utility CSS language server for every packaged runtime identifier,
+    stages the payloads into this extension's server/ folder, and compiles the TypeScript client.
 
 .DESCRIPTION
-    The publish recipe itself lives in build\Targets\Build.LanguageServer.targets — the same shared
-    target extensions\VisualStudio\Build.ps1 and the Visual Studio extension build drive — so the
-    two editor hosts cannot drift apart on trimming, single-file, or debug-type settings.
+    The publish recipe lives in build\Targets\Build.LanguageServer.targets. This package overrides
+    only the server project and executable name, keeping runtime identifiers, self-contained
+    publishing, single-file compression, and debug settings aligned with packages\viu.
 
-    The two hosts differ in exactly one property: the Visual Studio VSIX embeds only win-x64 and
-    win-arm64 (five payloads at roughly 18 MB apiece would push a single VSIX past the Marketplace
-    size gate), while Visual Studio Code ships one platform-specific package per runtime identifier
-    and therefore asks for the full set through ViuLanguageServerPublishAllRuntimeIdentifiers. Each
-    host also publishes to its OWN ViuLanguageServerPublishRoot, so neither can sweep the other's
-    payloads into its package.
-
-    This script does not run `vsce`. Packaging is per-platform and is documented in README.md.
+    This script does not run `vsce`. The root extensions\VisualStudioCode\Build.ps1 orchestrator
+    invokes this script once per runtime identifier and creates the platform-specific VSIX files.
 #>
 [CmdletBinding()]
 param(
@@ -40,27 +34,26 @@ $ErrorActionPreference = 'Stop'
 $packageDirectory = $PSScriptRoot
 $repositoryDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $packageDirectory '..\..\..\..'))
-# The language-server project is named once, here, only so the shared target can be invoked on a
-# project that imports it. Every publish argument still comes from the target.
 $languageServerProject = Join-Path $repositoryDirectory `
-    'tooling\Editor\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj'
+    'libraries\Utilities\Assimalign.Viu.UtilityCss.LanguageServer\src\Assimalign.Viu.UtilityCss.LanguageServer.csproj'
+$languageServerExecutableBaseName = 'Assimalign.Viu.UtilityCss.LanguageServer'
 
 $publishRoot = Join-Path $repositoryDirectory `
-    "_out\extensions\VisualStudioCode\viu\$Configuration"
+    "_out\extensions\VisualStudioCode\viu-utilitycss\$Configuration"
 $publishDirectory = [System.IO.Path]::GetFullPath((Join-Path $publishRoot 'LanguageServer'))
 $stagingDirectory = Join-Path $packageDirectory 'server'
 
 $versionBuildArguments = @()
 if (-not [string]::IsNullOrWhiteSpace($Version)) {
     if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
-        throw "The Visual Studio Code extension version must contain three numeric components, for example 0.1.0."
+        throw 'The Visual Studio Code extension version must contain three numeric components, for example 0.1.0.'
     }
 
     $versionBuildArguments = @(
         "-p:VersionPrefix=$Version",
         '-p:VersionSuffix='
     )
-    Write-Host "Viu language server version: $Version"
+    Write-Host "Viu Utility CSS language server version: $Version"
 }
 
 if ($RuntimeIdentifier.Count -gt 0) {
@@ -70,8 +63,6 @@ if ($RuntimeIdentifier.Count -gt 0) {
     )
 }
 else {
-    # The full set is defined once, in the shared target. Reading it back rather than restating it
-    # here is what keeps this script from becoming a second source of truth.
     $requestedRuntimeIdentifiers = (
         & dotnet msbuild $languageServerProject `
             -nologo `
@@ -79,7 +70,7 @@ else {
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
         ForEach-Object { $_.Trim() }
     if ($LASTEXITCODE -ne 0 -or $requestedRuntimeIdentifiers.Count -eq 0) {
-        throw "Could not read ViuLanguageServerAllRuntimeIdentifiers from the shared language-server target."
+        throw 'Could not read ViuLanguageServerAllRuntimeIdentifiers from the shared language-server target.'
     }
 
     $runtimeIdentifierArguments = @(
@@ -87,20 +78,21 @@ else {
     )
 }
 
-# The shared target's default stamp is publish-root-wide. This package can be invoked once per RID
-# by the root orchestrator, so a shared stamp would let a fresh RID suppress another RID's stale
-# publish on the next incremental run. Key the stamp by the exact requested set (and explicit
-# version) while keeping it beside, never inside, the payload directory.
+# The root orchestrator invokes package builds one RID at a time. A publish-root-wide stamp could
+# therefore let a fresh RID suppress another RID's stale publish. Key the stamp by the exact
+# requested set and explicit version, keeping it beside the payload directory so it is never staged.
 $publishStampRuntimeIdentifier = $requestedRuntimeIdentifiers -join '.'
 $publishStampVersion = if ([string]::IsNullOrWhiteSpace($Version)) { 'default' } else { $Version }
 $publishStampFile = Join-Path $publishRoot `
     ".languageserver-publish.$publishStampRuntimeIdentifier.$publishStampVersion.stamp"
 
-Write-Host "Publishing the Viu language server for: $($requestedRuntimeIdentifiers -join ', ')"
+Write-Host "Publishing the Viu Utility CSS language server for: $($requestedRuntimeIdentifiers -join ', ')"
 & dotnet msbuild $languageServerProject `
     -target:ViuPublishLanguageServer `
     "-p:Configuration=$Configuration" `
     -p:ViuLanguageServerPublishEnabled=true `
+    "-p:ViuLanguageServerProjectPath=$languageServerProject" `
+    "-p:ViuLanguageServerExecutableBaseName=$languageServerExecutableBaseName" `
     "-p:ViuLanguageServerPublishRoot=$publishRoot" `
     "-p:ViuLanguageServerPublishPath=$publishDirectory" `
     "-p:ViuLanguageServerPublishStampFile=$publishStampFile" `
@@ -108,7 +100,7 @@ Write-Host "Publishing the Viu language server for: $($requestedRuntimeIdentifie
     @runtimeIdentifierArguments `
     @versionBuildArguments
 if ($LASTEXITCODE -ne 0) {
-    throw "Publishing the Viu language server failed with exit code $LASTEXITCODE."
+    throw "Publishing the Viu Utility CSS language server failed with exit code $LASTEXITCODE."
 }
 
 Write-Host "Staging the language-server payloads into $stagingDirectory"
@@ -123,13 +115,11 @@ foreach ($runtimeIdentifierName in $requestedRuntimeIdentifiers) {
         throw "The $runtimeIdentifierName language-server payload is missing at $sourceDirectory."
     }
 
-    # Only Windows runtimes carry the .exe suffix: `dotnet publish` names the apphost after the
-    # target platform, and the TypeScript client resolves the same two spellings.
     $executableName = if ($runtimeIdentifierName.StartsWith('win-')) {
-        'Assimalign.Viu.LanguageServer.exe'
+        "$languageServerExecutableBaseName.exe"
     }
     else {
-        'Assimalign.Viu.LanguageServer'
+        $languageServerExecutableBaseName
     }
 
     $sourceExecutable = Join-Path $sourceDirectory $executableName
@@ -146,7 +136,7 @@ if ($SkipNodeBuild) {
     Write-Host 'Skipping npm install and the TypeScript compile.'
 }
 else {
-    Write-Host 'Installing the Visual Studio Code extension dependencies'
+    Write-Host 'Installing the Viu Utilities extension dependencies'
     Push-Location -LiteralPath $packageDirectory
     try {
         & npm install
@@ -154,7 +144,7 @@ else {
             throw "npm install failed with exit code $LASTEXITCODE."
         }
 
-        Write-Host 'Compiling the Visual Studio Code extension client'
+        Write-Host 'Compiling the Viu Utilities extension client'
         & npm run compile
         if ($LASTEXITCODE -ne 0) {
             throw "The TypeScript compile failed with exit code $LASTEXITCODE."
@@ -169,4 +159,4 @@ Write-Host ''
 Write-Host "Staged runtime identifiers: $($requestedRuntimeIdentifiers -join ', ')"
 Write-Host 'Package a platform-specific VSIX with, for example:'
 Write-Host '  npx @vscode/vsce package --target win32-x64'
-Write-Host 'See README.md for the runtime-identifier to vsce target mapping.'
+Write-Host 'The root extensions\VisualStudioCode\Build.ps1 orchestrator builds the complete VSIX set.'
