@@ -158,6 +158,10 @@
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Tasks/src/Assimalign.Viu.Sdk.Browser.Tasks.csproj" />
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Tasks/test/Assimalign.Viu.Sdk.Browser.Tasks.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk.Browser/RunHost/">
+		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/RunHost/src/Assimalign.Viu.Sdk.Browser.RunHost.csproj" />
+		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/RunHost/test/Assimalign.Viu.Sdk.Browser.RunHost.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk.Browser/Watch/">
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Watch/src/Assimalign.Viu.Sdk.CssHotReload.csproj" />
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj" />

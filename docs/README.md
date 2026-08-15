@@ -33,6 +33,7 @@ nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
 | [`DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked consumption examples for the Components, Reactivity, State, Core, and Browser packages, written from the application developer's point of view. |
 | [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Standalone add-on design; non-normative for Viu core.** The former Viu integration was removed on 2026-08-13; its Tailwind CSS v4.3.3 target belongs only to the independently published add-on. |
 | [`PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md) | **Explicitly non-normative.** The ledger of optimization techniques observed in other rendering frameworks, measured against Viu's baselines before any are adopted. |
+| [`upstream/`](upstream/) | Minimal, version-pinned reproductions prepared for upstream toolchain issue reports; these are evidence records, not Viu specifications. |
 | [`NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The historical record of Viu's .NET-native API reshape, with the arcs that have merged and the parts since superseded. |
 | [`RELEASING.md`](RELEASING.md) | Release channels, NuGet trusted publishing, GitHub Packages, and the Visual Studio Marketplace preview. |
 

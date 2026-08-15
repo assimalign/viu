@@ -20,8 +20,26 @@ From the application directory, run:
 dotnet watch
 ```
 
-Open the address printed by the watch host if it does not open automatically. Keep that page
-connected for the session. The SDK injects component stylesheet links during the build; no
+The `viu-app` template supplies one active launch profile with `launchBrowser=true` and a pinned
+`applicationUrl`. Existing applications must add the same shape themselves; the SDK deliberately
+does not choose or force a port for an existing project. Keep the URL fixed for the whole watch
+session. `ASPNETCORE_URLS` also pins WasmAppHost, but the selected launch profile must still enable
+browser launch, and `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER` must remain unset, for `dotnet watch` to
+install its restart-reload observer.
+
+Open the printed address if it does not open automatically and keep that page connected. On .NET
+SDK 10.0.302, the observer recognizes the literal `Now listening on:` while WasmAppHost 10.0.11
+prints `App url:` after binding. The Browser SDK therefore runs WasmAppHost through its packaged
+run host, which forwards every original standard-output and standard-error line and adds the
+recognized form after each valid `App url:` line. After a rude-edit rebuild, that readiness event
+makes `dotnet watch` send `Reload` to the already-connected browser. The added line is harmless
+under ordinary `dotnet run`.
+Set `ViuBrowserRunHostReadinessEnabled=false` only when a custom run host supplies an equivalent
+readiness contract.
+
+A fixed origin and the readiness mirror solve different halves of the restart path. Without a
+pinned URL, WasmAppHost selects a new random port after the restart, so the browser's old origin is
+dead and cannot be followed. The SDK injects component stylesheet links during the build; no
 development script or hand-authored stylesheet link is required.
 
 The CSS worker starts only for the Debug, design-time watch-list build. It waits for the default
@@ -51,7 +69,7 @@ component work; the .NET watch host remains responsible for that update.
 | Content or options inside a component `<style>` block | Regenerate the component bundle and replace its linked stylesheet; Core performs no component work | Page, application, and mounted component state are retained |
 | Template body accepted by metadata update | Remount only affected component instances in Viu's post-flush phase, then commit the buffered host operations | The document and other components remain mounted; affected component-local state resets |
 | Script marker, declaring component type without a more specific marker, or missing updated-type set | Remount only affected component instances in Viu's post-flush phase while the applied managed delta remains loaded | The document and other components remain mounted; affected component-local state resets |
-| Signature, property-surface, or another edit rejected by metadata update | The .NET watch host rebuilds/restarts and refreshes the browser | Application and component state reset |
+| Signature, property-surface, or another edit rejected by metadata update | The .NET watch host rebuilds/restarts; the packaged run host reports readiness and the watch refresh server reloads the connected browser on the pinned origin | The document, application, and component state reset; without a fixed application URL the browser remains on the abandoned origin |
 | CSS edit whose deterministic output is byte-identical | Do not rewrite the bundle and send no stylesheet update | All state is retained |
 | Updated type unrelated to registered component metadata | Viu performs no component action | Determined by the .NET update that owns that type |
 
@@ -86,9 +104,10 @@ nothing.
 
 ## Release boundary
 
-The worker and its state file are SDK build tools, not application assets. Ordinary Release builds
-disable worker launch, the generator omits its metadata handler and marker members, and the worker's
-`Watch/Assimalign.Viu.Sdk.CssHotReload.*` files are never copied into application publish output.
+The CSS worker, its state file, and the readiness run host are SDK development tools, not application
+assets. Ordinary Release builds disable worker launch, the generator omits its metadata handler and
+marker members, and neither `Watch/Assimalign.Viu.Sdk.CssHotReload.*` nor
+`RunHost/Assimalign.Viu.Sdk.Browser.RunHost.*` is copied into application publish output.
 The platform browser-refresh channel is supplied only by the active development host. Release and
 AOT output are checked through `scripts/Measure-PublishBudget.ps1` against the reviewed manifest in
 `scripts/budgets/PublishBudgets.json`.
@@ -105,8 +124,9 @@ publish budget. The opt-in
 a `.vue`-only package consumer, requires its component-CSS asset, and scans generated and
 published code for absent Debug-only metadata; add `-Aot` to exercise the same boundary after AOT
 compilation. The separate `scripts/Test-EndToEnd.ps1 -HotReload -Configuration Debug` lane starts
-an isolated packaged consumer under `dotnet watch` and uses a connected Chromium page to prove
-component stylesheet replacement, document identity, mounted-state survival, template/script
-remount, and semantic no-op suppression. These opt-in modes remain separate from the
-ordinary three-scenario browser matrix because the live lane mutates staged sources and owns a
-long-lived watch process tree.
+an isolated packaged consumer under `dotnet watch` and uses a connected Chromium page to prove a
+structural rude edit restarts on the same port and automatically reloads to new content without
+manual navigation, component stylesheet replacement, accepted-update document identity,
+mounted-state survival, template/script remount, and semantic no-op suppression. These opt-in modes
+remain separate from the ordinary three-scenario browser matrix because the live lane mutates staged
+sources and owns a long-lived watch process tree.

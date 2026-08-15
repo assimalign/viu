@@ -38,6 +38,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 | `RELEASING.md` | [`docs/RELEASING.md`](RELEASING.md) | Package and extension release channels, credentials, validation, and publication sequence. |
 | Architecture decision records | [`docs/adr/`](adr/) | The append-only log of repo-wide, cross-cutting decisions (see [`adr/README.md`](adr/README.md)). Normative for *rationale*, not for current API shape. |
 | `PERFORMANCE-RESEARCH.md` | [`docs/PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md) | The ledger of optimization techniques observed in other rendering frameworks. **Explicitly non-normative**: nothing there constrains Viu until it is measured, adopted, and written into `SPECIFICATION.md` or an ADR. |
+| Upstream reproductions | [`docs/upstream/`](upstream/) | Minimal, version-pinned external toolchain reproductions prepared for upstream issue reports; evidence only, never semantic authority for Viu. |
 | Per-project `OVERVIEW.md` | `<project folder>/docs/OVERVIEW.md` | What the library **is**. |
 | Per-project `DESIGN.md` | `<project folder>/docs/DESIGN.md` | **Why** the library is shaped the way it is. |
 | Per-project topic docs | `<project folder>/docs/*.md` | Focused specs or local ADRs (e.g. `FORMAT.md`, a library-local `ADR-000N-*.md`). |

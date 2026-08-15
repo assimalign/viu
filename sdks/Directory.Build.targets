@@ -2,7 +2,7 @@
     <Import Project="..\Directory.Build.targets" />
     <PropertyGroup>
         <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectSdkTaskFiles;CollectShippedVersionProps</TargetsForTfmSpecificContentInPackage>
-        <TargetsForTfmSpecificContentInPackage Condition="'$(ViuSdkBrowserPackage)' == 'true'">$(TargetsForTfmSpecificContentInPackage);CollectSdkWatchFiles</TargetsForTfmSpecificContentInPackage>
+        <TargetsForTfmSpecificContentInPackage Condition="'$(ViuSdkBrowserPackage)' == 'true'">$(TargetsForTfmSpecificContentInPackage);CollectSdkWatchFiles;CollectSdkRunHostFiles</TargetsForTfmSpecificContentInPackage>
     </PropertyGroup>
     <ItemGroup>
         <!-- The SDK-shaped nupkg layout: Sdk/ and Targets/ at package root -
@@ -170,6 +170,19 @@
             <_ViuSdkWatchFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Watch\Assimalign.Viu.Sdk.CssHotReload.runtimeconfig.json" />
             <TfmSpecificPackageFile Include="@(_ViuSdkWatchFile)">
                 <PackagePath>Watch/%(_ViuSdkWatchFile.RecursiveDir)%(_ViuSdkWatchFile.Filename)%(_ViuSdkWatchFile.Extension)</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+
+    <Target Name="CollectSdkRunHostFiles" Condition="'$(ViuSdkBrowserPackage)' == 'true'">
+        <ItemGroup>
+            <!-- The readiness launcher is a platform-neutral managed tool. Its apphost and symbols
+                 are deliberately outside the Browser SDK package contract. [V01.01.12.31], #349. -->
+            <_ViuSdkRunHostFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\RunHost\Assimalign.Viu.Sdk.Browser.RunHost.dll" />
+            <_ViuSdkRunHostFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\RunHost\Assimalign.Viu.Sdk.Browser.RunHost.deps.json" />
+            <_ViuSdkRunHostFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\RunHost\Assimalign.Viu.Sdk.Browser.RunHost.runtimeconfig.json" />
+            <TfmSpecificPackageFile Include="@(_ViuSdkRunHostFile)">
+                <PackagePath>RunHost/%(_ViuSdkRunHostFile.RecursiveDir)%(_ViuSdkRunHostFile.Filename)%(_ViuSdkRunHostFile.Extension)</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
     </Target>

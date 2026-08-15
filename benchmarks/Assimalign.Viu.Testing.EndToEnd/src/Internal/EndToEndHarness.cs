@@ -108,9 +108,94 @@ internal sealed class EndToEndHarness
         await RunScenarioAsync(
             browser,
             BrowserEngine.Chromium,
+            "packaged-vue-watch-rude-edit-restart-reload",
+            page => RunRudeEditRestartScenarioAsync(page, session));
+        await RunScenarioAsync(
+            browser,
+            BrowserEngine.Chromium,
             "packaged-vue-watch-css-and-remount",
             page => RunHotReloadScenarioAsync(page, session));
         await session.StopAsync();
+    }
+
+    private static async Task RunRudeEditRestartScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await NavigateAsync(page, session.Address.AbsoluteUri);
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                session.CountOutputLinesContaining(
+                    "Connected to refresh server.") > 0),
+            "the Playwright page to connect to the browser-refresh server",
+            HotReloadAssertionTimeout);
+
+        string initialPageAddress = page.Url;
+        string documentToken = await page.EvaluateAsync<string>(
+            "() => { const token = `${Date.now()}-${Math.random()}`; "
+            + "globalThis.__viuHotReloadDocumentToken = token; return token; }");
+        await RequireDocumentTokenAsync(page, documentToken);
+        int diagnosticCount = session.CountOutputLinesContaining("ENC0118");
+        int restartCount = session.CountOutputLinesContaining(
+            "Restart is needed to apply the changes.");
+        int applicationStartCount = session.CountOutputLinesContaining(
+            "App url: http://");
+        int exactApplicationStartCount = session.CountOutputLinesContaining(
+            $"App url: {session.Address.AbsoluteUri}");
+        int readinessCount = session.CountOutputLinesContaining(
+            "Now listening on:");
+        int browserReloadCount = session.CountOutputLinesContaining(
+            "Reloading browser.");
+
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "        <p data-testid=\"hot-count\">{{ Count }}</p>",
+            "        <div data-testid=\"hot-rude-edit\">Rude edit landed automatically</div>"
+            + Environment.NewLine
+            + "        <p data-testid=\"hot-count\">{{ Count }}</p>");
+
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                session.CountOutputLinesContaining("ENC0118") > diagnosticCount
+                && session.CountOutputLinesContaining(
+                    "Restart is needed to apply the changes.") > restartCount
+                && session.CountOutputLinesContaining(
+                    "App url: http://") > applicationStartCount
+                && session.CountOutputLinesContaining(
+                    $"App url: {session.Address.AbsoluteUri}")
+                    > exactApplicationStartCount
+                && session.CountOutputLinesContaining(
+                    "Now listening on:") > readinessCount
+                && session.CountOutputLinesContaining(
+                    "Reloading browser.") > browserReloadCount),
+            "the rude edit to rebuild and restart on the pinned application address",
+            HotReloadAssertionTimeout);
+        await RequireTextAsync(
+            page,
+            "hot-rude-edit",
+            "Rude edit landed automatically",
+            HotReloadAssertionTimeout);
+
+        int totalApplicationStarts = session.CountOutputLinesContaining(
+            "App url: http://");
+        int startsAtPinnedAddress = session.CountOutputLinesContaining(
+            $"App url: {session.Address.AbsoluteUri}");
+        Require(
+            totalApplicationStarts == startsAtPinnedAddress,
+            "The rude-edit restart changed the application URL or port.");
+        Require(
+            string.Equals(
+                page.Url,
+                initialPageAddress,
+                StringComparison.Ordinal)
+            && string.Equals(
+                page.Url,
+                session.Address.AbsoluteUri,
+                StringComparison.Ordinal),
+            "The connected browser did not remain on the pinned application origin.");
+        await RequireDocumentReloadAsync(page);
+        session.RequireRunning();
     }
 
     private static async Task RunHotReloadScenarioAsync(
@@ -347,6 +432,19 @@ internal sealed class EndToEndHarness
         Require(
             string.Equals(actual, expected, StringComparison.Ordinal),
             "The browser document reloaded during an accepted hot update.");
+    }
+
+    private static async Task RequireDocumentReloadAsync(IPage page)
+    {
+        await WaitUntilAsync(
+            async () =>
+            {
+                string? actual = await page.EvaluateAsync<string?>(
+                    "() => globalThis.__viuHotReloadDocumentToken ?? null");
+                return actual is null;
+            },
+            "the readiness-triggered browser Reload to replace the document",
+            HotReloadAssertionTimeout);
     }
 
     private async Task RunBrowserEngineAsync(

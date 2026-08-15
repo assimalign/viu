@@ -22,9 +22,10 @@
     Adds Chromium boot-to-interactive warm-up and measured runs and writes stable JSON.
 
 .PARAMETER HotReload
-    Runs the isolated packaged Debug .vue component-CSS watch scenario instead of the ordinary
-    three-scenario published fixture lane. This mode requires Chromium and owns the complete
-    dotnet-watch process tree for its staged consumer.
+    Runs the isolated packaged Debug .vue watch scenarios instead of the ordinary three-scenario
+    published fixture lane. This mode proves both accepted hot updates and automatic browser reload
+    after a rude-edit restart. It requires Chromium and owns the complete dotnet-watch process tree
+    for its staged consumer.
 
 .PARAMETER StartupResultsPath
     Destination for startup measurement JSON.
@@ -897,7 +898,7 @@ if (-not $HotReload) {
             Get-ChildItem -LiteralPath $browserPublishDirectory -Recurse -File |
                 Where-Object {
                     $_.Name -match
-                        '(?i)(Assimalign\.Viu\.Sdk\.CssHotReload|browser[-.]?refresh|dotnet[-.]?watch)'
+                        '(?i)(Assimalign\.Viu\.Sdk\.(CssHotReload|Browser\.RunHost)|browser[-.]?refresh|dotnet[-.]?watch)'
                 })
         if ($developmentArtifactFiles.Count -ne 0) {
             $relativeDevelopmentArtifactFiles = @(

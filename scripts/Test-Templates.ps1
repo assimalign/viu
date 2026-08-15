@@ -215,6 +215,32 @@ function Assert-NullableSetting {
     }
 }
 
+function Assert-ApplicationLaunchSettings {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path
+    )
+
+    $settings = Get-Content -Raw -LiteralPath $Path | ConvertFrom-Json
+    $profiles = @($settings.profiles.PSObject.Properties)
+    if ($profiles.Count -ne 1) {
+        throw "$Path must contain exactly one launch profile; found $($profiles.Count)."
+    }
+
+    $profile = $profiles[0].Value
+    if (-not [string]::Equals(
+            [string]$profile.commandName,
+            'Project',
+            [System.StringComparison]::Ordinal) -or
+        $profile.launchBrowser -ne $true -or
+        -not [string]::Equals(
+            [string]$profile.applicationUrl,
+            'http://127.0.0.1:51235',
+            [System.StringComparison]::Ordinal)) {
+        throw "$Path must pin the Project launch profile to http://127.0.0.1:51235 with launchBrowser enabled."
+    }
+}
+
 function Assert-GlobalJsonVersions {
     param(
         [Parameter(Mandatory)]
@@ -562,6 +588,7 @@ try {
                     "Components/$($case.Name).Components.csproj",
                     'Components/Counter.viu',
                     'global.json',
+                    'Properties/launchSettings.json',
                     'Program.cs',
                     "Server/$($case.Name).Server.csproj",
                     'Server/Program.cs',
@@ -573,6 +600,7 @@ try {
                 $expectedFiles = @(
                     'Counter.viu',
                     'global.json',
+                    'Properties/launchSettings.json',
                     'Program.cs',
                     "$($case.Name).csproj",
                     'wwwroot/index.html',
@@ -581,6 +609,8 @@ try {
             Assert-ExactFileSet -Root $caseDirectory -Expected $expectedFiles
             Assert-NoSourceTokens -Root $caseDirectory
             Assert-NullableSetting -ProjectPaths $projectPaths -Expected $case.Nullable
+            Assert-ApplicationLaunchSettings `
+                -Path (Join-Path $caseDirectory 'Properties/launchSettings.json')
             Assert-GlobalJsonVersions `
                 -Path (Join-Path $caseDirectory 'global.json') `
                 -SdkIds @('Assimalign.Viu.Sdk', 'Assimalign.Viu.Sdk.Browser') `

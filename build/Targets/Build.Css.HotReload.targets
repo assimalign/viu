@@ -1,6 +1,6 @@
 <Project>
   <!--
-    Development-only stylesheet regeneration for dotnet watch ([V01.01.12.05.01], #248).
+    Development-only component-stylesheet regeneration for dotnet watch ([V01.01.12.05.02]).
 
     The .NET 10 watch host can hot-swap CSS only after a watched static file changes; it does not
     invoke arbitrary MSBuild targets for changes to .viu/.vue AdditionalFiles. A small SDK

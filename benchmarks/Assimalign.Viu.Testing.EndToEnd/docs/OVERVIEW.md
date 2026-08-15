@@ -32,8 +32,9 @@ hot-reload metadata in Release and AOT output.
 
 The separate `-HotReload` mode stages one package-only Debug Browser application and starts it under
 an owned `dotnet watch` process. Its mounted root is a tag-based `.vue` component. The Chromium
-scenario proves component-stylesheet replacement without document navigation, semantic no-op
-suppression without a managed or static-asset update, and affected-component remount for accepted
-`.vue` template and C# script changes. The harness terminates the complete process tree it started
-and verifies that the CSS worker process did not survive. This opt-in mode never changes the ordinary
-three-scenario-per-engine matrix.
+scenarios prove a structural rude edit rebuilds on the pinned origin and automatically reloads the
+already-connected document, component-stylesheet replacement without document navigation, semantic
+no-op suppression without a managed or static-asset update, and affected-component remount for
+accepted `.vue` template and C# script changes. The harness terminates the complete process tree it
+started and verifies that the CSS worker process did not survive. This opt-in mode never changes the
+ordinary three-scenario-per-engine matrix.

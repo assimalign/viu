@@ -490,6 +490,7 @@ jobs:
                 'Targets/Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.WebAssembly.targets',
                 'Watch/Assimalign.Viu.Sdk.CssHotReload.dll',
+                'RunHost/Assimalign.Viu.Sdk.Browser.RunHost.dll',
                 'assets/Assimalign.Viu.Browser/viu-dom.js'
               ) + $parkedCssAddOnEntries)
 
@@ -497,11 +498,12 @@ jobs:
               $sdkArchive.Entries |
                 Where-Object {
                   $_.FullName.StartsWith('Watch/', [System.StringComparison]::Ordinal) -or
+                  $_.FullName.StartsWith('RunHost/', [System.StringComparison]::Ordinal) -or
                   $_.FullName.StartsWith('assets/', [System.StringComparison]::Ordinal)
                 }
             )
             if ($baseBrowserPayload.Count -ne 0) {
-              throw "$($sdkPackage.Name) must not carry Browser Watch/assets payload."
+              throw "$($sdkPackage.Name) must not carry Browser Watch/RunHost/assets payload."
             }
 
             $baseSdkProps = Read-ArchiveEntryText `
@@ -550,6 +552,7 @@ jobs:
                 'Sdk/Sdk.targets',
                 'Tasks/Assimalign.Viu.Sdk.Browser.Tasks.dll',
                 'Tasks/Assimalign.Viu.Sdk.Browser.Tasks.deps.json',
+                'Targets/Assimalign.Viu.Sdk.Browser.Common.props',
                 'Targets/Assimalign.Viu.Sdk.Browser.Css.Bundling.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.ComponentStyles.targets',
                 'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.props',
@@ -560,6 +563,9 @@ jobs:
                 'Watch/Assimalign.Viu.Sdk.CssHotReload.dll',
                 'Watch/Assimalign.Viu.Sdk.CssHotReload.deps.json',
                 'Watch/Assimalign.Viu.Sdk.CssHotReload.runtimeconfig.json',
+                'RunHost/Assimalign.Viu.Sdk.Browser.RunHost.dll',
+                'RunHost/Assimalign.Viu.Sdk.Browser.RunHost.deps.json',
+                'RunHost/Assimalign.Viu.Sdk.Browser.RunHost.runtimeconfig.json',
                 'assets/Assimalign.Viu.Browser/viu-dom.js'
               )
             Assert-NoArchiveEntries `
@@ -592,6 +598,24 @@ jobs:
               throw "$($browserSdkPackage.Name) Watch payload differs from the platform-neutral worker contract: $($watchDifference | Out-String)"
             }
 
+            $expectedRunHostEntries = @(
+              'RunHost/Assimalign.Viu.Sdk.Browser.RunHost.deps.json',
+              'RunHost/Assimalign.Viu.Sdk.Browser.RunHost.dll',
+              'RunHost/Assimalign.Viu.Sdk.Browser.RunHost.runtimeconfig.json'
+            ) | Sort-Object
+            $actualRunHostEntries = @(
+              $browserSdkArchive.Entries |
+                ForEach-Object FullName |
+                Where-Object {
+                  $_.StartsWith('RunHost/', [System.StringComparison]::Ordinal)
+                } |
+                Sort-Object
+            )
+            $runHostDifference = @(Compare-Object $expectedRunHostEntries $actualRunHostEntries)
+            if ($runHostDifference.Count -ne 0) {
+              throw "$($browserSdkPackage.Name) RunHost payload differs from the platform-neutral readiness-launcher contract: $($runHostDifference | Out-String)"
+            }
+
             $browserSdkProps = Read-ArchiveEntryText `
               -Archive $browserSdkArchive `
               -Package $browserSdkPackage `
@@ -600,6 +624,11 @@ jobs:
                 'Assimalign.Viu.Sdk.Browser.FrameworkReference.props',
                 [System.StringComparison]::Ordinal)) {
               throw "$($browserSdkPackage.Name) Sdk.props must import the Browser framework-reference props."
+            }
+            if (-not $browserSdkProps.Contains(
+                'Assimalign.Viu.Sdk.Browser.Common.props',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($browserSdkPackage.Name) Sdk.props must import the Browser common props."
             }
             if (-not $browserSdkProps.Contains(
                 '<Import Sdk="Assimalign.Viu.Sdk" Project="Sdk.props"',
@@ -617,9 +646,27 @@ jobs:
               throw "$($browserSdkPackage.Name) Sdk.targets must import the Browser framework-reference targets."
             }
             if (-not $browserSdkTargets.Contains(
+                'Assimalign.Viu.Sdk.Browser.WebAssembly.targets',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($browserSdkPackage.Name) Sdk.targets must import the Browser WebAssembly targets."
+            }
+            if (-not $browserSdkTargets.Contains(
                 '<Import Sdk="Assimalign.Viu.Sdk" Project="Sdk.targets"',
                 [System.StringComparison]::Ordinal)) {
               throw "$($browserSdkPackage.Name) Sdk.targets must import the base SDK targets."
+            }
+
+            $browserCommonProps = Read-ArchiveEntryText `
+              -Archive $browserSdkArchive `
+              -Package $browserSdkPackage `
+              -EntryName 'Targets/Assimalign.Viu.Sdk.Browser.Common.props'
+            if (-not $browserCommonProps.Contains(
+                'ViuBrowserRunHostAssembly',
+                [System.StringComparison]::Ordinal) -or
+                -not $browserCommonProps.Contains(
+                  'RunHost\Assimalign.Viu.Sdk.Browser.RunHost.dll',
+                  [System.StringComparison]::Ordinal)) {
+              throw "$($browserSdkPackage.Name) Browser common props must locate the packaged run host."
             }
 
             $browserNuspec = Read-PackageNuspec `
@@ -715,3 +762,9 @@ jobs:
 
       - name: Test CSS hot-reload worker
         run: dotnet test sdks/Assimalign.Viu.Sdk.Browser/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj --configuration Release --no-build
+
+      - name: Build Browser run host (warnings are errors)
+        run: dotnet build sdks/Assimalign.Viu.Sdk.Browser/RunHost/test/Assimalign.Viu.Sdk.Browser.RunHost.Tests.csproj --configuration Release -warnaserror
+
+      - name: Test Browser run host
+        run: dotnet test sdks/Assimalign.Viu.Sdk.Browser/RunHost/test/Assimalign.Viu.Sdk.Browser.RunHost.Tests.csproj --configuration Release --no-build

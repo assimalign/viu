@@ -22,6 +22,11 @@ dotnet new viu-app --name HelloViu
 dotnet new viu-lib --name Contoso.Components
 ```
 
+The application template pins its development origin to `http://127.0.0.1:51235` in
+`Properties/launchSettings.json`. Keeping that URL stable lets a browser connected through
+`dotnet watch` follow a rebuild/restart automatically. To use another port, change the active
+profile's `applicationUrl` to an unused fixed port before starting the watch session.
+
 Add a dual-target component assembly and an ASP.NET server host to the application with `--ssr`:
 
 ```sh

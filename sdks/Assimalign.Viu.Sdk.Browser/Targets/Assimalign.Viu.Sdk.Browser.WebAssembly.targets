@@ -1,4 +1,52 @@
 <Project>
+    <!--
+        [V01.01.12.31], #349: WasmAppHost reports "App url:" while dotnet-watch 10.0.302
+        recognizes only "Now listening on:" as run-process readiness. Wrap the finalized
+        WebAssembly run command so the packaged run host can forward each WasmAppHost output line,
+        add that marker, and preserve working-directory selection and application arguments.
+    -->
+    <PropertyGroup Condition="'$(_ViuBrowserSdk)' == 'true'
+        and '$(RuntimeIdentifier)' == 'browser-wasm'
+        and '$(_IsExecutable)' == 'true'
+        and '$(ViuBrowserRunHostReadinessEnabled)' == 'true'
+        and '$(_ViuBrowserRunHostConfigured)' != 'true'
+        and '$(RunCommand)' != ''">
+        <!-- The installed browser workload can pre-set WasmGenerateAppBundle=false even though the
+             executable ultimately runs through WasmAppHost. Gate on the Viu Browser app shape.
+             dotnet-watch consumes the evaluation-time Run* values directly, so wrapping happens
+             here as well as through the target fallback below. -->
+        <_ViuBrowserOriginalRunCommand>$(RunCommand)</_ViuBrowserOriginalRunCommand>
+        <_ViuBrowserOriginalRunArguments>$(RunArguments)</_ViuBrowserOriginalRunArguments>
+        <_ViuBrowserRunHostCommand Condition="'$(DOTNET_HOST_PATH)' != '' and Exists('$(DOTNET_HOST_PATH)')">$(DOTNET_HOST_PATH)</_ViuBrowserRunHostCommand>
+        <_ViuBrowserRunHostCommand Condition="'$(_ViuBrowserRunHostCommand)' == ''">dotnet</_ViuBrowserRunHostCommand>
+        <RunCommand>$(_ViuBrowserRunHostCommand)</RunCommand>
+        <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; -- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
+        <_ViuBrowserRunHostConfigured>true</_ViuBrowserRunHostConfigured>
+    </PropertyGroup>
+
+    <!-- Keep the target seam for hosts that defer Run* computation to ComputeRunArguments. -->
+    <Target Name="_ViuConfigureBrowserRunHost"
+            AfterTargets="ComputeRunArguments"
+            Condition="'$(_ViuBrowserSdk)' == 'true'
+                and '$(RuntimeIdentifier)' == 'browser-wasm'
+                and '$(_IsExecutable)' == 'true'
+                and '$(ViuBrowserRunHostReadinessEnabled)' == 'true'
+                and '$(_ViuBrowserRunHostConfigured)' != 'true'">
+        <PropertyGroup>
+            <_ViuBrowserOriginalRunCommand>$(RunCommand)</_ViuBrowserOriginalRunCommand>
+            <_ViuBrowserOriginalRunArguments>$(RunArguments)</_ViuBrowserOriginalRunArguments>
+            <_ViuBrowserRunHostCommand Condition="'$(DOTNET_HOST_PATH)' != '' and Exists('$(DOTNET_HOST_PATH)')">$(DOTNET_HOST_PATH)</_ViuBrowserRunHostCommand>
+            <_ViuBrowserRunHostCommand Condition="'$(_ViuBrowserRunHostCommand)' == ''">dotnet</_ViuBrowserRunHostCommand>
+            <RunCommand>$(_ViuBrowserRunHostCommand)</RunCommand>
+            <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; -- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
+            <_ViuBrowserRunHostConfigured>true</_ViuBrowserRunHostConfigured>
+        </PropertyGroup>
+        <Error Condition="'$(_ViuBrowserOriginalRunCommand)' == ''"
+               Text="The Viu Browser run host cannot wrap an empty WebAssembly RunCommand." />
+        <Error Condition="!Exists('$(ViuBrowserRunHostAssembly)')"
+               Text="The Viu Browser run host is missing at $(ViuBrowserRunHostAssembly). Restore a complete Assimalign.Viu.Sdk.Browser package." />
+    </Target>
+
     <Target Name="_ViuPinMicrosoftNetCoreAppRuntimePack"
             BeforeTargets="_InitializeCommonProperties"
             Condition="'$(MicrosoftNetCoreAppRuntimePackDir)' == ''">

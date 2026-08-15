@@ -5,6 +5,8 @@
         <ViuInjectCssBundleLinkTaskAssembly Condition="'$(ViuInjectCssBundleLinkTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuInjectCssBundleLinkTaskAssembly>
         <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuCssHotReloadTaskAssembly>
         <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(MSBuildThisFileDirectory)..\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
+        <ViuBrowserRunHostAssembly Condition="'$(ViuBrowserRunHostAssembly)' == ''">$(MSBuildThisFileDirectory)..\RunHost\Assimalign.Viu.Sdk.Browser.RunHost.dll</ViuBrowserRunHostAssembly>
+        <ViuBrowserRunHostReadinessEnabled Condition="'$(ViuBrowserRunHostReadinessEnabled)' == ''">true</ViuBrowserRunHostReadinessEnabled>
         <MetadataUpdaterSupport Condition="'$(MetadataUpdaterSupport)' == '' and '$(Configuration)' == 'Debug' and '$(WasmEnableHotReload)' != 'false'">true</MetadataUpdaterSupport>
     </PropertyGroup>
 </Project>

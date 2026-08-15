@@ -12,6 +12,10 @@
                                     ReferenceOutputAssembly="false"
                                     SkipGetTargetFrameworkProperties="true"
                                     Private="false" />
+        <ViuPrivateProjectReference Include="Assimalign.Viu.Sdk.Browser.RunHost"
+                                    ReferenceOutputAssembly="false"
+                                    SkipGetTargetFrameworkProperties="true"
+                                    Private="false" />
         <ViuProjectReference Include="Assimalign.Viu.Sdk.Tasks" Private="false" />
     </ItemGroup>
     <ItemGroup>

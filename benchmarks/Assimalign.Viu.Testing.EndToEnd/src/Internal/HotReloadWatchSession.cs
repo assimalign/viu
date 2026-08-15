@@ -92,6 +92,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
         foreach (string argument in new[]
         {
             "watch",
+            "--verbose",
             "--project",
             ProjectPath,
             "--configuration",
@@ -99,16 +100,25 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
             "--runtime",
             "browser-wasm",
             "--non-interactive",
-            "--no-launch-profile",
+            "--launch-profile",
+            "EndToEndHotReloadApp",
             "--no-restore",
         })
         {
             startInfo.ArgumentList.Add(argument);
         }
 
-        startInfo.Environment["DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER"] = "1";
+        // [V01.01.12.31], #349: Keep dotnet-watch's browser observer enabled while Playwright owns
+        // the only interactive browser. The harness executable absorbs the automatic launch.
+        string browserLaunchSinkPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "Assimalign.Viu.Testing.EndToEnd"
+                + (OperatingSystem.IsWindows() ? ".exe" : string.Empty));
+        RequireFile(browserLaunchSinkPath, "dotnet-watch browser launch sink");
+        startInfo.Environment["DOTNET_WATCH_BROWSER_PATH"] = browserLaunchSinkPath;
         startInfo.Environment["DOTNET_WATCH_SUPPRESS_EMOJIS"] = "1";
         startInfo.Environment["DOTNET_NOLOGO"] = "1";
+        startInfo.Environment["VIU_END_TO_END_BROWSER_LAUNCH_SINK"] = "1";
         startInfo.Environment["ViuConsumerVersion"] = ViuVersion;
 
         _process = new Process { StartInfo = startInfo };
