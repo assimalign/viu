@@ -135,7 +135,7 @@ public sealed class ViuGenerateUtilityCssTests
             var outputPath = Path.Combine(projectDirectory, "obj", "project.utilities.css");
             File.WriteAllText(
                 sourcePath,
-                "<div class=\"bg-brand flex project-card\"></div>");
+                "<div class=\"bg-brand flex project-card hover:grid\"></div>");
             File.WriteAllText(
                 additionalSourcePath,
                 "<span class=\"block\"></span>");
@@ -186,8 +186,54 @@ public sealed class ViuGenerateUtilityCssTests
                 File.ReadAllBytes(GetCatalogPath(outputPath)));
             var catalogRoot = catalog.RootElement;
             catalogRoot.GetProperty("version").GetInt32().ShouldBe(1);
-            catalogRoot.GetProperty("truncated").GetBoolean().ShouldBeTrue();
+            catalogRoot.GetProperty("truncated").GetBoolean().ShouldBeFalse();
             var entries = catalogRoot.GetProperty("entries");
+            var classNames = entries
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("class").GetString()!)
+                .ToArray();
+            var sourceUsedClassNames = new HashSet<string>(
+                new[] { "bg-brand", "block", "flex", "project-card" },
+                StringComparer.Ordinal);
+            classNames.Take(sourceUsedClassNames.Count)
+                .ToHashSet(StringComparer.Ordinal)
+                .SetEquals(sourceUsedClassNames)
+                .ShouldBeTrue();
+            classNames.Skip(sourceUsedClassNames.Count)
+                .ShouldBe(
+                    classNames
+                        .Skip(sourceUsedClassNames.Count)
+                        .OrderBy(item => item, StringComparer.Ordinal));
+            classNames.ShouldNotContain("hover:grid");
+            classNames.ShouldNotContain("sm:block");
+            classNames.ShouldContain("m-0");
+            classNames.ShouldContain("m-0.5");
+            classNames.ShouldContain("m-96");
+            classNames.ShouldContain("m-auto");
+            classNames.ShouldContain("m-px");
+            classNames.ShouldContain("mx-auto");
+            classNames.ShouldContain("-m-4");
+            classNames.ShouldContain("inset-auto");
+            classNames.ShouldContain("-top-full");
+            classNames.ShouldContain("w-auto");
+            classNames.ShouldContain("h-dvh");
+            classNames.ShouldContain("grid-cols-12");
+            classNames.ShouldContain("col-span-12");
+            classNames.ShouldContain("object-top-left");
+            classNames.ShouldContain("flex-1/2");
+            classNames.ShouldContain("order-12");
+            classNames.ShouldContain("z-20");
+            classNames.ShouldContain("border-4");
+            classNames.ShouldContain("opacity-25");
+            classNames.ShouldContain("-rotate-45");
+            classNames.ShouldContain("-translate-1/2");
+            classNames.ShouldContain("-scale-105");
+            classNames.ShouldNotContain("-m-auto");
+            classNames.ShouldNotContain("-translate-none");
+            classNames.ShouldContain("text-brand");
+            classNames.ShouldContain("ring-brand");
+            classNames.ShouldContain("mask-conic-to-brand");
+            classNames.ShouldContain("stroke-brand");
             var colorEntry = FindCatalogEntry(entries, "bg-brand");
             colorEntry.GetProperty("css").GetString()!.ShouldContain(
                 "background-color: var(--color-brand);");

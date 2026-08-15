@@ -30,6 +30,7 @@ namespace Assimalign.Viu.UtilityCss.Build;
 /// </remarks>
 public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    private const int DefaultEditorCatalogMaximumItems = 50000;
     private const string DiscoveryMetadataName = "ViuUtilityCssDiscovery";
     private const string ExplicitDiscoveryMetadataValue = "Explicit";
     private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
@@ -77,13 +78,13 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
     public bool EmitEditorSidecar { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets the maximum number of class-catalog entries. Generated bundle rules receive
-    /// priority within this budget before unused project-aware completions fill remaining slots.
-    /// The default is the engine completion budget of 500; a negative value makes
+    /// Gets or sets the maximum number of class-catalog entries. Source-used base classes receive
+    /// priority within this budget before the complete project-aware base expansion fills remaining
+    /// slots. The default is 50,000; a negative value makes
     /// <see cref="Execute"/> log an error and fail without generating output.
     /// </summary>
     public int EditorCatalogMaximumItems { get; set; } =
-        UtilityClassCompletionQuery.DefaultMaximumItems;
+        DefaultEditorCatalogMaximumItems;
 
     /// <summary>
     /// Gets or sets the generated output path that exists after execution, or the empty string when
@@ -327,13 +328,20 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
             authoredSections.Body,
             utilityCss);
         UtilityClassCompletionResult? completionResult = null;
+        IReadOnlyList<UtilityClassMetadata>? baseCatalogRules = null;
         if (EmitEditorSidecar)
         {
+            baseCatalogRules = SelectBaseCatalogRules(
+                rules,
+                theme.Prefix,
+                variantRegistry,
+                _cancellation.Token);
             completionResult = UtilityProjectStylesheetCompiler.GetCompletions(
                 entry.Css,
                 UtilityClassCompletionQuery.Default with
                 {
-                    MaximumItems = EditorCatalogMaximumItems,
+                    IncludeVariants = false,
+                    MaximumItems = int.MaxValue,
                 },
                 projectOptions,
                 _cancellation.Token);
@@ -349,8 +357,35 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
                 entry,
                 sourceFiles,
                 theme,
-                rules,
+                baseCatalogRules!,
                 completionResult);
+    }
+
+    private static IReadOnlyList<UtilityClassMetadata> SelectBaseCatalogRules(
+        IReadOnlyList<UtilityClassMetadata> rules,
+        string? configuredPrefix,
+        UtilityVariantRegistry variantRegistry,
+        CancellationToken cancellationToken)
+    {
+        var configuredPrefixCount = string.IsNullOrEmpty(configuredPrefix)
+            ? 0
+            : 1;
+        var selected = new List<UtilityClassMetadata>(rules.Count);
+        foreach (var rule in rules)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var parseResult = UtilityCandidateParser.Parse(
+                rule.CandidateText,
+                configuredPrefix,
+                variantRegistry,
+                cancellationToken);
+            if (parseResult.Candidate?.Variants.Count == configuredPrefixCount)
+            {
+                selected.Add(rule);
+            }
+        }
+
+        return selected;
     }
 
     private bool WriteEditorSidecars(

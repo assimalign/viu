@@ -25,6 +25,73 @@ public sealed class UtilityClassCompletionTests
     }
 
     [Fact]
+    public void GetCompletions_BaseOnlyQuery_ReturnsCompleteNamedBaseSurface()
+    {
+        var result = UtilityCssRegistry.BuiltIn.GetCompletions(
+            new UtilityClassCompletionQuery
+            {
+                IncludeVariants = false,
+                MaximumItems = 50000,
+            });
+        var candidateTexts = result.Items
+            .Select(item => item.CandidateText)
+            .ToHashSet(StringComparer.Ordinal);
+
+        result.IsTruncated.ShouldBeFalse();
+        candidateTexts.ShouldContain("m-0");
+        candidateTexts.ShouldContain("m-0.5");
+        candidateTexts.ShouldContain("m-96");
+        candidateTexts.ShouldContain("m-auto");
+        candidateTexts.ShouldContain("m-px");
+        candidateTexts.ShouldContain("mx-auto");
+        candidateTexts.ShouldContain("-m-4");
+        candidateTexts.ShouldContain("-m-0");
+        candidateTexts.ShouldContain("inset-auto");
+        candidateTexts.ShouldContain("top-auto");
+        candidateTexts.ShouldContain("inset-full");
+        candidateTexts.ShouldContain("-top-full");
+        candidateTexts.ShouldContain("w-auto");
+        candidateTexts.ShouldContain("h-auto");
+        candidateTexts.ShouldContain("size-auto");
+        candidateTexts.ShouldContain("w-screen");
+        candidateTexts.ShouldContain("h-dvh");
+        candidateTexts.ShouldContain("grid-cols-12");
+        candidateTexts.ShouldContain("col-span-12");
+        candidateTexts.ShouldContain("object-top-left");
+        candidateTexts.ShouldContain("object-bottom-right");
+        candidateTexts.ShouldContain("flex-12");
+        candidateTexts.ShouldContain("flex-1/2");
+        candidateTexts.ShouldContain("order-12");
+        candidateTexts.ShouldContain("z-20");
+        candidateTexts.ShouldContain("border-4");
+        candidateTexts.ShouldContain("border-x-4");
+        candidateTexts.ShouldContain("opacity-25");
+        candidateTexts.ShouldContain("font-stretch-50%");
+        candidateTexts.ShouldContain("font-stretch-200%");
+        candidateTexts.ShouldContain("grayscale-25");
+        candidateTexts.ShouldContain("backdrop-invert-75");
+        candidateTexts.ShouldContain("sepia-50");
+        candidateTexts.ShouldContain("backdrop-sepia-50");
+        candidateTexts.ShouldContain("bg-linear-330");
+        candidateTexts.ShouldContain("-bg-linear-330");
+        candidateTexts.ShouldContain("bg-conic-330");
+        candidateTexts.ShouldContain("-bg-conic-330");
+        candidateTexts.ShouldContain("-rotate-0");
+        candidateTexts.ShouldContain("-rotate-45");
+        candidateTexts.ShouldContain("-hue-rotate-90");
+        candidateTexts.ShouldContain("-backdrop-hue-rotate-90");
+        candidateTexts.ShouldContain("-translate-1/2");
+        candidateTexts.ShouldContain("-scale-105");
+        candidateTexts.ShouldNotContain("-m-auto");
+        candidateTexts.ShouldNotContain("-inset-auto");
+        candidateTexts.ShouldNotContain("-col-auto");
+        candidateTexts.ShouldNotContain("-translate-none");
+        candidateTexts.ShouldNotContain("-translate-screen");
+        candidateTexts.ShouldNotContain("hover:m-4");
+        candidateTexts.ShouldNotContain("sm:m-4");
+    }
+
+    [Fact]
     public void GetCompletions_ZeroBudget_ReportsWhetherMatchesExist()
     {
         var matching = UtilityCssRegistry.BuiltIn.GetCompletions(

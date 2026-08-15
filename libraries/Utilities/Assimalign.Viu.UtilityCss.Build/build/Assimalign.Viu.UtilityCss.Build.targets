@@ -6,7 +6,7 @@
     <ViuUtilityCssBundleName Condition="'$(ViuUtilityCssBundleName)' == ''">$(AssemblyName).utilities.css</ViuUtilityCssBundleName>
     <ViuUtilityCssCopyToOutput Condition="'$(ViuUtilityCssCopyToOutput)' == ''">true</ViuUtilityCssCopyToOutput>
     <ViuUtilityCssEmitEditorSidecar Condition="'$(ViuUtilityCssEmitEditorSidecar)' == ''">true</ViuUtilityCssEmitEditorSidecar>
-    <ViuUtilityCssEditorCatalogMaximumItems Condition="'$(ViuUtilityCssEditorCatalogMaximumItems)' == ''">500</ViuUtilityCssEditorCatalogMaximumItems>
+    <ViuUtilityCssCatalogMaximumEntries Condition="'$(ViuUtilityCssCatalogMaximumEntries)' == ''">50000</ViuUtilityCssCatalogMaximumEntries>
     <ViuUtilityCssSourceIdentifier Condition="'$(ViuUtilityCssSourceIdentifier)' == ''">$(AssemblyName)</ViuUtilityCssSourceIdentifier>
     <_ViuUtilityCssContentRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'utilitycss'))</_ViuUtilityCssContentRoot>
     <_ViuUtilityCssOutputPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', '$(ViuUtilityCssBundleName)'))</_ViuUtilityCssOutputPath>
@@ -65,7 +65,7 @@
                            ProjectDirectory="$(MSBuildProjectDirectory)"
                            OutputPath="$(_ViuUtilityCssOutputPath)"
                            EmitEditorSidecar="$(ViuUtilityCssEmitEditorSidecar)"
-                           EditorCatalogMaximumItems="$(ViuUtilityCssEditorCatalogMaximumItems)">
+                           EditorCatalogMaximumItems="$(ViuUtilityCssCatalogMaximumEntries)">
       <Output TaskParameter="GeneratedOutputPath" PropertyName="_ViuUtilityCssGeneratedOutputPath" />
       <Output TaskParameter="OutputWritten" PropertyName="_ViuUtilityCssOutputWritten" />
       <Output TaskParameter="OutputExists" PropertyName="_ViuUtilityCssOutputExists" />

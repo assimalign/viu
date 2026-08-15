@@ -1,31 +1,37 @@
 <Solution>
-  <Folder Name="/Visual Studio/">
-    <File Path="README.md" />
-    <File Path="Build.ps1" />
-    <File Path="Assimalign.Viu.VisualStudio/Build.ps1" />
-  </Folder>
-  <!-- The language service and server are developer tooling and live under the repository's
-       tooling/ root; this solution still carries them because they are built, debugged, and
-       deployed together with the Visual Studio host. -->
-  <Folder Name="/Visual Studio/Language Service/">
-    <Project Path="../../tooling/Editor/Assimalign.Viu.LanguageService/src/Assimalign.Viu.LanguageService.csproj" />
-    <Project Path="../../tooling/Editor/Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj" />
-  </Folder>
-  <Folder Name="/Visual Studio/Language Server/">
-    <Project Path="../../tooling/Editor/Assimalign.Viu.LanguageServer/src/Assimalign.Viu.LanguageServer.csproj" />
-    <Project Path="../../tooling/Editor/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj" />
-  </Folder>
-  <!-- The extension is a classic in-process VSSDK package. It is in this solution so it can be
-       built and debugged from Visual Studio, but the solution as a whole can no longer be handed to
-       `dotnet build`/`dotnet test`: the VSSDK build tasks are .NET Framework MSBuild tasks.
-       Command-line packaging goes through Build.ps1, and CI names the test projects individually.
-       The Deploy flag below pairs with the project's host-split DeployExtension: building inside
-       Visual Studio refreshes the experimental hive so F5 launches the current code, while
-       command-line builds package the VSIX without touching any hive. -->
-  <Folder Name="/Visual Studio/Extension/">
-    <Project Path="Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj">
-      <Deploy />
-    </Project>
-    <Project Path="Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj" />
-  </Folder>
+	<Configurations>
+		<Platform Name="Any CPU" />
+		<Platform Name="x64" />
+		<Platform Name="x86" />
+	</Configurations>
+	<Folder Name="/VisualStudio/">
+		<File Path="Build.ps1" />
+		<File Path="EDITOR-ENHANCEMENTS.md" />
+		<File Path="Marketplace.md" />
+		<File Path="README.md" />
+		<File Path="vs-publish.json" />
+	</Folder>
+	<Folder Name="/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/">
+		<File Path="Assimalign.Viu.UtilityCss.VisualStudio/Build.ps1" />
+		<File Path="Assimalign.Viu.UtilityCss.VisualStudio/Marketplace.md" />
+		<File Path="Assimalign.Viu.UtilityCss.VisualStudio/README.md" />
+	</Folder>
+	<Folder Name="/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/src/">
+		<Project Path="Assimalign.Viu.UtilityCss.VisualStudio/src/Assimalign.Viu.UtilityCss.VisualStudio.csproj" />
+	</Folder>
+	<Folder Name="/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/">
+		<Project Path="Assimalign.Viu.UtilityCss.VisualStudio/test/Assimalign.Viu.UtilityCss.VisualStudio.Tests.csproj" />
+	</Folder>
+	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio/">
+		<File Path="Assimalign.Viu.VisualStudio/Build.ps1" />
+	</Folder>
+	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio/docs/">
+		<File Path="Assimalign.Viu.VisualStudio/docs/DESIGN.md" />
+	</Folder>
+	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio/src/">
+		<Project Path="Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj" />
+	</Folder>
+	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio/test/">
+		<Project Path="Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj" />
+	</Folder>
 </Solution>

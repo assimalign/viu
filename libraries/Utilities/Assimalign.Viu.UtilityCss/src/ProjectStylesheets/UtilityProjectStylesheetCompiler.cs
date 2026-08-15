@@ -204,11 +204,16 @@ public static class UtilityProjectStylesheetCompiler
             query.Prefix,
             out var variantPrefix,
             out var baseFragment);
+        var hasVariantPrefix = UtilityCompletionPrefix.HasVariant(
+            UtilityCompletionPrefix.RemoveConfiguredPrefix(
+                query.Prefix ?? string.Empty,
+                effectiveOptions.Theme.Prefix));
         var projectCandidates = new HashSet<string>(StringComparer.Ordinal);
-        if (variantPrefix.Length == 0 ||
-            UtilityCompletionPrefix.HasConfiguredPrefix(
-                variantPrefix,
-                effectiveOptions.Theme.Prefix))
+        if ((variantPrefix.Length == 0 ||
+             UtilityCompletionPrefix.HasConfiguredPrefix(
+                 variantPrefix,
+                 effectiveOptions.Theme.Prefix)) &&
+            (query.IncludeVariants || !hasVariantPrefix))
         {
             AddProjectUtilityCandidates(
                 definitionCompilation.Utilities,
@@ -218,7 +223,7 @@ public static class UtilityProjectStylesheetCompiler
                 effectiveOptions.Theme.Prefix,
                 projectCandidates);
 
-            if (variantPrefix.Length > 0)
+            if (query.IncludeVariants && variantPrefix.Length > 0)
             {
                 AddVariantCandidates(
                     effectiveOptions.Registry,

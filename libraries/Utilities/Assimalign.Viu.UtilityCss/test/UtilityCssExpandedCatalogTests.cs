@@ -270,6 +270,66 @@ public sealed class UtilityCssExpandedCatalogTests
             resolution.IsSuccess.ShouldBeTrue(expectedCandidate);
             resolution.Metadata.ShouldBe(completion);
         }
+
+        var colorRoots = new[]
+        {
+            "text",
+            "bg",
+            "border",
+            "border-x",
+            "border-y",
+            "border-t",
+            "border-r",
+            "border-b",
+            "border-l",
+            "border-s",
+            "border-e",
+            "border-bs",
+            "border-be",
+            "outline",
+            "accent",
+            "caret",
+            "placeholder",
+            "decoration",
+            "divide",
+            "ring",
+            "inset-ring",
+            "ring-offset",
+            "shadow",
+            "inset-shadow",
+            "text-shadow",
+            "drop-shadow",
+            "scrollbar-thumb",
+            "scrollbar-track",
+            "from",
+            "via",
+            "to",
+            "mask-x-from",
+            "mask-x-to",
+            "mask-y-from",
+            "mask-y-to",
+            "mask-t-from",
+            "mask-t-to",
+            "mask-r-from",
+            "mask-r-to",
+            "mask-b-from",
+            "mask-b-to",
+            "mask-l-from",
+            "mask-l-to",
+            "mask-linear-from",
+            "mask-linear-to",
+            "mask-radial-from",
+            "mask-radial-to",
+            "mask-conic-from",
+            "mask-conic-to",
+            "fill",
+            "stroke",
+        };
+        foreach (var colorRoot in colorRoots)
+        {
+            completions.ShouldContain(
+                item => item.CandidateText == colorRoot + "-brand");
+        }
     }
 
     [Fact]

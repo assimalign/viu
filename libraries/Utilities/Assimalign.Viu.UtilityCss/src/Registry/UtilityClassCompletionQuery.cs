@@ -24,6 +24,14 @@ public sealed record UtilityClassCompletionQuery
     public string? Prefix { get; init; }
 
     /// <summary>
+    /// Gets whether completion results include variant-prefixed composites. The default preserves
+    /// live editor completion behavior; catalog producers can disable variants to enumerate the
+    /// finite base-class surface without multiplying it by breakpoint variants. The build-catalog
+    /// boundary is tracked by <c>[V01.01.12.30]</c>.
+    /// </summary>
+    public bool IncludeVariants { get; init; } = true;
+
+    /// <summary>
     /// Gets the maximum number of items returned. Zero returns no items while still reporting
     /// whether matching candidates exist.
     /// </summary>

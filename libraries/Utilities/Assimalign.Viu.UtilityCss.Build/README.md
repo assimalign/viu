@@ -20,7 +20,7 @@ Build normally; the package emits `obj/.../utilitycss/<AssemblyName>.utilities.c
 | `ViuUtilityCssBundleName` | Overrides `<AssemblyName>.utilities.css`. |
 | `ViuUtilityCssCopyToOutput` | Controls plain-host output copying. |
 | `ViuUtilityCssEmitEditorSidecar` | Emits the manifest and class catalog; defaults to `true`. |
-| `ViuUtilityCssEditorCatalogMaximumItems` | Bounds catalog entries; defaults to the engine completion budget of `500`. |
+| `ViuUtilityCssCatalogMaximumEntries` | Bounds base-class catalog entries; defaults to `50000`. A value below the applicable expansion reduces sidecar size and sets `truncated`; higher values accommodate unusually large project themes. |
 | `ViuUtilityCssSourceIdentifier` | Overrides the Static Web Asset source identifier. |
 | `@(ViuUtilityCss)` | Supplies zero or one CSS-first entry stylesheet. |
 | `@(ViuUtilityCssSource)` | Adds explicit sources. |

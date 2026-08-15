@@ -35,7 +35,7 @@ The manifest is the UtilityCss-owned discovery contract. Additive manifest field
 ```json
 {
   "version": 1,
-  "truncated": true,
+  "truncated": false,
   "entries": [
     {
       "class": "bg-brand",
@@ -50,9 +50,11 @@ The manifest is the UtilityCss-owned discovery contract. Additive manifest field
 }
 ```
 
-The task uses the engine's project-aware bounded completion query against the same registry, resolved theme, references, `@utility` definitions, and `@variant` definitions used for the bundle. The default budget is `500` and can be changed with `ViuUtilityCssEditorCatalogMaximumItems`.
+The task uses the engine's project-aware bounded completion query against the same registry, resolved theme, references, and `@utility` definitions used for the bundle. It emits the complete finite base-name expansion: static and named built-ins, every theme-backed family, and negative theme values only where the registry's utility definition declares negative-value support. Variant-prefixed composites such as `hover:bg-brand` are excluded; live language-server completion owns variant composition. Catalog v1 also does not form the Cartesian product of slash modifiers such as every color with every opacity. A slash-modified class used in source still receives source-used priority, while live completion owns unused modifier composition.
 
-Rules actually generated into the bundle receive priority within the budget. When those rules fit, completion and hover metadata for a source-used class is not displaced by a large themed catalog. If generated rules alone exceed the budget, the first engine-ordered generated rules are retained and `truncated` is `true`. Remaining slots are filled from the bounded project-aware completion result, de-duplicated by exact class text. Selected entries are finally ordered by engine `SortOrder` and then ordinal class text. `truncated` is also `true` when available completions were omitted.
+Source-used base classes receive priority within the budget and retain deterministic engine order. The remaining base expansion follows in ordinal class-name order, de-duplicated by exact class text across both groups. If source-used classes alone exceed the budget, the first engine-ordered classes are retained. `truncated` is `true` whenever the configured budget omits an applicable entry.
+
+`ViuUtilityCssCatalogMaximumEntries` controls the budget and defaults to `50000`. The v4.3.3 default theme currently expands to 24,087 base entries, leaving headroom for realistic project-defined theme tokens. Consumers can lower the property to trade completion breadth for a smaller sidecar or raise it for an unusually large theme; the `truncated` signal remains authoritative.
 
 `colorValue` is present only when structured engine metadata identifies a color-bearing class. Consumers must not infer colors by parsing `css`. Version 1 does not emit the optional `sortText` field; array order is authoritative.
 

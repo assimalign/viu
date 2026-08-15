@@ -96,6 +96,46 @@ public sealed class UtilityProjectEditorApiTests
     }
 
     [Fact]
+    public void GetCompletions_BaseOnlyQueryWithVariantPrefix_ExcludesProjectUtility()
+    {
+        var result = UtilityProjectStylesheetCompiler.GetCompletions(
+            "@utility brand-surface { background-color: rebeccapurple; }",
+            new UtilityClassCompletionQuery
+            {
+                Prefix = "hover:brand-",
+                IncludeVariants = false,
+                MaximumItems = 20,
+            });
+
+        result.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void GetCompletions_BaseOnlyQueryWithConfiguredPrefix_IncludesProjectUtility()
+    {
+        const string Css =
+            "@theme prefix(viu) { --color-brand: #123456; }\n" +
+            "@utility brand-surface { background-color: var(--viu-color-brand); }";
+        var options = new UtilityProjectStylesheetCompilationOptions
+        {
+            Theme = UtilityThemeParser.Parse(Css).Theme,
+        };
+
+        var result = UtilityProjectStylesheetCompiler.GetCompletions(
+            Css,
+            new UtilityClassCompletionQuery
+            {
+                Prefix = "viu:brand-",
+                IncludeVariants = false,
+                MaximumItems = 20,
+            },
+            options);
+
+        result.Items.ShouldHaveSingleItem().CandidateText.ShouldBe(
+            "viu:brand-surface");
+    }
+
+    [Fact]
     public void GetCompletions_ProjectAndBuiltInVariants_ComposeBuiltInUtilities()
     {
         var result = UtilityProjectStylesheetCompiler.GetCompletions(

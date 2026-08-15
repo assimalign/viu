@@ -75,14 +75,14 @@ internal static class UtilityCssEditorSidecarWriter
         UtilityClassCompletionResult completionResult,
         int maximumItems)
     {
-        var selected = new Dictionary<string, UtilityClassMetadata>(
-            StringComparer.Ordinal);
+        var selected = new List<UtilityClassMetadata>();
+        var selectedCandidateTexts = new HashSet<string>(StringComparer.Ordinal);
         var isTruncated = completionResult.IsTruncated;
         foreach (var rule in generatedRules
                      .OrderBy(item => item.SortOrder)
                      .ThenBy(item => item.CandidateText, StringComparer.Ordinal))
         {
-            if (selected.ContainsKey(rule.CandidateText))
+            if (selectedCandidateTexts.Contains(rule.CandidateText))
             {
                 continue;
             }
@@ -93,12 +93,16 @@ internal static class UtilityCssEditorSidecarWriter
                 continue;
             }
 
-            selected.Add(rule.CandidateText, rule);
+            selectedCandidateTexts.Add(rule.CandidateText);
+            selected.Add(rule);
         }
 
-        foreach (var completion in completionResult.Items)
+        foreach (var completion in completionResult.Items
+                     .OrderBy(
+                         item => item.CandidateText,
+                         StringComparer.Ordinal))
         {
-            if (selected.ContainsKey(completion.CandidateText))
+            if (selectedCandidateTexts.Contains(completion.CandidateText))
             {
                 continue;
             }
@@ -109,14 +113,12 @@ internal static class UtilityCssEditorSidecarWriter
                 continue;
             }
 
-            selected.Add(completion.CandidateText, completion);
+            selectedCandidateTexts.Add(completion.CandidateText);
+            selected.Add(completion);
         }
 
         return new EditorCatalog(
-            selected.Values
-                .OrderBy(item => item.SortOrder)
-                .ThenBy(item => item.CandidateText, StringComparer.Ordinal)
-                .ToArray(),
+            selected,
             isTruncated);
     }
 

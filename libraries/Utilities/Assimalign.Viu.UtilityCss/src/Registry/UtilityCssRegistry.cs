@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -25,7 +26,15 @@ public sealed class UtilityCssRegistry
         completionItemsByTheme = new();
 
     private readonly ConditionalWeakTable<UtilityTheme, StrongBox<UtilityCollection<UtilityClassMetadata>>>
+        baseCompletionItemsByTheme = new();
+
+    private readonly ConditionalWeakTable<UtilityTheme, StrongBox<UtilityCollection<UtilityClassMetadata>>>
         .CreateValueCallback createCompletionItemsForTheme;
+
+    private readonly ConditionalWeakTable<UtilityTheme, StrongBox<UtilityCollection<UtilityClassMetadata>>>
+        .CreateValueCallback createBaseCompletionItemsForTheme;
+
+    private readonly Lazy<UtilityCollection<UtilityClassMetadata>> defaultBaseCompletionItems;
 
     private UtilityCssRegistry(
         IEnumerable<UtilityRegisteredDefinition> registrations)
@@ -55,6 +64,11 @@ public sealed class UtilityCssRegistry
         createCompletionItemsForTheme =
             theme => new StrongBox<UtilityCollection<UtilityClassMetadata>>(
                 CreateCompletionItems(theme));
+        defaultBaseCompletionItems = new Lazy<UtilityCollection<UtilityClassMetadata>>(
+            () => CreateBaseCompletionItems(UtilityTheme.Default));
+        createBaseCompletionItemsForTheme =
+            theme => new StrongBox<UtilityCollection<UtilityClassMetadata>>(
+                CreateBaseCompletionItems(theme));
     }
 
     /// <summary>
@@ -266,9 +280,21 @@ public sealed class UtilityCssRegistry
                 UtilityClassCompletionQuery.DefaultMaximumItems));
         var matchedCandidateTexts = new HashSet<string>(StringComparer.Ordinal);
         var isTruncated = false;
-        foreach (var completionItem in GetCompletionItems(theme))
+        var completionItems = query.IncludeVariants
+            ? GetCompletionItems(theme)
+            : GetBaseCompletionItems(theme);
+        foreach (var completionItem in completionItems)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            var baseCandidate = UtilityCompletionPrefix.RemoveConfiguredPrefix(
+                completionItem.CandidateText,
+                theme.Prefix);
+            if (!query.IncludeVariants &&
+                UtilityCompletionPrefix.HasVariant(baseCandidate))
+            {
+                continue;
+            }
 
             if (completionItem.CandidateText.StartsWith(
                     query.Prefix ?? string.Empty,
@@ -284,14 +310,11 @@ public sealed class UtilityCssRegistry
                 matches.Add(completionItem);
             }
 
-            if (variantPrefix.Length == 0)
+            if (variantPrefix.Length == 0 || !query.IncludeVariants)
             {
                 continue;
             }
 
-            var baseCandidate = UtilityCompletionPrefix.RemoveConfiguredPrefix(
-                completionItem.CandidateText,
-                theme.Prefix);
             if (UtilityCompletionPrefix.HasVariant(baseCandidate) ||
                 !baseCandidate.StartsWith(
                     baseFragment,
@@ -351,6 +374,14 @@ public sealed class UtilityCssRegistry
                 .GetValue(theme, createCompletionItemsForTheme)
                 .Value;
 
+    private UtilityCollection<UtilityClassMetadata> GetBaseCompletionItems(
+        UtilityTheme theme) =>
+        ReferenceEquals(theme, UtilityTheme.Default)
+            ? defaultBaseCompletionItems.Value
+            : baseCompletionItemsByTheme
+                .GetValue(theme, createBaseCompletionItemsForTheme)
+                .Value;
+
     private UtilityCollection<UtilityClassMetadata> CreateCompletionItems(
         UtilityTheme theme)
     {
@@ -400,6 +431,123 @@ public sealed class UtilityCssRegistry
                 .ThenBy(item => item.CandidateText, StringComparer.Ordinal));
     }
 
+    private UtilityCollection<UtilityClassMetadata> CreateBaseCompletionItems(
+        UtilityTheme theme)
+    {
+        var candidates = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var definition in Definitions)
+        {
+            var registration = definitionsByRoot[definition.Root];
+            var definitionCandidates = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var candidateText in definition.CompletionCandidates)
+            {
+                if (TryGetNamedBaseCandidate(
+                        candidateText,
+                        out var namedCandidate))
+                {
+                    definitionCandidates.Add(namedCandidate!);
+                }
+            }
+
+            AddThemeCandidates(
+                definitionCandidates,
+                definition,
+                theme);
+            AddDirectThemePropertyCandidates(
+                definitionCandidates,
+                definition,
+                theme);
+            UtilityBaseClassCandidateCatalog.AddCandidates(
+                definitionCandidates,
+                registration);
+            if (definition.SupportsNegativeValues)
+            {
+                foreach (var candidateText in definitionCandidates.ToArray())
+                {
+                    if (CanSynthesizeNegativeCandidate(
+                            candidateText,
+                            definition.Root))
+                    {
+                        definitionCandidates.Add("-" + candidateText);
+                    }
+                }
+            }
+
+            candidates.UnionWith(definitionCandidates);
+        }
+
+        var completionItems = new List<UtilityClassMetadata>();
+        foreach (var candidate in candidates)
+        {
+            var candidateText = AddConfiguredPrefix(
+                candidate,
+                theme.Prefix);
+            var result = Resolve(
+                candidateText,
+                theme,
+                CancellationToken.None);
+            if (result.IsSuccess && result.Metadata is not null)
+            {
+                completionItems.Add(result.Metadata);
+            }
+        }
+
+        return new UtilityCollection<UtilityClassMetadata>(
+            completionItems
+                .Distinct()
+                .OrderBy(item => item.SortOrder)
+                .ThenBy(item => item.CandidateText, StringComparer.Ordinal));
+    }
+
+    private static bool TryGetNamedBaseCandidate(
+        string candidateText,
+        out string? namedCandidate)
+    {
+        namedCandidate = null;
+        var parseResult = UtilityCandidateParser.Parse(candidateText);
+        var candidate = parseResult.Candidate;
+        if (candidate is null ||
+            candidate.Kind != UtilityCandidateKind.Named ||
+            candidate.Variants.Count != 0 ||
+            candidate.IsImportant ||
+            candidate.Value?.Kind is UtilityValueKind.Arbitrary or UtilityValueKind.CssVariable ||
+            candidate.Modifier?.Kind is UtilityModifierKind.Arbitrary or UtilityModifierKind.CssVariable)
+        {
+            return false;
+        }
+
+        namedCandidate = candidate.CanonicalText;
+        return true;
+    }
+
+    private static bool CanSynthesizeNegativeCandidate(
+        string candidateText,
+        string expectedRoot)
+    {
+        var parseResult = UtilityCandidateParser.Parse(candidateText);
+        var candidate = parseResult.Candidate;
+        if (candidate is null ||
+            candidate.Root != expectedRoot ||
+            candidate.IsNegative ||
+            candidate.Value?.Kind != UtilityValueKind.Named ||
+            candidate.Variants.Count != 0 ||
+            candidate.IsImportant)
+        {
+            return false;
+        }
+
+        if (candidate.Value.Text == "full")
+        {
+            return true;
+        }
+
+        return decimal.TryParse(
+            candidate.Value.Text,
+            NumberStyles.Number,
+            CultureInfo.InvariantCulture,
+            out _);
+    }
+
     private static void AddThemeCandidates(
         ISet<string> candidates,
         UtilityDefinition definition,
@@ -411,8 +559,7 @@ public sealed class UtilityCssRegistry
             foreach (var token in theme.Spacing)
             {
                 candidates.Add(root + "-" + token.Name);
-                if (definition.SupportsNegativeValues &&
-                    token.Name != "0")
+                if (definition.SupportsNegativeValues)
                 {
                     candidates.Add("-" + root + "-" + token.Name);
                 }
@@ -425,6 +572,10 @@ public sealed class UtilityCssRegistry
             {
                 candidates.Add(root + "-" + token.Name);
             }
+
+            candidates.Add(root + "-current");
+            candidates.Add(root + "-inherit");
+            candidates.Add(root + "-transparent");
         }
 
         if (root == "text")
@@ -465,6 +616,44 @@ public sealed class UtilityCssRegistry
         }
     }
 
+    private static void AddDirectThemePropertyCandidates(
+        ISet<string> candidates,
+        UtilityDefinition definition,
+        UtilityTheme theme)
+    {
+        var propertyPrefix = definition.Root switch
+        {
+            "outline" => "--outline-width-",
+            "duration" => "--transition-duration-",
+            "delay" => "--transition-delay-",
+            "transition" => "--transition-property-",
+            "from" or "via" or "to" =>
+                "--gradient-color-stop-positions-",
+            _ => null,
+        };
+        if (propertyPrefix is null)
+        {
+            return;
+        }
+
+        foreach (var property in theme.Properties)
+        {
+            if (!property.Name.StartsWith(
+                    propertyPrefix,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var tokenName = property.Name.Substring(propertyPrefix.Length);
+            if (tokenName.Length > 0 &&
+                tokenName.IndexOf("--", StringComparison.Ordinal) < 0)
+            {
+                candidates.Add(definition.Root + "-" + tokenName);
+            }
+        }
+    }
+
     private static void AddNamespaceCandidates(
         ISet<string> candidates,
         UtilityDefinition definition,
@@ -478,7 +667,7 @@ public sealed class UtilityCssRegistry
                 : definition.Root + "-" + token.Name;
             candidates.Add(candidate);
             if (definition.SupportsNegativeValues &&
-                token.Name is not "0" and not "DEFAULT")
+                token.Name != "DEFAULT")
             {
                 candidates.Add("-" + candidate);
             }
@@ -528,7 +717,10 @@ public sealed class UtilityCssRegistry
             "min-inline" or
             "min-block" or
             "max-inline" or
-            "max-block";
+            "max-block" or
+            "translate" or
+            "translate-x" or
+            "translate-y";
 
     private static bool UsesSpacingTheme(string root) =>
         root is
@@ -543,6 +735,7 @@ public sealed class UtilityCssRegistry
             "right" or
             "bottom" or
             "left" or
+            "start" or
             "m" or
             "mx" or
             "my" or
@@ -595,6 +788,8 @@ public sealed class UtilityCssRegistry
             "scroll-pr" or
             "scroll-pb" or
             "scroll-pl" or
+            "auto-cols" or
+            "auto-rows" or
             "w" or
             "h" or
             "min-w" or
@@ -609,8 +804,12 @@ public sealed class UtilityCssRegistry
             "max-inline" or
             "max-block" or
             "basis" or
+            "leading" or
             "indent" or
             "underline-offset" or
+            "translate" or
+            "translate-x" or
+            "translate-y" or
             "translate-z" or
             "mask-x-from" or
             "mask-x-to" or
@@ -658,6 +857,7 @@ public sealed class UtilityCssRegistry
             "shadow" or
             "inset-shadow" or
             "text-shadow" or
+            "drop-shadow" or
             "scrollbar-thumb" or
             "scrollbar-track" or
             "from" or
@@ -915,7 +1115,25 @@ public sealed class UtilityCssRegistry
                 "mbs",
                 "mbe",
             },
-            new[] { "m-0", "mx-4", "mt-2", "-mb-4", "mbs-2", "mbe-auto" });
+            new[]
+            {
+                "m-0",
+                "m-auto",
+                "mx-4",
+                "mx-auto",
+                "my-auto",
+                "mt-2",
+                "mt-auto",
+                "mr-auto",
+                "mb-auto",
+                "-mb-4",
+                "ml-auto",
+                "ms-auto",
+                "me-auto",
+                "mbs-2",
+                "mbs-auto",
+                "mbe-auto",
+            });
         AddMany(
             registrations,
             UtilityResolverKind.Spacing,

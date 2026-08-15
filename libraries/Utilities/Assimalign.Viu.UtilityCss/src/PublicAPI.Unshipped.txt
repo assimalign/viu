@@ -1,0 +1,2 @@
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.IncludeVariants.get -> bool
+Assimalign.Viu.UtilityCss.UtilityClassCompletionQuery.IncludeVariants.init -> void

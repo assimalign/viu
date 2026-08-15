@@ -239,7 +239,7 @@ function Get-UtilityCssProjectProperties {
             $ProjectPath,
             '-nologo',
             '-verbosity:quiet',
-            '-getProperty:IntermediateOutputPath;BaseIntermediateOutputPath;ProjectAssetsFile;TargetDir;AssemblyName;ViuUtilityCssBundleName;UsingMicrosoftNETSdkStaticWebAssets',
+            '-getProperty:IntermediateOutputPath;BaseIntermediateOutputPath;ProjectAssetsFile;TargetDir;AssemblyName;ViuUtilityCssBundleName;ViuUtilityCssCatalogMaximumEntries;UsingMicrosoftNETSdkStaticWebAssets',
             '-property:Configuration=Release') + $CommonProperties)
     if ($null -eq $result.Properties) {
         throw "MSBuild returned no property set for $ProjectPath."
@@ -527,8 +527,8 @@ function Assert-UtilityCssEditorSidecar {
     if ($catalogTruncated -isnot [bool]) {
         throw "$catalogDescription truncated signal must be Boolean."
     }
-    if (-not $catalogTruncated) {
-        throw "$catalogDescription should be truncated at the default 500-item editor budget."
+    if ($catalogTruncated) {
+        throw "$catalogDescription should contain the complete default-theme base expansion."
     }
 
     $catalogEntries = @(
@@ -539,11 +539,35 @@ function Assert-UtilityCssEditorSidecar {
     if ($catalogEntries.Count -eq 0) {
         throw "$catalogDescription contains no entries."
     }
-    if ($catalogEntries.Count -gt 500) {
-        throw "$catalogDescription contains $($catalogEntries.Count) entries; expected at most 500."
+    if ($catalogEntries.Count -gt 50000) {
+        throw "$catalogDescription contains $($catalogEntries.Count) entries; expected at most 50000."
     }
 
-    foreach ($expectedCatalogClass in $ExpectedCatalogClasses) {
+    $requiredBreadthCatalogClasses = @(
+        'm-0',
+        'm-0.5',
+        'm-96',
+        'm-auto',
+        'm-px',
+        'mx-auto',
+        '-m-4',
+        'inset-auto',
+        '-top-full',
+        'w-auto',
+        'h-dvh',
+        'grid-cols-12',
+        'col-span-12',
+        'object-top-left',
+        'flex-1/2',
+        'order-12',
+        'z-20',
+        'border-4',
+        'opacity-25',
+        '-rotate-45',
+        '-translate-1/2',
+        '-scale-105')
+    foreach ($expectedCatalogClass in @(
+            $ExpectedCatalogClasses) + $requiredBreadthCatalogClasses) {
         $matchingCatalogEntries = @(
             $catalogEntries |
                 Where-Object {
@@ -838,6 +862,9 @@ function Assert-UtilityCssPlainOutputRemoval {
 function Assert-ViuClassCatalogCompletion {
     param(
         [Parameter(Mandatory)]
+        [string] $ProjectPath,
+
+        [Parameter(Mandatory)]
         [string] $ProjectDirectory,
 
         [Parameter(Mandatory)]
@@ -856,7 +883,10 @@ function Assert-ViuClassCatalogCompletion {
         [string] $LanguageServerExecutable,
 
         [Parameter(Mandatory)]
-        [string] $LanguageServerTestProjectPath
+        [string] $LanguageServerTestProjectPath,
+
+        [Parameter(Mandatory)]
+        [string[]] $CommonProperties
     )
 
     try {
@@ -887,6 +917,33 @@ function Assert-ViuClassCatalogCompletion {
         -Description "The '$ClassName' class-catalog entry"
     if ([string]::IsNullOrWhiteSpace($colorValue.ToString())) {
         throw "The '$ClassName' class-catalog entry has no colorValue."
+    }
+
+    Invoke-DotNet `
+        -Description 'Rebuilding the class-catalog process fixture with a three-entry consumer budget' `
+        -Arguments (@(
+            'build',
+            $ProjectPath,
+            '--configuration',
+            'Release',
+            '--no-restore',
+            '-warnaserror',
+            '-property:ViuUtilityCssCatalogMaximumEntries=3') + $CommonProperties)
+    $truncatedCatalog = [System.IO.File]::ReadAllText($CatalogPath) |
+        ConvertFrom-Json
+    if ($truncatedCatalog.truncated -ne $true -or
+        @($truncatedCatalog.entries).Count -ne 3) {
+        throw 'The consumer catalog budget did not emit exactly three entries with truncated=true.'
+    }
+    $truncatedMatchingEntries = @(
+        $truncatedCatalog.entries |
+            Where-Object {
+                $_.class.ToString().Equals(
+                    $ClassName,
+                    [System.StringComparison]::Ordinal)
+            })
+    if ($truncatedMatchingEntries.Count -ne 1) {
+        throw "The three-entry consumer catalog did not retain source-used class '$ClassName'."
     }
 
     $fixturePath = Join-Path `
@@ -929,6 +986,15 @@ function Assert-ViuClassCatalogCompletion {
             'VIU_CLASS_CATALOG_FIXTURE',
             $previousFixture,
             [System.EnvironmentVariableTarget]::Process)
+        Invoke-DotNet `
+            -Description 'Restoring the complete default-budget class catalog after the process proof' `
+            -Arguments (@(
+                'build',
+                $ProjectPath,
+                '--configuration',
+                'Release',
+                '--no-restore',
+                '-warnaserror') + $CommonProperties)
     }
 
     Write-Host `
@@ -990,6 +1056,15 @@ function Test-UtilityCssFixture {
     $expectedBundleName = "$fixtureName.utilities.css"
     if (-not $bundleName.Equals($expectedBundleName, [System.StringComparison]::Ordinal)) {
         throw "$fixtureName evaluated bundle name '$bundleName'; expected '$expectedBundleName'."
+    }
+
+    $catalogMaximumEntries = Get-JsonPropertyValue `
+        -InputObject $properties `
+        -Name 'ViuUtilityCssCatalogMaximumEntries'
+    if (-not $catalogMaximumEntries.Equals(
+            '50000',
+            [System.StringComparison]::Ordinal)) {
+        throw "$fixtureName evaluated ViuUtilityCssCatalogMaximumEntries='$catalogMaximumEntries'; expected '50000'."
     }
 
     $usingStaticWebAssets = Get-JsonPropertyValue `
@@ -1073,6 +1148,7 @@ function Test-UtilityCssFixture {
 
     if ($Fixture.ContainsKey('ClassCatalogCompletionClass')) {
         Assert-ViuClassCatalogCompletion `
+            -ProjectPath $projectPath `
             -ProjectDirectory $projectDirectory `
             -CatalogPath (Join-Path `
                 ([System.IO.Path]::GetDirectoryName($bundlePath)) `
@@ -1081,7 +1157,8 @@ function Test-UtilityCssFixture {
             -ClassName $Fixture.ClassCatalogCompletionClass `
             -CompletionPrefix $Fixture.ClassCatalogCompletionPrefix `
             -LanguageServerExecutable $LanguageServerExecutable `
-            -LanguageServerTestProjectPath $LanguageServerTestProjectPath
+            -LanguageServerTestProjectPath $LanguageServerTestProjectPath `
+            -CommonProperties $commonProperties
     }
 
     $bundleItem = Get-Item -LiteralPath $bundlePath
