@@ -45,3 +45,6 @@ Assimalign.Viu.Components.IElementEvent.TargetChecked.get -> bool
 Assimalign.Viu.Components.IElementEvent.TargetValue.get -> string?
 Assimalign.Viu.Components.IComponentInspectionStateProvider
 Assimalign.Viu.Components.IComponentInspectionStateProvider.GetInspectionState() -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Assimalign.Viu.Components.ComponentRenderCacheSizeProvider
+Assimalign.Viu.Components.ComponentContract.ComponentContract(string? displayName, Assimalign.Viu.Components.ComponentRenderCacheSizeProvider! renderCacheSizeProvider, Assimalign.Viu.Components.ComponentFlags flags = Assimalign.Viu.Components.ComponentFlags.InheritFallthroughBindings, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentParameter!>? parameters = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentEvent!>? events = null) -> void
+virtual Assimalign.Viu.Components.ComponentRenderCacheSizeProvider.Invoke() -> int

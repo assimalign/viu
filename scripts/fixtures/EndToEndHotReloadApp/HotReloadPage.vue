@@ -1,6 +1,7 @@
 <template>
     <main class="hot-shell" data-testid="hot-shell">
         <h1 data-testid="hot-heading">Hot reload template v1</h1>
+        <div data-testid="hot-removable">Structural removal baseline</div>
         <p data-testid="hot-count">{{ Count }}</p>
         <button type="button" data-testid="hot-increment" @click="Increment">
             Increment

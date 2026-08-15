@@ -34,8 +34,11 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// pipeline stays value-equatable.
 /// </param>
 /// <param name="RenderCacheSize">
-/// The exact number of per-mount cache slots the frame-based render function uses. Emitted through
-/// <c>ComponentContract.RenderCacheSize</c> so Core creates the mount-owned frame at the compiled size.
+/// The exact number of per-mount cache slots the frame-based render function uses. Emitted as the
+/// body of a stable generated size provider retained by <c>ComponentContract</c>, so Core creates
+/// each mount-owned frame at the currently installed compiled size without changing a static field
+/// initializer during a structural edit. Specified by <c>[SFC-CG-9]</c> and
+/// <c>[SFC-OPT-1]</c> ([V01.01.06.14]).
 /// </param>
 /// <param name="ScopeId">
 /// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one

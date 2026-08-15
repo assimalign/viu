@@ -1194,8 +1194,13 @@ template/script/style marker types. The generator gates emission from configurat
 components implement no public hot-reload metadata interface. For an accepted template or script
 metadata update, mounted renderers MUST remount only affected component instances in the post-flush
 phase; the Browser host MUST retain the current document so the applied in-memory managed delta is
-not discarded by booting stale on-disk assemblies. Rude edits rejected by metadata update remain the
-.NET watch host's rebuild/restart responsibility.
+not discarded by booting stale on-disk assemblies. Adding or removing template elements, or adding a
+structural directive such as `v-if`, MUST remain eligible for that accepted metadata-delta path and
+MUST NOT require a restart because of generated cache-size metadata. A valid newly added component
+file MUST remain eligible for a `NewTypeDefinition` delta when the runtime advertises that capability;
+it MUST NOT remount an unrelated component. Rude edits rejected by metadata update, including an
+authored `@script` member-signature change that the runtime cannot apply, remain the .NET watch host's
+rebuild/restart responsibility [V01.01.06.14] (#350).
 
 `[SFC-CG-5]` **Generated-file identity.** Each emitted component occupies exactly one `AddSource` hint
 name, derived from its path alone as
@@ -1247,6 +1252,18 @@ their dedicated lowering and do not require an application component declaration
 parameterless generated components, because identity resolution does not depend on whether a component
 declares inputs [V01.01.05.11].
 
+`[SFC-CG-9]` **Structural-edit EnC stability.** Across an add-element, remove-element, or structural-
+directive edit to an existing component, the generator-declared type surface MUST remain ordinally
+identical: member names, signatures, kinds, declaration order, modifiers, attributes, and every
+executed static or instance initializer do not change. Structure-dependent values live only in
+replaceable method/accessor bodies; compiler-synthesized members MAY be added only when the active
+runtime capability set permits them. In particular, every template component declares one stable
+`__ViuGetRenderCacheSize` method and its static `ComponentContract` initializer retains that method
+through `ComponentRenderCacheSizeProvider`. The literal slot count appears only in the provider body,
+so a remount after an accepted delta reads the updated count without rerunning the type initializer.
+Generator tests compare the complete body-elided type and preserve all initializers across each
+structural edit [V01.01.06.14] (#350).
+
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost
 expression and closed with `#line default`. The span form is required because a render expression is
@@ -1261,10 +1278,16 @@ render line, falls back to the generated file.
 One cached description MAY occupy multiple positions in one render result, including cache access
 inside list generation; only the immutable description is shared, and every position mounts
 independently [RND-2] [RND-4].
-The generated `ComponentContract.RenderCacheSize` carries the exact non-negative slot count,
-including zero, and Core constructs each mount's frame from that value. The legacy contract
-constructor that predates compiler cache-size metadata alone receives a 64-slot compatibility
-fallback; newly generated contracts always supply the exact value.
+The generated `ComponentContract` retains a stable `ComponentRenderCacheSizeProvider` whose body
+returns the exact non-negative slot count, including zero, required by the currently installed render
+body. Core invokes the provider once while constructing each mount's frame, including a replacement
+mount after structural hot reload [SFC-CG-9]. Structural-directive lowering MUST NOT count a
+property-cache slot when its selected structural code-generation node cannot read that slot; in
+particular, a keyed single-child `v-if` branch MUST NOT retain a side-table-only property-cache slot
+that shifts later indices. The deterministic reserved-slot rule for stringified static runs remains
+unchanged [SFC-OPT-2]. The legacy contract constructor that predates compiler cache-size metadata
+alone receives a 64-slot compatibility fallback; fixed-size code-first contracts keep their explicit
+value [V01.01.06.14] (#350).
 
 `[SFC-OPT-2]` Contiguous runs of cached, stringifiable siblings collapse into a single static
 insert. The thresholds are **`NODE_COUNT = 20`** consecutive stringifiable nodes and

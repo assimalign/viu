@@ -458,7 +458,9 @@ namespace Demo
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Static.SingleFileComponent.g.cs");
-        generated.ShouldContain("renderCacheSize: 1");
+        generated.ShouldContain("private static int __ViuGetRenderCacheSize()");
+        generated.ShouldContain("return 1;");
+        generated.ShouldContain("renderCacheSizeProvider: __ViuGetRenderCacheSize");
         generated.ShouldContain("frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>(0,");
     }
 

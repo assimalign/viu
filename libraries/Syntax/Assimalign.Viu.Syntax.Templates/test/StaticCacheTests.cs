@@ -113,6 +113,24 @@ public class StaticCacheTests
         result.Cached.Count.ShouldBe(0);
     }
 
+    [Fact]
+    public void SingleChildVIf_StaticProperties_DoNotReserveOrphanedCacheSlot()
+    {
+        // [V01.01.06.14]/[SFC-OPT-1] The keyed v-if branch owns a snapshotted vnode call. A
+        // side-table-only property cache would be unreachable from emitted code and would shift every
+        // later slot, so the compiler must not count it.
+        RenderFunctionEmitterResult emitted = Emit(
+            "<main><div class=\"conditional\" v-if=\"show\">visible</div>" +
+            "<p>cached sibling</p></main>",
+            prefixIdentifiers: true);
+
+        emitted.CacheSlotCount.ShouldBe(1);
+        emitted.Code.ShouldContain(
+            "frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>(0");
+        emitted.Code.ShouldNotContain(
+            "frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>(1");
+    }
+
     // ---- the opt-out flag ----
 
     [Fact]

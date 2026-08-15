@@ -21,10 +21,11 @@ public sealed record RenderFunctionEmitterResult
     public required string Code { get; init; }
 
     /// <summary>
-    /// The number of frame-owned cache slots the render function uses for cached subtrees, properties,
-    /// handlers, and memo metadata. The composition root emits this as the component contract's exact
-    /// render-cache size (<c>[SFC-CG-1]</c>). The count must be exact because the per-mount frame allocates
-    /// its cache once at that size.
+    /// The frame-owned cache-array length reserved by compilation for cached subtrees, properties,
+    /// handlers, and memo metadata. The composition root emits this inside the stable provider body
+    /// retained by the component contract (<c>[SFC-CG-9]</c>). The length includes deterministic
+    /// reserved-but-unused positions left by static-run stringification, but excludes property-cache
+    /// positions that structural lowering cannot emit (<c>[SFC-OPT-1]</c>, [V01.01.06.14]).
     /// </summary>
     public required int CacheSlotCount { get; init; }
 

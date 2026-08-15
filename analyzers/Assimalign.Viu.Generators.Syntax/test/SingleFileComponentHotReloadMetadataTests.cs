@@ -100,7 +100,11 @@ public sealed class SingleFileComponentHotReloadMetadataTests
         baseline.GeneratedSource.ShouldNotContain("NormalizeRoot(");
         baseline.GeneratedSource.ShouldContain(
             "global::System.GC.KeepAlive(\"" + baseline.TemplateContentHash + "\");");
-        baseline.GeneratedSource.ShouldContain("renderCacheSize: 0");
+        baseline.GeneratedSource.ShouldContain(
+            "private static int __ViuGetRenderCacheSize()");
+        baseline.GeneratedSource.ShouldContain("return 0;");
+        baseline.GeneratedSource.ShouldContain(
+            "renderCacheSizeProvider: __ViuGetRenderCacheSize");
         baseline.GeneratedSource.ShouldContain(
             "internal static string ExtractedStyles => ");
         baseline.GeneratedSource.ShouldNotContain("RenderCacheSize =>");

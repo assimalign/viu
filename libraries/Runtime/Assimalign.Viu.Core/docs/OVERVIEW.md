@@ -31,8 +31,10 @@ shared load while every mount retains its own wrapper and target activation [BLT
 ## Component lifetime and application composition
 
 Persistent renderer mounts and one-shot server rendering share the same activation core. One
-`ComponentRenderFrame`, sized from the component's compiler contract, is retained per activation;
-only compatibility contracts without cache metadata receive the legacy capacity.
+`ComponentRenderFrame`, sized once per activation from the component contract's fixed value or stable
+compiler provider, is retained per activation; only compatibility contracts without cache metadata
+receive the legacy capacity. A structural hot-reload remount reads the provider's updated method body
+without reinitializing the generated contract ([V01.01.06.14], #350; [SFC-CG-9]).
 `ComponentHost.RenderAsync(ComponentRenderRequest)` returns an
 `IComponentRenderScope` after setup, awaited server prefetch, and one render. Disposing that lease
 aborts the lifetime without client hooks; nested requests use the still-live parent context [SSR-4],

@@ -379,11 +379,18 @@
   <p class="prose">The same nine steps, seen from the generated <code>.viu</code> component's side:</p>
   <pre class="codeblock"><code><span class="kw">partial class</span> <span class="ty">Counter</span> : ComponentBase, <span class="ty">IComponent</span>
 {
+    <span class="kw">private static int</span> __ViuGetRenderCacheSize() <span class="cm">// [SFC-CG-9] body-updatable</span>
+    {
+        <span class="kw">return</span> 3;
+    }
+
     <span class="cm">// ③ read before activation — the contract rides the registration</span>
     <span class="kw">static readonly</span> <span class="ty">ComponentContract</span> __ViuContract = <span class="kw">new</span>(
-        <span class="cm">"Counter"</span>, ComponentFlags.InheritFallthroughBindings,
+        displayName: <span class="cm">"Counter"</span>,
+        flags: ComponentFlags.InheritFallthroughBindings,
         parameters: [<span class="kw">new</span> <span class="ty">ComponentParameter</span>(<span class="cm">"count"</span>, isRequired: <span class="kw">true</span>), <span class="kw">new</span> <span class="ty">ComponentParameter</span>(<span class="cm">"title"</span>)],
-        events:     [<span class="kw">new</span> <span class="ty">ComponentEvent</span>(<span class="cm">"increment"</span>)]);
+        events:     [<span class="kw">new</span> <span class="ty">ComponentEvent</span>(<span class="cm">"increment"</span>)],
+        renderCacheSizeProvider: __ViuGetRenderCacheSize);
 
     <span class="ty">ComponentRenderer</span> IComponent.Setup(<span class="ty">ComponentContext</span> context)   <span class="cm">// ⑦</span>
     {

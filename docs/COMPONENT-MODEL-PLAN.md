@@ -255,10 +255,17 @@ mutable static helper surface by name.
 ```csharp
 partial class Counter : Assimalign.Viu.Components.ComponentBase, IComponent
 {
+    private static int __ViuGetRenderCacheSize()
+    {
+        return 3;
+    }
+
     static readonly ComponentContract __ViuContract = new(
-        "Counter", ComponentFlags.InheritFallthroughBindings,
+        displayName: "Counter",
+        flags: ComponentFlags.InheritFallthroughBindings,
         parameters: [ new ComponentParameter("count", ...) ],
-        events:     [ new ComponentEvent("increment") ]);
+        events:     [ new ComponentEvent("increment") ],
+        renderCacheSizeProvider: __ViuGetRenderCacheSize);
 
     internal static VirtualNode? Render(Counter instance, ComponentRenderFrame frame)
     { /* statement-form block assembly, direct node construction, frozen raw-int patch flags */ }
@@ -537,10 +544,11 @@ source-only-package failure mode). The hot-reload ABI fails the same test in sta
 runtime registry, not one per assembly), and Browser directive tokens are `typeof` identity.
 The resulting three-tier disposition:
 
-1. **Public by necessity** (state/identity crosses assemblies): `ComponentRenderFrame`, node
-   constructors, `ComponentReference`/contract/invocation, normalization statics,
-   `ComponentHotReload` (hidden), Browser directive tokens. Designed API — also the surface
-   code-first components (§9.2) author against, so it earns its public status.
+1. **Public by necessity** (state/identity crosses assemblies): `ComponentRenderFrame`,
+   `ComponentRenderCacheSizeProvider`, node constructors,
+   `ComponentReference`/contract/invocation, normalization statics, `ComponentHotReload` (hidden),
+   Browser directive tokens. Designed API — also the surface code-first components (§9.2) author
+   against, so it earns its public status.
 2. **Dissolved** — statement-form emission turns most former helpers into emitted code shapes
    (list rendering → `foreach`, slot contexts → closures, slot sets → dictionary literals); no
    call remains to hide.
@@ -550,6 +558,16 @@ The resulting three-tier disposition:
    loose source to version-skew against runtime binaries, no analyzer noise in consumer builds,
    and it stays on the one sanctioned metaprogramming path (`[EXE-4]`, ADR-0001) instead of
    adding a second injection channel to maintain.
+
+**Phase 2 refinement ([V01.01.06.14], #350; `[SFC-CG-9]`).** The exact frame-cache requirement is
+also a cross-assembly generated-code seam, but the structure-dependent integer cannot live in the
+initializer of the static contract: that initializer has already executed when an EnC delta arrives.
+Every generated template component therefore has one always-present private
+`__ViuGetRenderCacheSize` method. `ComponentContract` retains it as a
+`ComponentRenderCacheSizeProvider`, and Core invokes it once for each new mount. Structural edits
+replace the provider method and render bodies while leaving the contract/registration fields and the
+entire declared member surface unchanged; the hot-reload remount allocates the three frame arrays at
+the new exact size without adding a branch to render-time cache access.
 
 Wins beyond aesthetics: per-frame state makes failed renders discard cleanly and removes the
 ambient-static blocker on concurrent SSR noted by the earlier critique.

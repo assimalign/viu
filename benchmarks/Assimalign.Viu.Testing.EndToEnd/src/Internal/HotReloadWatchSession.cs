@@ -35,6 +35,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
         _artifactDirectory = Path.GetFullPath(artifactDirectory);
         ViuVersion = viuVersion;
         MainSourcePath = Path.Combine(ProjectDirectory, "HotReloadPage.vue");
+        NewSourcePath = Path.Combine(ProjectDirectory, "NewTypeDefinitionProbe.viu");
         ComponentBundlePath = Path.Combine(
             ProjectDirectory,
             "obj",
@@ -68,6 +69,8 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
 
     internal string MainSourcePath { get; }
 
+    internal string NewSourcePath { get; }
+
     internal string ComponentBundlePath { get; }
 
     internal string CssEventLogPath { get; }
@@ -78,6 +81,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
     {
         RequireFile(ProjectPath, "hot-reload fixture project");
         RequireFile(MainSourcePath, "mounted .vue source");
+        RequireMissingFile(NewSourcePath, "new-type-definition probe source");
         Directory.CreateDirectory(_artifactDirectory);
 
         ProcessStartInfo startInfo = new()
@@ -120,6 +124,9 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
         startInfo.Environment["DOTNET_NOLOGO"] = "1";
         startInfo.Environment["VIU_END_TO_END_BROWSER_LAUNCH_SINK"] = "1";
         startInfo.Environment["ViuConsumerVersion"] = ViuVersion;
+        // [V01.01.06.14], #350: Adding a watched component re-evaluates the staged packaged
+        // project. Its isolated restore graph intentionally omits workload prune-package data.
+        startInfo.Environment["AllowMissingPrunePackageData"] = "true";
 
         _process = new Process { StartInfo = startInfo };
         _process.OutputDataReceived += (_, arguments) =>
@@ -338,6 +345,15 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
             throw new FileNotFoundException(
                 $"The {description} does not exist.",
                 path);
+        }
+    }
+
+    private static void RequireMissingFile(string path, string description)
+    {
+        if (File.Exists(path))
+        {
+            throw new InvalidOperationException(
+                $"The {description} must not exist before the watch session starts: {path}");
         }
     }
 }

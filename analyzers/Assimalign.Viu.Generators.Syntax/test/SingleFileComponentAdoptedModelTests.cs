@@ -49,7 +49,8 @@ public sealed class SingleFileComponentAdoptedModelTests
         generated.ShouldContain(
             "ComponentParameter(\"title\", isRequired: true, parameterType: typeof(string))");
         generated.ShouldContain("ComponentEvent(\"changed\"");
-        generated.ShouldContain("renderCacheSize: ");
+        generated.ShouldContain("private static int __ViuGetRenderCacheSize()");
+        generated.ShouldContain("renderCacheSizeProvider: __ViuGetRenderCacheSize");
         generated.ShouldContain(
             "ComponentReference.ForName(\"ActionButton\")");
         generated.ShouldContain(

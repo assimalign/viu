@@ -33,6 +33,28 @@ public sealed class ComponentRenderFrameTests
     }
 
     [Fact]
+    public void Constructor_UpdatedCompilerProvider_UsesCurrentExactCacheSizeOncePerMount()
+    {
+        // [V01.01.06.14]/[SFC-CG-9] A remount after a structural delta must allocate from the
+        // updated provider body retained by the existing static contract.
+        int currentSize = 1;
+        int providerRuns = 0;
+        ComponentContract contract = new(displayName: null, renderCacheSizeProvider: () =>
+        {
+            providerRuns++;
+            return currentSize;
+        });
+
+        ComponentRenderFrame first = new(contract);
+        currentSize = 4;
+        ComponentRenderFrame second = new(contract);
+
+        first.Cache.Length.ShouldBe(1);
+        second.Cache.Length.ShouldBe(4);
+        providerRuns.ShouldBe(2);
+    }
+
+    [Fact]
     public void CloseBlock_TwoTrackedNodes_ReturnsExactlyThoseNodesInOrder()
     {
         ComponentRenderFrame frame = new();

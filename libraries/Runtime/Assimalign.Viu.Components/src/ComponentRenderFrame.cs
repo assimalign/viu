@@ -39,9 +39,12 @@ public sealed class ComponentRenderFrame
     /// </summary>
     /// <param name="contract">The non-null contract that owns the cache-size declaration.</param>
     /// <remarks>
-    /// Compiler-aware contracts use their exact size, including zero. The 64-slot capacity is
-    /// retained only for compatibility contracts created before the compiler supplied cache-size
-    /// metadata. Specified by <c>[SFC-OPT-1]</c>.
+    /// Compiler-aware contracts use their exact current size, including zero. A generated provider is
+    /// invoked exactly once by this constructor, so a remount after a structural metadata delta uses
+    /// the updated body without adding provider dispatch to render-time cache access. The 64-slot
+    /// capacity is retained only for compatibility contracts created before the compiler supplied
+    /// cache-size metadata. Specified by <c>[SFC-CG-9]</c> and <c>[SFC-OPT-1]</c>
+    /// ([V01.01.06.14]).
     /// </remarks>
     public ComponentRenderFrame(ComponentContract contract)
         : this(ResolveCacheSize(contract))

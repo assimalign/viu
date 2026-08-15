@@ -62,11 +62,20 @@ Only the marker for an edited block receives a changed method body. The .NET met
 `updatedTypes` set can therefore classify the delta by type identity without invoking the patched body.
 This avoids reflection, runtime activation, generated revision delegates, and stale-body hash reads.
 
-The marker methods are the complete per-component hot-reload ABI. The generator deliberately emits no
-revision interface, hash property, static revision field, or inspection getter: changing a `const` or
-static-field initializer is an `ENC0011` rude edit, while changing the body of one marker method gives the
-metadata-update callback the edited block's type identity without requiring Viu to read the patched body.
-Generated style extraction uses an updatable method body for the same reason.
+The marker methods are the complete per-component update-classification ABI. The generator deliberately
+emits no revision interface, hash property, static revision field, or inspection getter: executable
+content stays in method bodies so the metadata-update callback receives the edited block's type identity
+without requiring Viu to inspect a patched value. Generated style extraction uses an updatable method
+body for the same reason.
+
+The same rule now governs the compiler-informed render cache ([V01.01.06.14], #350;
+`[SFC-CG-9]`). Every template component declares one stable `__ViuGetRenderCacheSize` method, and the
+static `ComponentContract` retains it as a `ComponentRenderCacheSizeProvider`. The contract initializer
+therefore stays source-stable while add-element, remove-element, and structural-directive edits replace
+only the provider, render, and template-marker bodies. A remount invokes the retained provider and
+allocates for the updated body. Before this contract, the literal lived in the static readonly contract
+initializer; changing it produced `ENC0118` because the already-executed type initializer could not
+reconstruct the existing object.
 
 ## Consumer-assembly metadata-update handler
 

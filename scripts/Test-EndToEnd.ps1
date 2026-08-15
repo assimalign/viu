@@ -23,9 +23,10 @@
 
 .PARAMETER HotReload
     Runs the isolated packaged Debug .vue watch scenarios instead of the ordinary three-scenario
-    published fixture lane. This mode proves both accepted hot updates and automatic browser reload
-    after a rude-edit restart. It requires Chromium and owns the complete dotnet-watch process tree
-    for its staged consumer.
+    published fixture lane. This mode proves structural add/remove/v-if managed deltas, new-file
+    NewTypeDefinition application, accepted style/template/script updates, and automatic browser
+    reload after a script-signature rude-edit restart. It requires Chromium and owns the complete
+    dotnet-watch process tree for its staged consumer.
 
 .PARAMETER StartupResultsPath
     Destination for startup measurement JSON.
@@ -1142,6 +1143,38 @@ if (-not $HotReload) {
     Invoke-DotNet `
         -Description $harnessDescription `
         -Arguments $harnessArguments.ToArray()
+
+    if ($HotReload) {
+        $hotReloadResultPath = Join-Path $artifactsDirectoryPath 'results.json'
+        if (-not [System.IO.File]::Exists($hotReloadResultPath)) {
+            throw "The hot-reload harness did not write its result summary: $hotReloadResultPath"
+        }
+
+        $hotReloadResult = Get-Content `
+            -Raw `
+            -LiteralPath $hotReloadResultPath |
+            ConvertFrom-Json
+        # [V01.01.06.14], #350, [SFC-CG-4]: keep every structural delta case in
+        # the packaged Mono-WASM lane even if the harness scenario list changes.
+        $requiredHotReloadScenarios = @(
+            'packaged-vue-watch-structural-add-delta',
+            'packaged-vue-watch-structural-remove-delta',
+            'packaged-vue-watch-structural-v-if-delta',
+            'packaged-vue-watch-new-file-new-type-definition-delta')
+        foreach ($requiredHotReloadScenario in $requiredHotReloadScenarios) {
+            $matchingScenarios = @(
+                $hotReloadResult.scenarios |
+                    Where-Object {
+                        $_.scenario -eq $requiredHotReloadScenario
+                    })
+            if ($matchingScenarios.Count -ne 1) {
+                throw "Expected exactly one hot-reload result for '$requiredHotReloadScenario'; found $($matchingScenarios.Count)."
+            }
+            if (-not $matchingScenarios[0].succeeded) {
+                throw "The required hot-reload scenario failed: $requiredHotReloadScenario"
+            }
+        }
+    }
 
     if ($MeasureStartup -and -not [System.IO.File]::Exists(
             [System.IO.Path]::GetFullPath($StartupResultsPath))) {

@@ -105,106 +105,276 @@ internal sealed class EndToEndHarness
             {
                 Headless = !_options.Headed,
             });
-        await RunScenarioAsync(
-            browser,
+        await using IBrowserContext context = await browser.NewContextAsync(
+            new BrowserNewContextOptions
+            {
+                ViewportSize = new ViewportSize
+                {
+                    Width = 1280,
+                    Height = 720,
+                },
+            });
+        List<string> browserErrors = [];
+        List<string> requestFailures = [];
+        IPage page = await context.NewPageAsync();
+        page.Console += (_, message) =>
+        {
+            if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase))
+            {
+                lock (browserErrors)
+                {
+                    browserErrors.Add($"console: {message.Text}");
+                }
+            }
+        };
+        page.PageError += (_, message) =>
+        {
+            lock (browserErrors)
+            {
+                browserErrors.Add($"page: {message}");
+            }
+        };
+        page.RequestFailed += (_, request) =>
+        {
+            if (IsExpectedHotReloadRequestAbort(request))
+            {
+                return;
+            }
+
+            lock (requestFailures)
+            {
+                requestFailures.Add(
+                    $"{request.Method} {request.Url}: {request.Failure}");
+            }
+        };
+
+        // [V01.01.06.14], #350, [SFC-CG-4]: structural template edits keep the
+        // generated member surface stable and apply sequentially to one connected Mono-WASM
+        // document. A fresh page would boot the unchanged on-disk assembly and miss earlier deltas.
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
             BrowserEngine.Chromium,
-            "packaged-vue-watch-rude-edit-restart-reload",
-            page => RunRudeEditRestartScenarioAsync(page, session));
-        await RunScenarioAsync(
-            browser,
+            "packaged-vue-watch-structural-add-delta",
+            browserErrors,
+            requestFailures,
+            connectedPage => RunStructuralAddScenarioAsync(connectedPage, session));
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
+            BrowserEngine.Chromium,
+            "packaged-vue-watch-structural-remove-delta",
+            browserErrors,
+            requestFailures,
+            connectedPage => RunStructuralRemoveScenarioAsync(connectedPage, session));
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
+            BrowserEngine.Chromium,
+            "packaged-vue-watch-structural-v-if-delta",
+            browserErrors,
+            requestFailures,
+            connectedPage => RunStructuralVIfScenarioAsync(connectedPage, session));
+        // [V01.01.06.14], #350: a newly watched component is delivered through
+        // the runtime's NewTypeDefinition capability without restarting the application.
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
+            BrowserEngine.Chromium,
+            "packaged-vue-watch-new-file-new-type-definition-delta",
+            browserErrors,
+            requestFailures,
+            connectedPage => RunNewTypeDefinitionScenarioAsync(connectedPage, session));
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
             BrowserEngine.Chromium,
             "packaged-vue-watch-css-and-remount",
-            page => RunHotReloadScenarioAsync(page, session));
+            browserErrors,
+            requestFailures,
+            connectedPage => RunHotReloadScenarioAsync(connectedPage, session));
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
+            BrowserEngine.Chromium,
+            "packaged-vue-watch-script-signature-restart-reload",
+            browserErrors,
+            requestFailures,
+            connectedPage => RunScriptSignatureRestartScenarioAsync(connectedPage, session));
         await session.StopAsync();
     }
 
-    private static async Task RunRudeEditRestartScenarioAsync(
+    private static async Task RunStructuralAddScenarioAsync(
         IPage page,
         HotReloadWatchSession session)
     {
-        await NavigateAsync(page, session.Address.AbsoluteUri);
+        await NavigateHotReloadAsync(page, session);
         await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
-        await WaitUntilAsync(
-            () => Task.FromResult(
-                session.CountOutputLinesContaining(
-                    "Connected to refresh server.") > 0),
-            "the Playwright page to connect to the browser-refresh server",
-            HotReloadAssertionTimeout);
+        await RequireTextAsync(
+            page,
+            "hot-removable",
+            "Structural removal baseline");
+        string documentToken = await PrepareRemountProbeAsync(page);
+        HotReloadProcessSnapshot snapshot = CaptureHotReloadProcessSnapshot(session);
 
-        string initialPageAddress = page.Url;
-        string documentToken = await page.EvaluateAsync<string>(
-            "() => { const token = `${Date.now()}-${Math.random()}`; "
-            + "globalThis.__viuHotReloadDocumentToken = token; return token; }");
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "        <div data-testid=\"hot-removable\">Structural removal baseline</div>",
+            "        <div data-testid=\"hot-added\">Structural add landed</div>"
+            + Environment.NewLine
+            + "        <div data-testid=\"hot-removable\">Structural removal baseline</div>");
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            snapshot,
+            "the structural element addition to apply as a managed delta");
+        await RequireTextAsync(
+            page,
+            "hot-added",
+            "Structural add landed",
+            HotReloadAssertionTimeout);
+        await RequireTextAsync(page, "hot-count", "0", HotReloadAssertionTimeout);
         await RequireDocumentTokenAsync(page, documentToken);
-        int diagnosticCount = session.CountOutputLinesContaining("ENC0118");
-        int restartCount = session.CountOutputLinesContaining(
-            "Restart is needed to apply the changes.");
-        int applicationStartCount = session.CountOutputLinesContaining(
-            "App url: http://");
-        int exactApplicationStartCount = session.CountOutputLinesContaining(
-            $"App url: {session.Address.AbsoluteUri}");
-        int readinessCount = session.CountOutputLinesContaining(
-            "Now listening on:");
-        int browserReloadCount = session.CountOutputLinesContaining(
-            "Reloading browser.");
+    }
+
+    private static async Task RunStructuralRemoveScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await RequireTextAsync(
+            page,
+            "hot-removable",
+            "Structural removal baseline");
+        await RequireTextAsync(page, "hot-added", "Structural add landed");
+        string documentToken = await PrepareRemountProbeAsync(page);
+        HotReloadProcessSnapshot snapshot = CaptureHotReloadProcessSnapshot(session);
+
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "        <div data-testid=\"hot-removable\">Structural removal baseline</div>",
+            string.Empty);
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            snapshot,
+            "the structural element removal to apply as a managed delta");
+        await RequireAbsentAsync(page, "hot-removable", HotReloadAssertionTimeout);
+        await RequireTextAsync(page, "hot-added", "Structural add landed");
+        await RequireTextAsync(page, "hot-count", "0", HotReloadAssertionTimeout);
+        await RequireDocumentTokenAsync(page, documentToken);
+    }
+
+    private static async Task RunStructuralVIfScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await RequireAbsentAsync(page, "hot-conditional");
+        string documentToken = await PrepareRemountProbeAsync(page);
+        HotReloadProcessSnapshot snapshot = CaptureHotReloadProcessSnapshot(session);
 
         await ReplaceSourceTextAsync(
             session.MainSourcePath,
             "        <p data-testid=\"hot-count\">{{ Count }}</p>",
-            "        <div data-testid=\"hot-rude-edit\">Rude edit landed automatically</div>"
+            "        <div data-testid=\"hot-conditional\" v-if=\"Count > 0\">"
+            + "Conditional element landed</div>"
             + Environment.NewLine
             + "        <p data-testid=\"hot-count\">{{ Count }}</p>");
-
-        await WaitUntilAsync(
-            () => Task.FromResult(
-                session.CountOutputLinesContaining("ENC0118") > diagnosticCount
-                && session.CountOutputLinesContaining(
-                    "Restart is needed to apply the changes.") > restartCount
-                && session.CountOutputLinesContaining(
-                    "App url: http://") > applicationStartCount
-                && session.CountOutputLinesContaining(
-                    $"App url: {session.Address.AbsoluteUri}")
-                    > exactApplicationStartCount
-                && session.CountOutputLinesContaining(
-                    "Now listening on:") > readinessCount
-                && session.CountOutputLinesContaining(
-                    "Reloading browser.") > browserReloadCount),
-            "the rude edit to rebuild and restart on the pinned application address",
-            HotReloadAssertionTimeout);
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            snapshot,
+            "the v-if structural addition to apply as a managed delta");
+        await RequireTextAsync(page, "hot-count", "0", HotReloadAssertionTimeout);
+        await RequireAbsentAsync(page, "hot-conditional", HotReloadAssertionTimeout);
+        await RequireDocumentTokenAsync(page, documentToken);
+        await page.Locator("[data-testid='hot-increment']").ClickAsync();
+        await RequireTextAsync(page, "hot-count", "1");
         await RequireTextAsync(
             page,
-            "hot-rude-edit",
-            "Rude edit landed automatically",
+            "hot-conditional",
+            "Conditional element landed",
             HotReloadAssertionTimeout);
+        await RequireDocumentTokenAsync(page, documentToken);
+    }
 
-        int totalApplicationStarts = session.CountOutputLinesContaining(
-            "App url: http://");
-        int startsAtPinnedAddress = session.CountOutputLinesContaining(
-            $"App url: {session.Address.AbsoluteUri}");
+    private static async Task RunNewTypeDefinitionScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await RequireTextAsync(page, "hot-count", "1");
+        string documentToken = await SetDocumentTokenAsync(page);
+        await RequireDocumentTokenAsync(page, documentToken);
+        await RequireTextAsync(
+            page,
+            "hot-conditional",
+            "Conditional element landed");
+        HotReloadProcessSnapshot snapshot = CaptureHotReloadProcessSnapshot(session);
+        int fileReevaluationCount = session.CountOutputLinesContaining(
+            "File addition triggered re-evaluation:");
+        int newTypeDefinitionCapabilityCount = session.CountOutputLinesContaining(
+            "NewTypeDefinition");
+        int runtimeAppliedUpdateCount = session.CountOutputLinesContaining(
+            "[Browser #1] Updates applied.");
         Require(
-            totalApplicationStarts == startsAtPinnedAddress,
-            "The rude-edit restart changed the application URL or port.");
+            !File.Exists(session.NewSourcePath),
+            $"The new-type-definition probe already exists: {session.NewSourcePath}");
+
+        string temporarySourcePath = Path.Combine(
+            Path.GetTempPath(),
+            Path.GetRandomFileName() + ".pending");
+        try
+        {
+            await File.WriteAllTextAsync(
+                temporarySourcePath,
+                """
+                <template>
+                    <aside data-testid="new-type-probe">{{ Message }}</aside>
+                </template>
+
+                @script {
+                    public string Message => "new type definition";
+                }
+                """,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(temporarySourcePath, session.NewSourcePath);
+        }
+        finally
+        {
+            File.Delete(temporarySourcePath);
+        }
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                session.CountOutputLinesContaining(
+                    "File addition triggered re-evaluation:") > fileReevaluationCount
+                && session.CountOutputLinesContaining(
+                    "NewTypeDefinition") > newTypeDefinitionCapabilityCount),
+            "the new component file to re-evaluate with NewTypeDefinition capability",
+            HotReloadAssertionTimeout);
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            snapshot,
+            "the new component type definition to apply as a managed delta");
+        // The added file is the only semantic change in this batch. The browser acknowledgement
+        // therefore pins runtime application of its NewTypeDefinition delta, not merely capability
+        // advertisement by the watch host.
         Require(
-            string.Equals(
-                page.Url,
-                initialPageAddress,
-                StringComparison.Ordinal)
-            && string.Equals(
-                page.Url,
-                session.Address.AbsoluteUri,
-                StringComparison.Ordinal),
-            "The connected browser did not remain on the pinned application origin.");
-        await RequireDocumentReloadAsync(page);
-        session.RequireRunning();
+            session.CountOutputLinesContaining("[Browser #1] Updates applied.")
+                > runtimeAppliedUpdateCount,
+            "The browser runtime did not acknowledge the new component type definition.");
+        await RequireTextAsync(page, "hot-count", "1");
+        await RequireTextAsync(
+            page,
+            "hot-conditional",
+            "Conditional element landed");
+        await RequireDocumentTokenAsync(page, documentToken);
     }
 
     private static async Task RunHotReloadScenarioAsync(
         IPage page,
         HotReloadWatchSession session)
     {
-        await NavigateAsync(page, session.Address.AbsoluteUri);
         await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
-        await RequireTextAsync(page, "hot-count", "0");
+        await RequireTextAsync(page, "hot-count", "1");
         await RequireStylesheetRulesAsync(
             page,
             ".viu.css",
@@ -215,7 +385,7 @@ internal sealed class EndToEndHarness
             "() => { const token = `${Date.now()}-${Math.random()}`; "
             + "globalThis.__viuHotReloadDocumentToken = token; return token; }");
         await page.Locator("[data-testid='hot-increment']").ClickAsync();
-        await RequireTextAsync(page, "hot-count", "1");
+        await RequireTextAsync(page, "hot-count", "2");
 
         byte[] originalBundleContent = await File.ReadAllBytesAsync(
             session.ComponentBundlePath);
@@ -231,7 +401,7 @@ internal sealed class EndToEndHarness
         Require(
             !originalBundleContent.SequenceEqual(changedBundleContent),
             "The component style edit did not rewrite the generated bundle.");
-        await RequireTextAsync(page, "hot-count", "1");
+        await RequireTextAsync(page, "hot-count", "2");
         await RequireDocumentTokenAsync(page, documentToken);
 
         await Task.Delay(HotReloadNoOperationObservationWindow);
@@ -269,13 +439,18 @@ internal sealed class EndToEndHarness
             session.CountOutputLinesContaining(StaticAssetHotReloadCompletionMessage)
                 == staticAssetUpdateCount,
             "A no-content-change component-style update triggered a static-asset update.");
-        await RequireTextAsync(page, "hot-count", "1");
+        await RequireTextAsync(page, "hot-count", "2");
         await RequireDocumentTokenAsync(page, documentToken);
 
+        HotReloadProcessSnapshot templateSnapshot = CaptureHotReloadProcessSnapshot(session);
         await ReplaceSourceTextAsync(
             session.MainSourcePath,
             "Hot reload template v1",
             "Hot reload template v2");
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            templateSnapshot,
+            "the existing text-edit scenario to apply as a managed delta");
         await RequireTextAsync(
             page,
             "hot-heading",
@@ -290,10 +465,15 @@ internal sealed class EndToEndHarness
 
         await page.Locator("[data-testid='hot-increment']").ClickAsync();
         await RequireTextAsync(page, "hot-count", "1");
+        HotReloadProcessSnapshot scriptBodySnapshot = CaptureHotReloadProcessSnapshot(session);
         await ReplaceSourceTextAsync(
             session.MainSourcePath,
             "CountReference.Value++;",
             "CountReference.Value += 2;");
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            scriptBodySnapshot,
+            "the existing script-body scenario to apply as a managed delta");
         await RequireTextAsync(
             page,
             "hot-count",
@@ -309,6 +489,159 @@ internal sealed class EndToEndHarness
         await RequireDocumentTokenAsync(page, documentToken);
         session.RequireRunning();
     }
+
+    private static async Task RunScriptSignatureRestartScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v2");
+        await RequireTextAsync(page, "hot-count", "2");
+
+        string initialPageAddress = page.Url;
+        string documentToken = await SetDocumentTokenAsync(page);
+        await RequireDocumentTokenAsync(page, documentToken);
+        HotReloadProcessSnapshot snapshot = CaptureHotReloadProcessSnapshot(session);
+        int exactApplicationStartCount = session.CountOutputLinesContaining(
+            $"App url: {session.Address.AbsoluteUri}");
+
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "private void Increment() => CountReference.Value += 2;",
+            "protected virtual void Increment() => CountReference.Value += 3;");
+
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                CountEditAndContinueDiagnostics(session)
+                    > snapshot.EditAndContinueDiagnosticCount
+                && session.CountOutputLinesContaining(
+                    "Restart is needed to apply the changes.") > snapshot.RestartCount
+                && session.CountOutputLinesContaining(
+                    "App url: http://") > snapshot.ApplicationStartCount
+                && session.CountOutputLinesContaining(
+                    $"App url: {session.Address.AbsoluteUri}")
+                    > exactApplicationStartCount
+                && session.CountOutputLinesContaining(
+                    "Now listening on:") > snapshot.ReadinessCount
+                && session.CountOutputLinesContaining(
+                    "Reloading browser.") > snapshot.BrowserReloadCount),
+            "the script-signature edit to rebuild and restart on the pinned application address",
+            HotReloadAssertionTimeout);
+        await RequireTextAsync(
+            page,
+            "hot-heading",
+            "Hot reload template v2",
+            HotReloadAssertionTimeout);
+        await RequireTextAsync(page, "hot-count", "0", HotReloadAssertionTimeout);
+
+        int totalApplicationStarts = session.CountOutputLinesContaining(
+            "App url: http://");
+        int startsAtPinnedAddress = session.CountOutputLinesContaining(
+            $"App url: {session.Address.AbsoluteUri}");
+        Require(
+            totalApplicationStarts == startsAtPinnedAddress,
+            "The script-signature restart changed the application URL or port.");
+        Require(
+            session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage)
+                == snapshot.ManagedCompletionCount,
+            "The rejected script-signature edit unexpectedly completed as a managed delta.");
+        Require(
+            string.Equals(
+                page.Url,
+                initialPageAddress,
+                StringComparison.Ordinal)
+            && string.Equals(
+                page.Url,
+                session.Address.AbsoluteUri,
+                StringComparison.Ordinal),
+            "The connected browser did not remain on the pinned application origin.");
+        await RequireDocumentReloadAsync(page);
+        await page.Locator("[data-testid='hot-increment']").ClickAsync();
+        await RequireTextAsync(page, "hot-count", "3", HotReloadAssertionTimeout);
+        await RequireTextAsync(
+            page,
+            "hot-conditional",
+            "Conditional element landed",
+            HotReloadAssertionTimeout);
+        session.RequireRunning();
+    }
+
+    private static async Task NavigateHotReloadAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        int connectionCount = session.CountOutputLinesContaining(
+            "Connected to refresh server.");
+        await NavigateAsync(page, session.Address.AbsoluteUri);
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                session.CountOutputLinesContaining(
+                    "Connected to refresh server.") > connectionCount),
+            "the Playwright page to connect to the browser-refresh server",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task<string> PrepareRemountProbeAsync(IPage page)
+    {
+        await RequireTextAsync(page, "hot-count", "0");
+        string documentToken = await SetDocumentTokenAsync(page);
+        await RequireDocumentTokenAsync(page, documentToken);
+        await page.Locator("[data-testid='hot-increment']").ClickAsync();
+        await RequireTextAsync(page, "hot-count", "1");
+        return documentToken;
+    }
+
+    private static async Task<string> SetDocumentTokenAsync(IPage page)
+        => await page.EvaluateAsync<string>(
+            "() => { const token = `${Date.now()}-${Math.random()}`; "
+            + "globalThis.__viuHotReloadDocumentToken = token; return token; }");
+
+    private static HotReloadProcessSnapshot CaptureHotReloadProcessSnapshot(
+        HotReloadWatchSession session) => new(
+            session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage),
+            CountEditAndContinueDiagnostics(session),
+            session.CountOutputLinesContaining("Restart is needed to apply the changes."),
+            session.CountOutputLinesContaining("App url: http://"),
+            session.CountOutputLinesContaining("Now listening on:"),
+            session.CountOutputLinesContaining("Reloading browser."));
+
+    private static async Task RequireAcceptedManagedDeltaAsync(
+        HotReloadWatchSession session,
+        HotReloadProcessSnapshot snapshot,
+        string description)
+    {
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage)
+                    > snapshot.ManagedCompletionCount),
+            description,
+            HotReloadAssertionTimeout);
+        await Task.Delay(HotReloadNoOperationObservationWindow);
+        Require(
+            CountEditAndContinueDiagnostics(session)
+                == snapshot.EditAndContinueDiagnosticCount,
+            "An accepted managed update produced an Edit and Continue diagnostic.");
+        Require(
+            session.CountOutputLinesContaining(
+                "Restart is needed to apply the changes.") == snapshot.RestartCount,
+            "An accepted managed update requested an application restart.");
+        Require(
+            session.CountOutputLinesContaining("App url: http://")
+                == snapshot.ApplicationStartCount,
+            "An accepted managed update restarted the application host.");
+        Require(
+            session.CountOutputLinesContaining("Now listening on:")
+                == snapshot.ReadinessCount,
+            "An accepted managed update restarted the packaged Browser run host.");
+        Require(
+            session.CountOutputLinesContaining("Reloading browser.")
+                == snapshot.BrowserReloadCount,
+            "An accepted managed update reloaded the browser document.");
+        session.RequireRunning();
+    }
+
+    private static int CountEditAndContinueDiagnostics(HotReloadWatchSession session) =>
+        session.CountOutputLinesContaining("warning ENC")
+        + session.CountOutputLinesContaining("error ENC");
 
     private static async Task ReplaceSourceTextAsync(
         string path,
@@ -639,6 +972,129 @@ internal sealed class EndToEndHarness
         }
     }
 
+    private async Task RunConnectedHotReloadScenarioAsync(
+        IBrowserContext context,
+        IPage page,
+        BrowserEngine browserEngine,
+        string scenario,
+        List<string> browserErrors,
+        List<string> requestFailures,
+        Func<IPage, Task> execute)
+    {
+        string engineDirectory = Path.Combine(
+            _options.ArtifactDirectory,
+            browserEngine.ToString().ToLowerInvariant());
+        Directory.CreateDirectory(engineDirectory);
+        string screenshotPath = Path.Combine(engineDirectory, scenario + ".png");
+        string tracePath = Path.Combine(engineDirectory, scenario + ".trace.zip");
+        int browserErrorCount;
+        lock (browserErrors)
+        {
+            browserErrorCount = browserErrors.Count;
+        }
+
+        int requestFailureCount;
+        lock (requestFailures)
+        {
+            requestFailureCount = requestFailures.Count;
+        }
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        bool tracingStarted = false;
+        try
+        {
+            await context.Tracing.StartAsync(
+                new TracingStartOptions
+                {
+                    Screenshots = true,
+                    Snapshots = true,
+                    Sources = true,
+                });
+            tracingStarted = true;
+            await execute(page);
+            await Task.Delay(100);
+
+            string[] errors;
+            lock (browserErrors)
+            {
+                errors = browserErrors.Skip(browserErrorCount).ToArray();
+            }
+
+            if (errors.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    "Unexpected browser errors:\n" + string.Join("\n", errors));
+            }
+
+            string[] failedRequests;
+            lock (requestFailures)
+            {
+                failedRequests = requestFailures.Skip(requestFailureCount).ToArray();
+            }
+
+            if (failedRequests.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    "Browser requests failed:\n" + string.Join("\n", failedRequests));
+            }
+
+            await context.Tracing.StopAsync();
+            tracingStarted = false;
+            stopwatch.Stop();
+            _results.Add(
+                new ScenarioResult(
+                    browserEngine.ToString(),
+                    scenario,
+                    true,
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    null,
+                    null,
+                    null));
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+            try
+            {
+                await page.ScreenshotAsync(
+                    new PageScreenshotOptions
+                    {
+                        Path = screenshotPath,
+                        FullPage = true,
+                    });
+            }
+            catch (Exception screenshotException)
+            {
+                File.WriteAllText(
+                    screenshotPath + ".error.txt",
+                    screenshotException.ToString());
+            }
+
+            if (tracingStarted)
+            {
+                try
+                {
+                    await context.Tracing.StopAsync(
+                        new TracingStopOptions { Path = tracePath });
+                }
+                catch (Exception traceException)
+                {
+                    File.WriteAllText(tracePath + ".error.txt", traceException.ToString());
+                }
+            }
+
+            _results.Add(
+                new ScenarioResult(
+                    browserEngine.ToString(),
+                    scenario,
+                    false,
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    exception.ToString(),
+                    screenshotPath,
+                    tracePath));
+        }
+    }
+
     private static bool IsExpectedHotReloadRequestAbort(IRequest request)
     {
         if (!string.Equals(
@@ -954,6 +1410,16 @@ internal sealed class EndToEndHarness
         $"'{testIdentifier}' to contain '{expected}'",
         timeout);
 
+    private static Task RequireAbsentAsync(
+        IPage page,
+        string testIdentifier,
+        TimeSpan? timeout = null) => WaitUntilAsync(
+        async () => await page
+            .Locator($"[data-testid='{testIdentifier}']")
+            .CountAsync() == 0,
+        $"'{testIdentifier}' to be absent",
+        timeout);
+
     private static async Task<string> ReadTextAsync(
         IPage page,
         string testIdentifier)
@@ -1001,4 +1467,12 @@ internal sealed class EndToEndHarness
             throw new InvalidOperationException(message);
         }
     }
+
+    private readonly record struct HotReloadProcessSnapshot(
+        int ManagedCompletionCount,
+        int EditAndContinueDiagnosticCount,
+        int RestartCount,
+        int ApplicationStartCount,
+        int ReadinessCount,
+        int BrowserReloadCount);
 }

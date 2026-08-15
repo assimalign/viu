@@ -37,7 +37,11 @@ internal static class StaticCache
     {
         // The root itself is never cached: a single root element may receive parent fallthrough
         // attributes, so it is not static from the parent's point of view even when its own subtree is.
-        Walk(root, context, IsSingleElementRoot(root, context));
+        Walk(
+            root,
+            context,
+            IsSingleElementRoot(root, context),
+            cacheStaticProperties: true);
     }
 
     private static bool IsSingleElementRoot(RootNode root, TransformContext context)
@@ -47,7 +51,11 @@ internal static class StaticCache
                children[0] is ElementNode { ElementType: not ElementType.Slot };
     }
 
-    private static void Walk(TemplateSyntaxNode node, TransformContext context, bool doNotHoistNode)
+    private static void Walk(
+        TemplateSyntaxNode node,
+        TransformContext context,
+        bool doNotHoistNode,
+        bool cacheStaticProperties)
     {
         var children = ChildrenOf(node, context);
         if (children is null)
@@ -78,7 +86,7 @@ internal static class StaticCache
                         continue;
                     }
                 }
-                else
+                else if (cacheStaticProperties)
                 {
                     // The element may have dynamic children, but its props can still be eligible for caching.
                     if (context.GetCodegenNode(element) is VirtualNodeCall { Properties: { } props } codegenNode)
@@ -103,7 +111,11 @@ internal static class StaticCache
                         context.ScopeVSlot++;
                     }
 
-                    Walk(descendant, context, doNotHoistNode: false);
+                    Walk(
+                        descendant,
+                        context,
+                        doNotHoistNode: false,
+                        cacheStaticProperties: true);
                     if (isComponent)
                     {
                         context.ScopeVSlot--;
@@ -112,25 +124,51 @@ internal static class StaticCache
                     break;
                 case WorkingFor workingFor:
                     // A single v-for child stays a block, so do not hoist it.
-                    Walk(workingFor, context, doNotHoistNode: workingFor.Children.Count == 1);
+                    Walk(
+                        workingFor,
+                        context,
+                        doNotHoistNode: workingFor.Children.Count == 1,
+                        cacheStaticProperties: true);
                     break;
                 case ForNode forNode:
-                    Walk(forNode, context, doNotHoistNode: forNode.Children.Count == 1);
+                    Walk(
+                        forNode,
+                        context,
+                        doNotHoistNode: forNode.Children.Count == 1,
+                        cacheStaticProperties: true);
                     break;
                 case WorkingIf workingIf:
+                {
                     foreach (var branch in workingIf.Branches)
                     {
-                        Walk(branch, context, doNotHoistNode: branch.Children.Count == 1);
+                        bool hasSingleChild = branch.Children.Count == 1;
+                        // [V01.01.06.14]/[SFC-OPT-1] A one-child v-if branch injects its key into a
+                        // code-generation node snapshotted before this pass. Replacing only the
+                        // element side-table entry would reserve a property-cache slot that the
+                        // emitted conditional can never read.
+                        Walk(
+                            branch,
+                            context,
+                            doNotHoistNode: hasSingleChild,
+                            cacheStaticProperties: !hasSingleChild);
                     }
 
                     break;
+                }
                 case IfNode ifNode:
+                {
                     foreach (var branch in ifNode.Branches)
                     {
-                        Walk(branch, context, doNotHoistNode: branch.Children.Count == 1);
+                        bool hasSingleChild = branch.Children.Count == 1;
+                        Walk(
+                            branch,
+                            context,
+                            doNotHoistNode: hasSingleChild,
+                            cacheStaticProperties: !hasSingleChild);
                     }
 
                     break;
+                }
             }
         }
 

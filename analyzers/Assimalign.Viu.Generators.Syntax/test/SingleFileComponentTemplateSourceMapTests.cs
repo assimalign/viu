@@ -301,6 +301,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
                     protected ComponentContext? Context { get; set; }
                 }
                 internal delegate VirtualNode? ComponentRenderer(ComponentRenderFrame frame);
+                internal delegate int ComponentRenderCacheSizeProvider();
                 internal interface IComponent
                 {
                     ComponentRenderer Setup(ComponentContext context);
@@ -313,7 +314,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
                         ComponentFlags flags = default,
                         object? parameters = null,
                         object? events = null,
-                        int renderCacheSize = 0) { }
+                        ComponentRenderCacheSizeProvider? renderCacheSizeProvider = null) { }
                 }
                 internal sealed class ComponentReference
                 {

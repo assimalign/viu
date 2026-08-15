@@ -4,9 +4,10 @@
     app hosting two things on CoreCLR (never a browser, never trimmed/AOT'd — like a test project):
 
       1. BenchmarkDotNet micro/meso benchmarks of the pure-.NET hot paths the architecture bets on —
-         reactivity track/trigger, renderer diff/patch over the in-memory test adapter, and compiled
-         direct-write server rendering against virtual-tree traversal. Wall-clock numbers are
-         environment-relative, so they are published as artifacts, never a CI gate.
+         reactivity track/trigger, component render-frame contract/cache setup ([V01.01.06.14], #350),
+         renderer diff/patch over the in-memory test adapter, and compiled direct-write server rendering
+         against virtual-tree traversal. Wall-clock numbers are environment-relative, so they are
+         published as artifacts, never a CI gate.
       2. A deterministic interop-count harness: it drives the js-framework-benchmark scenarios through
          the same in-memory adapter and counts node operations. Op count is the DOM-free proxy for
          JSImport crossings (Assimalign.Viu.Testing's op log == "N node ops == N interop calls"), so it

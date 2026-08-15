@@ -373,6 +373,20 @@ public static class SingleFileComponentSourceEmitter
         string displayName)
     {
         AppendIndent(builder, indent);
+        builder.Append("/// <summary>Reports the render-cache size required by the current render body.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// <remarks>Body-resident for structural hot reload. Specified by <c>[SFC-CG-9]</c> ([V01.01.06.14]).</remarks>\n");
+        AppendIndent(builder, indent);
+        builder.Append("private static int __ViuGetRenderCacheSize()\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("return ").Append(Count(model.RenderCacheSize)).Append(";\n");
+        AppendIndent(builder, indent);
+        builder.Append("}\n");
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
         builder.Append("/// <summary>The immutable component contract read before activation.</summary>\n");
         AppendIndent(builder, indent);
         builder.Append("internal static readonly ").Append(ComponentsNamespace)
@@ -407,7 +421,7 @@ public static class SingleFileComponentSourceEmitter
         }
 
         AppendIndent(builder, indent + 1);
-        builder.Append("renderCacheSize: ").Append(Count(model.RenderCacheSize)).Append(");\n");
+        builder.Append("renderCacheSizeProvider: __ViuGetRenderCacheSize);\n");
     }
 
     private static void AppendContractParameters(

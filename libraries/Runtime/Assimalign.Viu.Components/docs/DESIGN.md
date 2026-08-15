@@ -64,9 +64,12 @@ application composition; they do not add convention-specific context members or 
 ## Generated-code ABI
 
 `ComponentRenderFrame` is per mount. It owns block tracking and the exact contract-declared cache
-used by compiled renderers for static subtree identity, stable handlers, and memo snapshots. Generated
+used by compiled renderers for static subtree identity, stable handlers, and memo snapshots. A
+generated contract retains `ComponentRenderCacheSizeProvider`; frame construction invokes it once per
+mount so a structural metadata delta can update the size in a method body without changing an
+already-executed static initializer ([V01.01.06.14], #350; `[SFC-CG-9]`, `[SFC-OPT-1]`). Generated
 code calls through its frame parameter and qualified public APIs, not mutable static helper state
-(`[SFC-CG-2]`, `[SFC-OPT-1]`).
+(`[SFC-CG-2]`).
 
 `RenderPlan`, `PatchFlags`, `ShapeFlags`, and `SlotStability` are data contracts between compiled output
 and Core. Their meanings and numeric layouts are frozen; Core may optimize only when the supplied

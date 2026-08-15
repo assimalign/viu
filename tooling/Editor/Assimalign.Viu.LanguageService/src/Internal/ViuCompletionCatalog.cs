@@ -209,8 +209,9 @@ internal static class ViuCompletionCatalog
             "Declares an asynchronous template event handler.",
             "public async Task $1()\n{\n\t$0\n}",
             "06"),
-        // The generator scaffold's only other author-facing member. Render and RenderCacheSize are
-        // compiler-owned and must never be offered (SingleFileComponentSourceEmitter).
+        // The generator scaffold's only other author-facing member. The render method and stable
+        // render-cache-size provider are compiler-owned and must never be offered
+        // (SingleFileComponentSourceEmitter, [SFC-CG-9]).
         Snippet(
             "OnSetup",
             "partial void OnSetup()",

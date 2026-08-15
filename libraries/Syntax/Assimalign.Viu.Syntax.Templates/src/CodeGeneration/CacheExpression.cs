@@ -3,8 +3,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// A code-generation cache-slot expression: the value is computed once and stored in the render function's
 /// per-instance cache array at <see cref="Index"/>, then reused. Produced by <c>v-once</c> (cached
-/// subtree) and by cached event handlers. The slot count becomes the generated
-/// <c>RenderCacheSize</c> constant (<c>[SFC-CG-1]</c>).
+/// subtree) and by cached event handlers. The final reserved slot span becomes the body of the generated
+/// stable render-cache-size provider (<c>[SFC-CG-9]</c>, <c>[SFC-OPT-1]</c>).
 /// </summary>
 public sealed record CacheExpression : TemplateSyntaxNode
 {

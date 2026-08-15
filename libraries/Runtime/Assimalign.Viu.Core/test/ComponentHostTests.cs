@@ -35,6 +35,28 @@ public sealed class ComponentHostTests
     }
 
     [Fact]
+    public async Task RenderAsync_RetainedCompilerProvider_UsesCurrentSizeForEachActivation()
+    {
+        // [V01.01.06.14]/[SFC-CG-9] Core retains the generated registration and contract across
+        // hot reload; a replacement activation must read the updated provider body.
+        int currentSize = 2;
+        int providerRuns = 0;
+        ComponentContract contract = new(displayName: null, renderCacheSizeProvider: () =>
+        {
+            providerRuns++;
+            return currentSize;
+        });
+
+        string first = await RenderCacheSizeAsync(contract);
+        currentSize = 6;
+        string second = await RenderCacheSizeAsync(contract);
+
+        first.ShouldBe("2");
+        second.ShouldBe("6");
+        providerRuns.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task RenderAsync_RawInvocation_ProducesNormalizedBindingsAndFreshTree()
     {
         var reference = ComponentReference.ForType(typeof(GreetingComponent));

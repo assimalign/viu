@@ -38,10 +38,12 @@ surface never exposes an enum-keyed callback registry.
 A `ComponentRenderer` receives its mount's `ComponentRenderFrame` — the per-mount render cache
 and block assembly — so there is no ambient render-helper state and no public static helper
 class; compiled output binds through the frame parameter, never through statics imported by name.
-The frame supports nested/disabled block tracking, compiler-sized cache slots, stable handler caching, and
-memo dependency snapshots. Block snapshots preserve ordered occurrences, including repeated node
-references; cached static subtrees retain description identity for one mount while every render
-position keeps independent mounted state ([RND-2], [RND-4], [SFC-OPT-1]).
+The frame supports nested/disabled block tracking, exact compiler-sized cache slots read once per mount
+through the contract's stable `ComponentRenderCacheSizeProvider`, stable handler caching, and memo
+dependency snapshots. The provider keeps structural edits method-body-shaped while a remount allocates
+the current size ([V01.01.06.14], #350; [SFC-CG-9]). Block snapshots preserve ordered occurrences,
+including repeated node references; cached static subtrees retain description identity for one mount
+while every render position keeps independent mounted state ([RND-2], [RND-4], [SFC-OPT-1]).
 Code-first components are `ComponentRegistration.Define(name, contract, setup)` wrapping a
 `ComponentSetup` delegate (composition-only per
 [ADR-0004](../../../../docs/adr/0004-composition-only-component-model.md); no options-object

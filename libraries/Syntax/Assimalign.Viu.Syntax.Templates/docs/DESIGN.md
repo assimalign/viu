@@ -308,11 +308,13 @@ What code generation requires of each DOM member, mapped to the runtime machiner
 The generated render method itself is the generator's contract:
 `private static global::Assimalign.Viu.Components.VirtualNode? __ViuRender(<ComponentClass> component,
 global::Assimalign.Viu.Components.ComponentRenderFrame frame)`. The generator records the emitter's
-cache-slot count in `ComponentContract.renderCacheSize`, so Core creates the mount-owned frame at exactly
-the compiled size. The method returns the closed-algebra node directly; no root-normalization shim sits
-between generated code and the renderer. The compiled-fixture suite builds generator-emitted `.viu` and
-compatible `.vue` components against the shipping packages and drives them through the runtime, providing
-the end-to-end proof deferred from [V01.01.05.05].
+cache-slot count in the body of an always-present `__ViuGetRenderCacheSize` method and retains that
+method through the `ComponentContract` provider, so Core creates the mount-owned frame at exactly the
+currently installed size without changing a static initializer during structural hot reload
+([V01.01.06.14], #350; `[SFC-CG-9]`). The method returns the closed-algebra node directly; no
+root-normalization shim sits between generated code and the renderer. The compiled-fixture suite builds
+generator-emitted `.viu` and compatible `.vue` components against the shipping packages and drives
+them through the runtime, providing the end-to-end proof deferred from [V01.01.05.05].
 
 ### Render source mapping ([V01.01.05.08])
 
