@@ -1,5 +1,7 @@
 # Viu Utilities for Visual Studio
 
+![Viu logo](https://raw.githubusercontent.com/assimalign/viu/main/assets/branding/png/on-light/viu-256.png)
+
 Utility CSS IntelliSense for Visual Studio's modern HTML editor, delivered by a standalone language
 server and rendered through Visual Studio's standard Language Server Protocol client.
 

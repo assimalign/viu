@@ -38,5 +38,6 @@
 		<Description Condition="'$(ViuSdkBrowserPackage)' == 'true'">Viu Browser application SDK with WebAssembly hosting, Browser framework, static assets, CSS bundling, and hot reload.</Description>
 		<PackageTags Condition="'$(ViuSdkBrowserPackage)' != 'true'">Sdk;MSBuild;Viu;Components</PackageTags>
 		<PackageTags Condition="'$(ViuSdkBrowserPackage)' == 'true'">Sdk;MSBuild;Viu;WebAssembly;Browser</PackageTags>
+		<ViuPackageReadmeSource>$(MSBuildThisFileDirectory)README.md</ViuPackageReadmeSource>
 	</PropertyGroup>
 </Project>

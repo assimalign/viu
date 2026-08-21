@@ -205,6 +205,8 @@ Copy-Item -LiteralPath $extensionPackagePath -Destination $packagedExtension -Fo
 $requiredEntries = @(
     'extension.vsixmanifest',
     'Assimalign.Viu.UtilityCss.VisualStudio.dll',
+    'Branding/on-light/viu-32.png',
+    'Branding/on-light/viu-256.png',
     'language-server.json',
     'LanguageServer/win-x64/Assimalign.Viu.UtilityCss.LanguageServer.exe',
     'LanguageServer/win-arm64/Assimalign.Viu.UtilityCss.LanguageServer.exe'
@@ -275,6 +277,16 @@ try {
     }
     if ($identity.Publisher -ne 'Assimalign') {
         throw "Unexpected Viu Utility CSS VSIX publisher: $($identity.Publisher)."
+    }
+
+    $metadata = $manifest.SelectSingleNode(
+        '/vsix:PackageManifest/vsix:Metadata',
+        $namespaceManager)
+    if ($metadata.Icon -ne 'Branding\on-light\viu-32.png') {
+        throw "Unexpected Viu Utility CSS extension icon: $($metadata.Icon)."
+    }
+    if ($metadata.PreviewImage -ne 'Branding\on-light\viu-256.png') {
+        throw "Unexpected Viu Utility CSS extension preview image: $($metadata.PreviewImage)."
     }
 
     $entryCount = $entryNames.Count

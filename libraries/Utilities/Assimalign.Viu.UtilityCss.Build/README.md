@@ -1,5 +1,7 @@
 # Assimalign.Viu.UtilityCss.Build
 
+[![NuGet version](https://img.shields.io/nuget/v/Assimalign.Viu.UtilityCss.Build?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.UtilityCss.Build) [![NuGet downloads](https://img.shields.io/nuget/dt/Assimalign.Viu.UtilityCss.Build?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.UtilityCss.Build)
+
 Add one private build reference to generate utility CSS from `.viu`, `.vue`, `.razor`, `.cshtml`, `.html`, and `.htm` files.
 
 ```xml

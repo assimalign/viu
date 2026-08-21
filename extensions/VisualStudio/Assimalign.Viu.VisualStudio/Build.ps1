@@ -206,6 +206,12 @@ $requiredEntries = @(
     'extension.vsixmanifest',
     'Assimalign.Viu.VisualStudio.dll',
     'Assimalign.Viu.VisualStudio.pkgdef',
+    'ViuFileIcon.imagemanifest',
+    'Branding/on-light/viu-16.png',
+    'Branding/on-light/viu-32.png',
+    'Branding/on-light/viu-256.png',
+    'Branding/on-dark/viu-16.png',
+    'Branding/on-dark/viu-32.png',
     'language-server.json',
     'LanguageServer/win-x64/Assimalign.Viu.LanguageServer.exe',
     'LanguageServer/win-arm64/Assimalign.Viu.LanguageServer.exe'
@@ -245,6 +251,24 @@ try {
         $namespaceManager)
     if ($null -eq $packageAsset) {
         throw 'The packaged extension declares no Microsoft.VisualStudio.VsPackage asset, so the .viu file-extension claim would never be registered.'
+    }
+
+    $imageManifestAsset = $manifest.SelectSingleNode(
+        "/vsix:PackageManifest/vsix:Assets/vsix:Asset[@Type='Microsoft.VisualStudio.ImageManifest']",
+        $namespaceManager)
+    if ($null -eq $imageManifestAsset -or
+        $imageManifestAsset.Path -ne 'ViuFileIcon.imagemanifest') {
+        throw 'The packaged extension does not declare ViuFileIcon.imagemanifest as its Visual Studio Image Manifest asset.'
+    }
+
+    $metadata = $manifest.SelectSingleNode(
+        '/vsix:PackageManifest/vsix:Metadata',
+        $namespaceManager)
+    if ($metadata.Icon -ne 'Branding\on-light\viu-32.png') {
+        throw "Unexpected Visual Studio extension icon: $($metadata.Icon)."
+    }
+    if ($metadata.PreviewImage -ne 'Branding\on-light\viu-256.png') {
+        throw "Unexpected Visual Studio extension preview image: $($metadata.PreviewImage)."
     }
 
     $entryCount = $entryNames.Count

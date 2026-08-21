@@ -113,6 +113,17 @@
               PackagePath="\" />
     </ItemGroup>
 
+    <!--
+        Every shipped package embeds the same purpose-built NuGet icon. SDK and framework pack
+        producers import this target through their Directory.Build.targets chains, so their
+        custom archive layouts retain the same central branding contract as ordinary libraries.
+    -->
+    <ItemGroup Condition="'$(IsPackable)' != 'false'">
+        <None Include="$(ViuPackageIconSource)"
+              Pack="true"
+              PackagePath="\" />
+    </ItemGroup>
+
     <!-- Every package embeds the repository license named by PackageLicenseFile. -->
     <ItemGroup Condition="'$(IsPackable)' != 'false'">
         <None Include="$(ViuRepositoryDirectory)LICENSE"

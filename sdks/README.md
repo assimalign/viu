@@ -1,5 +1,7 @@
 # Viu SDKs
 
+[![Assimalign.Viu.Sdk version](https://img.shields.io/nuget/v/Assimalign.Viu.Sdk?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.Sdk) [![Assimalign.Viu.Sdk downloads](https://img.shields.io/nuget/dt/Assimalign.Viu.Sdk?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.Sdk) [![Assimalign.Viu.Sdk.Browser version](https://img.shields.io/nuget/v/Assimalign.Viu.Sdk.Browser?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.Sdk.Browser) [![Assimalign.Viu.Sdk.Browser downloads](https://img.shields.io/nuget/dt/Assimalign.Viu.Sdk.Browser?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.Sdk.Browser)
+
 Viu ships two compositional MSBuild project SDKs. Choose by consumer shape:
 
 | Project SDK | Consumer | SDK chain | Viu framework |

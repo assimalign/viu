@@ -1,5 +1,7 @@
 # Viu for Visual Studio
 
+![Viu logo](https://raw.githubusercontent.com/assimalign/viu/main/assets/branding/png/on-light/viu-256.png)
+
 Viu for Visual Studio adds editing support for Viu single-file components (`.viu`) to Visual Studio.
 One package: the `.viu` file association, the Viu color theme, and the Viu language server.
 
@@ -14,7 +16,8 @@ One package: the `.viu` file association, the Viu color theme, and the Viu langu
   expressions color with Visual Studio's own C# classifications, so embedded code looks exactly like
   the C# in the file next to it
 - **`.viu` opens in the right editor automatically.** The package registers the file extension, so
-  there is no per-file Open With step
+  there is no per-file Open With step, and the Viu logo identifies components in Solution Explorer
+  and editor tabs
 - **Auto-closing that knows which section you are in.** `{`, `(`, and `[` pair everywhere — typing
   `{` twice gives you `{{}}` for an interpolation. Quotes pair only where they mean a string, so an
   apostrophe in template prose stays an apostrophe. Typing `>` after an open tag inserts its end tag

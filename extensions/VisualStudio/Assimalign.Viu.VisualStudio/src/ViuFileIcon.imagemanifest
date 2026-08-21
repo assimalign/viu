@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns="http://schemas.microsoft.com/VisualStudio/ImageManifestSchema/2014">
+  <Symbols>
+    <String Name="Resources" Value="/Assimalign.Viu.VisualStudio;Component/Branding" />
+    <Guid Name="ViuImageAssets" Value="{6aa672fb-e43f-4822-9353-30fb3069a6e0}" />
+    <ID Name="ViuFile" Value="1" />
+  </Symbols>
+  <Images>
+    <!-- The paired sources are authored for their named backgrounds. Keeping inversion disabled
+         preserves the Viu palette while allowing the Image Service to select the correct size and
+         theme for Solution Explorer and editor tabs. -->
+    <Image Guid="$(ViuImageAssets)" ID="$(ViuFile)" AllowColorInversion="false">
+      <Source Uri="$(Resources)/on-light/viu-16.png" Background="Light">
+        <Size Value="16" />
+      </Source>
+      <Source Uri="$(Resources)/on-light/viu-32.png" Background="Light">
+        <Size Value="32" />
+      </Source>
+      <Source Uri="$(Resources)/on-dark/viu-16.png" Background="Dark">
+        <Size Value="16" />
+      </Source>
+      <Source Uri="$(Resources)/on-dark/viu-32.png" Background="Dark">
+        <Size Value="32" />
+      </Source>
+      <Source Uri="$(Resources)/on-light/viu-16.png" Background="HighContrastLight">
+        <Size Value="16" />
+      </Source>
+      <Source Uri="$(Resources)/on-light/viu-32.png" Background="HighContrastLight">
+        <Size Value="32" />
+      </Source>
+      <Source Uri="$(Resources)/on-dark/viu-16.png" Background="HighContrastDark">
+        <Size Value="16" />
+      </Source>
+      <Source Uri="$(Resources)/on-dark/viu-32.png" Background="HighContrastDark">
+        <Size Value="32" />
+      </Source>
+    </Image>
+  </Images>
+  <ImageLists />
+</ImageManifest>

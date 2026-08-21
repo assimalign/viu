@@ -512,9 +512,38 @@ function Assert-ViuReleasePackageSet {
             }
             $readme = $metadata.SelectSingleNode("./*[local-name()='readme']")
             $readmePath = if ($null -eq $readme) { '' } else { $readme.InnerText }
-            if ([string]::IsNullOrWhiteSpace($readmePath) -or
-                $null -eq $archive.GetEntry($readmePath)) {
+            $readmeEntry = if ([string]::IsNullOrWhiteSpace($readmePath)) {
+                $null
+            }
+            else {
+                $archive.GetEntry($readmePath)
+            }
+            if ($null -eq $readmeEntry) {
                 throw "$packageId must declare and embed a package README."
+            }
+            $readmeReader = [System.IO.StreamReader]::new($readmeEntry.Open())
+            try {
+                $readmeContent = $readmeReader.ReadToEnd()
+            }
+            finally {
+                $readmeReader.Dispose()
+            }
+            foreach ($badgeKind in @('v', 'dt')) {
+                $badgeUrl = "https://img.shields.io/nuget/$badgeKind/$packageId"
+                if (-not $readmeContent.Contains(
+                        $badgeUrl,
+                        [System.StringComparison]::Ordinal)) {
+                    throw "$packageId package README must contain its own NuGet $badgeKind badge."
+                }
+            }
+            $icon = $metadata.SelectSingleNode("./*[local-name()='icon']")
+            $iconPath = if ($null -eq $icon) { '' } else { $icon.InnerText }
+            if ($iconPath -ne 'viu-nuget-dark-128.png' -or
+                $null -eq $archive.GetEntry($iconPath)) {
+                throw "$packageId must declare and embed the canonical Viu NuGet icon."
+            }
+            if ($null -ne $metadata.SelectSingleNode("./*[local-name()='iconUrl']")) {
+                throw "$packageId must not declare the obsolete package icon URL fallback."
             }
 
             $repository = $metadata.repository

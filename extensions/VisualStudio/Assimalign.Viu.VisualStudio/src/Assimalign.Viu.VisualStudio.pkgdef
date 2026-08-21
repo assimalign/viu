@@ -24,6 +24,12 @@
 // See extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md, "File extension
 // ownership".
 
+// The Viu image manifest binds this stable GUID/ID moniker to separate light- and dark-background
+// 16- and 32-pixel sources. ShellFileAssociations is the Visual Studio 2022+ path used by Solution
+// Explorer and editor tabs; it is independent of editor-factory ownership below.
+[$RootKey$\ShellFileAssociations\.viu]
+"DefaultIconMoniker"="6aa672fb-e43f-4822-9353-30fb3069a6e0:1"
+
 // Source Code (Text) Editor
 [$RootKey$\Editors\{8B382828-6202-11D1-8870-0000F87579D2}\Extensions]
 "viu"=dword:00000032

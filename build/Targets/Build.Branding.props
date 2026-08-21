@@ -6,6 +6,7 @@
         <RepositoryUrl>https://github.com/assimalign/viu</RepositoryUrl>
         <PackageProjectUrl>https://github.com/assimalign/viu</PackageProjectUrl>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageIcon>viu-nuget-dark-128.png</PackageIcon>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <Authors>Assimalign</Authors>
         <Description>$(MSBuildProjectName) is part of Viu, a C#/.NET UI framework for WebAssembly.</Description>
@@ -15,6 +16,12 @@
             Whether to keep it is a product decision; see docs/SPECIFICATION.md §9.
         -->
         <PackageTags>Viu;Vue;WebAssembly;WASM;dotnet</PackageTags>
+
+        <!--
+            The package icon is an imported branding artifact. Keep its repository location
+            separate from PackageIcon, which is the path NuGet records inside the archive.
+        -->
+        <ViuPackageIconSource>$(ViuRepositoryDirectory)assets\branding\nuget\$(PackageIcon)</ViuPackageIconSource>
 
         <!--
             .NET 10 carries the Git providers and SourceLink tasks in the SDK, so no external

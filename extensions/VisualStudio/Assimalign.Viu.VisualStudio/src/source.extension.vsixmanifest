@@ -12,6 +12,8 @@
     <DisplayName>Viu for Visual Studio</DisplayName>
     <Description xml:space="preserve">Editing support for Viu single-file components: the Viu color theme for templates, styles, and embedded C#, and the .viu file association. Semantic features are served by a separate Viu language-server process.</Description>
     <MoreInfo>https://github.com/assimalign/viu</MoreInfo>
+    <Icon>Branding\on-light\viu-32.png</Icon>
+    <PreviewImage>Branding\on-light\viu-256.png</PreviewImage>
     <Preview>true</Preview>
   </Metadata>
   <Installation>
@@ -60,5 +62,9 @@
     <Asset Type="Microsoft.VisualStudio.VsPackage"
            d:Source="File"
            Path="Assimalign.Viu.VisualStudio.pkgdef" />
+    <!-- Registers the custom GUID/ID moniker used by the .viu ShellFileAssociations entry. -->
+    <Asset Type="Microsoft.VisualStudio.ImageManifest"
+           d:Source="File"
+           Path="ViuFileIcon.imagemanifest" />
   </Assets>
 </PackageManifest>

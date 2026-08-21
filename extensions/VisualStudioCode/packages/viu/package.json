@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "publisher": "assimalign",
   "license": "MIT",
+  "icon": "assets/branding/viu-on-light-256.png",
   "preview": true,
   "private": true,
   "repository": {
@@ -40,7 +41,11 @@
         "extensions": [
           ".viu"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./assets/branding/viu-on-light-32.png",
+          "dark": "./assets/branding/viu-on-dark-32.png"
+        }
       }
     ],
     "grammars": [

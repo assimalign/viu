@@ -1,5 +1,7 @@
 # Assimalign.Viu.UtilityCss
 
+[![NuGet version](https://img.shields.io/nuget/v/Assimalign.Viu.UtilityCss?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.UtilityCss) [![NuGet downloads](https://img.shields.io/nuget/dt/Assimalign.Viu.UtilityCss?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.UtilityCss)
+
 A standalone .NET utility CSS engine for programmatic build and editor integrations.
 
 ```xml

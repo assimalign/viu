@@ -9,3 +9,5 @@ tsconfig.json
 Build.ps1
 **/*.ts
 !out/**/*.js
+!assets/branding/*.png
+!LICENSE

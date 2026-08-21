@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "publisher": "assimalign",
   "license": "MIT",
+  "icon": "assets/branding/viu-on-light-256.png",
   "preview": true,
   "private": true,
   "repository": {

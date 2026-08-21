@@ -1,5 +1,7 @@
 # Viu project templates
 
+[![NuGet version](https://img.shields.io/nuget/v/Assimalign.Viu.Templates?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.Templates) [![NuGet downloads](https://img.shields.io/nuget/dt/Assimalign.Viu.Templates?logo=nuget)](https://www.nuget.org/packages/Assimalign.Viu.Templates)
+
 `Assimalign.Viu.Templates` installs two `dotnet new` templates for the current Viu SDK and
 shared-framework package model ([V01.01.12.04]):
 

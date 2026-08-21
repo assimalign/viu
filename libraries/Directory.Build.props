@@ -3,5 +3,8 @@
   <PropertyGroup>
 		<TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
         <IsAotCompatible>true</IsAotCompatible>
+        <!-- Every library package carries the library catalog, whose badge table contains that
+             package's own version and download badges. Package-specific projects may override it. -->
+        <ViuPackageReadmeSource>$(MSBuildThisFileDirectory)README.md</ViuPackageReadmeSource>
     </PropertyGroup>
 </Project>

@@ -5,6 +5,7 @@
     <PackageType>Template</PackageType>
     <Description>Project templates for Viu Browser WebAssembly applications and host-neutral component libraries.</Description>
     <PackageTags>dotnet-new;templates;Viu;WebAssembly;Components</PackageTags>
+    <ViuPackageReadmeSource>$(MSBuildProjectDirectory)\README.md</ViuPackageReadmeSource>
     <IsPackable>true</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <!-- A content-only dotnet-new pack has no PDB payload from which NuGet could create a snupkg. -->

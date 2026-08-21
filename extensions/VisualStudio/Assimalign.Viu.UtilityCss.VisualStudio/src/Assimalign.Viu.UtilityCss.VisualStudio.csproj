@@ -78,6 +78,16 @@
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- The Visual Studio Marketplace metadata supports one non-themed icon and preview image.
+         Link the on-light artwork from the repository's imported branding source of truth. -->
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-32.png"
+             Link="Branding\on-light\viu-32.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-256.png"
+             Link="Branding\on-light\viu-256.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
   </ItemGroup>
 
   <!-- The manifest version follows VersionPrefix, so the root Build.ps1 -Version argument drives
