@@ -48,8 +48,60 @@ nested MSBuild invocation, and writes it only when its bytes changed. Override t
 quiet period with `ViuCssHotReloadDebounceMilliseconds`, or disable this part of the loop with
 `ViuCssHotReloadEnabled=false`.
 
-Visual Studio's ordinary Hot Reload command does not invoke this watch-list contract. Launch the
-project through `dotnet watch` when stylesheet regeneration is required.
+## Visual Studio
+
+The `viu-app` template carries Visual Studio's managed WebAssembly debugging contract in its active
+launch profile ([V01.01.12.32], issue #352):
+
+```json
+{
+  "profiles": {
+    "ViuApplication": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
+      "applicationUrl": "http://127.0.0.1:51235"
+    }
+  }
+}
+```
+
+Existing applications must add the exact lowercase `inspectUri` property to every `Project` profile
+used for a Viu Browser application and keep `launchBrowser=true`. Visual Studio uses the value to
+create its `Managed Wasm Debugger` target and attach Mono ICorDebug to the browser it launches. The
+SDK cannot add an `ILaunchProfile` field to an existing application through MSBuild props or targets.
+Without this field, Visual Studio creates no Mono ICorDebug browser target. F5 routes the metadata,
+method-body, and symbol deltas through its debug engine, then removes those bytes from the
+BrowserRefresh follow-up; the page receives only the updated-type notification and keeps executing the
+old method bodies.
+
+Under Ctrl+F5, Visual Studio sends complete template-text and supported `@script` method-body deltas
+through BrowserRefresh. Viu remounts each affected component after the delta is loaded: the document
+and unrelated components survive, while affected component-local state resets. F5 uses the same Viu
+metadata handler after Visual Studio successfully launches and attaches its managed WebAssembly
+debugger.
+
+The [V01.01.12.32] control run used Visual Studio Community 18.9.12112.369 and .NET SDK 10.0.400.
+Community created `Managed Wasm Debugger` and `VSWebAssemblyBridge` from the corrected profile, but its
+JavaScript adapter then queried the private `localhost` browser-debug port over IPv6, received HTTP
+503, and aborted before navigating the browser. F5 application of a Viu delta therefore could not be
+manually verified on that installation. Ctrl+F5 remained operational. This failure occurs before a
+browser connects to Viu, WasmAppHost's debug proxy, or the page-side hot-reload handler; use Ctrl+F5
+or `dotnet watch` when that Visual Studio browser-launch error occurs.
+
+Visual Studio owns classification and delta computation for generator-driven structural edits, and
+the observed results were inconsistent. Earlier F5 and Ctrl+F5 controls stopped before browser
+delivery: a DTE save disabled `Debug.ApplyCodeChanges`, an external edit returned from the command but
+sent no BrowserRefresh update, and neither the Hot Reload pane nor a dialog supplied a diagnostic. In
+a fresh Community 18.9 Ctrl+F5 control, however, adding one template element produced a managed delta,
+the Hot Reload pane reported `Code changes were successfully applied.`, and Viu showed the new node
+without a document reload. Thus, when this stall occurs, it is on the Visual Studio side before page
+or Viu delivery, but it is not deterministic. If Visual Studio requests a restart, or reports no
+applied update and leaves the page unchanged, accept its restart or run the application through
+`dotnet watch`; the watch path rebuilds, restarts, and reloads rude edits on the pinned origin.
+
+Visual Studio's ordinary Hot Reload command does not invoke the Browser SDK's CSS watch-list contract.
+Launch the project through `dotnet watch` when component stylesheet regeneration is required.
 
 ## Update decisions
 

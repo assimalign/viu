@@ -228,16 +228,25 @@ function Assert-ApplicationLaunchSettings {
     }
 
     $profile = $profiles[0].Value
+    $expectedInspectUri = '{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}'
+    $inspectUriProperties = @(
+        $profile.PSObject.Properties |
+            Where-Object { $_.Name -ceq 'inspectUri' })
     if (-not [string]::Equals(
             [string]$profile.commandName,
             'Project',
             [System.StringComparison]::Ordinal) -or
         $profile.launchBrowser -ne $true -or
+        $inspectUriProperties.Count -ne 1 -or
+        -not [string]::Equals(
+            [string]$inspectUriProperties[0].Value,
+            $expectedInspectUri,
+            [System.StringComparison]::Ordinal) -or
         -not [string]::Equals(
             [string]$profile.applicationUrl,
             'http://127.0.0.1:51235',
             [System.StringComparison]::Ordinal)) {
-        throw "$Path must pin the Project launch profile to http://127.0.0.1:51235 with launchBrowser enabled."
+        throw "$Path must pin the Project launch profile to http://127.0.0.1:51235 with launchBrowser enabled and the standard WebAssembly inspectUri."
     }
 }
 
