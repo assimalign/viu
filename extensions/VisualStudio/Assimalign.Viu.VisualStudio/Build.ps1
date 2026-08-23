@@ -207,11 +207,12 @@ $requiredEntries = @(
     'Assimalign.Viu.VisualStudio.dll',
     'Assimalign.Viu.VisualStudio.pkgdef',
     'ViuFileIcon.imagemanifest',
-    'Branding/on-light/viu-16.png',
-    'Branding/on-light/viu-32.png',
-    'Branding/on-light/viu-256.png',
-    'Branding/on-dark/viu-16.png',
-    'Branding/on-dark/viu-32.png',
+    'Branding/on-light/viu-mono-16.png',
+    'Branding/on-light/viu-mono-32.png',
+    'Branding/on-dark/viu-mono-16.png',
+    'Branding/on-dark/viu-mono-32.png',
+    'Branding/nuget/viu-nuget-mono-light-32.png',
+    'Branding/nuget/viu-nuget-mono-light-256.png',
     'language-server.json',
     'LanguageServer/win-x64/Assimalign.Viu.LanguageServer.exe',
     'LanguageServer/win-arm64/Assimalign.Viu.LanguageServer.exe'
@@ -264,10 +265,10 @@ try {
     $metadata = $manifest.SelectSingleNode(
         '/vsix:PackageManifest/vsix:Metadata',
         $namespaceManager)
-    if ($metadata.Icon -ne 'Branding\on-light\viu-32.png') {
+    if ($metadata.Icon -ne 'Branding\nuget\viu-nuget-mono-light-32.png') {
         throw "Unexpected Visual Studio extension icon: $($metadata.Icon)."
     }
-    if ($metadata.PreviewImage -ne 'Branding\on-light\viu-256.png') {
+    if ($metadata.PreviewImage -ne 'Branding\nuget\viu-nuget-mono-light-256.png') {
         throw "Unexpected Visual Studio extension preview image: $($metadata.PreviewImage)."
     }
 

@@ -1,6 +1,6 @@
 # Viu for Visual Studio
 
-![Viu logo](https://raw.githubusercontent.com/assimalign/viu/main/assets/branding/png/on-light/viu-256.png)
+![Viu logo](https://raw.githubusercontent.com/assimalign/viu/main/assets/branding/nuget/viu-nuget-mono-light-256.png)
 
 Viu for Visual Studio adds editing support for Viu single-file components (`.viu`) to Visual Studio.
 One package: the `.viu` file association, the Viu color theme, and the Viu language server.

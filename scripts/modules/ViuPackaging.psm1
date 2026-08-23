@@ -538,7 +538,7 @@ function Assert-ViuReleasePackageSet {
             }
             $icon = $metadata.SelectSingleNode("./*[local-name()='icon']")
             $iconPath = if ($null -eq $icon) { '' } else { $icon.InnerText }
-            if ($iconPath -ne 'viu-nuget-dark-128.png' -or
+            if ($iconPath -ne 'viu-nuget-mono-light-128.png' -or
                 $null -eq $archive.GetEntry($iconPath)) {
                 throw "$packageId must declare and embed the canonical Viu NuGet icon."
             }

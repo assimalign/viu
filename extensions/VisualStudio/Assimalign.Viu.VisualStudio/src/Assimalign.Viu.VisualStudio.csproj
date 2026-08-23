@@ -146,39 +146,43 @@
     <!-- The Image Service resolves these assembly resources through ViuFileIcon.imagemanifest.
          They remain linked to the repository's imported branding source of truth; the parallel
          Content items make the exact inputs visible in the VSIX for artifact inspection. -->
-    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-16.png"
-              Link="Branding\on-light\viu-16.png" />
-    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-32.png"
-              Link="Branding\on-light\viu-32.png" />
-    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-16.png"
-              Link="Branding\on-dark\viu-16.png" />
-    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-32.png"
-              Link="Branding\on-dark\viu-32.png" />
+    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-mono-16.png"
+              Link="Branding\on-light\viu-mono-16.png" />
+    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-mono-32.png"
+              Link="Branding\on-light\viu-mono-32.png" />
+    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-mono-16.png"
+              Link="Branding\on-dark\viu-mono-16.png" />
+    <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-mono-32.png"
+              Link="Branding\on-dark\viu-mono-32.png" />
 
     <Content Include="ViuFileIcon.imagemanifest">
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-16.png"
-             Link="Branding\on-light\viu-16.png">
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-mono-16.png"
+             Link="Branding\on-light\viu-mono-16.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-32.png"
-             Link="Branding\on-light\viu-32.png">
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-mono-32.png"
+             Link="Branding\on-light\viu-mono-32.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-16.png"
-             Link="Branding\on-dark\viu-16.png">
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-mono-16.png"
+             Link="Branding\on-dark\viu-mono-16.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-32.png"
-             Link="Branding\on-dark\viu-32.png">
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-dark\viu-mono-32.png"
+             Link="Branding\on-dark\viu-mono-32.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <!-- VSIX listing metadata has no theme switch, so its icon and preview use the on-light
-         artwork intended for the Marketplace's neutral listing surface. -->
-    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-256.png"
-             Link="Branding\on-light\viu-256.png">
+    <!-- VSIX listing metadata has no theme switch. The opaque light tile self-grounds its dark mono
+         glyph so the icon and preview remain legible on both light and dark Extension Manager UI. -->
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\nuget\viu-nuget-mono-light-32.png"
+             Link="Branding\nuget\viu-nuget-mono-light-32.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\nuget\viu-nuget-mono-light-256.png"
+             Link="Branding\nuget\viu-nuget-mono-light-256.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
   </ItemGroup>

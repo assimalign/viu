@@ -78,14 +78,14 @@
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <!-- The Visual Studio Marketplace metadata supports one non-themed icon and preview image.
-         Link the on-light artwork from the repository's imported branding source of truth. -->
-    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-32.png"
-             Link="Branding\on-light\viu-32.png">
+    <!-- Visual Studio extension metadata supports one non-themed icon and preview image. The opaque
+         light tile self-grounds its dark mono glyph on both light and dark Extension Manager UI. -->
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\nuget\viu-nuget-mono-light-32.png"
+             Link="Branding\nuget\viu-nuget-mono-light-32.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-256.png"
-             Link="Branding\on-light\viu-256.png">
+    <Content Include="$(ViuRepositoryDirectory)assets\branding\nuget\viu-nuget-mono-light-256.png"
+             Link="Branding\nuget\viu-nuget-mono-light-256.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
   </ItemGroup>

@@ -8,32 +8,32 @@
     <ID Name="ViuFile" Value="1" />
   </Symbols>
   <Images>
-    <!-- The paired sources are authored for their named backgrounds. Keeping inversion disabled
-         preserves the Viu palette while allowing the Image Service to select the correct size and
-         theme for Solution Explorer and editor tabs. -->
+    <!-- The paired mono sources are authored for their named backgrounds. Keeping inversion disabled
+         preserves their intended contrast while allowing the Image Service to select the correct
+         size and theme for Solution Explorer and editor tabs. -->
     <Image Guid="$(ViuImageAssets)" ID="$(ViuFile)" AllowColorInversion="false">
-      <Source Uri="$(Resources)/on-light/viu-16.png" Background="Light">
+      <Source Uri="$(Resources)/on-light/viu-mono-16.png" Background="Light">
         <Size Value="16" />
       </Source>
-      <Source Uri="$(Resources)/on-light/viu-32.png" Background="Light">
+      <Source Uri="$(Resources)/on-light/viu-mono-32.png" Background="Light">
         <Size Value="32" />
       </Source>
-      <Source Uri="$(Resources)/on-dark/viu-16.png" Background="Dark">
+      <Source Uri="$(Resources)/on-dark/viu-mono-16.png" Background="Dark">
         <Size Value="16" />
       </Source>
-      <Source Uri="$(Resources)/on-dark/viu-32.png" Background="Dark">
+      <Source Uri="$(Resources)/on-dark/viu-mono-32.png" Background="Dark">
         <Size Value="32" />
       </Source>
-      <Source Uri="$(Resources)/on-light/viu-16.png" Background="HighContrastLight">
+      <Source Uri="$(Resources)/on-light/viu-mono-16.png" Background="HighContrastLight">
         <Size Value="16" />
       </Source>
-      <Source Uri="$(Resources)/on-light/viu-32.png" Background="HighContrastLight">
+      <Source Uri="$(Resources)/on-light/viu-mono-32.png" Background="HighContrastLight">
         <Size Value="32" />
       </Source>
-      <Source Uri="$(Resources)/on-dark/viu-16.png" Background="HighContrastDark">
+      <Source Uri="$(Resources)/on-dark/viu-mono-16.png" Background="HighContrastDark">
         <Size Value="16" />
       </Source>
-      <Source Uri="$(Resources)/on-dark/viu-32.png" Background="HighContrastDark">
+      <Source Uri="$(Resources)/on-dark/viu-mono-32.png" Background="HighContrastDark">
         <Size Value="32" />
       </Source>
     </Image>
