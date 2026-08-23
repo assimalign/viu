@@ -10,7 +10,7 @@
     <DisplayName>Viu Utilities for Visual Studio</DisplayName>
     <Description xml:space="preserve">Utility CSS completion, generated-CSS hover previews, and document colors for HTML files, served by an isolated Viu Utilities language-server process.</Description>
     <MoreInfo>https://github.com/assimalign/viu</MoreInfo>
-    <Icon>Branding\nuget\viu-nuget-mono-light-32.png</Icon>
+    <Icon>Branding\nuget\viu-nuget-mono-light-256.png</Icon>
     <PreviewImage>Branding\nuget\viu-nuget-mono-light-256.png</PreviewImage>
     <Preview>true</Preview>
   </Metadata>

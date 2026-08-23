@@ -265,7 +265,7 @@ try {
     $metadata = $manifest.SelectSingleNode(
         '/vsix:PackageManifest/vsix:Metadata',
         $namespaceManager)
-    if ($metadata.Icon -ne 'Branding\nuget\viu-nuget-mono-light-32.png') {
+    if ($metadata.Icon -ne 'Branding\nuget\viu-nuget-mono-light-256.png') {
         throw "Unexpected Visual Studio extension icon: $($metadata.Icon)."
     }
     if ($metadata.PreviewImage -ne 'Branding\nuget\viu-nuget-mono-light-256.png') {

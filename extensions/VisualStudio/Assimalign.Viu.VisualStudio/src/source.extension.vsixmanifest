@@ -12,7 +12,7 @@
     <DisplayName>Viu for Visual Studio</DisplayName>
     <Description xml:space="preserve">Editing support for Viu single-file components: the Viu color theme for templates, styles, and embedded C#, and the .viu file association. Semantic features are served by a separate Viu language-server process.</Description>
     <MoreInfo>https://github.com/assimalign/viu</MoreInfo>
-    <Icon>Branding\nuget\viu-nuget-mono-light-32.png</Icon>
+    <Icon>Branding\nuget\viu-nuget-mono-light-256.png</Icon>
     <PreviewImage>Branding\nuget\viu-nuget-mono-light-256.png</PreviewImage>
     <Preview>true</Preview>
   </Metadata>
