@@ -29,9 +29,9 @@ $extensions = @(
         Artifact = Join-Path $artifactDirectory 'Assimalign.Viu.VisualStudio.vsix'
     },
     [pscustomobject]@{
-        Name = 'Assimalign.Viu.UtilityCss.VisualStudio'
-        Build = Join-Path $PSScriptRoot 'Assimalign.Viu.UtilityCss.VisualStudio\Build.ps1'
-        Artifact = Join-Path $artifactDirectory 'Assimalign.Viu.UtilityCss.VisualStudio.vsix'
+        Name = 'Assimalign.Viu.VisualStudio.UtilityCss'
+        Build = Join-Path $PSScriptRoot 'Assimalign.Viu.VisualStudio.UtilityCss\Build.ps1'
+        Artifact = Join-Path $artifactDirectory 'Assimalign.Viu.VisualStudio.UtilityCss.vsix'
     }
 )
 

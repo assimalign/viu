@@ -45,7 +45,7 @@ From the repository root:
 
 The root orchestrator locates Visual Studio MSBuild through `vswhere`, builds both Visual Studio
 extensions sequentially, and writes this artifact to
-`_out/extensions/VisualStudio/Release/Assimalign.Viu.UtilityCss.VisualStudio.vsix`. The build fails
+`_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.UtilityCss.vsix`. The build fails
 if either Windows payload is absent, if the UtilityCss dependency manifest contains
 `Microsoft.CodeAnalysis`, if the VSIX gains a pkgdef/VsPackage asset, or if it exceeds 50 MB.
 

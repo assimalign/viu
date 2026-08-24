@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 using Microsoft.VisualStudio.LanguageServer.Client;
 
-namespace Assimalign.Viu.UtilityCss.VisualStudio;
+namespace Assimalign.Viu.VisualStudio.UtilityCss;
 
 /// <summary>
 /// Short-circuits document messages that reach the client through an HTML-derived content type but

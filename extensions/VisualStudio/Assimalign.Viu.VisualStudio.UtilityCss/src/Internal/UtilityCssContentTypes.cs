@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.UtilityCss.VisualStudio;
+namespace Assimalign.Viu.VisualStudio.UtilityCss;
 
 /// <summary>
 /// Names the Visual Studio-owned HTML content types to which the utility-CSS language client may

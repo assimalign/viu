@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
-namespace Assimalign.Viu.UtilityCss.VisualStudio;
+namespace Assimalign.Viu.VisualStudio.UtilityCss;
 
 /// <summary>
 /// Resolves and launches the architecture-specific utility-CSS language-server payload installed

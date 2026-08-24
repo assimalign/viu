@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json;
 
-namespace Assimalign.Viu.UtilityCss.VisualStudio;
+namespace Assimalign.Viu.VisualStudio.UtilityCss;
 
 /// <summary>
 /// Restricts messages inherited through Visual Studio's HTML content-type hierarchy to standalone

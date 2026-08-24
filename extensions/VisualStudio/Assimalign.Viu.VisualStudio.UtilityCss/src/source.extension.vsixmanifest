@@ -3,8 +3,11 @@
                  xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
                  xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="Assimalign.Viu.UtilityCss.VisualStudio.8fcd5c9a-f62f-467c-8655-b7791c41775b"
-              Version="|Assimalign.Viu.UtilityCss.VisualStudio;GetVsixVersion|"
+    <!-- The identity deliberately changes from the former UtilityCss-first name: this pre-1.0
+         product rename creates a new Marketplace entry, so installed copies do not upgrade in
+         place. The opaque GUID suffix remains stable because it identifies this extension. -->
+    <Identity Id="Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b"
+              Version="|Assimalign.Viu.VisualStudio.UtilityCss;GetVsixVersion|"
               Language="en-US"
               Publisher="Assimalign" />
     <DisplayName>Viu Utilities for Visual Studio</DisplayName>

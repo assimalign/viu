@@ -11,16 +11,16 @@
 		<File Path="README.md" />
 		<File Path="vs-publish.json" />
 	</Folder>
-	<Folder Name="/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/">
-		<File Path="Assimalign.Viu.UtilityCss.VisualStudio/Build.ps1" />
-		<File Path="Assimalign.Viu.UtilityCss.VisualStudio/Marketplace.md" />
-		<File Path="Assimalign.Viu.UtilityCss.VisualStudio/README.md" />
+	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/">
+		<File Path="Assimalign.Viu.VisualStudio.UtilityCss/Build.ps1" />
+		<File Path="Assimalign.Viu.VisualStudio.UtilityCss/Marketplace.md" />
+		<File Path="Assimalign.Viu.VisualStudio.UtilityCss/README.md" />
 	</Folder>
-	<Folder Name="/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/src/">
-		<Project Path="Assimalign.Viu.UtilityCss.VisualStudio/src/Assimalign.Viu.UtilityCss.VisualStudio.csproj" />
+	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/src/">
+		<Project Path="Assimalign.Viu.VisualStudio.UtilityCss/src/Assimalign.Viu.VisualStudio.UtilityCss.csproj" />
 	</Folder>
-	<Folder Name="/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/">
-		<Project Path="Assimalign.Viu.UtilityCss.VisualStudio/test/Assimalign.Viu.UtilityCss.VisualStudio.Tests.csproj" />
+	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/test/">
+		<Project Path="Assimalign.Viu.VisualStudio.UtilityCss/test/Assimalign.Viu.VisualStudio.UtilityCss.Tests.csproj" />
 	</Folder>
 	<Folder Name="/VisualStudio/Assimalign.Viu.VisualStudio/">
 		<File Path="Assimalign.Viu.VisualStudio/Build.ps1" />

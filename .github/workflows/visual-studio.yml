@@ -112,7 +112,7 @@ jobs:
         run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release
 
       - name: Test Utility CSS Visual Studio extension
-        run: dotnet test extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/Assimalign.Viu.UtilityCss.VisualStudio.Tests.csproj --configuration Release
+        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/test/Assimalign.Viu.VisualStudio.UtilityCss.Tests.csproj --configuration Release
 
       - name: Inspect packaged VSIX files
         shell: pwsh
@@ -124,9 +124,9 @@ jobs:
               Identity = 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c'
             },
             [pscustomobject]@{
-              Name = 'Assimalign.Viu.UtilityCss.VisualStudio'
-              Path = '_out/extensions/VisualStudio/Release/Assimalign.Viu.UtilityCss.VisualStudio.vsix'
-              Identity = 'Assimalign.Viu.UtilityCss.VisualStudio.8fcd5c9a-f62f-467c-8655-b7791c41775b'
+              Name = 'Assimalign.Viu.VisualStudio.UtilityCss'
+              Path = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.UtilityCss.vsix'
+              Identity = 'Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b'
             }
           )
 
@@ -197,7 +197,7 @@ jobs:
         run: |
           ./scripts/Test-NoNodeToolchain.ps1 -Artifact @(
             '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix',
-            '_out/extensions/VisualStudio/Release/Assimalign.Viu.UtilityCss.VisualStudio.vsix'
+            '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.UtilityCss.vsix'
           )
 
       - name: Upload VSIX build artifact
@@ -213,7 +213,7 @@ jobs:
         # actions/upload-artifact v4
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Assimalign.Viu.UtilityCss.VisualStudio
-          path: _out/extensions/VisualStudio/Release/Assimalign.Viu.UtilityCss.VisualStudio.vsix
+          name: Assimalign.Viu.VisualStudio.UtilityCss
+          path: _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.UtilityCss.vsix
           if-no-files-found: error
           retention-days: 7

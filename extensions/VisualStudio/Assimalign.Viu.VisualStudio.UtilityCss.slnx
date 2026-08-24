@@ -1,9 +1,9 @@
 <Solution>
   <Folder Name="/Visual Studio/">
     <File Path="Build.ps1" />
-    <File Path="Assimalign.Viu.UtilityCss.VisualStudio/Build.ps1" />
-    <File Path="Assimalign.Viu.UtilityCss.VisualStudio/README.md" />
-    <File Path="Assimalign.Viu.UtilityCss.VisualStudio/Marketplace.md" />
+    <File Path="Assimalign.Viu.VisualStudio.UtilityCss/Build.ps1" />
+    <File Path="Assimalign.Viu.VisualStudio.UtilityCss/README.md" />
+    <File Path="Assimalign.Viu.VisualStudio.UtilityCss/Marketplace.md" />
   </Folder>
   <!-- The UtilityCss language server is a public standalone add-on under libraries/. This solution
        carries it because the server and this Visual Studio host are built and debugged together. -->
@@ -14,9 +14,9 @@
   <!-- Kept separate from Assimalign.Viu.VisualStudio.slnx so F5 deploys only the VSIX being
        developed and the two nested language-server publishes never race over shared project output. -->
   <Folder Name="/Visual Studio/Extension/">
-    <Project Path="Assimalign.Viu.UtilityCss.VisualStudio/src/Assimalign.Viu.UtilityCss.VisualStudio.csproj">
+    <Project Path="Assimalign.Viu.VisualStudio.UtilityCss/src/Assimalign.Viu.VisualStudio.UtilityCss.csproj">
       <Deploy />
     </Project>
-    <Project Path="Assimalign.Viu.UtilityCss.VisualStudio/test/Assimalign.Viu.UtilityCss.VisualStudio.Tests.csproj" />
+    <Project Path="Assimalign.Viu.VisualStudio.UtilityCss/test/Assimalign.Viu.VisualStudio.UtilityCss.Tests.csproj" />
   </Folder>
 </Solution>

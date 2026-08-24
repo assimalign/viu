@@ -15,7 +15,7 @@ using Microsoft.VisualStudio.Utilities;
 
 using StreamJsonRpc;
 
-namespace Assimalign.Viu.UtilityCss.VisualStudio;
+namespace Assimalign.Viu.VisualStudio.UtilityCss;
 
 /// <summary>
 /// Connects Visual Studio's standard LSP presentation to the standalone Viu Utilities language

@@ -189,7 +189,7 @@
 	</Folder>
 	<Folder Name="/viu/extensions/VisualStudio/">
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx" />
-		<File Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio.slnx" />
+		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss.slnx" />
 		<File Path="extensions/VisualStudio/Build.ps1" />
 		<File Path="extensions/VisualStudio/README.md" />
 	</Folder>
@@ -205,12 +205,12 @@
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/">
 		<Project Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/">
-		<File Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/README.md" />
-		<File Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/Marketplace.md" />
+	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/">
+		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/README.md" />
+		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/Marketplace.md" />
 	</Folder>
-	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/">
-		<Project Path="extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio/test/Assimalign.Viu.UtilityCss.VisualStudio.Tests.csproj" />
+	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/test/">
+		<Project Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/test/Assimalign.Viu.VisualStudio.UtilityCss.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/tooling/Editor/Assimalign.Viu.LanguageService/" />
 	<Folder Name="/viu/tooling/Editor/Assimalign.Viu.LanguageService/src/">

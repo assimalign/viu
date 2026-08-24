@@ -5,11 +5,11 @@ This area contains two independently installable classic in-process VSSDK extens
 - `Assimalign.Viu.VisualStudio` contributes the `viu` content type, the `.pkgdef` that claims the
   `.viu` file extension, the Viu color theme, and the language client that starts the Viu language
   server.
-- `Assimalign.Viu.UtilityCss.VisualStudio` contributes only an `ILanguageClient` for the modern
+- `Assimalign.Viu.VisualStudio.UtilityCss` contributes only an `ILanguageClient` for the modern
   Visual Studio HTML editor. It starts the standalone UtilityCss language server and leaves content
   types, file ownership, and all LSP presentation with Visual Studio. Its exact scope and Razor
   follow-up are documented in
-  [its README](Assimalign.Viu.UtilityCss.VisualStudio/README.md).
+  [its README](Assimalign.Viu.VisualStudio.UtilityCss/README.md).
 
 The clients launch editor-neutral language servers in separate processes.
 `Assimalign.Viu.LanguageService` owns Viu document state and language features without depending on
@@ -56,7 +56,7 @@ because the VSSDK build tasks are .NET Framework MSBuild tasks that cannot load 
 
 ```text
 _out/extensions/VisualStudio/Debug/Assimalign.Viu.VisualStudio.vsix
-_out/extensions/VisualStudio/Debug/Assimalign.Viu.UtilityCss.VisualStudio.vsix
+_out/extensions/VisualStudio/Debug/Assimalign.Viu.VisualStudio.UtilityCss.vsix
 ```
 
 Pass `-Configuration Release` for a release build. Validation requires each manifest, MEF assembly,
@@ -73,7 +73,7 @@ Studio projects individually rather than handing either VSSDK solution to `dotne
 Open the solution for the package being developed:
 
 - `extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx`
-- `extensions/VisualStudio/Assimalign.Viu.UtilityCss.VisualStudio.slnx`
+- `extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss.slnx`
 
 Run the root `Build.ps1` once for the active configuration first, so both standalone server publish
 directories exist and are picked up by subsequent in-IDE builds.

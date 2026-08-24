@@ -31,7 +31,7 @@
     <ViuLanguageServerPublishEnabled>true</ViuLanguageServerPublishEnabled>
     <ViuLanguageServerProjectPath>$(ViuRepositoryDirectory)libraries\Utilities\Assimalign.Viu.UtilityCss.LanguageServer\src\Assimalign.Viu.UtilityCss.LanguageServer.csproj</ViuLanguageServerProjectPath>
     <ViuLanguageServerExecutableBaseName>Assimalign.Viu.UtilityCss.LanguageServer</ViuLanguageServerExecutableBaseName>
-    <ViuLanguageServerPublishRoot>$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)\Assimalign.Viu.UtilityCss.VisualStudio</ViuLanguageServerPublishRoot>
+    <ViuLanguageServerPublishRoot>$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)\Assimalign.Viu.VisualStudio.UtilityCss</ViuLanguageServerPublishRoot>
 
     <!-- A target produces the payload, so the design-time build cannot describe the real inputs to
          Visual Studio's fast up-to-date check. Always reaching MSBuild is cheaper than deploying a

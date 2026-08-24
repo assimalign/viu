@@ -4,9 +4,9 @@ using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu.UtilityCss.VisualStudio;
+using Assimalign.Viu.VisualStudio.UtilityCss;
 
-namespace Assimalign.Viu.UtilityCss.VisualStudio.Tests;
+namespace Assimalign.Viu.VisualStudio.UtilityCss.Tests;
 
 public sealed class UtilityCssDocumentMessageFilterTests
 {

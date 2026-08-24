@@ -7,9 +7,9 @@ using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu.UtilityCss.VisualStudio;
+using Assimalign.Viu.VisualStudio.UtilityCss;
 
-namespace Assimalign.Viu.UtilityCss.VisualStudio.Tests;
+namespace Assimalign.Viu.VisualStudio.UtilityCss.Tests;
 
 public sealed class UtilityCssLanguageServerConfigurationTests
 {
@@ -18,10 +18,10 @@ public sealed class UtilityCssLanguageServerConfigurationTests
     {
         string extensionDirectory = Path.Combine(
             Path.GetTempPath(),
-            $"viu-utilitycss-visual-studio-{Guid.NewGuid():N}");
+            $"viu-visual-studio-utilitycss-{Guid.NewGuid():N}");
         string assemblyLocation = Path.Combine(
             extensionDirectory,
-            "Assimalign.Viu.UtilityCss.VisualStudio.dll");
+            "Assimalign.Viu.VisualStudio.UtilityCss.dll");
 
         UtilityCssLanguageServerConfiguration.GetExtensionDirectory(assemblyLocation)
             .ShouldBe(extensionDirectory);
@@ -42,7 +42,7 @@ public sealed class UtilityCssLanguageServerConfigurationTests
     {
         string extensionDirectory = Path.Combine(
             Path.GetTempPath(),
-            $"viu-utilitycss-visual-studio-{Guid.NewGuid():N}");
+            $"viu-visual-studio-utilitycss-{Guid.NewGuid():N}");
         UtilityCssLanguageServerConfiguration configuration =
             UtilityCssLanguageServerConfiguration.Load(extensionDirectory);
 
@@ -67,7 +67,7 @@ public sealed class UtilityCssLanguageServerConfigurationTests
     {
         string extensionDirectory = Path.Combine(
             Path.GetTempPath(),
-            $"viu-utilitycss-visual-studio-{Guid.NewGuid():N}");
+            $"viu-visual-studio-utilitycss-{Guid.NewGuid():N}");
         Directory.CreateDirectory(extensionDirectory);
 
         try
@@ -101,7 +101,7 @@ public sealed class UtilityCssLanguageServerConfigurationTests
     {
         string extensionDirectory = Path.Combine(
             Path.GetTempPath(),
-            $"viu-utilitycss-visual-studio-{Guid.NewGuid():N}");
+            $"viu-visual-studio-utilitycss-{Guid.NewGuid():N}");
         UtilityCssLanguageServerConfiguration configuration =
             UtilityCssLanguageServerConfiguration.Load(extensionDirectory);
 
@@ -129,7 +129,7 @@ public sealed class UtilityCssLanguageServerConfigurationTests
     {
         string extensionDirectory = Path.Combine(
             Path.GetTempPath(),
-            $"viu-utilitycss-visual-studio-{Guid.NewGuid():N}");
+            $"viu-visual-studio-utilitycss-{Guid.NewGuid():N}");
         Directory.CreateDirectory(extensionDirectory);
 
         try

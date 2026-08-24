@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds Assimalign.Viu.UtilityCss.VisualStudio and its Utility CSS language-server payload.
+    Builds Assimalign.Viu.VisualStudio.UtilityCss and its Utility CSS language-server payload.
 
 .DESCRIPTION
     The extension is a classic in-process VSSDK MEF package, so packaging it needs Visual Studio's
@@ -47,14 +47,14 @@ $extensionDirectory = $PSScriptRoot
 $repositoryDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $extensionDirectory '..\..\..'))
 $extensionProject = Join-Path $extensionDirectory `
-    'src\Assimalign.Viu.UtilityCss.VisualStudio.csproj'
+    'src\Assimalign.Viu.VisualStudio.UtilityCss.csproj'
 $languageServerProject = Join-Path $repositoryDirectory `
     'libraries\Utilities\Assimalign.Viu.UtilityCss.LanguageServer\src\Assimalign.Viu.UtilityCss.LanguageServer.csproj'
 $languageServerExecutableBaseName = 'Assimalign.Viu.UtilityCss.LanguageServer'
 $extensionOutputDirectory = Join-Path $repositoryDirectory `
     "_out\extensions\VisualStudio\$Configuration"
 $languageServerPublishRoot = Join-Path $extensionOutputDirectory `
-    'Assimalign.Viu.UtilityCss.VisualStudio'
+    'Assimalign.Viu.VisualStudio.UtilityCss'
 $languageServerPublishDirectory = Join-Path $languageServerPublishRoot `
     'LanguageServer'
 
@@ -198,13 +198,13 @@ if (-not (Test-Path -LiteralPath $normalizedExtensionOutputDirectory)) {
 }
 
 $packagedExtension = Join-Path $normalizedExtensionOutputDirectory `
-    'Assimalign.Viu.UtilityCss.VisualStudio.vsix'
+    'Assimalign.Viu.VisualStudio.UtilityCss.vsix'
 Copy-Item -LiteralPath $extensionPackagePath -Destination $packagedExtension -Force
 
 # #region: Verify the package
 $requiredEntries = @(
     'extension.vsixmanifest',
-    'Assimalign.Viu.UtilityCss.VisualStudio.dll',
+    'Assimalign.Viu.VisualStudio.UtilityCss.dll',
     'Branding/nuget/viu-nuget-mono-light-32.png',
     'Branding/nuget/viu-nuget-mono-light-256.png',
     'language-server.json',
@@ -272,7 +272,7 @@ try {
     if ($null -eq $identity) {
         throw 'The packaged extension manifest does not contain an Identity element.'
     }
-    if ($identity.Id -ne 'Assimalign.Viu.UtilityCss.VisualStudio.8fcd5c9a-f62f-467c-8655-b7791c41775b') {
+    if ($identity.Id -ne 'Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b') {
         throw "Unexpected Viu Utility CSS VSIX identity: $($identity.Id)."
     }
     if ($identity.Publisher -ne 'Assimalign') {

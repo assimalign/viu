@@ -2,12 +2,12 @@ using System.Diagnostics;
 
 using Microsoft.VisualStudio.Shell;
 
-namespace Assimalign.Viu.UtilityCss.VisualStudio;
+namespace Assimalign.Viu.VisualStudio.UtilityCss;
 
 /// <summary>Surfaces language-server diagnostic output through Visual Studio's activity log.</summary>
 internal static class UtilityCssLanguageClientLog
 {
-    private const string SourceName = "Assimalign.Viu.UtilityCss.VisualStudio";
+    private const string SourceName = "Assimalign.Viu.VisualStudio.UtilityCss";
 
     /// <summary>Writes one standard-error line without allowing logging to disrupt the client.</summary>
     internal static void WriteServerStandardError(string message)
