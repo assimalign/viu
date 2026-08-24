@@ -346,10 +346,7 @@ jobs:
 
   publish-visual-studio-preview:
     name: publish Visual Studio Marketplace preview
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      vars.VIU_PUBLISH_MARKETPLACE == 'true'
+    if: github.event_name == 'release' && github.ref == 'refs/heads/main'
     runs-on: windows-latest
     environment:
       name: visual-studio-marketplace
