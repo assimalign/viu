@@ -121,7 +121,7 @@ jobs:
             [pscustomobject]@{
               Name = 'Assimalign.Viu.VisualStudio'
               Path = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
-              Identity = 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c'
+              Identity = 'Assimalign.Viu.VisualStudio.9d68bb9d-64dd-4715-8362-164655899684'
             },
             [pscustomobject]@{
               Name = 'Assimalign.Viu.VisualStudio.UtilityCss'
