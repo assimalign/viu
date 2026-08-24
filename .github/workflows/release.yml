@@ -868,10 +868,13 @@ jobs:
       - name: Validate Visual Studio Code Marketplace credentials
         shell: pwsh
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          # vsce reads the VSCE_PAT environment variable by convention; the credential is the
+          # organization's VS_MARKETPLACE_TOKEN — both marketplaces authenticate with the same
+          # Azure DevOps PAT when it carries All-accessible-organizations + Marketplace (Manage).
+          VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:VSCE_PAT)) {
-            throw 'Configure the VSCE_PAT secret in the visual-studio-code-marketplace environment.'
+            throw 'Configure the organization secret VS_MARKETPLACE_TOKEN (Azure DevOps PAT, All accessible organizations, Marketplace Manage scope); the VS Code publish reuses it.'
           }
           Write-Host "::add-mask::$($env:VSCE_PAT)"
 
@@ -1111,7 +1114,7 @@ jobs:
           VIU_VSCODE_PRE_RELEASE: ${{ steps.marketplace.outputs.pre_release }}
           VIU_VSCODE_TARGET: ${{ matrix.target }}
           VIU_VSCODE_VERSION: ${{ steps.marketplace.outputs.version }}
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
         run: |
           Write-Host "::add-mask::$($env:VSCE_PAT)"
           $packagePath = [System.IO.Path]::GetFullPath($env:VIU_VSCODE_PACKAGE_PATH)

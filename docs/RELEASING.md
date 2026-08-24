@@ -195,10 +195,13 @@ and is intentionally not performed by the workflow.
 3. Create the protected GitHub environment `visual-studio-code-marketplace` and configure its
    required reviewers and deployment protection rules. Its deployment branch/tag policy must allow
    the `vMAJOR.MINOR.PATCH[-PRERELEASE]` release tags; a `main`-only policy rejects these jobs.
-4. Add the PAT as the environment secret `VSCE_PAT`.
+4. No new secret is required: the job reuses the organization secret `VS_MARKETPLACE_TOKEN`
+   (exposed to `vsce` through its conventional `VSCE_PAT` environment variable).
 
-`VSCE_PAT` and `VS_MARKETPLACE_TOKEN` are different credentials for different publisher systems and
-must not be reused. Microsoft currently states that global Azure DevOps PATs retire on December 1,
+Both marketplaces authenticate with an Azure DevOps PAT, so one organization secret serves both —
+provided the PAT carries **All accessible organizations** and **Marketplace (Manage)** scope. A PAT
+scoped to a single organization or to publish-only rights fails the VS Code publish; widen the
+existing token rather than minting a second credential. Microsoft currently states that global Azure DevOps PATs retire on December 1,
 2026, so this requested PAT flow must migrate to Entra-based Marketplace publishing before that
 date. Current PAT setup and the migration notice are documented in the
 [Visual Studio Code publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension).
