@@ -29,16 +29,15 @@ push and no pull-request event can publish a package.
 
 The same workflow has two separately protected editor-extension paths:
 
-- A push to `main` that changes the Visual Studio extensions or their tooling, Syntax,
-  ServerRenderer, Utilities, shared-build, or branding inputs can publish the two Visual Studio
-  preview VSIXs only when `VIU_PUBLISH_MARKETPLACE` is `true`. The protected
-  `visual-studio-marketplace` environment remains the credential and approval boundary. Package
-  jobs are explicitly release-only, so this path cannot stage or promote NuGet packages.
-- A published GitHub Release can publish the two Visual Studio Code extensions only after the
-  `validate-release` matrix succeeds. The protected `visual-studio-code-marketplace` environment
-  gates ten independent package/platform cells with `fail-fast: false`. The cells execute serially
-  so first publication and later target updates cannot race, while every package/target failure
-  remains independently visible.
+- A published GitHub Release can publish the two Visual Studio preview VSIXs through the protected
+  `visual-studio-marketplace` environment. Its required reviewers and Marketplace credential remain
+  the approval boundary.
+- The same release can publish the two Visual Studio Code extensions only after the
+  `validate-release` matrix succeeds. A non-matrix job resolves one Marketplace version per package
+  and emits only the missing package/platform cells. The protected
+  `visual-studio-code-marketplace` environment gates those cells with `fail-fast: false`; they
+  execute serially so first publication and later target updates cannot race, while every planned
+  package/target result remains independently visible.
 
 ### Visual Studio Code platform and version contract
 
@@ -54,16 +53,28 @@ The Visual Studio Code Marketplace identifiers are `assimalign.viu` and
 | `osx-arm64` | `darwin-arm64` |
 
 The GitHub tag and NuGet packages continue to use the complete `ViuVersion`. Visual Studio Code
-accepts only numeric `MAJOR.MINOR.PATCH` extension versions, so the packaged `extension/package.json`
-uses `ViuVersionPrefix`; the source `package.json` and lock file remain unchanged. A nonempty
-`ViuVersionSuffix` adds `--pre-release` to both `vsce package` and `vsce publish`, while a stable Viu
-version omits it. For example, `10.0.0-beta.2` maps to Visual Studio Code version `10.0.0` on the
-pre-release channel.
+Marketplace versions are derived once per release and package because it accepts only numeric
+`MAJOR.MINOR.PATCH` versions and does not allow a package/target version to be republished. For a
+canonical `MAJOR.MINOR.PATCH-SUFFIX` prerelease, the Marketplace major stays `MAJOR`, the minor is
+the odd lane `MINOR * 2 + 1`, and the Marketplace patch is independent of the canonical patch. The
+resolver starts that lane at patch `0`; after a complete five-target version it uses the maximum
+published patch plus one.
 
-Marketplace prerelease and regular releases must use distinct numeric versions. After publishing
-`10.0.0` as a prerelease, a later regular release therefore cannot reuse `10.0.0`; its
-`ViuVersionPrefix` must advance. The package-level `preview: true` flag only marks the gallery
-listing as public preview and does not select the prerelease update channel. See the
+For example:
+
+- With only the historical `10.0.0` entries present, canonical `10.0.0-beta.3` maps to Marketplace
+  `10.1.0` on the pre-release channel.
+- After `10.1.0` is complete for all five targets, canonical `10.0.1-rc.1` maps to Marketplace
+  `10.1.1` on the pre-release channel.
+
+If the highest patch on the mapped lane exists for only some targets, a rerun reuses that version
+and emits only its missing targets; it advances only when the target set is complete. Stable
+releases use the even half of the convention, `MINOR * 2`, so future stable canonical `10.0.x`
+releases use Marketplace `10.0.N` while prereleases use `10.1.N`. The source `package.json` and lock
+file remain unchanged placeholders. A nonempty `ViuVersionSuffix` still adds `--pre-release` to both
+`vsce package` and `vsce publish`, while a stable Viu version omits it. The package-level
+`preview: true` flag only marks the gallery listing as public preview and does not select the
+pre-release update channel. See the
 [Visual Studio Code publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#pre-release-extensions).
 
 ## Package contract
@@ -171,22 +182,31 @@ configuration.
 ### Visual Studio Marketplace previews
 
 **Existing owner setup:** keep the `visual-studio-marketplace` GitHub environment and its required
-reviewers, the existing organization secret `VS_MARKETPLACE_TOKEN`, and
-`VIU_PUBLISH_MARKETPLACE=true` at the repository or organization level. The one protected job uses
-that token to publish both preview VSIXs:
+reviewers plus the existing organization secret `VS_MARKETPLACE_TOKEN`. The protected release job
+uses that token to publish both preview VSIXs:
 
 - `Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c`
 - `Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b`
 
-The second identity is new; the pre-rename VSIX was never published, so no orphaned listing exists
-and no cleanup is required.
+The owner deleted the former `assimalign-tooling-vs-viu-extension` listing. Neither clean internal
+name exists yet, so both Visual Studio listings are first-time creations:
 
-Publisher-manifest internal names are constrained to `[A-Za-z0-9-]` (no dots) and must match the
-existing Marketplace listing exactly for updates. The live "Viu for Visual Studio" listing's
-internal name is the legacy `assimalign-tooling-vs-viu-extension`; the Viu Utilities listing is
-created on first publish as `assimalign-tooling-vs-viu-utilitycss-extension` for symmetry. VSIX
-identities (dotted, above) and Marketplace internal names are different namespaces — the VSIX
-identity is what installed copies upgrade by, the internal name is only the listing's URL slug.
+- `viu-visualstudio` ->
+  `https://marketplace.visualstudio.com/items?itemName=Assimalign.viu-visualstudio`
+- `viu-utilitycss-visualstudio` ->
+  `https://marketplace.visualstudio.com/items?itemName=Assimalign.viu-utilitycss-visualstudio`
+
+Publisher-manifest internal names are constrained to `[A-Za-z0-9-]` (no dots). Microsoft documents
+`VsixPublisher.exe publish -payload ... -publishManifest ...` as creating a listing when its
+internal name does not exist; there is no separate listing-creation command. The existing manifests
+already supply the required categories, overview, publisher, and valid free price category. See the
+[Visual Studio command-line publishing guide](https://learn.microsoft.com/visualstudio/extensibility/walkthrough-publishing-a-visual-studio-extension-via-command-line?view=vs-2022).
+
+VSIX identities (dotted, above) and Marketplace internal names are different namespaces. The clean
+internal names provide the new listing URL slugs, while the unchanged VSIX identities let installed
+copies reacquire updates from the new listings; Visual Studio recognizes an update by the same VSIX
+ID and a higher version, as documented in the
+[Visual Studio extension update guidance](https://learn.microsoft.com/visualstudio/extensibility/how-to-update-a-visual-studio-extension?view=vs-2022).
 
 ### Visual Studio Code Marketplace
 
@@ -209,9 +229,9 @@ existing token rather than minting a second credential. Microsoft currently stat
 2026, so this requested PAT flow must migrate to Entra-based Marketplace publishing before that
 date. Current PAT setup and the migration notice are documented in the
 [Visual Studio Code publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension).
-The ten matrix deployments are deliberately serialized to protect first listing creation. Reviewers
-should expect the protected-environment approvals to appear one cell at a time when the environment
-requires approval for every deployment.
+The planned matrix deployments are deliberately serialized. Reviewers should expect the protected
+environment approvals to appear one cell at a time when the environment requires approval for every
+deployment; a partial-failure rerun contains only the targets still missing at the reused version.
 
 ## Publishing a release
 
@@ -230,4 +250,5 @@ requires approval for every deployment.
 `package-order.txt` and `symbol-package-order.txt` enumerate the validated artifacts, and
 `checksums.sha256` covers both sets. Duplicate NuGet package versions are skipped, so a partially
 completed NuGet publication can be rerun without rebuilding or renumbering packages. Visual Studio
-Code package/target versions are immutable and are not silently skipped.
+Code package/target versions are immutable; the central resolver reuses an incomplete version and
+schedules only its missing targets instead of attempting to overwrite published cells.

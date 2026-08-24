@@ -357,7 +357,7 @@ jobs:
     runs-on: windows-latest
     environment:
       name: visual-studio-marketplace
-      url: https://marketplace.visualstudio.com/items?itemName=Assimalign.assimalign-tooling-vs-viu-extension
+      url: https://marketplace.visualstudio.com/items?itemName=Assimalign.viu-visualstudio
     concurrency:
       group: visual-studio-marketplace-preview
       cancel-in-progress: false
@@ -401,11 +401,11 @@ jobs:
           $marketplaceItems = @(
             [pscustomobject]@{
               Name = 'Viu for Visual Studio'
-              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio'
+              ItemName = 'Assimalign.viu-visualstudio'
             },
             [pscustomobject]@{
               Name = 'Viu Utilities for Visual Studio'
-              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio.UtilityCss'
+              ItemName = 'Assimalign.viu-utilitycss-visualstudio'
             }
           )
 
@@ -645,11 +645,11 @@ jobs:
           $marketplaceItems = @(
             [pscustomobject]@{
               Name = 'Viu for Visual Studio'
-              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio'
+              ItemName = 'Assimalign.viu-visualstudio'
             },
             [pscustomobject]@{
               Name = 'Viu Utilities for Visual Studio'
-              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio.UtilityCss'
+              ItemName = 'Assimalign.viu-utilitycss-visualstudio'
             }
           )
           $targetVersion = [System.Version]::Parse($env:VIU_VSIX_VERSION)
@@ -778,12 +778,10 @@ jobs:
 
           Viu for Visual Studio ``$($env:VIU_VSIX_VERSION)`` was published as a preview.
 
-          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.assimalign-tooling-vs-viu-extension)
+          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.viu-visualstudio)
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
-      # This is a NEW Marketplace identity. The pre-rename UtilityCss-first listing is orphaned;
-      # unpublishing that old listing remains a manual owner action.
       - name: Publish Viu Utilities to Visual Studio Marketplace
         shell: pwsh
         env:
@@ -805,13 +803,163 @@ jobs:
 
           Viu Utilities for Visual Studio ``$($env:VIU_VSIX_VERSION)`` was published as a preview.
 
-          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.assimalign-tooling-vs-viu-utilitycss-extension)
+          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.viu-utilitycss-visualstudio)
           "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+  resolve-visual-studio-code-marketplace:
+    name: resolve Visual Studio Code Marketplace versions
+    needs: validate-release
+    if: github.event_name == 'release' && github.event.release.draft == false
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.marketplace.outputs.matrix }}
+    steps:
+      - name: Checkout release tag
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Validate checked-out commit
+        shell: pwsh
+        run: |
+          & git fetch origin main --no-tags
+          if ($LASTEXITCODE -ne 0) {
+            throw "Fetching origin/main failed with exit code $LASTEXITCODE."
+          }
+
+          $checkedOutCommit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Resolving the checked-out commit failed.'
+          }
+          & git merge-base --is-ancestor $checkedOutCommit origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Release builds must use a commit reachable from main.'
+          }
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Resolve Marketplace versions and missing targets
+        id: marketplace
+        shell: pwsh
+        env:
+          VIU_GITHUB_RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
+          VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $versionProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
+          function Read-BuildProperty {
+            param([string] $PropertyName)
+
+            $propertyValue = (
+              & dotnet msbuild $versionProject -nologo "-getProperty:$PropertyName"
+            ) -join [System.Environment]::NewLine
+            if ($LASTEXITCODE -ne 0) {
+              throw "Reading $PropertyName failed with exit code $LASTEXITCODE."
+            }
+
+            return ([string] $propertyValue).Trim()
+          }
+
+          $canonicalVersion = Read-BuildProperty -PropertyName 'ViuVersion'
+          $versionSuffix = Read-BuildProperty -PropertyName 'ViuVersionSuffix'
+          $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
+            $env:VIU_RELEASE_TAG,
+            '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?)$',
+            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+          if (-not $tagMatch.Success) {
+            throw 'GitHub releases must use a vMAJOR.MINOR.PATCH[-PRERELEASE] tag.'
+          }
+          if ($tagMatch.Groups['version'].Value -ne $canonicalVersion) {
+            throw "Release tag version $($tagMatch.Groups['version'].Value) does not match canonical Viu version $canonicalVersion."
+          }
+
+          $isPreRelease = -not [string]::IsNullOrWhiteSpace($versionSuffix)
+          $githubReleaseIsPreRelease = [string]::Equals(
+            $env:VIU_GITHUB_RELEASE_IS_PRERELEASE,
+            'true',
+            [System.StringComparison]::OrdinalIgnoreCase)
+          if ($isPreRelease -ne $githubReleaseIsPreRelease) {
+            throw "GitHub Release prerelease=$githubReleaseIsPreRelease does not match ViuVersionSuffix '$versionSuffix'."
+          }
+
+          $targetDefinitions = @(
+            [pscustomobject]@{
+              RuntimeIdentifier = 'win-x64'
+              Target = 'win32-x64'
+            },
+            [pscustomobject]@{
+              RuntimeIdentifier = 'win-arm64'
+              Target = 'win32-arm64'
+            },
+            [pscustomobject]@{
+              RuntimeIdentifier = 'linux-x64'
+              Target = 'linux-x64'
+            },
+            [pscustomobject]@{
+              RuntimeIdentifier = 'osx-x64'
+              Target = 'darwin-x64'
+            },
+            [pscustomobject]@{
+              RuntimeIdentifier = 'osx-arm64'
+              Target = 'darwin-arm64'
+            }
+          )
+          $resolutions = @(
+            & ./scripts/Resolve-VisualStudioCodeMarketplaceVersion.ps1 -CanonicalVersion $canonicalVersion -PackageName 'viu'
+            & ./scripts/Resolve-VisualStudioCodeMarketplaceVersion.ps1 -CanonicalVersion $canonicalVersion -PackageName 'viu-utilitycss'
+          )
+
+          $preRelease = $isPreRelease.ToString().ToLowerInvariant()
+          $matrixRows = @(
+            foreach ($resolution in $resolutions) {
+              foreach ($targetDefinition in $targetDefinitions) {
+                if ($resolution.TargetPlatformsToPublish -notcontains $targetDefinition.Target) {
+                  continue
+                }
+
+                [ordered]@{
+                  package = $resolution.PackageName
+                  runtime_identifier = $targetDefinition.RuntimeIdentifier
+                  target = $targetDefinition.Target
+                  version = $resolution.Version
+                  pre_release = $preRelease
+                }
+              }
+            }
+          )
+          if ($matrixRows.Count -eq 0) {
+            throw 'Marketplace version resolution produced no package targets.'
+          }
+
+          $matrix = [ordered]@{ include = $matrixRows } |
+            ConvertTo-Json -Depth 5 -Compress
+          "matrix=$matrix" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+          @(
+            '## Visual Studio Code Marketplace publish plan'
+            ''
+            "Canonical Viu version: $canonicalVersion"
+            ''
+            foreach ($resolution in $resolutions) {
+              $decision = if ($resolution.ReusesPartialVersion) {
+                'reusing the incomplete Marketplace version'
+              }
+              else {
+                'using the next Marketplace version'
+              }
+              "- $($resolution.ExtensionIdentifier) -> $($resolution.Version) ($decision); targets: $($resolution.TargetPlatformsToPublish -join ', ')"
+            }
+          ) |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
   publish-visual-studio-code:
     name: publish VS Code ${{ matrix.package }} (${{ matrix.target }})
-    needs: validate-release
+    needs: resolve-visual-studio-code-marketplace
     if: github.event_name == 'release' && github.event.release.draft == false
     runs-on: ubuntu-24.04
     environment:
@@ -819,21 +967,10 @@ jobs:
       url: https://marketplace.visualstudio.com/manage/publishers/assimalign
     strategy:
       fail-fast: false
-      # The first target creates each listing. Serialize every cell so later target updates cannot
-      # race that creation, while retaining one independently visible result per package/target.
+      # The resolver emits one version per package and only its missing targets. Serialize those
+      # cells so first listing creation and later target updates cannot race.
       max-parallel: 1
-      matrix:
-        include:
-          - { package: viu, runtime_identifier: win-x64, target: win32-x64 }
-          - { package: viu, runtime_identifier: win-arm64, target: win32-arm64 }
-          - { package: viu, runtime_identifier: linux-x64, target: linux-x64 }
-          - { package: viu, runtime_identifier: osx-x64, target: darwin-x64 }
-          - { package: viu, runtime_identifier: osx-arm64, target: darwin-arm64 }
-          - { package: viu-utilitycss, runtime_identifier: win-x64, target: win32-x64 }
-          - { package: viu-utilitycss, runtime_identifier: win-arm64, target: win32-arm64 }
-          - { package: viu-utilitycss, runtime_identifier: linux-x64, target: linux-x64 }
-          - { package: viu-utilitycss, runtime_identifier: osx-x64, target: darwin-x64 }
-          - { package: viu-utilitycss, runtime_identifier: osx-arm64, target: darwin-arm64 }
+      matrix: ${{ fromJSON(needs.resolve-visual-studio-code-marketplace.outputs.matrix) }}
     steps:
       - name: Checkout release tag
         # actions/checkout v4
@@ -882,58 +1019,21 @@ jobs:
           }
           Write-Host "::add-mask::$($env:VSCE_PAT)"
 
-      - name: Resolve Marketplace package inputs
+      - name: Validate Marketplace package inputs
         id: marketplace
         shell: pwsh
         env:
-          VIU_GITHUB_RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
-          VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
           VIU_VSCODE_PACKAGE: ${{ matrix.package }}
+          VIU_VSCODE_PRE_RELEASE: ${{ matrix.pre_release }}
           VIU_VSCODE_RUNTIME_IDENTIFIER: ${{ matrix.runtime_identifier }}
           VIU_VSCODE_TARGET: ${{ matrix.target }}
+          VIU_VSCODE_VERSION: ${{ matrix.version }}
         run: |
-          $versionProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
-          function Read-BuildProperty {
-            param([string] $PropertyName)
-
-            $propertyValue = (
-              & dotnet msbuild $versionProject -nologo "-getProperty:$PropertyName"
-            ) -join [System.Environment]::NewLine
-            if ($LASTEXITCODE -ne 0) {
-              throw "Reading $PropertyName failed with exit code $LASTEXITCODE."
-            }
-
-            return ([string] $propertyValue).Trim()
+          if ($env:VIU_VSCODE_VERSION -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw "Marketplace version '$($env:VIU_VSCODE_VERSION)' is not numeric MAJOR.MINOR.PATCH."
           }
-
-          $canonicalVersion = Read-BuildProperty -PropertyName 'ViuVersion'
-          $versionPrefix = Read-BuildProperty -PropertyName 'ViuVersionPrefix'
-          $versionSuffix = Read-BuildProperty -PropertyName 'ViuVersionSuffix'
-          if ($canonicalVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
-            throw "Canonical Viu version '$canonicalVersion' is not supported SemVer."
-          }
-          if ($versionPrefix -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
-            throw "ViuVersionPrefix '$versionPrefix' is not a numeric three-component Marketplace version."
-          }
-
-          $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
-            $env:VIU_RELEASE_TAG,
-            '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?)$',
-            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
-          if (-not $tagMatch.Success) {
-            throw 'GitHub releases must use a vMAJOR.MINOR.PATCH[-PRERELEASE] tag.'
-          }
-          if ($tagMatch.Groups['version'].Value -ne $canonicalVersion) {
-            throw "Release tag version $($tagMatch.Groups['version'].Value) does not match canonical Viu version $canonicalVersion."
-          }
-
-          $isPreRelease = -not [string]::IsNullOrWhiteSpace($versionSuffix)
-          $githubReleaseIsPreRelease = [string]::Equals(
-            $env:VIU_GITHUB_RELEASE_IS_PRERELEASE,
-            'true',
-            [System.StringComparison]::OrdinalIgnoreCase)
-          if ($isPreRelease -ne $githubReleaseIsPreRelease) {
-            throw "GitHub Release prerelease=$githubReleaseIsPreRelease does not match ViuVersionSuffix '$versionSuffix'."
+          if ($env:VIU_VSCODE_PRE_RELEASE -notin @('true', 'false')) {
+            throw "Marketplace prerelease value '$($env:VIU_VSCODE_PRE_RELEASE)' is not true or false."
           }
 
           $runtimeIdentifierProject = 'libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/src/Assimalign.Viu.UtilityCss.LanguageServer.csproj'
@@ -963,16 +1063,102 @@ jobs:
             throw "Runtime identifier '$($env:VIU_VSCODE_RUNTIME_IDENTIFIER)' must map to '$expectedTarget', not '$($env:VIU_VSCODE_TARGET)'."
           }
 
-          $packagePath = "_out/extensions/VisualStudioCode/Release/Vsix/$($env:VIU_VSCODE_PACKAGE)-$versionPrefix-$expectedTarget.vsix"
-          "version=$versionPrefix" |
+          $packagePath = "_out/extensions/VisualStudioCode/Release/Vsix/$($env:VIU_VSCODE_PACKAGE)-$($env:VIU_VSCODE_VERSION)-$expectedTarget.vsix"
+          "version=$($env:VIU_VSCODE_VERSION)" |
             Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "pre_release=$($isPreRelease.ToString().ToLowerInvariant())" |
+          "pre_release=$($env:VIU_VSCODE_PRE_RELEASE)" |
             Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "package_path=$packagePath" |
             Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "VS Code package: $($env:VIU_VSCODE_PACKAGE) $versionPrefix ($expectedTarget), prerelease=$isPreRelease"
+          Write-Host "VS Code package: $($env:VIU_VSCODE_PACKAGE) $($env:VIU_VSCODE_VERSION) ($expectedTarget), prerelease=$($env:VIU_VSCODE_PRE_RELEASE)"
+
+      - name: Confirm selected Marketplace target is missing
+        id: availability
+        shell: pwsh
+        env:
+          VIU_VSCODE_PACKAGE: ${{ matrix.package }}
+          VIU_VSCODE_TARGET: ${{ matrix.target }}
+          VIU_VSCODE_VERSION: ${{ matrix.version }}
+        run: |
+          $extensionIdentifier = "Assimalign.$($env:VIU_VSCODE_PACKAGE)"
+          $query = @{
+            filters = @(
+              @{
+                criteria = @(
+                  @{
+                    filterType = 7
+                    value = $extensionIdentifier
+                  }
+                )
+                pageNumber = 1
+                pageSize = 1
+                sortBy = 0
+                sortOrder = 0
+              }
+            )
+            assetTypes = @()
+            # ExtensionQueryFlags.IncludeVersions
+            flags = 1
+          } | ConvertTo-Json -Depth 10 -Compress
+
+          try {
+            $queryResult = Invoke-RestMethod `
+              -Method Post `
+              -Uri 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' `
+              -Headers @{ Accept = 'application/json;api-version=7.1-preview.1' } `
+              -ContentType 'application/json' `
+              -Body $query
+          }
+          catch {
+            throw "The Marketplace availability query for $extensionIdentifier failed; refusing to publish. $($_.Exception.Message)"
+          }
+
+          $extensions = @(
+            $queryResult.results |
+              ForEach-Object { $_.extensions } |
+              Where-Object { $null -ne $_ }
+          )
+          if ($extensions.Count -gt 1) {
+            throw "The Marketplace returned more than one exact match for $extensionIdentifier."
+          }
+          if ($extensions.Count -eq 1 -and
+              (-not [string]::Equals(
+                  [string] $extensions[0].publisher.publisherName,
+                  'Assimalign',
+                  [System.StringComparison]::OrdinalIgnoreCase) -or
+                -not [string]::Equals(
+                  [string] $extensions[0].extensionName,
+                  $env:VIU_VSCODE_PACKAGE,
+                  [System.StringComparison]::Ordinal))) {
+            throw "The Marketplace response did not exactly match $extensionIdentifier."
+          }
+
+          $matchingVersions = if ($extensions.Count -eq 0) {
+            @()
+          }
+          else {
+            @(
+              $extensions[0].versions |
+                Where-Object {
+                  $_.version -eq $env:VIU_VSCODE_VERSION -and
+                  $_.targetPlatform -eq $env:VIU_VSCODE_TARGET
+                }
+            )
+          }
+          $targetExists = $matchingVersions.Count -gt 0
+          $publish = (-not $targetExists).ToString().ToLowerInvariant()
+          "publish=$publish" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+          if ($targetExists) {
+            Write-Host "$extensionIdentifier $($env:VIU_VSCODE_VERSION) for $($env:VIU_VSCODE_TARGET) became available after central resolution; keeping the selected version and skipping this target."
+          }
+          else {
+            Write-Host "$extensionIdentifier $($env:VIU_VSCODE_VERSION) for $($env:VIU_VSCODE_TARGET) remains available to publish."
+          }
 
       - name: Build platform-specific VSIX
+        if: steps.availability.outputs.publish == 'true'
         shell: pwsh
         env:
           VIU_VSCODE_PACKAGE: ${{ matrix.package }}
@@ -996,6 +1182,7 @@ jobs:
           }
 
       - name: Validate platform-specific VSIX
+        if: steps.availability.outputs.publish == 'true'
         shell: pwsh
         env:
           VIU_VSCODE_PACKAGE: ${{ matrix.package }}
@@ -1102,6 +1289,7 @@ jobs:
           Write-Host "Validated $($packageFile.Name), $($packageFile.Length) bytes, SHA256 $($packageHash.Hash)."
 
       - name: Upload Visual Studio Code Marketplace artifact
+        if: steps.availability.outputs.publish == 'true'
         # actions/upload-artifact v4
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -1111,6 +1299,7 @@ jobs:
           retention-days: 14
 
       - name: Publish to Visual Studio Code Marketplace
+        if: steps.availability.outputs.publish == 'true'
         shell: pwsh
         env:
           VIU_VSCODE_PACKAGE: ${{ matrix.package }}
@@ -1158,5 +1347,22 @@ jobs:
 
           ``assimalign.$($env:VIU_VSCODE_PACKAGE)`` ``$($env:VIU_VSCODE_VERSION)`` was published
           for ``$($env:VIU_VSCODE_TARGET)`` on the $channel channel.
+          "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Record already-published Marketplace target
+        if: steps.availability.outputs.publish == 'false'
+        shell: pwsh
+        env:
+          VIU_VSCODE_PACKAGE: ${{ matrix.package }}
+          VIU_VSCODE_TARGET: ${{ matrix.target }}
+          VIU_VSCODE_VERSION: ${{ matrix.version }}
+        run: |
+          @"
+          ## Visual Studio Code Marketplace target already present
+
+          ``assimalign.$($env:VIU_VSCODE_PACKAGE)`` ``$($env:VIU_VSCODE_VERSION)`` already exists
+          for ``$($env:VIU_VSCODE_TARGET)``. The cell kept the centrally selected version and did
+          not rebuild or republish the immutable target.
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
