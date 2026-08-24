@@ -43,8 +43,8 @@
         ],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "./assets/branding/viu-mono-on-light-32.png",
-          "dark": "./assets/branding/viu-mono-on-dark-32.png"
+          "light": "./assets/branding/viu-mono-on-light-tight.svg",
+          "dark": "./assets/branding/viu-mono-on-dark-tight.svg"
         }
       }
     ],

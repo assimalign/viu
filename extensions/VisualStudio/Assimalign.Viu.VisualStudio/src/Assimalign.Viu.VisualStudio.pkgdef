@@ -26,7 +26,8 @@
 
 // The Viu image manifest binds this stable GUID/ID moniker to separate light- and dark-background
 // 16- and 32-pixel sources. ShellFileAssociations is the Visual Studio 2022+ path used by Solution
-// Explorer and editor tabs; it is independent of editor-factory ownership below.
+// Explorer and editor tabs; it is independent of editor-factory ownership below. The image library
+// must be rebuilt with devenv /UpdateConfiguration after first deployment.
 [$RootKey$\ShellFileAssociations\.viu]
 "DefaultIconMoniker"="6aa672fb-e43f-4822-9353-30fb3069a6e0:1"
 

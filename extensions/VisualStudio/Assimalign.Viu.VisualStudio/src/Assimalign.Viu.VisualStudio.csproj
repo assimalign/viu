@@ -143,9 +143,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The Image Service resolves these assembly resources through ViuFileIcon.imagemanifest.
+    <!-- The Image Service preloads these assembly resources through ViuFileIcon.imagemanifest.
          They remain linked to the repository's imported branding source of truth; the parallel
-         Content items make the exact inputs visible in the VSIX for artifact inspection. -->
+         Content items make the exact inputs visible in the VSIX for artifact inspection. Build.ps1
+         verifies that the compiled WPF resource keys and manifest source paths still agree. -->
     <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-mono-16.png"
               Link="Branding\on-light\viu-mono-16.png" />
     <Resource Include="$(ViuRepositoryDirectory)assets\branding\png\on-light\viu-mono-32.png"
@@ -198,6 +199,18 @@
     <PropertyGroup>
       <_ViuExtensionVsixVersion>$(VersionPrefix)</_ViuExtensionVsixVersion>
     </PropertyGroup>
+  </Target>
+
+  <!-- The VSSDK deployment target copies and enables the extension but does not refresh Visual
+       Studio's ImageLibrary cache. Without this pass, a newly added file moniker remains the
+       generic document icon even though its pkgdef registration is already live. Command-line
+       deployment uses Build.ps1 -DeployExperimental, which performs the same refresh explicitly. -->
+  <Target Name="RefreshViuExperimentalImageLibrary"
+          AfterTargets="DeployVsixExtensionFiles"
+          Condition="'$(DeployExtension)' == 'true' and
+                     '$(BuildingInsideVisualStudio)' == 'true' and
+                     Exists('$(DevEnvDir)devenv.exe')">
+    <Exec Command="&quot;$(DevEnvDir)devenv.exe&quot; /RootSuffix &quot;$(VSSDKTargetPlatformRegRootSuffix)&quot; /UpdateConfiguration" />
   </Target>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />

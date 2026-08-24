@@ -58,5 +58,8 @@ reason that Visual Studio surfaces rather than failing silently.
 
 Run `extensions/VisualStudio/Build.ps1` and install the resulting VSIX, then restart Visual Studio and
 open a `.viu` file: the Viu colors appear immediately and the language server starts with the buffer.
-The project sets `DeployExtension=false`, so no build installs itself into an experimental hive; pass
-`-p:DeployExtension=true` for one build to opt into the classic experimental-instance loop.
+The project sets `DeployExtension=false` for command-line builds, so no ordinary build installs itself
+into an experimental hive. For a command-line development deployment, use this package's
+`Build.ps1 -DeployExperimental -Version <version>` flow; it also runs `/UpdateConfiguration`, which
+is required to make a newly deployed image moniker visible to Solution Explorer. In-IDE deployment
+performs the same image-library refresh after the VSSDK deployment target.

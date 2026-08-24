@@ -80,8 +80,24 @@ directories exist and are picked up by subsequent in-IDE builds.
 
 Command-line builds produce the `.vsix` without installing it into an experimental hive. Inside
 Visual Studio, each extension solution's `<Deploy />` entry and host-split `DeployExtension`
-property preserve the classic F5-into-the-experimental-instance loop for that VSIX alone. A
-command-line build can opt into deployment explicitly with `-p:DeployExtension=true`.
+property preserve the classic F5-into-the-experimental-instance loop for that VSIX alone. The Viu
+project follows deployment by running `devenv /RootSuffix Exp /UpdateConfiguration`, because the
+VSSDK copy-and-enable target does not refresh Visual Studio's cached image-manifest library.
+
+For the equivalent command-line loop, build and deploy the Viu package through its script. Use a
+version greater than any copy already present in the experimental hive:
+
+```powershell
+./Assimalign.Viu.VisualStudio/Build.ps1 `
+  -Configuration Debug `
+  -Version 10.0.2 `
+  -DeployExperimental
+```
+
+The switch installs into the released Visual Studio instance's `Exp` root suffix and completes the
+same configuration refresh before returning. `-ExperimentalRootSuffix` selects a different named
+experimental hive when needed. The script refuses to deploy while that selected Visual Studio
+installation is running; another installation, such as Visual Studio Insiders, is unaffected.
 
 The installed extension does not require a separately installed .NET runtime for the language
 server. It chooses the server matching the Visual Studio process architecture at startup.
@@ -101,6 +117,16 @@ override with Open With… → **Source Code (Text) Editor** → **Set as Defaul
 
 See [Assimalign.Viu.VisualStudio/docs/DESIGN.md](Assimalign.Viu.VisualStudio/docs/DESIGN.md), "File
 extension ownership", for the editor-factory ladder and the mechanism.
+
+### Troubleshooting: `.viu` has the generic document icon
+
+The VSIX ships a `ShellFileAssociations\.viu` GUID/ID moniker and a root-level
+`ViuFileIcon.imagemanifest` with 16- and 32-pixel sources for light, dark, and high-contrast
+backgrounds. Visual Studio caches every discovered image manifest in the selected hive's
+`ImageLibrary\ImageLibrary.cache`; copying and enabling a development VSIX alone does not invalidate
+that cache. Use `-DeployExperimental` for local deployment, or close Visual Studio and run
+`devenv /RootSuffix <suffix> /UpdateConfiguration` once after installing. A fresh process then uses
+the Viu glyph in both CPS/SDK-style Solution Explorer trees and loose-file views.
 
 ## Marketplace releases
 

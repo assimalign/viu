@@ -62,7 +62,9 @@
     <Asset Type="Microsoft.VisualStudio.VsPackage"
            d:Source="File"
            Path="Assimalign.Viu.VisualStudio.pkgdef" />
-    <!-- Registers the custom GUID/ID moniker used by the .viu ShellFileAssociations entry. -->
+    <!-- Keeps the image manifest visible as extension metadata. Visual Studio's Image Service
+         discovers the deployed root-level *.imagemanifest by scanning its configured extension
+         search path; the local deployment flow refreshes that cached library explicitly. -->
     <Asset Type="Microsoft.VisualStudio.ImageManifest"
            d:Source="File"
            Path="ViuFileIcon.imagemanifest" />

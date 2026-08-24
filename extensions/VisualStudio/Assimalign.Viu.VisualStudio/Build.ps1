@@ -20,13 +20,22 @@
     The publish recipe itself is never restated here. It lives in that shared target so this script
     and an in-IDE F5 cannot drift apart, and the language-server project is resolved from
     ViuLanguageServerProjectPath rather than named a second time.
+
+    -DeployExperimental installs the validated package into the selected released Visual Studio's
+    named experimental root suffix and runs /UpdateConfiguration before returning. That explicit
+    pass is required for newly deployed image manifests to invalidate the ImageLibrary cache.
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Debug',
 
-    [string] $Version
+    [string] $Version,
+
+    [switch] $DeployExperimental,
+
+    [ValidatePattern('^[A-Za-z][A-Za-z0-9]*$')]
+    [string] $ExperimentalRootSuffix = 'Exp'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -262,6 +271,134 @@ try {
         throw 'The packaged extension does not declare ViuFileIcon.imagemanifest as its Visual Studio Image Manifest asset.'
     }
 
+    $packageDefinitionEntry = $extensionArchive.GetEntry(
+        'Assimalign.Viu.VisualStudio.pkgdef')
+    $packageDefinitionReader = [System.IO.StreamReader]::new(
+        $packageDefinitionEntry.Open())
+    try {
+        $packageDefinition = $packageDefinitionReader.ReadToEnd()
+    }
+    finally {
+        $packageDefinitionReader.Dispose()
+    }
+
+    $expectedFileAssociationKey = '[$RootKey$\ShellFileAssociations\.viu]'
+    $expectedFileAssociationValue =
+        '"DefaultIconMoniker"="6aa672fb-e43f-4822-9353-30fb3069a6e0:1"'
+    if (-not $packageDefinition.Contains(
+            $expectedFileAssociationKey,
+            [System.StringComparison]::Ordinal) -or
+        -not $packageDefinition.Contains(
+            $expectedFileAssociationValue,
+            [System.StringComparison]::Ordinal)) {
+        throw 'The packaged .viu file association does not use the expected Visual Studio GUID:ID image moniker.'
+    }
+
+    $imageManifestEntry = $extensionArchive.GetEntry('ViuFileIcon.imagemanifest')
+    $imageManifestReader = [System.IO.StreamReader]::new(
+        $imageManifestEntry.Open())
+    try {
+        [xml] $imageManifest = $imageManifestReader.ReadToEnd()
+    }
+    finally {
+        $imageManifestReader.Dispose()
+    }
+
+    $imageNamespaceManager = [System.Xml.XmlNamespaceManager]::new(
+        $imageManifest.NameTable)
+    $imageNamespaceManager.AddNamespace(
+        'image',
+        'http://schemas.microsoft.com/VisualStudio/ImageManifestSchema/2014')
+    $imageGuid = $imageManifest.SelectSingleNode(
+        "/image:ImageManifest/image:Symbols/image:Guid[@Name='ViuImageAssets']",
+        $imageNamespaceManager)
+    $imageId = $imageManifest.SelectSingleNode(
+        "/image:ImageManifest/image:Symbols/image:ID[@Name='ViuFile']",
+        $imageNamespaceManager)
+    $imageResources = $imageManifest.SelectSingleNode(
+        "/image:ImageManifest/image:Symbols/image:String[@Name='Resources']",
+        $imageNamespaceManager)
+    if ($null -eq $imageGuid -or
+        $imageGuid.Value -ne '{6aa672fb-e43f-4822-9353-30fb3069a6e0}' -or
+        $null -eq $imageId -or
+        $imageId.Value -ne '1' -or
+        $null -eq $imageResources -or
+        $imageResources.Value -ne '/Assimalign.Viu.VisualStudio;Component/Branding') {
+        throw 'The packaged image manifest does not match the .viu GUID:ID association or its WPF Branding resource root.'
+    }
+
+    $expectedImageSources = @(
+        [pscustomobject]@{ Uri = '$(Resources)/on-light/viu-mono-16.png'; Background = 'Light'; Size = '16' },
+        [pscustomobject]@{ Uri = '$(Resources)/on-light/viu-mono-32.png'; Background = 'Light'; Size = '32' },
+        [pscustomobject]@{ Uri = '$(Resources)/on-dark/viu-mono-16.png'; Background = 'Dark'; Size = '16' },
+        [pscustomobject]@{ Uri = '$(Resources)/on-dark/viu-mono-32.png'; Background = 'Dark'; Size = '32' },
+        [pscustomobject]@{ Uri = '$(Resources)/on-light/viu-mono-16.png'; Background = 'HighContrastLight'; Size = '16' },
+        [pscustomobject]@{ Uri = '$(Resources)/on-light/viu-mono-32.png'; Background = 'HighContrastLight'; Size = '32' },
+        [pscustomobject]@{ Uri = '$(Resources)/on-dark/viu-mono-16.png'; Background = 'HighContrastDark'; Size = '16' },
+        [pscustomobject]@{ Uri = '$(Resources)/on-dark/viu-mono-32.png'; Background = 'HighContrastDark'; Size = '32' }
+    )
+    foreach ($expectedImageSource in $expectedImageSources) {
+        $source = $imageManifest.SelectSingleNode(
+            "/image:ImageManifest/image:Images/image:Image/image:Source[@Uri='$($expectedImageSource.Uri)' and @Background='$($expectedImageSource.Background)']/image:Size[@Value='$($expectedImageSource.Size)']",
+            $imageNamespaceManager)
+        if ($null -eq $source) {
+            throw "The packaged image manifest is missing $($expectedImageSource.Background) $($expectedImageSource.Size)-pixel source $($expectedImageSource.Uri)."
+        }
+    }
+
+    $extensionAssemblyEntry = $extensionArchive.GetEntry(
+        'Assimalign.Viu.VisualStudio.dll')
+    $extensionAssemblyBytes = [System.IO.MemoryStream]::new()
+    try {
+        $extensionAssemblyEntryStream = $extensionAssemblyEntry.Open()
+        try {
+            $extensionAssemblyEntryStream.CopyTo($extensionAssemblyBytes)
+        }
+        finally {
+            $extensionAssemblyEntryStream.Dispose()
+        }
+        $extensionAssembly = [System.Reflection.Assembly]::Load(
+            $extensionAssemblyBytes.ToArray())
+    }
+    finally {
+        $extensionAssemblyBytes.Dispose()
+    }
+
+    $generatedResourceName = $extensionAssembly.GetManifestResourceNames() |
+        Where-Object { $_.EndsWith('.g.resources', [System.StringComparison]::Ordinal) } |
+        Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($generatedResourceName)) {
+        throw 'The packaged extension assembly has no WPF generated-resource table for the file icon.'
+    }
+
+    $generatedResourceStream = $extensionAssembly.GetManifestResourceStream(
+        $generatedResourceName)
+    $generatedResourceReader = [System.Resources.ResourceReader]::new(
+        $generatedResourceStream)
+    try {
+        $generatedResourceKeys = @()
+        $generatedResourceEnumerator = $generatedResourceReader.GetEnumerator()
+        while ($generatedResourceEnumerator.MoveNext()) {
+            $generatedResourceKeys += [string] $generatedResourceEnumerator.Key
+        }
+    }
+    finally {
+        $generatedResourceReader.Dispose()
+        $generatedResourceStream.Dispose()
+    }
+
+    $expectedGeneratedResourceKeys = @(
+        'branding/on-light/viu-mono-16.png',
+        'branding/on-light/viu-mono-32.png',
+        'branding/on-dark/viu-mono-16.png',
+        'branding/on-dark/viu-mono-32.png')
+    $missingGeneratedResourceKeys = @(
+        $expectedGeneratedResourceKeys |
+            Where-Object { $generatedResourceKeys -notcontains $_ })
+    if ($missingGeneratedResourceKeys.Count -gt 0) {
+        throw "The packaged extension assembly is missing image-manifest resources: $($missingGeneratedResourceKeys -join ', ')."
+    }
+
     $metadata = $manifest.SelectSingleNode(
         '/vsix:PackageManifest/vsix:Metadata',
         $namespaceManager)
@@ -291,3 +428,82 @@ Write-Host ("  {0} entries, {1:N2} MB ({2} bytes)" -f `
     $entryCount,
     $packageSizeInMegabytes,
     $packagedExtensionFile.Length)
+
+if ($DeployExperimental) {
+    $visualStudioInstances = @(
+        & $visualStudioInstaller `
+            -all `
+            -products '*' `
+            -requires Microsoft.Component.MSBuild `
+            -format json |
+            ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0) {
+        throw "vswhere.exe failed while locating the selected Visual Studio instance with exit code $LASTEXITCODE."
+    }
+
+    $visualStudioInstance = $visualStudioInstances |
+        Where-Object {
+            [System.IO.Path]::GetFullPath($_.installationPath).Equals(
+                [System.IO.Path]::GetFullPath($visualStudioInstallation),
+                [System.StringComparison]::OrdinalIgnoreCase)
+        } |
+        Select-Object -First 1
+    if ($null -eq $visualStudioInstance) {
+        throw "The Visual Studio instance id for $visualStudioInstallation could not be resolved."
+    }
+
+    $developmentEnvironment = Join-Path $visualStudioInstallation `
+        'Common7\IDE\devenv.exe'
+    $extensionInstaller = Join-Path $visualStudioInstallation `
+        'Common7\IDE\VSIXInstaller.exe'
+    if (-not (Test-Path -LiteralPath $developmentEnvironment) -or
+        -not (Test-Path -LiteralPath $extensionInstaller)) {
+        throw "Visual Studio's development environment or extension installer is missing under $visualStudioInstallation."
+    }
+
+    $runningDevelopmentEnvironments = @(
+        Get-CimInstance Win32_Process -Filter "Name = 'devenv.exe'" |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace($_.ExecutablePath) -and
+                [System.IO.Path]::GetFullPath($_.ExecutablePath).Equals(
+                    [System.IO.Path]::GetFullPath($developmentEnvironment),
+                    [System.StringComparison]::OrdinalIgnoreCase)
+            })
+    if ($runningDevelopmentEnvironments.Count -gt 0) {
+        $runningProcessIds = $runningDevelopmentEnvironments.ProcessId -join ', '
+        throw "Close the selected Visual Studio instance before experimental deployment. Running process ids: $runningProcessIds."
+    }
+
+    Write-Host "Installing into Visual Studio instance $($visualStudioInstance.instanceId), root suffix $ExperimentalRootSuffix"
+    # VSIXInstaller is a GUI executable and can hand work to a child process. Start-Process -Wait
+    # waits for that process tree, so /UpdateConfiguration cannot race ahead of the file copy.
+    $extensionInstallation = Start-Process `
+        -FilePath $extensionInstaller `
+        -ArgumentList @(
+            '/quiet',
+            '/force',
+            "/instanceIds:$($visualStudioInstance.instanceId)",
+            "/rootSuffix:$ExperimentalRootSuffix",
+            $packagedExtension) `
+        -WindowStyle Hidden `
+        -Wait `
+        -PassThru
+    if ($extensionInstallation.ExitCode -ne 0) {
+        throw "Visual Studio extension installation failed with exit code $($extensionInstallation.ExitCode)."
+    }
+
+    # DeployVsixExtensionFiles only copies and enables the VSIX. An explicit configuration pass is
+    # required to invalidate the root suffix's ImageLibrary cache before the next IDE process reads
+    # ShellFileAssociations. Run it hidden because it is a non-interactive maintenance process.
+    $configurationUpdate = Start-Process `
+        -FilePath $developmentEnvironment `
+        -ArgumentList @('/RootSuffix', $ExperimentalRootSuffix, '/UpdateConfiguration') `
+        -WindowStyle Hidden `
+        -Wait `
+        -PassThru
+    if ($configurationUpdate.ExitCode -ne 0) {
+        throw "Visual Studio experimental configuration update failed with exit code $($configurationUpdate.ExitCode)."
+    }
+
+    Write-Host 'Experimental deployment and image-library configuration refresh succeeded.'
+}

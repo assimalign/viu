@@ -10,4 +10,5 @@ Build.ps1
 **/*.ts
 !out/**/*.js
 !assets/branding/*.png
+!assets/branding/*.svg
 !LICENSE

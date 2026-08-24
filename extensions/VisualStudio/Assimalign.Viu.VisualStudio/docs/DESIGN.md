@@ -79,6 +79,33 @@ and lives under `tooling/Editor/` (`tooling/Editor/Assimalign.Viu.LanguageServer
 `tooling/Editor/Assimalign.Viu.LanguageService`) or `tooling/Compiler/` for the build-time cores.
 The publicly consumable parser libraries live under `libraries/Syntax/`.
 
+### File icon association
+
+Solution Explorer and editor tabs resolve `.viu` through
+`ShellFileAssociations\.viu\DefaultIconMoniker`. Its `guid:id` text names the identical GUID and ID
+in the root-level `ViuFileIcon.imagemanifest`; this is the same registry shape Visual Studio uses
+for other custom file monikers. The manifest supplies explicit 16- and 32-pixel PNGs for light,
+dark, and both high-contrast background variants. Its sources are WPF component-resource URIs into
+the extension assembly because VS 18's global image-library build preloads PNG bytes and discards a
+loose `$(ManifestFolder)` PNG source even though the same manifest can load it lazily. The VSIX also
+carries the input PNGs as loose files for artifact inspection, and the package build checks that
+the manifest paths, packaged files, and compiled WPF resource keys remain identical.
+
+The `Microsoft.VisualStudio.ImageManifest` VSIX asset is useful package metadata, but it is not the
+runtime discovery mechanism. Visual Studio scans `*.imagemanifest` files below its configured image
+search paths and serializes the resulting library into the selected hive's
+`ImageLibrary\ImageLibrary.cache`. The VSSDK `DeployVsixExtensionFiles` target copies and enables an
+extension without rebuilding that cache. Both supported development paths therefore run
+`devenv /RootSuffix <suffix> /UpdateConfiguration` after deployment: the in-IDE project target does
+so after VSSDK deployment, and `Build.ps1 -DeployExperimental` does so after VSIX installation. A
+fresh Visual Studio process is required because the shell caches extension-to-moniker results for
+the process lifetime.
+
+CPS needs no parallel icon provider. For an extension it does not recognize itself, the project
+tree leaves its image unset and the shell falls back to the same `ShellFileAssociations` lookup.
+Loose-file and SDK-style project trees therefore share the association once the image library has
+been refreshed.
+
 `Assimalign.Viu.VisualStudio` performs fast lexical classification with no server round trip. It
 lexes both container syntaxes of the hybrid `.viu` format ([V01.01.06.10]): tag-delimited top-level
 `<template>`/`<style>` sections (with nested-`<template>` depth tracking so slot fragments do not end
