@@ -274,7 +274,14 @@ jobs:
 
   publish-nuget:
     name: promote packages to nuget.org
-    if: github.event_name == 'release'
+    # nuget.org promotion is limited to the public prerelease channels: preview and
+    # release-candidate versions promote; alpha/beta releases stop at the GitHub Packages
+    # staging feed. Stable (suffixless) versions are deliberately NOT matched yet - when the
+    # stable channel opens, add a suffixless condition here alongside these two.
+    if: >-
+      github.event_name == 'release' &&
+      (contains(needs.pack-packages.outputs.version, '-preview.') ||
+       contains(needs.pack-packages.outputs.version, '-rc.'))
     needs: [pack-packages, publish-github-packages]
     runs-on: ubuntu-24.04
     environment:
