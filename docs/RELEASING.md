@@ -185,10 +185,13 @@ configuration.
 reviewers plus the existing organization secret `VS_MARKETPLACE_TOKEN`. The protected release job
 uses that token to publish both preview VSIXs:
 
-- `Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c`
+- `Assimalign.Viu.VisualStudio.9d68bb9d-64dd-4715-8362-164655899684`
 - `Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b`
 
-The owner deleted the former `assimalign-tooling-vs-viu-extension` listing. Neither clean internal
+The owner deleted the former `assimalign-tooling-vs-viu-extension` listing. A removed listing
+permanently retains its VSIX id registration, so the main extension's identity was rotated
+(previously `...3c6324dd-...`) — copies installed under the old id must be reinstalled once, since
+auto-update does not cross an identity rotation. Neither clean internal
 name exists yet, so both Visual Studio listings are first-time creations:
 
 - `viu-visualstudio` ->

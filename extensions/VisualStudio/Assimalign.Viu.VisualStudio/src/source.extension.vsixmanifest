@@ -3,9 +3,11 @@
                  xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
                  xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <!-- The identity is unchanged from the out-of-process implementation this extension replaces:
-         same product, same Marketplace entry, so an installed copy upgrades in place. -->
-    <Identity Id="Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c"
+    <!-- Identity rotated 2026-08-24: the retired legacy Marketplace listing permanently retains
+         the registration of the previous VSIX id (3c6324dd), so the fresh viu-visualstudio
+         listing requires a new id. Copies installed under the old id do not auto-update across
+         this rotation and must be reinstalled once. -->
+    <Identity Id="Assimalign.Viu.VisualStudio.9d68bb9d-64dd-4715-8362-164655899684"
               Version="|Assimalign.Viu.VisualStudio;GetVsixVersion|"
               Language="en-US"
               Publisher="Assimalign" />
