@@ -14,6 +14,12 @@ on:
       - 'tooling/**'
       - 'libraries/Syntax/**'
       - 'libraries/ServerRenderer/**'
+      - 'libraries/Utilities/**'
+      - 'build/**'
+      - 'assets/branding/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
   release:
     types: [published]
 
@@ -388,68 +394,87 @@ jobs:
             Accept = 'application/json;api-version=7.1-preview.1'
             Authorization = "Basic $([Convert]::ToBase64String($authorizationBytes))"
           }
-          $query = @{
-            filters = @(
-              @{
-                criteria = @(
-                  @{
-                    filterType = 7
-                    value = 'Assimalign.Assimalign.Viu.VisualStudio'
-                  }
-                )
-                pageNumber = 1
-                pageSize = 1
-                sortBy = 0
-                sortOrder = 0
-              }
-            )
-            assetTypes = @()
-            # ExtensionQueryFlags.IncludeVersions
-            flags = 1
-          } | ConvertTo-Json -Depth 10 -Compress
-
-          try {
-            $queryResult = Invoke-RestMethod `
-              -Method Post `
-              -Uri 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' `
-              -Headers $headers `
-              -ContentType 'application/json' `
-              -Body $query
-          }
-          catch {
-            throw "The Marketplace version query failed; refusing to publish. $($_.Exception.Message)"
-          }
-
-          $extensions = @(
-            $queryResult.results[0].extensions |
-              Where-Object { $null -ne $_ }
+          $marketplaceItems = @(
+            [pscustomobject]@{
+              Name = 'Viu for Visual Studio'
+              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio'
+            },
+            [pscustomobject]@{
+              Name = 'Viu Utilities for Visual Studio'
+              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio.UtilityCss'
+            }
           )
-          if ($extensions.Count -gt 1) {
-            throw 'The Marketplace returned more than one exact extension match.'
-          }
 
           $nextRevision = 1
-          if ($extensions.Count -eq 1) {
+          foreach ($marketplaceItem in $marketplaceItems) {
+            $query = @{
+              filters = @(
+                @{
+                  criteria = @(
+                    @{
+                      filterType = 7
+                      value = $marketplaceItem.ItemName
+                    }
+                  )
+                  pageNumber = 1
+                  pageSize = 1
+                  sortBy = 0
+                  sortOrder = 0
+                }
+              )
+              assetTypes = @()
+              # ExtensionQueryFlags.IncludeVersions
+              flags = 1
+            } | ConvertTo-Json -Depth 10 -Compress
+
+            try {
+              $queryResult = Invoke-RestMethod `
+                -Method Post `
+                -Uri 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' `
+                -Headers $headers `
+                -ContentType 'application/json' `
+                -Body $query
+            }
+            catch {
+              throw "The Marketplace version query for $($marketplaceItem.Name) failed; refusing to publish. $($_.Exception.Message)"
+            }
+
+            $extensions = @(
+              $queryResult.results |
+                ForEach-Object { $_.extensions } |
+                Where-Object { $null -ne $_ }
+            )
+            if ($extensions.Count -gt 1) {
+              throw "The Marketplace returned more than one exact match for $($marketplaceItem.ItemName)."
+            }
+            if ($extensions.Count -eq 0) {
+              Write-Host "$($marketplaceItem.Name) has no existing Marketplace listing."
+              continue
+            }
+
             $publishedVersions = @(
               $extensions[0].versions |
+                Where-Object { $null -ne $_ } |
                 ForEach-Object { [System.Version]::Parse($_.version) }
             )
-            if ($publishedVersions.Count -gt 0) {
-              $latestVersion = $publishedVersions |
-                Sort-Object -Descending |
-                Select-Object -First 1
-              $latestCoreVersion = [System.Version]::new(
-                $latestVersion.Major,
-                $latestVersion.Minor,
-                $latestVersion.Build)
-              $coreComparison = $canonicalVersion.CompareTo($latestCoreVersion)
-              if ($coreComparison -lt 0) {
-                throw "Canonical version $canonicalVersion is lower than Marketplace version $latestVersion."
-              }
-              if ($coreComparison -eq 0) {
-                $latestRevision = [Math]::Max($latestVersion.Revision, 0)
-                $nextRevision = $latestRevision + 1
-              }
+            if ($publishedVersions.Count -eq 0) {
+              continue
+            }
+
+            $latestVersion = $publishedVersions |
+              Sort-Object -Descending |
+              Select-Object -First 1
+            $latestCoreVersion = [System.Version]::new(
+              $latestVersion.Major,
+              $latestVersion.Minor,
+              $latestVersion.Build)
+            $coreComparison = $canonicalVersion.CompareTo($latestCoreVersion)
+            if ($coreComparison -lt 0) {
+              throw "Canonical version $canonicalVersion is lower than $($marketplaceItem.Name) Marketplace version $latestVersion."
+            }
+            if ($coreComparison -eq 0) {
+              $latestRevision = [Math]::Max($latestVersion.Revision, 0)
+              $nextRevision = [Math]::Max($nextRevision, $latestRevision + 1)
             }
           }
 
@@ -480,98 +505,127 @@ jobs:
       - name: Test language server
         run: dotnet test tooling/Editor/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj --configuration Release
 
+      - name: Test Utility CSS language server
+        run: dotnet test libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/test/Assimalign.Viu.UtilityCss.LanguageServer.Tests.csproj --configuration Release
+
       - name: Test Visual Studio extension
         run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release
 
-      - name: Validate and stage Marketplace preview
+      - name: Test Utility CSS Visual Studio extension
+        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/test/Assimalign.Viu.VisualStudio.UtilityCss.Tests.csproj --configuration Release
+
+      - name: Validate and stage Marketplace previews
         shell: pwsh
         env:
           VIU_VSIX_VERSION: ${{ steps.marketplace-version.outputs.version }}
         run: |
-          $extensionPath = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
-          $extensionFile = Get-Item -LiteralPath $extensionPath
-          $maximumPackageSize = 50MB
-          if ($extensionFile.Length -gt $maximumPackageSize) {
-            throw "The VSIX is $($extensionFile.Length) bytes; Marketplace packages must remain at or below $maximumPackageSize bytes."
-          }
-
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead(
-            $extensionFile.FullName)
-          try {
-            $manifestEntry = $extensionArchive.GetEntry('extension.vsixmanifest')
-            if ($null -eq $manifestEntry) {
-              throw 'The VSIX does not contain extension.vsixmanifest.'
+          $extensions = @(
+            [pscustomobject]@{
+              Name = 'Assimalign.Viu.VisualStudio'
+              Path = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
+              Identity = 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c'
+              MetadataDirectory = 'extensions/VisualStudio'
+            },
+            [pscustomobject]@{
+              Name = 'Assimalign.Viu.VisualStudio.UtilityCss'
+              Path = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.UtilityCss.vsix'
+              Identity = 'Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b'
+              MetadataDirectory = 'extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss'
             }
-
-            $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
-            try {
-              [xml] $manifest = $manifestReader.ReadToEnd()
-            }
-            finally {
-              $manifestReader.Dispose()
-            }
-
-            $namespaceManager = [System.Xml.XmlNamespaceManager]::new(
-              $manifest.NameTable)
-            $namespaceManager.AddNamespace(
-              'vsix',
-              'http://schemas.microsoft.com/developer/vsx-schema/2011')
-            $identity = $manifest.SelectSingleNode(
-              '/vsix:PackageManifest/vsix:Metadata/vsix:Identity',
-              $namespaceManager)
-            $preview = $manifest.SelectSingleNode(
-              '/vsix:PackageManifest/vsix:Metadata/vsix:Preview',
-              $namespaceManager)
-            if ($null -eq $identity) {
-              throw 'The VSIX manifest does not contain an Identity element.'
-            }
-            if ($identity.Id -ne 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c') {
-              throw "Unexpected VSIX identity: $($identity.Id)."
-            }
-            if ($identity.Publisher -ne 'Assimalign') {
-              throw "Unexpected VSIX publisher: $($identity.Publisher)."
-            }
-            if ($identity.Version -ne $env:VIU_VSIX_VERSION) {
-              throw "Expected VSIX version $($env:VIU_VSIX_VERSION), found $($identity.Version)."
-            }
-            if ($null -eq $preview -or $preview.InnerText -ne 'true') {
-              throw 'The Visual Studio extension must remain a Marketplace preview.'
-            }
-          }
-          finally {
-            $extensionArchive.Dispose()
-          }
+          )
 
           $marketplaceDirectory = '_out/release/visual-studio'
           New-Item -ItemType Directory -Path $marketplaceDirectory -Force | Out-Null
-          Copy-Item -LiteralPath $extensionPath -Destination $marketplaceDirectory
-          Copy-Item `
-            -LiteralPath 'extensions/VisualStudio/vs-publish.json' `
-            -Destination $marketplaceDirectory
-          Copy-Item `
-            -LiteralPath 'extensions/VisualStudio/Marketplace.md' `
-            -Destination $marketplaceDirectory
+          $maximumPackageSize = 50MB
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          foreach ($extension in $extensions) {
+            $extensionFile = Get-Item -LiteralPath $extension.Path
+            if ($extensionFile.Length -gt $maximumPackageSize) {
+              throw "$($extension.Name) is $($extensionFile.Length) bytes; Marketplace packages must remain at or below $maximumPackageSize bytes."
+            }
 
-          $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
-          Write-Host "Validated preview VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
+            $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead(
+              $extensionFile.FullName)
+            try {
+              $manifestEntry = $extensionArchive.GetEntry('extension.vsixmanifest')
+              if ($null -eq $manifestEntry) {
+                throw "$($extension.Name) does not contain extension.vsixmanifest."
+              }
+
+              $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
+              try {
+                [xml] $manifest = $manifestReader.ReadToEnd()
+              }
+              finally {
+                $manifestReader.Dispose()
+              }
+
+              $namespaceManager = [System.Xml.XmlNamespaceManager]::new(
+                $manifest.NameTable)
+              $namespaceManager.AddNamespace(
+                'vsix',
+                'http://schemas.microsoft.com/developer/vsx-schema/2011')
+              $identity = $manifest.SelectSingleNode(
+                '/vsix:PackageManifest/vsix:Metadata/vsix:Identity',
+                $namespaceManager)
+              $preview = $manifest.SelectSingleNode(
+                '/vsix:PackageManifest/vsix:Metadata/vsix:Preview',
+                $namespaceManager)
+              if ($null -eq $identity) {
+                throw "$($extension.Name) manifest does not contain an Identity element."
+              }
+              if ($identity.Id -ne $extension.Identity) {
+                throw "Unexpected $($extension.Name) VSIX identity: $($identity.Id)."
+              }
+              if ($identity.Publisher -ne 'Assimalign') {
+                throw "Unexpected $($extension.Name) VSIX publisher: $($identity.Publisher)."
+              }
+              if ($identity.Version -ne $env:VIU_VSIX_VERSION) {
+                throw "Expected $($extension.Name) version $($env:VIU_VSIX_VERSION), found $($identity.Version)."
+              }
+              if ($null -eq $preview -or $preview.InnerText -ne 'true') {
+                throw "$($extension.Name) must remain a Marketplace preview."
+              }
+            }
+            finally {
+              $extensionArchive.Dispose()
+            }
+
+            $extensionMarketplaceDirectory = Join-Path $marketplaceDirectory $extension.Name
+            New-Item `
+              -ItemType Directory `
+              -Path $extensionMarketplaceDirectory `
+              -Force | Out-Null
+            Copy-Item -LiteralPath $extension.Path -Destination $extensionMarketplaceDirectory
+            Copy-Item `
+              -LiteralPath (Join-Path $extension.MetadataDirectory 'vs-publish.json') `
+              -Destination $extensionMarketplaceDirectory
+            Copy-Item `
+              -LiteralPath (Join-Path $extension.MetadataDirectory 'Marketplace.md') `
+              -Destination $extensionMarketplaceDirectory
+
+            $extensionHash = Get-FileHash -LiteralPath $extension.Path -Algorithm SHA256
+            Write-Host "Validated $($extension.Name) preview $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
+          }
 
       - name: Verify no Node toolchain in Marketplace payload
         shell: pwsh
-        run: >-
-          ./scripts/Test-NoNodeToolchain.ps1
-          -Artifact _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
+        run: |
+          ./scripts/Test-NoNodeToolchain.ps1 -Artifact @(
+            '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix',
+            '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.UtilityCss.vsix'
+          )
 
       - name: Upload Marketplace preview artifact
         # actions/upload-artifact v4
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Assimalign.Viu.VisualStudio.Preview
+          name: Assimalign.Viu.VisualStudio.Previews
           path: _out/release/visual-studio
           if-no-files-found: error
           retention-days: 14
 
-      - name: Confirm Marketplace version is still available
+      - name: Confirm Marketplace versions are still available
         shell: pwsh
         env:
           VIU_VSIX_VERSION: ${{ steps.marketplace-version.outputs.version }}
@@ -584,53 +638,79 @@ jobs:
             Accept = 'application/json;api-version=7.1-preview.1'
             Authorization = "Basic $([Convert]::ToBase64String($authorizationBytes))"
           }
-          $query = @{
-            filters = @(
-              @{
-                criteria = @(
-                  @{
-                    filterType = 7
-                    value = 'Assimalign.Assimalign.Viu.VisualStudio'
-                  }
-                )
-                pageNumber = 1
-                pageSize = 1
-                sortBy = 0
-                sortOrder = 0
-              }
-            )
-            assetTypes = @()
-            flags = 1
-          } | ConvertTo-Json -Depth 10 -Compress
-
-          try {
-            $queryResult = Invoke-RestMethod `
-              -Method Post `
-              -Uri 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' `
-              -Headers $headers `
-              -ContentType 'application/json' `
-              -Body $query
-          }
-          catch {
-            throw "The Marketplace preflight failed; refusing to publish. $($_.Exception.Message)"
-          }
-
-          $targetVersion = [System.Version]::Parse($env:VIU_VSIX_VERSION)
-          $publishedVersions = @(
-            $queryResult.results[0].extensions[0].versions |
-              Where-Object { $null -ne $_ } |
-              ForEach-Object { [System.Version]::Parse($_.version) }
+          $marketplaceItems = @(
+            [pscustomobject]@{
+              Name = 'Viu for Visual Studio'
+              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio'
+            },
+            [pscustomobject]@{
+              Name = 'Viu Utilities for Visual Studio'
+              ItemName = 'Assimalign.Assimalign.Viu.VisualStudio.UtilityCss'
+            }
           )
-          if ($publishedVersions -contains $targetVersion) {
-            throw "VSIX version $targetVersion is already published."
+          $targetVersion = [System.Version]::Parse($env:VIU_VSIX_VERSION)
+          foreach ($marketplaceItem in $marketplaceItems) {
+            $query = @{
+              filters = @(
+                @{
+                  criteria = @(
+                    @{
+                      filterType = 7
+                      value = $marketplaceItem.ItemName
+                    }
+                  )
+                  pageNumber = 1
+                  pageSize = 1
+                  sortBy = 0
+                  sortOrder = 0
+                }
+              )
+              assetTypes = @()
+              flags = 1
+            } | ConvertTo-Json -Depth 10 -Compress
+
+            try {
+              $queryResult = Invoke-RestMethod `
+                -Method Post `
+                -Uri 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' `
+                -Headers $headers `
+                -ContentType 'application/json' `
+                -Body $query
+            }
+            catch {
+              throw "The Marketplace preflight for $($marketplaceItem.Name) failed; refusing to publish. $($_.Exception.Message)"
+            }
+
+            $extensions = @(
+              $queryResult.results |
+                ForEach-Object { $_.extensions } |
+                Where-Object { $null -ne $_ }
+            )
+            if ($extensions.Count -gt 1) {
+              throw "The Marketplace returned more than one exact match for $($marketplaceItem.ItemName)."
+            }
+
+            $publishedVersions = if ($extensions.Count -eq 0) {
+              @()
+            }
+            else {
+              @(
+                $extensions[0].versions |
+                  Where-Object { $null -ne $_ } |
+                  ForEach-Object { [System.Version]::Parse($_.version) }
+              )
+            }
+            if ($publishedVersions -contains $targetVersion) {
+              throw "$($marketplaceItem.Name) VSIX version $targetVersion is already published."
+            }
+            $latestVersion = $publishedVersions |
+              Sort-Object -Descending |
+              Select-Object -First 1
+            if ($null -ne $latestVersion -and $targetVersion -le $latestVersion) {
+              throw "$($marketplaceItem.Name) VSIX version $targetVersion must be greater than published version $latestVersion."
+            }
+            Write-Host "$($marketplaceItem.Name) preflight passed: $targetVersion > $latestVersion."
           }
-          $latestVersion = $publishedVersions |
-            Sort-Object -Descending |
-            Select-Object -First 1
-          if ($null -ne $latestVersion -and $targetVersion -le $latestVersion) {
-            throw "VSIX version $targetVersion must be greater than published version $latestVersion."
-          }
-          Write-Host "Marketplace version preflight passed: $targetVersion > $latestVersion."
 
       - name: Acquire pinned Microsoft VSIX publisher
         id: vsix-publisher
@@ -673,7 +753,7 @@ jobs:
             Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Verified Microsoft VsixPublisher $($env:VSSDK_BUILD_TOOLS_VERSION)."
 
-      - name: Publish to Visual Studio Marketplace
+      - name: Publish Viu to Visual Studio Marketplace
         shell: pwsh
         env:
           VIU_VSIX_PUBLISHER: ${{ steps.vsix-publisher.outputs.path }}
@@ -682,11 +762,11 @@ jobs:
         run: |
           Write-Host "::add-mask::$($env:VS_MARKETPLACE_TOKEN)"
           & $env:VIU_VSIX_PUBLISHER publish `
-            -payload '_out/release/visual-studio/Assimalign.Viu.VisualStudio.vsix' `
-            -publishManifest '_out/release/visual-studio/vs-publish.json' `
+            -payload '_out/release/visual-studio/Assimalign.Viu.VisualStudio/Assimalign.Viu.VisualStudio.vsix' `
+            -publishManifest '_out/release/visual-studio/Assimalign.Viu.VisualStudio/vs-publish.json' `
             -personalAccessToken $env:VS_MARKETPLACE_TOKEN
           if ($LASTEXITCODE -ne 0) {
-            throw "VsixPublisher failed with exit code $LASTEXITCODE."
+            throw "Publishing Viu for Visual Studio failed with exit code $LASTEXITCODE."
           }
 
           @"
@@ -695,5 +775,381 @@ jobs:
           Viu for Visual Studio ``$($env:VIU_VSIX_VERSION)`` was published as a preview.
 
           [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.Assimalign.Viu.VisualStudio)
+          "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      # This is a NEW Marketplace identity. The pre-rename UtilityCss-first listing is orphaned;
+      # unpublishing that old listing remains a manual owner action.
+      - name: Publish Viu Utilities to Visual Studio Marketplace
+        shell: pwsh
+        env:
+          VIU_VSIX_PUBLISHER: ${{ steps.vsix-publisher.outputs.path }}
+          VIU_VSIX_VERSION: ${{ steps.marketplace-version.outputs.version }}
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: |
+          Write-Host "::add-mask::$($env:VS_MARKETPLACE_TOKEN)"
+          & $env:VIU_VSIX_PUBLISHER publish `
+            -payload '_out/release/visual-studio/Assimalign.Viu.VisualStudio.UtilityCss/Assimalign.Viu.VisualStudio.UtilityCss.vsix' `
+            -publishManifest '_out/release/visual-studio/Assimalign.Viu.VisualStudio.UtilityCss/vs-publish.json' `
+            -personalAccessToken $env:VS_MARKETPLACE_TOKEN
+          if ($LASTEXITCODE -ne 0) {
+            throw "Publishing Viu Utilities for Visual Studio failed with exit code $LASTEXITCODE."
+          }
+
+          @"
+          ## Published Visual Studio Marketplace preview
+
+          Viu Utilities for Visual Studio ``$($env:VIU_VSIX_VERSION)`` was published as a preview.
+
+          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.Assimalign.Viu.VisualStudio.UtilityCss)
+          "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+  publish-visual-studio-code:
+    name: publish VS Code ${{ matrix.package }} (${{ matrix.target }})
+    needs: validate-release
+    if: github.event_name == 'release' && github.event.release.draft == false
+    runs-on: ubuntu-24.04
+    environment:
+      name: visual-studio-code-marketplace
+      url: https://marketplace.visualstudio.com/manage/publishers/assimalign
+    strategy:
+      fail-fast: false
+      # The first target creates each listing. Serialize every cell so later target updates cannot
+      # race that creation, while retaining one independently visible result per package/target.
+      max-parallel: 1
+      matrix:
+        include:
+          - { package: viu, runtime_identifier: win-x64, target: win32-x64 }
+          - { package: viu, runtime_identifier: win-arm64, target: win32-arm64 }
+          - { package: viu, runtime_identifier: linux-x64, target: linux-x64 }
+          - { package: viu, runtime_identifier: osx-x64, target: darwin-x64 }
+          - { package: viu, runtime_identifier: osx-arm64, target: darwin-arm64 }
+          - { package: viu-utilitycss, runtime_identifier: win-x64, target: win32-x64 }
+          - { package: viu-utilitycss, runtime_identifier: win-arm64, target: win32-arm64 }
+          - { package: viu-utilitycss, runtime_identifier: linux-x64, target: linux-x64 }
+          - { package: viu-utilitycss, runtime_identifier: osx-x64, target: darwin-x64 }
+          - { package: viu-utilitycss, runtime_identifier: osx-arm64, target: darwin-arm64 }
+    steps:
+      - name: Checkout release tag
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Validate checked-out commit
+        shell: pwsh
+        run: |
+          & git fetch origin main --no-tags
+          if ($LASTEXITCODE -ne 0) {
+            throw "Fetching origin/main failed with exit code $LASTEXITCODE."
+          }
+
+          $checkedOutCommit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Resolving the checked-out commit failed.'
+          }
+          & git merge-base --is-ancestor $checkedOutCommit origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Release builds must use a commit reachable from main.'
+          }
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Set up Node.js
+        # actions/setup-node v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Validate Visual Studio Code Marketplace credentials
+        shell: pwsh
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VSCE_PAT)) {
+            throw 'Configure the VSCE_PAT secret in the visual-studio-code-marketplace environment.'
+          }
+          Write-Host "::add-mask::$($env:VSCE_PAT)"
+
+      - name: Resolve Marketplace package inputs
+        id: marketplace
+        shell: pwsh
+        env:
+          VIU_GITHUB_RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
+          VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          VIU_VSCODE_PACKAGE: ${{ matrix.package }}
+          VIU_VSCODE_RUNTIME_IDENTIFIER: ${{ matrix.runtime_identifier }}
+          VIU_VSCODE_TARGET: ${{ matrix.target }}
+        run: |
+          $versionProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
+          function Read-BuildProperty {
+            param([string] $PropertyName)
+
+            $propertyValue = (
+              & dotnet msbuild $versionProject -nologo "-getProperty:$PropertyName"
+            ) -join [System.Environment]::NewLine
+            if ($LASTEXITCODE -ne 0) {
+              throw "Reading $PropertyName failed with exit code $LASTEXITCODE."
+            }
+
+            return ([string] $propertyValue).Trim()
+          }
+
+          $canonicalVersion = Read-BuildProperty -PropertyName 'ViuVersion'
+          $versionPrefix = Read-BuildProperty -PropertyName 'ViuVersionPrefix'
+          $versionSuffix = Read-BuildProperty -PropertyName 'ViuVersionSuffix'
+          if ($canonicalVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
+            throw "Canonical Viu version '$canonicalVersion' is not supported SemVer."
+          }
+          if ($versionPrefix -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw "ViuVersionPrefix '$versionPrefix' is not a numeric three-component Marketplace version."
+          }
+
+          $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
+            $env:VIU_RELEASE_TAG,
+            '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?)$',
+            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+          if (-not $tagMatch.Success) {
+            throw 'GitHub releases must use a vMAJOR.MINOR.PATCH[-PRERELEASE] tag.'
+          }
+          if ($tagMatch.Groups['version'].Value -ne $canonicalVersion) {
+            throw "Release tag version $($tagMatch.Groups['version'].Value) does not match canonical Viu version $canonicalVersion."
+          }
+
+          $isPreRelease = -not [string]::IsNullOrWhiteSpace($versionSuffix)
+          $githubReleaseIsPreRelease = [string]::Equals(
+            $env:VIU_GITHUB_RELEASE_IS_PRERELEASE,
+            'true',
+            [System.StringComparison]::OrdinalIgnoreCase)
+          if ($isPreRelease -ne $githubReleaseIsPreRelease) {
+            throw "GitHub Release prerelease=$githubReleaseIsPreRelease does not match ViuVersionSuffix '$versionSuffix'."
+          }
+
+          $runtimeIdentifierProject = 'libraries/Utilities/Assimalign.Viu.UtilityCss.LanguageServer/src/Assimalign.Viu.UtilityCss.LanguageServer.csproj'
+          $supportedRuntimeIdentifiers = (
+            & dotnet msbuild $runtimeIdentifierProject `
+                -nologo `
+                -getProperty:ViuLanguageServerAllRuntimeIdentifiers
+          ) -split ';' |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { $_.Trim() }
+          if ($LASTEXITCODE -ne 0 -or $supportedRuntimeIdentifiers.Count -eq 0) {
+            throw 'Could not read ViuLanguageServerAllRuntimeIdentifiers from the shared language-server target.'
+          }
+          if ($supportedRuntimeIdentifiers -notcontains $env:VIU_VSCODE_RUNTIME_IDENTIFIER) {
+            throw "Runtime identifier '$($env:VIU_VSCODE_RUNTIME_IDENTIFIER)' is not supported by the language-server build."
+          }
+
+          $targetByRuntimeIdentifier = @{
+            'win-x64' = 'win32-x64'
+            'win-arm64' = 'win32-arm64'
+            'linux-x64' = 'linux-x64'
+            'osx-x64' = 'darwin-x64'
+            'osx-arm64' = 'darwin-arm64'
+          }
+          $expectedTarget = $targetByRuntimeIdentifier[$env:VIU_VSCODE_RUNTIME_IDENTIFIER]
+          if ($env:VIU_VSCODE_TARGET -ne $expectedTarget) {
+            throw "Runtime identifier '$($env:VIU_VSCODE_RUNTIME_IDENTIFIER)' must map to '$expectedTarget', not '$($env:VIU_VSCODE_TARGET)'."
+          }
+
+          $packagePath = "_out/extensions/VisualStudioCode/Release/Vsix/$($env:VIU_VSCODE_PACKAGE)-$versionPrefix-$expectedTarget.vsix"
+          "version=$versionPrefix" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "pre_release=$($isPreRelease.ToString().ToLowerInvariant())" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "package_path=$packagePath" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "VS Code package: $($env:VIU_VSCODE_PACKAGE) $versionPrefix ($expectedTarget), prerelease=$isPreRelease"
+
+      - name: Build platform-specific VSIX
+        shell: pwsh
+        env:
+          VIU_VSCODE_PACKAGE: ${{ matrix.package }}
+          VIU_VSCODE_PRE_RELEASE: ${{ steps.marketplace.outputs.pre_release }}
+          VIU_VSCODE_RUNTIME_IDENTIFIER: ${{ matrix.runtime_identifier }}
+          VIU_VSCODE_VERSION: ${{ steps.marketplace.outputs.version }}
+        run: |
+          $buildArguments = @{
+            Configuration = 'Release'
+            Version = $env:VIU_VSCODE_VERSION
+            PackageName = @($env:VIU_VSCODE_PACKAGE)
+            RuntimeIdentifier = @($env:VIU_VSCODE_RUNTIME_IDENTIFIER)
+          }
+          if ($env:VIU_VSCODE_PRE_RELEASE -eq 'true') {
+            $buildArguments.PreRelease = $true
+          }
+
+          & ./extensions/VisualStudioCode/Build.ps1 @buildArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "Building $($env:VIU_VSCODE_PACKAGE) for $($env:VIU_VSCODE_RUNTIME_IDENTIFIER) failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Validate platform-specific VSIX
+        shell: pwsh
+        env:
+          VIU_VSCODE_PACKAGE: ${{ matrix.package }}
+          VIU_VSCODE_PACKAGE_PATH: ${{ steps.marketplace.outputs.package_path }}
+          VIU_VSCODE_PRE_RELEASE: ${{ steps.marketplace.outputs.pre_release }}
+          VIU_VSCODE_RUNTIME_IDENTIFIER: ${{ matrix.runtime_identifier }}
+          VIU_VSCODE_TARGET: ${{ matrix.target }}
+          VIU_VSCODE_VERSION: ${{ steps.marketplace.outputs.version }}
+        run: |
+          $packageFile = Get-Item -LiteralPath $env:VIU_VSCODE_PACKAGE_PATH
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $packageArchive = [System.IO.Compression.ZipFile]::OpenRead($packageFile.FullName)
+          try {
+            $manifestEntry = $packageArchive.GetEntry('extension.vsixmanifest')
+            $packageManifestEntry = $packageArchive.GetEntry('extension/package.json')
+            if ($null -eq $manifestEntry -or $null -eq $packageManifestEntry) {
+              throw 'The VSIX must contain extension.vsixmanifest and extension/package.json.'
+            }
+
+            $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
+            try {
+              [xml] $manifest = $manifestReader.ReadToEnd()
+            }
+            finally {
+              $manifestReader.Dispose()
+            }
+            $packageManifestReader = [System.IO.StreamReader]::new($packageManifestEntry.Open())
+            try {
+              $packageManifest = $packageManifestReader.ReadToEnd() | ConvertFrom-Json
+            }
+            finally {
+              $packageManifestReader.Dispose()
+            }
+
+            $namespaceManager = [System.Xml.XmlNamespaceManager]::new($manifest.NameTable)
+            $namespaceManager.AddNamespace(
+              'vsix',
+              'http://schemas.microsoft.com/developer/vsx-schema/2011')
+            $identity = $manifest.SelectSingleNode(
+              '/vsix:PackageManifest/vsix:Metadata/vsix:Identity',
+              $namespaceManager)
+            if ($null -eq $identity) {
+              throw 'The VSIX manifest does not contain an Identity element.'
+            }
+            if ($identity.Id -ne $env:VIU_VSCODE_PACKAGE) {
+              throw "Expected extension id $($env:VIU_VSCODE_PACKAGE), found $($identity.Id)."
+            }
+            if ($identity.Publisher -ne 'assimalign') {
+              throw "Expected publisher assimalign, found $($identity.Publisher)."
+            }
+            if ($identity.Version -ne $env:VIU_VSCODE_VERSION) {
+              throw "Expected extension version $($env:VIU_VSCODE_VERSION), found $($identity.Version)."
+            }
+            if ($identity.TargetPlatform -ne $env:VIU_VSCODE_TARGET) {
+              throw "Expected target $($env:VIU_VSCODE_TARGET), found $($identity.TargetPlatform)."
+            }
+            if ($packageManifest.name -ne $env:VIU_VSCODE_PACKAGE -or
+                $packageManifest.publisher -ne 'assimalign' -or
+                $packageManifest.version -ne $env:VIU_VSCODE_VERSION) {
+              throw 'The packaged extension/package.json identity does not match the release inputs.'
+            }
+
+            $preReleaseProperties = @($manifest.SelectNodes(
+              "/vsix:PackageManifest/vsix:Metadata/vsix:Properties/vsix:Property[@Id='Microsoft.VisualStudio.Code.PreRelease']",
+              $namespaceManager))
+            $expectedPreReleasePropertyCount = if ($env:VIU_VSCODE_PRE_RELEASE -eq 'true') { 1 } else { 0 }
+            if ($preReleaseProperties.Count -ne $expectedPreReleasePropertyCount) {
+              throw "Expected $expectedPreReleasePropertyCount Marketplace prerelease properties, found $($preReleaseProperties.Count)."
+            }
+
+            $serverRuntimeIdentifiers = @(
+              $packageArchive.Entries |
+                Where-Object { $_.FullName -match '^extension/server/[^/]+/' } |
+                ForEach-Object { $_.FullName.Split('/')[2] } |
+                Sort-Object -Unique
+            )
+            if ($serverRuntimeIdentifiers.Count -ne 1 -or
+                $serverRuntimeIdentifiers[0] -ne $env:VIU_VSCODE_RUNTIME_IDENTIFIER) {
+              throw "The VSIX contains runtime payloads '$($serverRuntimeIdentifiers -join ', ')' instead of only '$($env:VIU_VSCODE_RUNTIME_IDENTIFIER)'."
+            }
+
+            $serverExecutableBaseName = if ($env:VIU_VSCODE_PACKAGE -eq 'viu') {
+              'Assimalign.Viu.LanguageServer'
+            }
+            else {
+              'Assimalign.Viu.UtilityCss.LanguageServer'
+            }
+            $serverExecutableSuffix = if ($env:VIU_VSCODE_RUNTIME_IDENTIFIER.StartsWith('win-')) {
+              '.exe'
+            }
+            else {
+              ''
+            }
+            $serverExecutableEntry = "extension/server/$($env:VIU_VSCODE_RUNTIME_IDENTIFIER)/$serverExecutableBaseName$serverExecutableSuffix"
+            if ($null -eq $packageArchive.GetEntry($serverExecutableEntry)) {
+              throw "The VSIX is missing $serverExecutableEntry."
+            }
+          }
+          finally {
+            $packageArchive.Dispose()
+          }
+
+          $packageHash = Get-FileHash -LiteralPath $packageFile.FullName -Algorithm SHA256
+          Write-Host "Validated $($packageFile.Name), $($packageFile.Length) bytes, SHA256 $($packageHash.Hash)."
+
+      - name: Upload Visual Studio Code Marketplace artifact
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Assimalign.Viu.VisualStudioCode.${{ matrix.package }}.${{ matrix.target }}
+          path: ${{ steps.marketplace.outputs.package_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish to Visual Studio Code Marketplace
+        shell: pwsh
+        env:
+          VIU_VSCODE_PACKAGE: ${{ matrix.package }}
+          VIU_VSCODE_PACKAGE_PATH: ${{ steps.marketplace.outputs.package_path }}
+          VIU_VSCODE_PRE_RELEASE: ${{ steps.marketplace.outputs.pre_release }}
+          VIU_VSCODE_TARGET: ${{ matrix.target }}
+          VIU_VSCODE_VERSION: ${{ steps.marketplace.outputs.version }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          Write-Host "::add-mask::$($env:VSCE_PAT)"
+          $packagePath = [System.IO.Path]::GetFullPath($env:VIU_VSCODE_PACKAGE_PATH)
+          $packageDirectory = "extensions/VisualStudioCode/packages/$($env:VIU_VSCODE_PACKAGE)"
+          $publishArguments = @(
+            'publish',
+            '--packagePath',
+            $packagePath
+          )
+          if ($env:VIU_VSCODE_PRE_RELEASE -eq 'true') {
+            $publishArguments += '--pre-release'
+          }
+
+          # The target is already embedded by `vsce package --target`. Current vsce rejects
+          # combining --packagePath with --target and reads TargetPlatform from the VSIX instead.
+          # Run the exact package-lock version installed during the build; this step is the only
+          # process that receives VSCE_PAT, so it must never download executable npm code.
+          Push-Location -LiteralPath $packageDirectory
+          try {
+            & npx --no-install vsce @publishArguments
+            if ($LASTEXITCODE -ne 0) {
+              throw "Publishing $($env:VIU_VSCODE_PACKAGE) $($env:VIU_VSCODE_VERSION) for $($env:VIU_VSCODE_TARGET) failed with exit code $LASTEXITCODE."
+            }
+          }
+          finally {
+            Pop-Location
+          }
+
+          $channel = if ($env:VIU_VSCODE_PRE_RELEASE -eq 'true') {
+            'pre-release'
+          }
+          else {
+            'stable'
+          }
+          @"
+          ## Published Visual Studio Code Marketplace package
+
+          ``assimalign.$($env:VIU_VSCODE_PACKAGE)`` ``$($env:VIU_VSCODE_VERSION)`` was published
+          for ``$($env:VIU_VSCODE_TARGET)`` on the $channel channel.
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

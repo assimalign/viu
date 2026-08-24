@@ -4,6 +4,7 @@
     <File Path="Assimalign.Viu.VisualStudio.UtilityCss/Build.ps1" />
     <File Path="Assimalign.Viu.VisualStudio.UtilityCss/README.md" />
     <File Path="Assimalign.Viu.VisualStudio.UtilityCss/Marketplace.md" />
+    <File Path="Assimalign.Viu.VisualStudio.UtilityCss/vs-publish.json" />
   </Folder>
   <!-- The UtilityCss language server is a public standalone add-on under libraries/. This solution
        carries it because the server and this Visual Studio host are built and debugged together. -->

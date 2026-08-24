@@ -1,4 +1,4 @@
-# Releasing Viu packages
+# Releasing Viu packages and editor extensions
 
 The official package workflow is [`.github/workflows/release.yml`](../.github/workflows/release.yml).
 Area workflows and the shared build action only build and test; they never publish. This keeps every
@@ -27,11 +27,44 @@ Both stable and prerelease versions use this flow. A GitHub Release marked prere
 stages automatically and can be promoted only by an explicit environment approval; no main-branch
 push and no pull-request event can publish a package.
 
-The same workflow preserves the Visual Studio Marketplace preview contract on a separate trusted
-event path: a push to `main` that changes `extensions/VisualStudio/**` or `tooling/**` can run only the
-preview job, and only when `VIU_PUBLISH_MARKETPLACE` is `true`. Its protected
-`visual-studio-marketplace` environment remains the credential and approval boundary. Package jobs
-are explicitly release-only, so this path cannot stage or promote NuGet packages.
+The same workflow has two separately protected editor-extension paths:
+
+- A push to `main` that changes the Visual Studio extensions or their tooling, Syntax,
+  ServerRenderer, Utilities, shared-build, or branding inputs can publish the two Visual Studio
+  preview VSIXs only when `VIU_PUBLISH_MARKETPLACE` is `true`. The protected
+  `visual-studio-marketplace` environment remains the credential and approval boundary. Package
+  jobs are explicitly release-only, so this path cannot stage or promote NuGet packages.
+- A published GitHub Release can publish the two Visual Studio Code extensions only after the
+  `validate-release` matrix succeeds. The protected `visual-studio-code-marketplace` environment
+  gates ten independent package/platform cells with `fail-fast: false`. The cells execute serially
+  so first publication and later target updates cannot race, while every package/target failure
+  remains independently visible.
+
+### Visual Studio Code platform and version contract
+
+The Visual Studio Code Marketplace identifiers are `assimalign.viu` and
+`assimalign.viu-utilitycss`. Each extension packages one language-server runtime per VSIX:
+
+| .NET runtime identifier | `vsce` target |
+| --- | --- |
+| `win-x64` | `win32-x64` |
+| `win-arm64` | `win32-arm64` |
+| `linux-x64` | `linux-x64` |
+| `osx-x64` | `darwin-x64` |
+| `osx-arm64` | `darwin-arm64` |
+
+The GitHub tag and NuGet packages continue to use the complete `ViuVersion`. Visual Studio Code
+accepts only numeric `MAJOR.MINOR.PATCH` extension versions, so the packaged `extension/package.json`
+uses `ViuVersionPrefix`; the source `package.json` and lock file remain unchanged. A nonempty
+`ViuVersionSuffix` adds `--pre-release` to both `vsce package` and `vsce publish`, while a stable Viu
+version omits it. For example, `10.0.0-beta.2` maps to Visual Studio Code version `10.0.0` on the
+pre-release channel.
+
+Marketplace prerelease and regular releases must use distinct numeric versions. After publishing
+`10.0.0` as a prerelease, a later regular release therefore cannot reuse `10.0.0`; its
+`ViuVersionPrefix` must advance. The package-level `preview: true` flag only marks the gallery
+listing as public preview and does not select the prerelease update channel. See the
+[Visual Studio Code publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#pre-release-extensions).
 
 ## Package contract
 
@@ -135,17 +168,59 @@ dotnet restore <consumer-project> --configfile $stagingConfig
 Delete the temporary configuration after testing. Never add a GitHub token to the repository
 configuration.
 
+### Visual Studio Marketplace previews
+
+**Existing owner setup:** keep the `visual-studio-marketplace` GitHub environment and its required
+reviewers, the existing organization secret `VS_MARKETPLACE_TOKEN`, and
+`VIU_PUBLISH_MARKETPLACE=true` at the repository or organization level. The one protected job uses
+that token to publish both preview VSIXs:
+
+- `Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c`
+- `Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b`
+
+The second identity is new. First publish it, install and verify that new listing, and only then have
+an owner manually **unpublish** the orphaned pre-rename listing whose identity is
+`Assimalign.Viu.UtilityCss.VisualStudio.8fcd5c9a-f62f-467c-8655-b7791c41775b` (Marketplace item name
+`Assimalign.Assimalign.Viu.UtilityCss.VisualStudio`). That Marketplace owner action is irreversible
+and is intentionally not performed by the workflow.
+
+### Visual Studio Code Marketplace
+
+**OWNER SETUP REQUIRED:**
+
+1. Create or claim the Visual Studio Code Marketplace publisher id `assimalign`, matching the
+   `publisher` field in both extension manifests, and add the publishing Microsoft account to it.
+2. Create an Azure DevOps personal access token with organization set to **All accessible
+   organizations** and scope **Marketplace (Manage)**.
+3. Create the protected GitHub environment `visual-studio-code-marketplace` and configure its
+   required reviewers and deployment protection rules. Its deployment branch/tag policy must allow
+   the `vMAJOR.MINOR.PATCH[-PRERELEASE]` release tags; a `main`-only policy rejects these jobs.
+4. Add the PAT as the environment secret `VSCE_PAT`.
+
+`VSCE_PAT` and `VS_MARKETPLACE_TOKEN` are different credentials for different publisher systems and
+must not be reused. Microsoft currently states that global Azure DevOps PATs retire on December 1,
+2026, so this requested PAT flow must migrate to Entra-based Marketplace publishing before that
+date. Current PAT setup and the migration notice are documented in the
+[Visual Studio Code publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension).
+The ten matrix deployments are deliberately serialized to protect first listing creation. Reviewers
+should expect the protected-environment approvals to appear one cell at a time when the environment
+requires approval for every deployment.
+
 ## Publishing a release
 
 1. Set the intended full version once in
    [`build/Targets/Build.Version.props`](../build/Targets/Build.Version.props) and merge it to `main`.
 2. Create a tag such as `v10.0.0-alpha.2` or `v10.0.0` at that commit.
-3. Publish a GitHub Release for the tag, marking it prerelease when appropriate.
+3. Publish a GitHub Release for the tag. Mark it prerelease if and only if `ViuVersionSuffix` is
+   nonempty; the Visual Studio Code job rejects a mismatch.
 4. Confirm the area-test matrix, pack validation, checksum verification, and GitHub Packages staging
    succeed.
 5. A required reviewer inspects the staged packages and approves the `nuget-org` deployment when the
    same artifact is ready for public promotion.
+6. A required reviewer approves the `visual-studio-code-marketplace` deployment. Each matrix cell
+   uploads its platform-specific VSIX before publishing that exact artifact.
 
 `package-order.txt` and `symbol-package-order.txt` enumerate the validated artifacts, and
-`checksums.sha256` covers both sets. Duplicate versions are skipped, so a partially completed
-publication can be rerun without rebuilding or renumbering packages.
+`checksums.sha256` covers both sets. Duplicate NuGet package versions are skipped, so a partially
+completed NuGet publication can be rerun without rebuilding or renumbering packages. Visual Studio
+Code package/target versions are immutable and are not silently skipped.

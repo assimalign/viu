@@ -4,6 +4,10 @@ Viu Utilities adds utility CSS IntelliSense to HTML-based files without taking o
 language, grammar, formatting, or other editor features. Its standalone language server provides
 class-value completions, generated CSS hover previews, document colors, and color presentations.
 
+Marketplace publication runs through the protected owner setup in
+[`docs/RELEASING.md`](../../../../docs/RELEASING.md). The source `version` remains a placeholder;
+release packaging injects the numeric central version without modifying the manifest.
+
 The extension activates for:
 
 - `.html` and `.htm` files (`.htm` uses Visual Studio Code's `html` language id and also has an

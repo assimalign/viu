@@ -208,6 +208,7 @@
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/">
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/README.md" />
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/Marketplace.md" />
+		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/vs-publish.json" />
 	</Folder>
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/test/">
 		<Project Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.UtilityCss/test/Assimalign.Viu.VisualStudio.UtilityCss.Tests.csproj" />

@@ -9,7 +9,9 @@
 
     Use SkipVsix to retain the package-build-only workflow. In that mode the runtime-identifier
     arguments are forwarded unchanged, so an empty set stages every supported payload exactly as a
-    direct package Build.ps1 invocation would.
+    direct package Build.ps1 invocation would. PackageName narrows orchestration to one extension
+    for release-matrix isolation. PreRelease marks the generated VSIX for the Marketplace
+    prerelease channel; Version still supplies its numeric three-component manifest version.
 #>
 [CmdletBinding()]
 param(
@@ -18,10 +20,15 @@ param(
 
     [string] $Version,
 
+    [ValidateSet('viu', 'viu-utilitycss')]
+    [string[]] $PackageName = @(),
+
     [ValidateSet('win-x64', 'win-arm64', 'linux-x64', 'osx-arm64', 'osx-x64')]
     [string[]] $RuntimeIdentifier = @(),
 
     [switch] $SkipNodeBuild,
+
+    [switch] $PreRelease,
 
     [switch] $SkipVsix
 )
@@ -46,6 +53,10 @@ $packages = @(
         Build = Join-Path $PSScriptRoot 'packages\viu-utilitycss\Build.ps1'
     }
 )
+
+if ($PackageName.Count -gt 0) {
+    $packages = @($packages | Where-Object { $PackageName -contains $_.Name })
+}
 
 $visualStudioCodeTargetByRuntimeIdentifier = @{
     'win-x64' = 'win32-x64'
@@ -130,6 +141,10 @@ foreach ($package in $packages) {
             '--no-update-package-json'
         )
     }
+    $visualStudioCodePreReleaseArguments = @()
+    if ($PreRelease) {
+        $visualStudioCodePreReleaseArguments = @('--pre-release')
+    }
     $compileClient = -not $SkipNodeBuild
 
     foreach ($runtimeIdentifierName in $runtimeIdentifiersToPackage) {
@@ -156,8 +171,9 @@ foreach ($package in $packages) {
         Write-Host "Packaging $($package.Name) for $visualStudioCodeTarget"
         Push-Location -LiteralPath $package.Directory
         try {
-            & npx --yes '@vscode/vsce' package `
+            & npx --no-install vsce package `
                 @visualStudioCodePackageVersionArguments `
+                @visualStudioCodePreReleaseArguments `
                 --target $visualStudioCodeTarget `
                 --out $artifactPath
             if ($LASTEXITCODE -ne 0) {

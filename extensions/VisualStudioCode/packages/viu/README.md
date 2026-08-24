@@ -5,14 +5,15 @@ container grammar, and a client that starts the standalone Viu language server o
 
 ## Status
 
-**This is a scaffold, not a published product.** It compiles, it packages, and it starts the same
-language server the Visual Studio extension ships — but it has never been released to the Visual
-Studio Code Marketplace or to the Open VSX registry, it has no icon or gallery banner, it has no
-tests, and its `version` is a placeholder. Do not treat the `publisher`/`name` pair as claimed.
+**Release status.** The package compiles, packages, and starts the same language server the Visual
+Studio extension ships. Release automation targets the Visual Studio Code Marketplace through the
+protected owner setup in [`docs/RELEASING.md`](../../../../docs/RELEASING.md). Open VSX publication,
+extension tests, and a gallery banner remain deferred; the source `version` stays a placeholder
+because release packaging injects the numeric central version without modifying the manifest.
 
 What is deliberately deferred:
 
-- Marketplace and Open VSX publication, and the release workflow that would drive them.
+- Open VSX publication.
 - Semantic tokens. The container grammar is lexical; project-aware template classification,
   component resolution, and `@script` semantic colorization belong to the language server and
   arrive as semantic tokens rather than as TextMate guesses.
