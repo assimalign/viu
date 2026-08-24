@@ -350,7 +350,7 @@ jobs:
     runs-on: windows-latest
     environment:
       name: visual-studio-marketplace
-      url: https://marketplace.visualstudio.com/items?itemName=Assimalign.Assimalign.Viu.VisualStudio
+      url: https://marketplace.visualstudio.com/items?itemName=Assimalign.assimalign-tooling-vs-viu-extension
     concurrency:
       group: visual-studio-marketplace-preview
       cancel-in-progress: false
@@ -771,7 +771,7 @@ jobs:
 
           Viu for Visual Studio ``$($env:VIU_VSIX_VERSION)`` was published as a preview.
 
-          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.Assimalign.Viu.VisualStudio)
+          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.assimalign-tooling-vs-viu-extension)
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
@@ -798,7 +798,7 @@ jobs:
 
           Viu Utilities for Visual Studio ``$($env:VIU_VSIX_VERSION)`` was published as a preview.
 
-          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.Assimalign.Viu.VisualStudio.UtilityCss)
+          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.assimalign-tooling-vs-viu-utilitycss-extension)
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 

@@ -178,11 +178,15 @@ that token to publish both preview VSIXs:
 - `Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c`
 - `Assimalign.Viu.VisualStudio.UtilityCss.8fcd5c9a-f62f-467c-8655-b7791c41775b`
 
-The second identity is new. First publish it, install and verify that new listing, and only then have
-an owner manually **unpublish** the orphaned pre-rename listing whose identity is
-`Assimalign.Viu.UtilityCss.VisualStudio.8fcd5c9a-f62f-467c-8655-b7791c41775b` (Marketplace item name
-`Assimalign.Assimalign.Viu.UtilityCss.VisualStudio`). That Marketplace owner action is irreversible
-and is intentionally not performed by the workflow.
+The second identity is new; the pre-rename VSIX was never published, so no orphaned listing exists
+and no cleanup is required.
+
+Publisher-manifest internal names are constrained to `[A-Za-z0-9-]` (no dots) and must match the
+existing Marketplace listing exactly for updates. The live "Viu for Visual Studio" listing's
+internal name is the legacy `assimalign-tooling-vs-viu-extension`; the Viu Utilities listing is
+created on first publish as `assimalign-tooling-vs-viu-utilitycss-extension` for symmetry. VSIX
+identities (dotted, above) and Marketplace internal names are different namespaces — the VSIX
+identity is what installed copies upgrade by, the internal name is only the listing's URL slug.
 
 ### Visual Studio Code Marketplace
 
