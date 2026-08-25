@@ -42,9 +42,14 @@ pinned URL, WasmAppHost selects a new random port after the restart, so the brow
 dead and cannot be followed. The SDK injects component stylesheet links during the build; no
 development script or hand-authored stylesheet link is required.
 
-The CSS worker starts only for the Debug, design-time watch-list build. It waits for the default
-100-millisecond quiet period after the final file event, regenerates the component bundle in one
-nested MSBuild invocation, and writes it only when its bytes changed. Override the
+The generated-asset worker starts only for the Debug, design-time watch-list build. It waits for the
+default 100-millisecond quiet period after the final file event, then runs the distinct registered
+regeneration targets through the public [`@(ViuGeneratedAsset)` contract](GENERATED-ASSETS.md) in one
+nested MSBuild invocation. The component bundle uses this seam, and a compatible
+`Assimalign.Viu.UtilityCss.Build` package registers its standalone utility bundle through the same
+path. Adding a never-before-used utility class under `dotnet watch` therefore regenerates and
+live-swaps that stylesheet without restarting the application. Providers write only when generated
+bytes changed. Override the
 quiet period with `ViuCssHotReloadDebounceMilliseconds`, or disable this part of the loop with
 `ViuCssHotReloadEnabled=false`.
 
@@ -100,8 +105,11 @@ or Viu delivery, but it is not deterministic. If Visual Studio requests a restar
 applied update and leaves the page unchanged, accept its restart or run the application through
 `dotnet watch`; the watch path rebuilds, restarts, and reloads rude edits on the pinned origin.
 
-Visual Studio's ordinary Hot Reload command does not invoke the Browser SDK's CSS watch-list contract.
-Launch the project through `dotnet watch` when component stylesheet regeneration is required.
+Visual Studio's ordinary Hot Reload command does not start or drive the Browser SDK's generated-asset
+worker. Component styles and utility classes still regenerate on an ordinary Visual Studio build,
+but they do not live-swap from a managed Hot Reload delta alone. Launch the project through
+`dotnet watch` when live component or utility stylesheet regeneration is required; the seam is ready
+for a future Visual Studio-side driver without claiming that one exists today.
 
 ## Update decisions
 
@@ -119,6 +127,7 @@ component work; the .NET watch host remains responsible for that update.
 | Edit | Browser action | State boundary |
 | --- | --- | --- |
 | Content or options inside a component `<style>` block | Regenerate the component bundle and replace its linked stylesheet; Core performs no component work | Page, application, and mounted component state are retained |
+| A utility source gains or loses a class under a compatible UtilityCss.Build registration | Regenerate the utility bundle and replace its linked stylesheet; no Viu runtime work occurs | Page, application, and mounted component state are retained |
 | Template body accepted by metadata update | Remount only affected component instances in Viu's post-flush phase, then commit the buffered host operations | The document and other components remain mounted; affected component-local state resets |
 | Script marker, declaring component type without a more specific marker, or missing updated-type set | Remount only affected component instances in Viu's post-flush phase while the applied managed delta remains loaded | The document and other components remain mounted; affected component-local state resets |
 | Signature, property-surface, or another edit rejected by metadata update | The .NET watch host rebuilds/restarts; the packaged run host reports readiness and the watch refresh server reloads the connected browser on the pinned origin | The document, application, and component state reset; without a fixed application URL the browser remains on the abandoned origin |
@@ -134,9 +143,10 @@ State-preserving in-place template rerendering requires the later per-block runt
 outside [V01.01.06.05]. That work item supplies the stable per-block classification metadata; it does
 not weaken the .NET 10 browser-WASM stale-call-site constraint or promise in-place template rerendering.
 
-The component-CSS transport is independent of managed component replacement. A pure `<style>` edit
-can therefore replace the stylesheet without remounting the component, while a template edit still
-takes the managed template-update path.
+The generated-asset transport is independent of managed component replacement. A pure `<style>` edit
+can therefore replace the component stylesheet without remounting the component. A template edit
+that also introduces a utility class can produce both a managed component update and a utility
+stylesheet update while retaining the browser document; each path keeps its own responsibility.
 
 ## Expected latency
 
@@ -145,7 +155,7 @@ these operational expectations rather than hard guarantees:
 
 | Path | Typical save-to-visible interval |
 | --- | --- |
-| Stylesheet link replacement | approximately 0.2-1 second |
+| Component or utility stylesheet link replacement | approximately 0.2-1 second |
 | Accepted template update and affected-component remount | approximately 0.5-2 seconds |
 | Rebuild, restart, and full document reload | approximately 1-5 seconds |
 
@@ -156,7 +166,7 @@ nothing.
 
 ## Release boundary
 
-The CSS worker, its state file, and the readiness run host are SDK development tools, not application
+The generated-asset worker, its state file, and the readiness run host are SDK development tools, not application
 assets. Ordinary Release builds disable worker launch, the generator omits its metadata handler and
 marker members, and neither `Watch/Assimalign.Viu.Sdk.CssHotReload.*` nor
 `RunHost/Assimalign.Viu.Sdk.Browser.RunHost.*` is copied into application publish output.
@@ -169,8 +179,8 @@ configuration gate. Do not set it for a production publish.
 
 ## Verification status
 
-Unit and integration tests pin marker classification, post-flush remount ordering, watch-item
-registration, deterministic no-op writes, final-rule tombstones, worker lifetime, and the Release
+Unit and integration tests pin marker classification, post-flush remount ordering, generic
+generated-asset registration, deterministic no-op writes, final-rule tombstones, worker lifetime, and the Release
 publish budget. The opt-in
 `scripts/Test-EndToEnd.ps1 -PackagedVuePublish -PublishOnly -Configuration Release` lane publishes
 a `.vue`-only package consumer, requires its component-CSS asset, and scans generated and
@@ -179,6 +189,7 @@ compilation. The separate `scripts/Test-EndToEnd.ps1 -HotReload -Configuration D
 an isolated packaged consumer under `dotnet watch` and uses a connected Chromium page to prove a
 structural rude edit restarts on the same port and automatically reloads to new content without
 manual navigation, component stylesheet replacement, accepted-update document identity,
-mounted-state survival, template/script remount, and semantic no-op suppression. These opt-in modes
+mounted-state survival, template/script remount, semantic no-op suppression, a never-before-used
+utility class becoming styled live, and last-utility-source retirement. These opt-in modes
 remain separate from the ordinary three-scenario browser matrix because the live lane mutates staged
 sources and owns a long-lived watch process tree.

@@ -2055,7 +2055,14 @@ negotiation stays intact without duplicate links. The application's stable plain
 static-hosting default; manifest-aware deployments may opt into the actual static-web-asset endpoint
 labeled `<PackageId>.viu.css`, while an explicit application `LinkHref` takes precedence. Component
 links can be opted out. The Browser SDK also owns the component-CSS hot-reload worker and
-publish-budget hooks. Specified by [V01.01.12.12.04] through [V01.01.12.12.07].
+publish-budget hooks. Its development worker collects the public, exactly versioned
+`@(ViuGeneratedAsset)` contract, batches each declared regeneration target in one nested build,
+and reuses the .NET watch static-file update transport. Component CSS registers through the same
+contract as independent build extensions. An extension registers only when the Browser SDK
+advertises its exact seam version; absent or incompatible versions retain ordinary build-time
+generation without private `_Viu*` coupling. Providers preserve byte-identical outputs and declare
+whether removal deletes the asset or retains a watch-only empty stylesheet for one final update.
+Specified by [V01.01.12.12.04] through [V01.01.12.12.07] and [V01.01.12.30.04], issue #355.
 
 `[PKG-5]` In-repo projects **dogfood via `ViuProjectReference`**; the two SDKs are the *external
 consumer* surfaces. The in-repo build deliberately does not consume either SDK, so the framework can

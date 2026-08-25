@@ -5,6 +5,8 @@
     </PropertyGroup>
     <ItemGroup>
         <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+        <ViuPackageReference Include="Microsoft.Build.Framework" IncludeRuntimeAssets="true" />
+        <ViuPackageReference Include="Microsoft.Build.Utilities.Core" IncludeRuntimeAssets="true" />
         <ViuPackageReference Include="xunit" />
         <ViuPackageReference Include="xunit.runner.visualstudio" />
         <ViuPackageReference Include="Shouldly" />

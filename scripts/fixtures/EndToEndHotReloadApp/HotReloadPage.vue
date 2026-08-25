@@ -6,6 +6,9 @@
         <button type="button" data-testid="hot-increment" @click="Increment">
             Increment
         </button>
+        <div :class="UtilityClasses" data-testid="utility-probe">
+            <span data-testid="utility-style-probe">Utility stylesheet probe</span>
+        </div>
     </main>
 </template>
 
@@ -16,6 +19,8 @@ using Assimalign.Viu.Reactivity;
 private readonly Reference<int> CountReference = Reactive.Reference(0);
 
 public int Count => CountReference.Value;
+
+public string UtilityClasses => "hidden";
 
 private void Increment() => CountReference.Value++;
 </script>

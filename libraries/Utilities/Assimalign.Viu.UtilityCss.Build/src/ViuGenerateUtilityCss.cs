@@ -33,7 +33,14 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
     private const int DefaultEditorCatalogMaximumItems = 50000;
     private const string DiscoveryMetadataName = "ViuUtilityCssDiscovery";
     private const string ExplicitDiscoveryMetadataValue = "Explicit";
+    private const string WatchMetadataName = "Watch";
     private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
+    private readonly HashSet<string> _generatedAssetDependencyFiles =
+        new HashSet<string>(GetPathComparer());
+    private readonly HashSet<string> _generatedAssetExcludedDependencyFiles =
+        new HashSet<string>(GetPathComparer());
+    private readonly HashSet<string> _generatedAssetDependencyRoots =
+        new HashSet<string>(GetPathComparer());
 
     /// <summary>
     /// Initializes an MSBuild-activatable utility CSS generation task with empty input collections
@@ -70,6 +77,22 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
     /// </summary>
     [Required]
     public string OutputPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the optional path for the public generated-asset dependency manifest consumed
+    /// by a compatible host's development worker. The manifest records absolute file dependencies
+    /// and recursive source roots and remains available when the generated stylesheet is empty.
+    /// Specified by <c>[V01.01.12.30.04]</c>, issue #355.
+    /// </summary>
+    public string GeneratedAssetDependencyManifestPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets whether removing the final generated rule preserves a zero-byte output for a
+    /// generated-asset hot-reload transport. Ordinary builds leave this disabled and delete the
+    /// empty output, so a development tombstone cannot enter build or publish output. Specified by
+    /// <c>[V01.01.12.30.04]</c>, issue #355.
+    /// </summary>
+    public bool PreserveEmptyOutputOnRemoval { get; set; }
 
     /// <summary>
     /// Gets or sets whether the versioned editor manifest and class catalog are emitted beside the
@@ -114,6 +137,9 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
     /// <inheritdoc />
     public override bool Execute()
     {
+        _generatedAssetDependencyFiles.Clear();
+        _generatedAssetExcludedDependencyFiles.Clear();
+        _generatedAssetDependencyRoots.Clear();
         try
         {
             return ExecuteCore();
@@ -123,6 +149,10 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
             // Cancellation is expected build-host control flow. Preserve the output state observed
             // before cancellation and let MSBuild tear down without adding a misleading error.
             return !Log.HasLoggedErrors;
+        }
+        finally
+        {
+            WriteGeneratedAssetDependencyManifest();
         }
     }
 
@@ -490,6 +520,10 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
         var sourcePath = ResolvePath(
             projectDirectory,
             GetItemPath(UtilityStylesheets[0]));
+        if (ShouldWatch(UtilityStylesheets[0]))
+        {
+            _generatedAssetDependencyFiles.Add(sourcePath);
+        }
         string source;
         try
         {
@@ -532,6 +566,7 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
                 var resolvedSourceIdentity = ResolvePath(
                     referencingDirectory,
                     specifier);
+                _generatedAssetDependencyFiles.Add(resolvedSourceIdentity);
                 if (!File.Exists(resolvedSourceIdentity))
                 {
                     return null;
@@ -1053,6 +1088,18 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
                 var sourcePath = ResolvePath(
                     projectDirectory,
                     GetItemPath(sourceFile));
+                if (TryGetSupportedSourceKind(sourcePath, out _))
+                {
+                    if (ShouldWatch(sourceFile))
+                    {
+                        _generatedAssetDependencyFiles.Add(sourcePath);
+                    }
+                    else
+                    {
+                        _generatedAssetExcludedDependencyFiles.Add(sourcePath);
+                    }
+                }
+
                 if (File.Exists(sourcePath) &&
                     TryGetSupportedSourceKind(sourcePath, out _))
                 {
@@ -1065,7 +1112,8 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
                 AddSourcesFromSpecifier(
                     entry.BaseDirectory,
                     configuration.BasePath,
-                    resolvedSources);
+                    resolvedSources,
+                    trackGeneratedAssetDependencies: true);
             }
 
             foreach (var includedPath in configuration.IncludedPaths)
@@ -1073,7 +1121,8 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
                 AddSourcesFromSpecifier(
                     entry.BaseDirectory,
                     includedPath,
-                    resolvedSources);
+                    resolvedSources,
+                    trackGeneratedAssetDependencies: true);
             }
 
             var excludedSources = new HashSet<string>(
@@ -1083,10 +1132,19 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
                 AddSourcesFromSpecifier(
                     entry.BaseDirectory,
                     excludedPath,
-                    excludedSources);
+                    excludedSources,
+                    trackGeneratedAssetDependencies: false);
             }
 
             resolvedSources.ExceptWith(excludedSources);
+            foreach (var resolvedSource in resolvedSources)
+            {
+                if (!_generatedAssetExcludedDependencyFiles.Contains(resolvedSource))
+                {
+                    _generatedAssetDependencyFiles.Add(resolvedSource);
+                }
+            }
+
             sourceFiles = resolvedSources
                 .OrderBy(path => path, GetPathComparer())
                 .ToArray();
@@ -1109,7 +1167,8 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
     private void AddSourcesFromSpecifier(
         string baseDirectory,
         string specifier,
-        ISet<string> paths)
+        ISet<string> paths,
+        bool trackGeneratedAssetDependencies)
     {
         _cancellation.Token.ThrowIfCancellationRequested();
         if (!ContainsWildcard(specifier))
@@ -1122,6 +1181,10 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
                 if (TryGetSupportedSourceKind(resolvedPath, out _))
                 {
                     paths.Add(resolvedPath);
+                    if (trackGeneratedAssetDependencies)
+                    {
+                        _generatedAssetDependencyFiles.Add(resolvedPath);
+                    }
                 }
 
                 return;
@@ -1129,12 +1192,30 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
 
             if (!Directory.Exists(resolvedPath))
             {
+                if (trackGeneratedAssetDependencies)
+                {
+                    if (TryGetSupportedSourceKind(resolvedPath, out _))
+                    {
+                        _generatedAssetDependencyFiles.Add(resolvedPath);
+                    }
+                    else
+                    {
+                        _generatedAssetDependencyRoots.Add(resolvedPath);
+                    }
+                }
+
                 Log.LogMessage(
                     MessageImportance.Low,
                     "ViuGenerateUtilityCss: source path '{0}' does not exist.",
                     resolvedPath);
                 return;
             }
+
+            if (trackGeneratedAssetDependencies)
+            {
+                _generatedAssetDependencyRoots.Add(resolvedPath);
+            }
+
             foreach (var path in Directory.EnumerateFiles(
                          resolvedPath,
                          "*",
@@ -1166,6 +1247,11 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
             ? wildcardPath.Substring(0, separatorIndex + 1)
             : baseDirectory;
         var rootDirectory = Path.GetFullPath(rootText);
+        if (trackGeneratedAssetDependencies)
+        {
+            _generatedAssetDependencyRoots.Add(rootDirectory);
+        }
+
         if (!Directory.Exists(rootDirectory))
         {
             Log.LogMessage(
@@ -1396,10 +1482,47 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
             : path;
     }
 
+    private static bool ShouldWatch(ITaskItem item) =>
+        !string.Equals(
+            item.GetMetadata(WatchMetadataName),
+            "false",
+            StringComparison.OrdinalIgnoreCase);
+
     private bool DeleteObsoleteOutput()
     {
         try
         {
+            if (PreserveEmptyOutputOnRemoval && File.Exists(OutputPath))
+            {
+                var directory = Path.GetDirectoryName(OutputPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var outputWritten = new FileInfo(OutputPath).Length != 0;
+                if (outputWritten)
+                {
+                    File.WriteAllBytes(OutputPath, Array.Empty<byte>());
+                    Log.LogMessage(
+                        MessageImportance.Normal,
+                        "ViuGenerateUtilityCss: preserved an empty generated-asset output at {0}.",
+                        OutputPath);
+                }
+                else
+                {
+                    Log.LogMessage(
+                        MessageImportance.Low,
+                        "ViuGenerateUtilityCss: empty generated-asset output unchanged at {0}.",
+                        OutputPath);
+                }
+
+                GeneratedOutputPath = OutputPath;
+                OutputExists = true;
+                OutputWritten = outputWritten;
+                return DeleteEditorSidecars();
+            }
+
             if (File.Exists(OutputPath))
             {
                 File.Delete(OutputPath);
@@ -1426,6 +1549,80 @@ public sealed class ViuGenerateUtilityCss : Microsoft.Build.Utilities.Task, ICan
             return false;
         }
     }
+
+    private void WriteGeneratedAssetDependencyManifest()
+    {
+        if (string.IsNullOrWhiteSpace(GeneratedAssetDependencyManifestPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("viu-generated-asset-dependencies-v1");
+            foreach (var path in _generatedAssetDependencyFiles.OrderBy(
+                         value => value,
+                         GetPathComparer()))
+            {
+                builder.Append("file:");
+                builder.AppendLine(EncodeGeneratedAssetDependencyPath(path));
+            }
+
+            foreach (var path in _generatedAssetDependencyRoots.OrderBy(
+                         value => value,
+                         GetPathComparer()))
+            {
+                builder.Append("root:");
+                builder.AppendLine(EncodeGeneratedAssetDependencyPath(path));
+            }
+
+            var text = builder.ToString();
+            if (File.Exists(GeneratedAssetDependencyManifestPath) &&
+                string.Equals(
+                    File.ReadAllText(GeneratedAssetDependencyManifestPath),
+                    text,
+                    StringComparison.Ordinal))
+            {
+                Log.LogMessage(
+                    MessageImportance.Low,
+                    "ViuGenerateUtilityCss: generated-asset dependency manifest unchanged at {0}.",
+                    GeneratedAssetDependencyManifestPath);
+                return;
+            }
+
+            var directory = Path.GetDirectoryName(
+                GeneratedAssetDependencyManifestPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(
+                GeneratedAssetDependencyManifestPath,
+                text,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            Log.LogMessage(
+                MessageImportance.Low,
+                "ViuGenerateUtilityCss: wrote generated-asset dependency manifest to {0}.",
+                GeneratedAssetDependencyManifestPath);
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  UnauthorizedAccessException or
+                  ArgumentException or
+                  NotSupportedException)
+        {
+            Log.LogWarningFromException(
+                exception,
+                showStackTrace: false);
+        }
+    }
+
+    private static string EncodeGeneratedAssetDependencyPath(string path) =>
+        Convert.ToBase64String(
+            Encoding.UTF8.GetBytes(
+                Path.GetFullPath(path)));
 
     private bool DeleteEditorSidecars()
     {

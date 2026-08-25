@@ -26,7 +26,7 @@ internal static class Program
                 out parentProcessIdentifier)))
         {
             Console.Error.WriteLine(
-                "Viu CSS Hot Reload could not identify the dotnet-watch owner process.");
+                "Viu Generated Asset Hot Reload could not identify the dotnet-watch owner process.");
             return 3;
         }
         else if (ownerProcessIdentifier is null)
@@ -39,7 +39,7 @@ internal static class Program
                 out var ownerIdentity))
         {
             Console.Error.WriteLine(
-                "Viu CSS Hot Reload owner process is no longer running.");
+                "Viu Generated Asset Hot Reload owner process is no longer running.");
             return 3;
         }
 
@@ -87,7 +87,7 @@ internal static class Program
                     InvalidOperationException)
             {
                 Console.Error.WriteLine(
-                    "Viu CSS Hot Reload stopped: " + exception.Message);
+                    "Viu Generated Asset Hot Reload stopped: " + exception.Message);
                 return 4;
             }
             finally

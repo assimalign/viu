@@ -4,6 +4,11 @@
 base SDK produce deterministic component styles; the Browser SDK turns those outputs into browser
 static assets and links them from the host page during both `Build` and `Publish`.
 
+Development-time regeneration uses the Browser SDK's public
+[`@(ViuGeneratedAsset)` hot-reload seam](GENERATED-ASSETS.md). Component CSS registers through that
+contract directly; standalone add-ons can participate only when they guard on the advertised exact
+seam version. This does not make an add-on part of the Viu SDK or its runtime framework.
+
 ## Delivered stylesheets
 
 A Browser application can receive two component-style sources:

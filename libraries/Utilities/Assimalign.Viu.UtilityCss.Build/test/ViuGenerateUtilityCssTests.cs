@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 
 using Microsoft.Build.Framework;
@@ -15,6 +16,7 @@ namespace Assimalign.Viu.UtilityCss.Build.Tests;
 
 // [V01.01.12.30] pins the standalone task's source routing, SFC slicing, CSS-first entry,
 // deterministic-write, and stale-output contracts independently of any Viu SDK.
+// [V01.01.12.30.04], #355 pins its public generated-asset dependency and removal contracts.
 public sealed class ViuGenerateUtilityCssTests
 {
     [Theory]
@@ -373,6 +375,239 @@ public sealed class ViuGenerateUtilityCssTests
     }
 
     [Fact]
+    public void Execute_GeneratedAssetDependencyManifest_TracksEntrySourceReferenceAndRootClosure()
+    {
+        var projectDirectory = CreateProjectDirectory();
+        try
+        {
+            var sourceDirectory = Path.Combine(projectDirectory, "ExternalSources");
+            Directory.CreateDirectory(sourceDirectory);
+            var sourcePath = Path.Combine(sourceDirectory, "index.html");
+            var entryPath = Path.Combine(projectDirectory, "utilities.css");
+            var referencePath = Path.Combine(projectDirectory, "theme.css");
+            var outputPath = Path.Combine(projectDirectory, "obj", "project.utilities.css");
+            var dependencyManifestPath = Path.Combine(
+                projectDirectory,
+                "obj",
+                "utilitycss.generated-asset-dependencies.v1");
+            File.WriteAllText(
+                sourcePath,
+                "<div class=\"bg-shared\"></div>");
+            File.WriteAllText(
+                referencePath,
+                "@theme { --color-shared: #112233; }");
+            File.WriteAllText(
+                entryPath,
+                "@import \"viu-utilities\" source(\"./ExternalSources\");" +
+                Environment.NewLine +
+                "@reference \"./theme.css\";");
+            var task = CreateTask(projectDirectory, outputPath);
+            task.UtilityStylesheets = new ITaskItem[] { new TaskItem(entryPath) };
+            task.GeneratedAssetDependencyManifestPath = dependencyManifestPath;
+
+            task.Execute().ShouldBeTrue();
+
+            File.ReadAllText(outputPath).ShouldContain("#112233");
+            var manifest = ReadGeneratedAssetDependencyManifest(
+                dependencyManifestPath);
+            manifest.Files.ShouldBe(
+                new[]
+                {
+                    Path.GetFullPath(sourcePath),
+                    Path.GetFullPath(referencePath),
+                    Path.GetFullPath(entryPath),
+                },
+                ignoreOrder: true);
+            manifest.Roots.ShouldBe(
+                new[] { Path.GetFullPath(sourceDirectory) });
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Execute_GeneratedAssetDependencyManifestUnchanged_PreservesTimestamp()
+    {
+        var projectDirectory = CreateProjectDirectory();
+        try
+        {
+            var sourcePath = Path.Combine(projectDirectory, "index.html");
+            var outputPath = Path.Combine(projectDirectory, "obj", "project.utilities.css");
+            var dependencyManifestPath = Path.Combine(
+                projectDirectory,
+                "obj",
+                "utilitycss.generated-asset-dependencies.v1");
+            File.WriteAllText(sourcePath, "<div class=\"flex\"></div>");
+            var firstTask = CreateTask(projectDirectory, outputPath, sourcePath);
+            firstTask.GeneratedAssetDependencyManifestPath = dependencyManifestPath;
+            firstTask.Execute().ShouldBeTrue();
+            var expectedBytes = File.ReadAllBytes(dependencyManifestPath);
+            var expectedTimestamp = new DateTime(
+                2025,
+                1,
+                2,
+                3,
+                4,
+                5,
+                DateTimeKind.Utc);
+            File.SetLastWriteTimeUtc(
+                dependencyManifestPath,
+                expectedTimestamp);
+            var secondTask = CreateTask(projectDirectory, outputPath, sourcePath);
+            secondTask.GeneratedAssetDependencyManifestPath = dependencyManifestPath;
+
+            secondTask.Execute().ShouldBeTrue();
+
+            File.ReadAllBytes(dependencyManifestPath).ShouldBe(expectedBytes);
+            File.GetLastWriteTimeUtc(dependencyManifestPath).ShouldBe(
+                expectedTimestamp);
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Execute_GeneratedAssetDependencyManifest_WatchFalseOmitsDirectInputsButRetainsReferenceClosure()
+    {
+        var projectDirectory = CreateProjectDirectory();
+        try
+        {
+            var watchedSourcePath = Path.Combine(projectDirectory, "watched.html");
+            var unwatchedSourcePath = Path.Combine(projectDirectory, "unwatched.html");
+            var entryPath = Path.Combine(projectDirectory, "utilities.css");
+            var referencePath = Path.Combine(projectDirectory, "theme.css");
+            var outputPath = Path.Combine(projectDirectory, "obj", "project.utilities.css");
+            var dependencyManifestPath = Path.Combine(
+                projectDirectory,
+                "obj",
+                "utilitycss.generated-asset-dependencies.v1");
+            File.WriteAllText(watchedSourcePath, "<div class=\"flex\"></div>");
+            File.WriteAllText(unwatchedSourcePath, "<div class=\"grid\"></div>");
+            File.WriteAllText(referencePath, "@theme { --color-shared: #112233; }");
+            File.WriteAllText(entryPath, "@reference \"./theme.css\";");
+            var unwatchedSource = new TaskItem(unwatchedSourcePath);
+            unwatchedSource.SetMetadata("Watch", "false");
+            var unwatchedEntry = new TaskItem(entryPath);
+            unwatchedEntry.SetMetadata("Watch", "false");
+            var task = CreateTask(
+                projectDirectory,
+                outputPath,
+                watchedSourcePath);
+            task.SourceFiles = new ITaskItem[]
+            {
+                new TaskItem(watchedSourcePath),
+                unwatchedSource,
+            };
+            task.UtilityStylesheets = new ITaskItem[] { unwatchedEntry };
+            task.GeneratedAssetDependencyManifestPath = dependencyManifestPath;
+
+            task.Execute().ShouldBeTrue();
+
+            var manifest = ReadGeneratedAssetDependencyManifest(
+                dependencyManifestPath);
+            manifest.Files.ShouldBe(
+                new[]
+                {
+                    Path.GetFullPath(watchedSourcePath),
+                    Path.GetFullPath(referencePath),
+                },
+                ignoreOrder: true);
+            manifest.Roots.ShouldBeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Execute_FinalRuleRemovedDuringGeneratedAssetHotReload_PreservesEmptyOutputUntilOrdinaryBuild()
+    {
+        var projectDirectory = CreateProjectDirectory();
+        try
+        {
+            var sourcePath = Path.Combine(projectDirectory, "index.html");
+            var outputPath = Path.Combine(projectDirectory, "obj", "project.utilities.css");
+            var dependencyManifestPath = Path.Combine(
+                projectDirectory,
+                "obj",
+                "utilitycss.generated-asset-dependencies.v1");
+            File.WriteAllText(sourcePath, "<div class=\"flex\"></div>");
+            var firstTask = CreateTask(projectDirectory, outputPath, sourcePath);
+            firstTask.GeneratedAssetDependencyManifestPath = dependencyManifestPath;
+            firstTask.Execute().ShouldBeTrue();
+            File.WriteAllText(sourcePath, "<div>No utility candidate</div>");
+            var hotReloadTask = CreateTask(projectDirectory, outputPath, sourcePath);
+            hotReloadTask.GeneratedAssetDependencyManifestPath = dependencyManifestPath;
+            hotReloadTask.PreserveEmptyOutputOnRemoval = true;
+
+            hotReloadTask.Execute().ShouldBeTrue();
+
+            hotReloadTask.OutputExists.ShouldBeTrue();
+            hotReloadTask.OutputWritten.ShouldBeTrue();
+            new FileInfo(outputPath).Length.ShouldBe(0);
+            File.Exists(GetManifestPath(outputPath)).ShouldBeFalse();
+            File.Exists(GetCatalogPath(outputPath)).ShouldBeFalse();
+            var manifestBeforeOrdinaryBuild = File.ReadAllBytes(
+                dependencyManifestPath);
+
+            var unchangedHotReloadTask = CreateTask(
+                projectDirectory,
+                outputPath,
+                sourcePath);
+            unchangedHotReloadTask.GeneratedAssetDependencyManifestPath =
+                dependencyManifestPath;
+            unchangedHotReloadTask.PreserveEmptyOutputOnRemoval = true;
+            unchangedHotReloadTask.Execute().ShouldBeTrue();
+            unchangedHotReloadTask.OutputWritten.ShouldBeFalse();
+
+            var ordinaryTask = CreateTask(projectDirectory, outputPath, sourcePath);
+            ordinaryTask.GeneratedAssetDependencyManifestPath =
+                dependencyManifestPath;
+
+            ordinaryTask.Execute().ShouldBeTrue();
+
+            ordinaryTask.OutputExists.ShouldBeFalse();
+            File.Exists(outputPath).ShouldBeFalse();
+            File.Exists(dependencyManifestPath).ShouldBeTrue();
+            File.ReadAllBytes(dependencyManifestPath).ShouldBe(
+                manifestBeforeOrdinaryBuild);
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Execute_NoPriorOutputDuringGeneratedAssetHotReload_DoesNotCreateEmptyOutput()
+    {
+        var projectDirectory = CreateProjectDirectory();
+        try
+        {
+            var sourcePath = Path.Combine(projectDirectory, "index.html");
+            var outputPath = Path.Combine(projectDirectory, "obj", "project.utilities.css");
+            File.WriteAllText(sourcePath, "<div>No utility candidate</div>");
+            var task = CreateTask(projectDirectory, outputPath, sourcePath);
+            task.PreserveEmptyOutputOnRemoval = true;
+
+            task.Execute().ShouldBeTrue();
+
+            task.OutputExists.ShouldBeFalse();
+            task.OutputWritten.ShouldBeFalse();
+            File.Exists(outputPath).ShouldBeFalse();
+        }
+        finally
+        {
+            Directory.Delete(projectDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Execute_EditorSidecarDisabled_DeletesStaleSidecarsAndKeepsBundle()
     {
         var projectDirectory = CreateProjectDirectory();
@@ -461,6 +696,28 @@ public sealed class ViuGenerateUtilityCssTests
             Path.GetDirectoryName(outputPath)!,
             "utilitycss.classcatalog.v1.json");
 
+    private static GeneratedAssetDependencyManifest ReadGeneratedAssetDependencyManifest(
+        string path)
+    {
+        var lines = File.ReadAllLines(path);
+        lines[0].ShouldBe("viu-generated-asset-dependencies-v1");
+        return new GeneratedAssetDependencyManifest(
+            lines
+                .Where(line => line.StartsWith("file:", StringComparison.Ordinal))
+                .Select(line => DecodeGeneratedAssetDependencyPath(
+                    line.Substring("file:".Length)))
+                .ToArray(),
+            lines
+                .Where(line => line.StartsWith("root:", StringComparison.Ordinal))
+                .Select(line => DecodeGeneratedAssetDependencyPath(
+                    line.Substring("root:".Length)))
+                .ToArray());
+    }
+
+    private static string DecodeGeneratedAssetDependencyPath(string encodedPath) =>
+        Encoding.UTF8.GetString(
+            Convert.FromBase64String(encodedPath));
+
     private static JsonElement FindCatalogEntry(
         JsonElement entries,
         string candidateText)
@@ -523,4 +780,8 @@ public sealed class ViuGenerateUtilityCssTests
             IDictionary targetOutputs) =>
             true;
     }
+
+    private sealed record GeneratedAssetDependencyManifest(
+        string[] Files,
+        string[] Roots);
 }

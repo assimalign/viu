@@ -183,7 +183,7 @@
       <_ViuCssBundlePath>$(_ViuCssBundleContentRoot)$(ViuSingleFileComponentCssBundleName)</_ViuCssBundlePath>
       <_ViuCssHotReloadEmptyBundleMarkerPath>$(_ViuCssBundlePath).hot-reload-empty</_ViuCssHotReloadEmptyBundleMarkerPath>
       <_ViuPreserveCssHotReloadEmptyBundle>false</_ViuPreserveCssHotReloadEmptyBundle>
-      <_ViuPreserveCssHotReloadEmptyBundle Condition="'$(ViuCssHotReloadWorker)' == 'true'">true</_ViuPreserveCssHotReloadEmptyBundle>
+      <_ViuPreserveCssHotReloadEmptyBundle Condition="'$(ViuGeneratedAssetHotReload)' == 'true'">true</_ViuPreserveCssHotReloadEmptyBundle>
       <!-- Seed the availability state before the incremental target runs. If MSBuild skips that target
            because its Inputs/Outputs are current, this preserves the existing bundle's registration. When
            the task does run, its BundleExists output replaces this value after a write, no-op, or deletion. -->
@@ -196,7 +196,7 @@
        through its static-file update transport. Ordinary build/publish semantics delete that tombstone
        before the incremental Inputs/Outputs decision, then either rebuild real CSS or leave no asset. -->
   <Target Name="_ViuRemoveSingleFileComponentCssHotReloadTombstone"
-          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuCssHotReloadWorker)' != 'true' and Exists('$(_ViuCssHotReloadEmptyBundleMarkerPath)')"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuGeneratedAssetHotReload)' != 'true' and Exists('$(_ViuCssHotReloadEmptyBundleMarkerPath)')"
           DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration">
     <Delete Files="$(_ViuCssBundlePath);$(_ViuCssHotReloadEmptyBundleMarkerPath)" />
     <PropertyGroup>
@@ -247,6 +247,13 @@
                   Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')" />
     </ItemGroup>
   </Target>
+
+  <!-- Public regeneration entry point used by the generated-asset seam. The implementation target
+       remains private to the component bundler; extensions consume only the documented item contract.
+       Specified by [V01.01.12.30.04], issue #355. -->
+  <Target Name="ViuGenerateSingleFileComponentCss"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'"
+          DependsOnTargets="_ViuBundleSingleFileComponentCss" />
 
   <!-- Register the bundle as a Computed static web asset (mirrors Microsoft.NET.Sdk.StaticWebAssets.ScopedCss
        ResolveBundledCssAssets). BeforeTargets ResolveStaticWebAssetsInputs so the asset joins @(StaticWebAsset)

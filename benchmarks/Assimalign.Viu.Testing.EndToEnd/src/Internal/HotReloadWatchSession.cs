@@ -35,6 +35,9 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
         _artifactDirectory = Path.GetFullPath(artifactDirectory);
         ViuVersion = viuVersion;
         MainSourcePath = Path.Combine(ProjectDirectory, "HotReloadPage.vue");
+        UtilityCandidateSourcePath = Path.Combine(
+            ProjectDirectory,
+            "UtilityCandidate.html");
         NewSourcePath = Path.Combine(ProjectDirectory, "NewTypeDefinitionProbe.viu");
         ComponentBundlePath = Path.Combine(
             ProjectDirectory,
@@ -43,6 +46,13 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
             "net10.0",
             "viu",
             "EndToEndHotReloadApp.viu.css");
+        UtilityBundlePath = Path.Combine(
+            ProjectDirectory,
+            "obj",
+            "Debug",
+            "net10.0",
+            "utilitycss",
+            "EndToEndHotReloadApp.utilities.css");
         CssEventLogPath = Path.Combine(
             ProjectDirectory,
             "obj",
@@ -69,9 +79,13 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
 
     internal string MainSourcePath { get; }
 
+    internal string UtilityCandidateSourcePath { get; }
+
     internal string NewSourcePath { get; }
 
     internal string ComponentBundlePath { get; }
+
+    internal string UtilityBundlePath { get; }
 
     internal string CssEventLogPath { get; }
 
@@ -81,6 +95,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
     {
         RequireFile(ProjectPath, "hot-reload fixture project");
         RequireFile(MainSourcePath, "mounted .vue source");
+        RequireFile(UtilityCandidateSourcePath, "non-served utility candidate source");
         RequireMissingFile(NewSourcePath, "new-type-definition probe source");
         Directory.CreateDirectory(_artifactDirectory);
 
@@ -143,6 +158,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
         await WaitForApplicationAsync();
         _workerProcessIdentifier = await WaitForWorkerAsync();
         RequireFile(ComponentBundlePath, "initial component stylesheet bundle");
+        RequireFile(UtilityBundlePath, "initial utility stylesheet bundle");
     }
 
     internal async Task StopAsync()

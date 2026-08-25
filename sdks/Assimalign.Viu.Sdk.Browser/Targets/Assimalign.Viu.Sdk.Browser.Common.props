@@ -1,6 +1,10 @@
 <Project>
     <PropertyGroup>
         <_ViuBrowserSdk>true</_ViuBrowserSdk>
+        <!-- Public generated-asset hot-reload contract advertised by the Browser SDK.
+             Exact-version consumers remain inert when this value is absent or incompatible.
+             Specified by [V01.01.12.30.04], issue #355. -->
+        <ViuGeneratedAssetSeamVersion>1</ViuGeneratedAssetSeamVersion>
         <ViuBrowserTaskAssembly Condition="'$(ViuBrowserTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.dll</ViuBrowserTaskAssembly>
         <ViuInjectCssBundleLinkTaskAssembly Condition="'$(ViuInjectCssBundleLinkTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuInjectCssBundleLinkTaskAssembly>
         <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuCssHotReloadTaskAssembly>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Viu packaged hot-reload fixture</title>
   <link rel="preload" id="webassembly" />
+  <!-- [V01.01.12.30.04], #355: the standalone add-on registers the asset; the host owns its link. -->
+  <link rel="stylesheet" href="EndToEndHotReloadApp.utilities.css" />
   <script type="importmap"></script>
   <script type="module" src="main#[.{fingerprint}].js"></script>
 </head>

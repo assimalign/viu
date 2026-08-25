@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,6 +11,7 @@ internal sealed class CssHotReloadRegenerator
 {
     private readonly CssHotReloadOptions options;
     private readonly CssHotReloadEventLog eventLog;
+    private readonly string regenerationTargets;
 
     public CssHotReloadRegenerator(
         CssHotReloadOptions options,
@@ -17,11 +19,17 @@ internal sealed class CssHotReloadRegenerator
     {
         this.options = options;
         this.eventLog = eventLog;
+        regenerationTargets = string.Join(
+            ";",
+            options.GeneratedAssets
+                .Select(asset => asset.RegenerationTarget)
+                .Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     public async Task<bool> RegenerateAsync(CancellationToken cancellationToken)
     {
         eventLog.Append("start");
+        eventLog.Append("targets:" + regenerationTargets);
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var startInfo = CreateProcessStartInfo();
@@ -64,7 +72,7 @@ internal sealed class CssHotReloadRegenerator
             }
 
             Console.Error.WriteLine(
-                "Viu CSS Hot Reload regeneration failed with exit code " +
+                "Viu Generated Asset Hot Reload regeneration failed with exit code " +
                 process.ExitCode.ToString(CultureInfo.InvariantCulture) +
                 "." +
                 Environment.NewLine +
@@ -94,10 +102,8 @@ internal sealed class CssHotReloadRegenerator
         startInfo.ArgumentList.Add(options.ProjectPath);
         startInfo.ArgumentList.Add("-nologo");
         startInfo.ArgumentList.Add("-verbosity:quiet");
-        startInfo.ArgumentList.Add(
-            "-target:_ViuRegenerateCssHotReloadBundles");
-        startInfo.ArgumentList.Add(
-            "-property:ViuCssHotReloadWorker=true");
+        startInfo.ArgumentList.Add("-target:" + regenerationTargets);
+        startInfo.ArgumentList.Add("-property:ViuGeneratedAssetHotReload=true");
         startInfo.ArgumentList.Add("-property:DotNetWatchBuild=false");
         startInfo.ArgumentList.Add("-property:DesignTimeBuild=false");
         startInfo.ArgumentList.Add("-property:BuildProjectReferences=false");
@@ -115,7 +121,7 @@ internal sealed class CssHotReloadRegenerator
                 "-property:RuntimeIdentifier=" + options.RuntimeIdentifier);
         }
 
-        startInfo.Environment["VIU_CSS_HOT_RELOAD_WORKER"] = "1";
+        startInfo.Environment["VIU_GENERATED_ASSET_HOT_RELOAD"] = "1";
         return startInfo;
     }
 }

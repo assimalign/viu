@@ -39,6 +39,12 @@ The lane also pins component-stylesheet replacement without document navigation,
 suppression without a managed or static-asset update, affected-component remount for accepted
 template and C# script-body changes, and automatic pinned-origin browser reload only after a rejected
 script-signature edit. The harness terminates the complete process tree it started and verifies that
-the CSS worker process did not survive. This opt-in mode never changes the ordinary
+the CSS worker process did not survive. The same staged consumer privately references the packaged
+`Assimalign.Viu.UtilityCss.Build` add-on and authors its utility stylesheet link. Its final two
+connected-document scenarios add a never-before-generated utility class to the mounted template,
+observe the regenerated stylesheet and Chromium computed style without a restart, then delete the
+last source contributing a utility rule and observe the empty retirement update without a managed
+delta or state loss. This generated-asset coverage is specified by [V01.01.12.30.04], #355.
+This opt-in mode never changes the ordinary
 three-scenario-per-engine matrix. These Phase 2 guarantees are specified by [V01.01.06.14], #350,
 and [SFC-CG-4].

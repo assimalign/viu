@@ -8,5 +8,6 @@
     <PackageReference Include="Assimalign.Viu.UtilityCss.Build"
                       Version="$(ViuConsumerVersion)"
                       PrivateAssets="all" />
+    <ViuUtilityCss Include="utilities.css" Watch="false" />
   </ItemGroup>
 </Project>

@@ -5,6 +5,8 @@ Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EditorCatalogMaximumItems.
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EditorCatalogMaximumItems.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EmitEditorSidecar.get -> bool
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.EmitEditorSidecar.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedAssetDependencyManifestPath.get -> string!
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedAssetDependencyManifestPath.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedOutputPath.get -> string!
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.GeneratedOutputPath.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputExists.get -> bool
@@ -15,6 +17,8 @@ Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputWritten.get -> bool
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.OutputWritten.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.ProjectDirectory.get -> string!
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.ProjectDirectory.set -> void
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.PreserveEmptyOutputOnRemoval.get -> bool
+Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.PreserveEmptyOutputOnRemoval.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.SourceFiles.get -> Microsoft.Build.Framework.ITaskItem![]!
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.SourceFiles.set -> void
 Assimalign.Viu.UtilityCss.Build.ViuGenerateUtilityCss.UtilityStylesheets.get -> Microsoft.Build.Framework.ITaskItem![]!

@@ -59,3 +59,17 @@ Source-used base classes receive priority within the budget and retain determini
 `colorValue` is present only when structured engine metadata identifies a color-bearing class. Consumers must not infer colors by parsing `css`. Version 1 does not emit the optional `sortText` field; array order is authoritative.
 
 When sidecars are enabled, the packaged targets declare the absolute catalog path as `@(ViuClassCatalog)` during MSBuild project evaluation, before generation runs. A project-system host can therefore discover the contract without importing Viu editor tooling.
+
+## Generated-asset dependency manifest
+
+The editor sidecars above are not hot-reload inputs: they describe a non-empty generated bundle and are intentionally removed when that bundle becomes empty. For the Browser SDK generated-asset seam, UtilityCss instead writes `utilitycss.generated-asset-dependencies.v1` whenever `ViuGeneratedAssetSeamVersion` is exactly `1`. The file persists across empty output and uses the generic seam's line-oriented dependency-manifest format:
+
+```text
+viu-generated-asset-dependencies-v1
+file:<base64-encoded absolute UTF-8 path>
+root:<base64-encoded absolute UTF-8 path>
+```
+
+`file:` records include the resolved source set, the entry stylesheet, and every resolved or currently missing path in its recursive `@reference` closure. A direct source or entry item with `Watch="false"` is omitted while remaining available to generation; referenced files retain their own dependency records. A markup path below an independently declared automatic-discovery root remains covered by that root. `root:` records include directories or glob roots introduced by `@source`. Records use deterministic platform path order, are duplicate-free, and are byte-compared before writing so an unchanged dependency graph retains its timestamp. The manifest is declared through the public `DependencyManifestPath` metadata on `@(ViuGeneratedAsset)`; it is neither an editor-discovery contract nor an invitation for consumers to import UtilityCss-private MSBuild names.
+
+UtilityCss registers its bundle only when the host advertises generated-asset seam version `1`. Absent and incompatible versions remain silently build-triggered. This keeps independently versioned packages inert across unknown seam revisions while allowing a matching Browser SDK to regenerate and live-swap the bundle under `dotnet watch`. Specified by [V01.01.12.30.04], issue [#355](https://github.com/assimalign/viu/issues/355).

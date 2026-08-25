@@ -12,13 +12,16 @@ using Microsoft.Build.Utilities;
 namespace Assimalign.Viu.Sdk.Browser.Tasks;
 
 /// <summary>
-/// Starts the development-only Viu CSS regeneration worker for a
+/// Starts the development-only Viu generated-asset regeneration worker for a
 /// <c>dotnet watch</c> session.
 /// </summary>
 /// <remarks>
 /// The task waits until the worker records its process identity before returning. This lets the worker
 /// capture the owning <c>dotnet watch</c> process while the short-lived watch-list MSBuild process is
 /// still alive. A project-scoped state file and the worker's named mutex prevent duplicate workers.
+/// The task serializes the public <c>ViuGeneratedAsset</c> contract to a private, project-scoped
+/// worker configuration so provider metadata never depends on command-line quoting.
+/// Specified by <c>[V01.01.12.30.04]</c> (#355).
 /// </remarks>
 public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
 {
@@ -72,14 +75,15 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
     public string RuntimeIdentifier { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets whether component <c>.viu</c> and <c>.vue</c> inputs are watched.
+    /// Gets or sets the generated assets and their documented watch and regeneration metadata.
     /// </summary>
-    public bool WatchComponents { get; set; }
-
-    /// <summary>
-    /// Gets or sets exact additional input files watched by the worker.
-    /// </summary>
-    public ITaskItem[] WatchFiles { get; set; } = Array.Empty<ITaskItem>();
+    /// <remarks>
+    /// Each item identity is the generated output path. The task consumes <c>WatchFiles</c>,
+    /// <c>WatchRoots</c>, <c>WatchExtensions</c>, <c>RegenerationTarget</c>, optional
+    /// <c>DependencyManifestPath</c>, <c>StaticWebAssetPath</c>, and <c>RemovalBehavior</c> metadata.
+    /// Specified by <c>[V01.01.12.30.04]</c> (#355).
+    /// </remarks>
+    public ITaskItem[] GeneratedAssets { get; set; } = Array.Empty<ITaskItem>();
 
     /// <summary>
     /// Gets or sets project directories excluded from recursive observation.
@@ -94,11 +98,16 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
     /// <inheritdoc />
     public override bool Execute()
     {
+        if (GeneratedAssets.Length == 0)
+        {
+            return true;
+        }
+
         if (TryReadLiveWorker(StateFilePath, out var existingProcessIdentifier))
         {
             Log.LogMessage(
                 MessageImportance.Low,
-                "Viu CSS Hot Reload worker {0} is already active for {1}.",
+                "Viu Generated Asset Hot Reload worker {0} is already active for {1}.",
                 existingProcessIdentifier,
                 ProjectPath);
             return true;
@@ -114,7 +123,7 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
             if (!File.Exists(WorkerAssemblyPath))
             {
                 Log.LogError(
-                    "Viu CSS Hot Reload worker assembly was not found at '{0}'.",
+                    "Viu Generated Asset Hot Reload worker assembly was not found at '{0}'.",
                     WorkerAssemblyPath);
                 return false;
             }
@@ -122,7 +131,7 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
             if (!File.Exists(ProjectPath))
             {
                 Log.LogError(
-                    "Viu CSS Hot Reload project was not found at '{0}'.",
+                    "Viu Generated Asset Hot Reload project was not found at '{0}'.",
                     ProjectPath);
                 return false;
             }
@@ -133,11 +142,30 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
                 Directory.CreateDirectory(stateDirectory);
             }
 
-            var startInfo = CreateStartInfo();
+            var dotNetHostPath = ResolveDotNetHostPath();
+            var configurationFilePath = StateFilePath + ".configuration";
+            GeneratedAssetWorkerConfigurationWriter.Write(
+                configurationFilePath,
+                ProjectPath,
+                ProjectDirectory,
+                dotNetHostPath,
+                Configuration,
+                TargetFramework,
+                RuntimeIdentifier,
+                StateFilePath,
+                EventLogPath,
+                GetCurrentProcessIdentifier(),
+                DebounceMilliseconds,
+                GeneratedAssets,
+                ExcludedDirectories);
+
+            var startInfo = CreateStartInfo(
+                configurationFilePath,
+                dotNetHostPath);
             using var process = Process.Start(startInfo);
             if (process is null)
             {
-                Log.LogError("Viu CSS Hot Reload worker could not be started.");
+                Log.LogError("Viu Generated Asset Hot Reload worker could not be started.");
                 return false;
             }
 
@@ -148,7 +176,7 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
                 {
                     Log.LogMessage(
                         MessageImportance.Normal,
-                        "Viu CSS Hot Reload worker {0} is watching {1}.",
+                        "Viu Generated Asset Hot Reload worker {0} is watching {1}.",
                         workerProcessIdentifier,
                         ProjectDirectory);
                     return true;
@@ -157,7 +185,7 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
                 if (process.HasExited)
                 {
                     Log.LogError(
-                        "Viu CSS Hot Reload worker exited before initialization with code {0}.",
+                        "Viu Generated Asset Hot Reload worker exited before initialization with code {0}.",
                         process.ExitCode);
                     return false;
                 }
@@ -166,7 +194,7 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
             }
 
             Log.LogError(
-                "Viu CSS Hot Reload worker did not initialize within five seconds.");
+                "Viu Generated Asset Hot Reload worker did not initialize within five seconds.");
             return false;
         }
         catch (Exception exception) when (
@@ -180,48 +208,16 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
         }
     }
 
-    private ProcessStartInfo CreateStartInfo()
+    private ProcessStartInfo CreateStartInfo(
+        string configurationFilePath,
+        string dotNetHostPath)
     {
-        var dotNetHostPath = DotNetHostPath;
-        if (string.IsNullOrWhiteSpace(dotNetHostPath))
-        {
-            dotNetHostPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-        }
-
-        if (string.IsNullOrWhiteSpace(dotNetHostPath))
-        {
-            dotNetHostPath = "dotnet";
-        }
-
         var arguments = new List<string>
         {
             WorkerAssemblyPath,
-            "--project",
-            ProjectPath,
-            "--project-directory",
-            ProjectDirectory,
-            "--dotnet-host",
-            dotNetHostPath,
-            "--configuration",
-            Configuration,
-            "--state-file",
-            StateFilePath,
-            "--launcher-process-id",
-            GetCurrentProcessIdentifier().ToString(CultureInfo.InvariantCulture),
-            "--debounce-milliseconds",
-            Math.Max(1, DebounceMilliseconds).ToString(CultureInfo.InvariantCulture),
+            "--configuration-file",
+            configurationFilePath,
         };
-
-        AddOptionalArgument(arguments, "--target-framework", TargetFramework);
-        AddOptionalArgument(arguments, "--runtime-identifier", RuntimeIdentifier);
-        AddOptionalArgument(arguments, "--event-log", EventLogPath);
-        if (WatchComponents)
-        {
-            arguments.Add("--watch-components");
-        }
-
-        AddItemArguments(arguments, "--watch-file", WatchFiles);
-        AddItemArguments(arguments, "--exclude-directory", ExcludedDirectories);
 
         var startInfo = new ProcessStartInfo
         {
@@ -231,8 +227,21 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        startInfo.EnvironmentVariables["VIU_CSS_HOT_RELOAD_WORKER"] = "1";
+        startInfo.EnvironmentVariables["VIU_GENERATED_ASSET_HOT_RELOAD"] = "1";
         return startInfo;
+    }
+
+    private string ResolveDotNetHostPath()
+    {
+        var dotNetHostPath = DotNetHostPath;
+        if (string.IsNullOrWhiteSpace(dotNetHostPath))
+        {
+            dotNetHostPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        }
+
+        return string.IsNullOrWhiteSpace(dotNetHostPath)
+            ? "dotnet"
+            : dotNetHostPath;
     }
 
     private static int GetCurrentProcessIdentifier()
@@ -291,35 +300,6 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
         {
             processIdentifier = 0;
             return false;
-        }
-    }
-
-    private static void AddOptionalArgument(
-        ICollection<string> arguments,
-        string option,
-        string value)
-    {
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            arguments.Add(option);
-            arguments.Add(value);
-        }
-    }
-
-    private static void AddItemArguments(
-        ICollection<string> arguments,
-        string option,
-        IEnumerable<ITaskItem> items)
-    {
-        foreach (var item in items)
-        {
-            if (item is null || string.IsNullOrWhiteSpace(item.ItemSpec))
-            {
-                continue;
-            }
-
-            arguments.Add(option);
-            arguments.Add(item.ItemSpec);
         }
     }
 

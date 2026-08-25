@@ -6,8 +6,9 @@
     Packs the standalone engine and build-integration packages, stages Razor, plain-SDK, and
     package-only .viu consumers behind an isolated NuGet boundary, and verifies source discovery,
     single-file-component slicing, editor sidecars, Viu class-catalog completion over a real
-    language-server process, both delivery paths, and byte-compare incremental behavior.
-    Specified by [V01.01.12.30], issue #346.
+    language-server process, both delivery paths, byte-compare incremental behavior, and guarded
+    generated-asset registration for Browser SDK hot reload.
+    Specified by [V01.01.12.30], issue #346, and [V01.01.12.30.04], issue #355.
 
 .PARAMETER SkipPack
     Reuses current-version packages already present in PackageDirectory.
@@ -221,6 +222,65 @@ function Resolve-ProjectPath {
 
     return [System.IO.Path]::GetFullPath(
         (Join-Path $ProjectDirectory $Path))
+}
+
+function Read-GeneratedAssetDependencyManifest {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path
+    )
+
+    if (-not [System.IO.File]::Exists($Path)) {
+        throw "The generated-asset dependency manifest does not exist: $Path"
+    }
+
+    $lines = [System.IO.File]::ReadAllLines($Path)
+    if ($lines.Count -eq 0 -or
+        -not $lines[0].Equals(
+            'viu-generated-asset-dependencies-v1',
+            [System.StringComparison]::Ordinal)) {
+        throw "The generated-asset dependency manifest has an unsupported header: $Path"
+    }
+
+    $files = [System.Collections.Generic.List[string]]::new()
+    $roots = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in $lines | Select-Object -Skip 1) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
+        $destination = $null
+        $encodedPath = ''
+        if ($line.StartsWith('file:', [System.StringComparison]::Ordinal)) {
+            $destination = $files
+            $encodedPath = $line.Substring('file:'.Length)
+        }
+        elseif ($line.StartsWith('root:', [System.StringComparison]::Ordinal)) {
+            $destination = $roots
+            $encodedPath = $line.Substring('root:'.Length)
+        }
+        else {
+            throw "The generated-asset dependency manifest contains an unsupported record: $line"
+        }
+
+        try {
+            $decodedPath = [System.Text.Encoding]::UTF8.GetString(
+                [System.Convert]::FromBase64String($encodedPath))
+        }
+        catch {
+            throw "The generated-asset dependency manifest contains an invalid path record: $line"
+        }
+        if (-not [System.IO.Path]::IsPathRooted($decodedPath)) {
+            throw "The generated-asset dependency manifest contains a non-absolute path: $decodedPath"
+        }
+
+        $destination.Add([System.IO.Path]::GetFullPath($decodedPath))
+    }
+
+    return [pscustomobject]@{
+        Files = $files.ToArray()
+        Roots = $roots.ToArray()
+    }
 }
 
 function Get-UtilityCssProjectProperties {
@@ -654,6 +714,187 @@ function Assert-UtilityCssEditorSidecar {
 
     Write-Host `
         "Editor manifest and bounded class catalog passed for $([System.IO.Path]::GetFileName($ProjectPath))." `
+        -ForegroundColor Green
+}
+
+function Get-UtilityCssGeneratedAssetItems {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectPath,
+
+        [Parameter(Mandatory)]
+        [string[]] $CommonProperties,
+
+        [AllowNull()]
+        [string] $SeamVersion
+    )
+
+    $seamProperty = if ($null -eq $SeamVersion) {
+        @()
+    }
+    else {
+        @("-property:ViuGeneratedAssetSeamVersion=$SeamVersion")
+    }
+    $result = Invoke-DotNetForJson `
+        -Description "Resolving UtilityCss generated-asset registration with seam '$SeamVersion'" `
+        -Arguments (@(
+            'msbuild',
+            $ProjectPath,
+            '-nologo',
+            '-verbosity:quiet',
+            '-target:ViuRegisterUtilityCssGeneratedAsset',
+            '-getItem:ViuGeneratedAsset',
+            '-property:Configuration=Release') + $CommonProperties + $seamProperty)
+    $itemsProperty = $result.PSObject.Properties['Items']
+    if ($null -eq $itemsProperty -or $null -eq $itemsProperty.Value) {
+        return @()
+    }
+
+    $generatedAssetsProperty =
+        $itemsProperty.Value.PSObject.Properties['ViuGeneratedAsset']
+    if ($null -eq $generatedAssetsProperty -or
+        $null -eq $generatedAssetsProperty.Value) {
+        return @()
+    }
+
+    return @($generatedAssetsProperty.Value)
+}
+
+function Assert-UtilityCssGeneratedAssetRegistration {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectPath,
+
+        [Parameter(Mandatory)]
+        [string] $ProjectDirectory,
+
+        [Parameter(Mandatory)]
+        [string] $BundlePath,
+
+        [Parameter(Mandatory)]
+        [string] $BundleName,
+
+        [Parameter(Mandatory)]
+        [string[]] $ExpectedWatchRelativePaths,
+
+        [Parameter(Mandatory)]
+        [string[]] $ExpectedDependencyRelativePaths,
+
+        [Parameter(Mandatory)]
+        [string[]] $CommonProperties
+    )
+
+    foreach ($incompatibleVersion in @($null, '2')) {
+        $incompatibleItems = @(
+            Get-UtilityCssGeneratedAssetItems `
+                -ProjectPath $ProjectPath `
+                -CommonProperties $CommonProperties `
+                -SeamVersion $incompatibleVersion)
+        if ($incompatibleItems.Count -ne 0) {
+            $description = if ($null -eq $incompatibleVersion) {
+                'an absent seam advertisement'
+            }
+            else {
+                "incompatible seam version $incompatibleVersion"
+            }
+            throw "UtilityCss registered a generated asset for $description."
+        }
+    }
+
+    $compatibleItems = @(
+        Get-UtilityCssGeneratedAssetItems `
+            -ProjectPath $ProjectPath `
+            -CommonProperties $CommonProperties `
+            -SeamVersion '1')
+    if ($compatibleItems.Count -ne 1) {
+        throw "UtilityCss must register exactly one generated asset for seam version 1; found $($compatibleItems.Count)."
+    }
+
+    $asset = $compatibleItems[0]
+    $identity = Get-JsonPropertyValue -InputObject $asset -Name 'Identity'
+    if ([string]::IsNullOrWhiteSpace($identity)) {
+        $identity = Get-JsonPropertyValue -InputObject $asset -Name 'FullPath'
+    }
+    if (-not (Resolve-ProjectPath `
+            -ProjectDirectory $ProjectDirectory `
+            -Path $identity).Equals(
+                [System.IO.Path]::GetFullPath($BundlePath),
+                $pathComparison)) {
+        throw "UtilityCss generated-asset Identity was '$identity'; expected '$BundlePath'."
+    }
+
+    $expectedMetadata = @{
+        RegenerationTarget = 'ViuGenerateUtilityCss'
+        StaticWebAssetPath = "wwwroot/$BundleName"
+        RemovalBehavior = 'PreserveEmpty'
+        WatchExtensions = '.viu;.vue;.razor;.cshtml;.html;.htm'
+    }
+    foreach ($entry in $expectedMetadata.GetEnumerator()) {
+        $actualValue = Get-JsonPropertyValue `
+            -InputObject $asset `
+            -Name $entry.Key
+        if (-not $actualValue.Equals(
+                $entry.Value,
+                [System.StringComparison]::Ordinal)) {
+            throw "UtilityCss generated-asset metadata '$($entry.Key)' was '$actualValue'; expected '$($entry.Value)'."
+        }
+    }
+
+    $watchRoot = Get-JsonPropertyValue -InputObject $asset -Name 'WatchRoots'
+    $normalizedWatchRoot = [System.IO.Path]::GetFullPath($watchRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $normalizedProjectDirectory = [System.IO.Path]::GetFullPath(
+        $ProjectDirectory).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar)
+    if (-not $normalizedWatchRoot.Equals(
+            $normalizedProjectDirectory,
+            $pathComparison)) {
+        throw "UtilityCss generated-asset WatchRoots was '$watchRoot'; expected '$ProjectDirectory'."
+    }
+
+    $watchFiles = @(
+        (Get-JsonPropertyValue -InputObject $asset -Name 'WatchFiles') -split ';' |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { [System.IO.Path]::GetFullPath($_) })
+    $expectedWatchFiles = @(
+        $ExpectedWatchRelativePaths |
+            ForEach-Object {
+                [System.IO.Path]::GetFullPath(
+                    (Join-Path $ProjectDirectory $_))
+            })
+    $watchDifference = @(Compare-Object $expectedWatchFiles $watchFiles)
+    if ($watchDifference.Count -ne 0) {
+        throw "UtilityCss generated-asset WatchFiles differ from the resolved source and entry set: $($watchDifference | Out-String)"
+    }
+
+    $dependencyManifestPath = Get-JsonPropertyValue `
+        -InputObject $asset `
+        -Name 'DependencyManifestPath'
+    if ([string]::IsNullOrWhiteSpace($dependencyManifestPath) -or
+        -not [System.IO.Path]::IsPathRooted($dependencyManifestPath)) {
+        throw "UtilityCss generated-asset DependencyManifestPath is not absolute: '$dependencyManifestPath'."
+    }
+    $dependencyManifest = Read-GeneratedAssetDependencyManifest `
+        -Path $dependencyManifestPath
+    $expectedDependencyFiles = @(
+        $ExpectedDependencyRelativePaths |
+            ForEach-Object {
+                [System.IO.Path]::GetFullPath(
+                    (Join-Path $ProjectDirectory $_))
+            })
+    $dependencyDifference = @(
+        Compare-Object $expectedDependencyFiles $dependencyManifest.Files)
+    if ($dependencyDifference.Count -ne 0) {
+        throw "UtilityCss generated-asset dependency files differ from the expected closure: $($dependencyDifference | Out-String)"
+    }
+    if ($dependencyManifest.Roots.Count -ne 0) {
+        throw "The package fixture unexpectedly produced dependency roots: $($dependencyManifest.Roots -join ', ')"
+    }
+
+    Write-Host `
+        'Generated-asset seam guards and UtilityCss registration metadata passed for versions absent, 1, and 2.' `
         -ForegroundColor Green
 }
 
@@ -1146,6 +1387,15 @@ function Test-UtilityCssFixture {
         -ForbiddenCatalogClasses $Fixture.ForbiddenCatalogClasses `
         -CommonProperties $commonProperties
 
+    Assert-UtilityCssGeneratedAssetRegistration `
+        -ProjectPath $projectPath `
+        -ProjectDirectory $projectDirectory `
+        -BundlePath $bundlePath `
+        -BundleName $bundleName `
+        -ExpectedWatchRelativePaths $Fixture.ExpectedWatchRelativePaths `
+        -ExpectedDependencyRelativePaths $Fixture.ExpectedDependencyRelativePaths `
+        -CommonProperties $commonProperties
+
     if ($Fixture.ContainsKey('ClassCatalogCompletionClass')) {
         Assert-ViuClassCatalogCompletion `
             -ProjectPath $projectPath `
@@ -1403,6 +1653,12 @@ $fixtureDefinitions = @(
         ExpectedSourceRelativePaths = @(
             'UtilityProbe.razor'
             'Views/UtilityProbe.cshtml')
+        ExpectedWatchRelativePaths = @(
+            'UtilityProbe.razor'
+            'Views/UtilityProbe.cshtml')
+        ExpectedDependencyRelativePaths = @(
+            'UtilityProbe.razor'
+            'Views/UtilityProbe.cshtml')
         ExpectedCatalogClasses = @('sr-only', 'p-4', 'w-[37px]')
         ForbiddenCatalogClasses = @()
     },
@@ -1416,6 +1672,8 @@ $fixtureDefinitions = @(
             'height: 41px;')
         ForbiddenText = @()
         ExpectedSourceRelativePaths = @('index.html')
+        ExpectedWatchRelativePaths = @('index.html')
+        ExpectedDependencyRelativePaths = @('index.html')
         ExpectedCatalogClasses = @('sr-only', 'rounded-lg', 'h-[41px]')
         ForbiddenCatalogClasses = @()
     },
@@ -1429,6 +1687,10 @@ $fixtureDefinitions = @(
             'opacity: 0.7654321;')
         ForbiddenText = @('0.1234567')
         ExpectedSourceRelativePaths = @('SlicingProbe.viu')
+        ExpectedWatchRelativePaths = @('SlicingProbe.viu')
+        ExpectedDependencyRelativePaths = @(
+            'SlicingProbe.viu'
+            'theme.css')
         ExpectedCatalogClasses = @('sr-only', 'bg-blue-500', 'opacity-[0.7654321]')
         ForbiddenCatalogClasses = @('opacity-[0.1234567]')
         ClassCatalogCompletionClass = 'bg-blue-500'

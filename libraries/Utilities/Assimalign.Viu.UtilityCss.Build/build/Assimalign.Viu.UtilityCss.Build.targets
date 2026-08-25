@@ -8,17 +8,19 @@
     <ViuUtilityCssEmitEditorSidecar Condition="'$(ViuUtilityCssEmitEditorSidecar)' == ''">true</ViuUtilityCssEmitEditorSidecar>
     <ViuUtilityCssCatalogMaximumEntries Condition="'$(ViuUtilityCssCatalogMaximumEntries)' == ''">50000</ViuUtilityCssCatalogMaximumEntries>
     <ViuUtilityCssSourceIdentifier Condition="'$(ViuUtilityCssSourceIdentifier)' == ''">$(AssemblyName)</ViuUtilityCssSourceIdentifier>
+    <ViuGeneratedAssetHotReload Condition="'$(ViuGeneratedAssetHotReload)' == ''">false</ViuGeneratedAssetHotReload>
     <_ViuUtilityCssContentRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'utilitycss'))</_ViuUtilityCssContentRoot>
     <_ViuUtilityCssOutputPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', '$(ViuUtilityCssBundleName)'))</_ViuUtilityCssOutputPath>
     <_ViuUtilityCssEditorManifestPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.manifest.v1.json'))</_ViuUtilityCssEditorManifestPath>
     <_ViuUtilityCssEditorCatalogPath>$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.classcatalog.v1.json'))</_ViuUtilityCssEditorCatalogPath>
+    <_ViuUtilityCssGeneratedAssetDependencyManifestPath Condition="'$(ViuGeneratedAssetSeamVersion)' == '1'">$([MSBuild]::NormalizePath('$(_ViuUtilityCssContentRoot)', 'utilitycss.generated-asset-dependencies.v1'))</_ViuUtilityCssGeneratedAssetDependencyManifestPath>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(ViuUtilityCssEmitEditorSidecar)' == 'true'">
     <ViuClassCatalog Include="$(_ViuUtilityCssEditorCatalogPath)" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(ViuUtilityCssEnabled)' == 'true'">
+  <PropertyGroup Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(ViuGeneratedAssetSeamVersion)' != '1'">
     <CustomCollectWatchItems>$(CustomCollectWatchItems);_ViuCollectUtilityCssWatchItems</CustomCollectWatchItems>
   </PropertyGroup>
 
@@ -52,7 +54,10 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="_ViuGenerateUtilityCss"
+  <!-- Public regeneration entry point for the generated-asset seam
+       ([V01.01.12.30.04], #355). Its task remains package-owned; compatible hosts invoke only
+       this documented target name from @(ViuGeneratedAsset). -->
+  <Target Name="ViuGenerateUtilityCss"
           DependsOnTargets="_ViuResolveUtilityCssInputs"
           Condition="'$(ViuUtilityCssEnabled)' == 'true'">
     <PropertyGroup>
@@ -64,6 +69,8 @@
                            UtilityStylesheets="@(_ViuUtilityCssResolvedEntry)"
                            ProjectDirectory="$(MSBuildProjectDirectory)"
                            OutputPath="$(_ViuUtilityCssOutputPath)"
+                           GeneratedAssetDependencyManifestPath="$(_ViuUtilityCssGeneratedAssetDependencyManifestPath)"
+                           PreserveEmptyOutputOnRemoval="$(ViuGeneratedAssetHotReload)"
                            EmitEditorSidecar="$(ViuUtilityCssEmitEditorSidecar)"
                            EditorCatalogMaximumItems="$(ViuUtilityCssCatalogMaximumEntries)">
       <Output TaskParameter="GeneratedOutputPath" PropertyName="_ViuUtilityCssGeneratedOutputPath" />
@@ -78,11 +85,40 @@
                   Condition="'$(_ViuUtilityCssOutputExists)' == 'true' and Exists('$(_ViuUtilityCssOutputPath)')" />
       <FileWrites Include="$(_ViuUtilityCssEditorManifestPath);$(_ViuUtilityCssEditorCatalogPath)"
                   Condition="'$(ViuUtilityCssEmitEditorSidecar)' == 'true' and '$(_ViuUtilityCssOutputExists)' == 'true'" />
+      <FileWrites Include="$(_ViuUtilityCssGeneratedAssetDependencyManifestPath)"
+                  Condition="'$(_ViuUtilityCssGeneratedAssetDependencyManifestPath)' != '' and Exists('$(_ViuUtilityCssGeneratedAssetDependencyManifestPath)')" />
+    </ItemGroup>
+  </Target>
+
+  <!-- A compatible Browser SDK calls ViuCollectGeneratedAssets. Before that collection, register
+       the UtilityCss-owned output using only the public versioned seam contract. Exact version
+       matching keeps older and future incompatible hosts silently on build-time generation. -->
+  <Target Name="ViuRegisterUtilityCssGeneratedAsset"
+          BeforeTargets="ViuCollectGeneratedAssets"
+          DependsOnTargets="ViuGenerateUtilityCss"
+          Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(ViuGeneratedAssetSeamVersion)' == '1'">
+    <ItemGroup>
+      <_ViuUtilityCssGeneratedAssetWatchFile Remove="@(_ViuUtilityCssGeneratedAssetWatchFile)" />
+      <_ViuUtilityCssGeneratedAssetWatchFile Include="@(_ViuUtilityCssResolvedSource)"
+                                              Condition="'%(_ViuUtilityCssResolvedSource.Watch)' != 'false'"
+                                              KeepDuplicates="false" />
+      <_ViuUtilityCssGeneratedAssetWatchFile Include="@(_ViuUtilityCssResolvedEntry)"
+                                              Condition="'%(_ViuUtilityCssResolvedEntry.Watch)' != 'false'"
+                                              KeepDuplicates="false" />
+      <ViuGeneratedAsset Include="$(_ViuUtilityCssOutputPath)" KeepDuplicates="false">
+        <WatchFiles>@(_ViuUtilityCssGeneratedAssetWatchFile->'%(FullPath)', ';')</WatchFiles>
+        <WatchRoots Condition="'$(ViuUtilityCssAutomaticSourceDiscovery)' == 'true'">$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)'))</WatchRoots>
+        <WatchExtensions>.viu;.vue;.razor;.cshtml;.html;.htm</WatchExtensions>
+        <RegenerationTarget>ViuGenerateUtilityCss</RegenerationTarget>
+        <DependencyManifestPath>$(_ViuUtilityCssGeneratedAssetDependencyManifestPath)</DependencyManifestPath>
+        <StaticWebAssetPath>wwwroot/$(ViuUtilityCssBundleName)</StaticWebAssetPath>
+        <RemovalBehavior>PreserveEmpty</RemovalBehavior>
+      </ViuGeneratedAsset>
     </ItemGroup>
   </Target>
 
   <Target Name="_ViuResolveUtilityCssStaticWebAssets"
-          DependsOnTargets="ResolveStaticWebAssetsConfiguration;_ViuGenerateUtilityCss"
+          DependsOnTargets="ResolveStaticWebAssetsConfiguration;ViuGenerateUtilityCss"
           Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(UsingMicrosoftNETSdkStaticWebAssets)' == 'true'">
     <!-- The Static Web Assets SDK does not rewrite or delete its development manifest when the
          current graph becomes empty, and PreserveNewest cannot retire a prior runtime copy without
@@ -128,7 +164,7 @@
 
   <Target Name="_ViuPrepareUtilityCssContent"
           BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="_ViuGenerateUtilityCss"
+          DependsOnTargets="ViuGenerateUtilityCss"
           Condition="'$(ViuUtilityCssEnabled)' == 'true' and '$(UsingMicrosoftNETSdkStaticWebAssets)' != 'true'">
     <Delete Files="$(OutDir)$(ViuUtilityCssBundleName)"
             Condition="'$(_ViuUtilityCssOutputRemoved)' == 'true' and Exists('$(OutDir)$(ViuUtilityCssBundleName)')" />

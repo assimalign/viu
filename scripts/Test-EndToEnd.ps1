@@ -25,8 +25,9 @@
     Runs the isolated packaged Debug .vue watch scenarios instead of the ordinary three-scenario
     published fixture lane. This mode proves structural add/remove/v-if managed deltas, new-file
     NewTypeDefinition application, accepted style/template/script updates, and automatic browser
-    reload after a script-signature rude-edit restart. It requires Chromium and owns the complete
-    dotnet-watch process tree for its staged consumer.
+    reload after a script-signature rude-edit restart. It also proves generated utility CSS creation
+    and last-source retirement through the generic generated-asset seam ([V01.01.12.30.04], #355).
+    It requires Chromium and owns the complete dotnet-watch process tree for its staged consumer.
 
 .PARAMETER StartupResultsPath
     Destination for startup measurement JSON.
@@ -435,7 +436,10 @@ $requiredPackages = @(
     "Assimalign.Viu.App.Ref.$viuVersion.nupkg",
     "Assimalign.Viu.App.Browser.Ref.$viuVersion.nupkg",
     "Assimalign.Viu.App.Browser.Runtime.browser-wasm.$viuVersion.nupkg")
-if (-not $HotReload -and -not $PackagedVuePublish) {
+if ($HotReload) {
+    $requiredPackages += "Assimalign.Viu.UtilityCss.Build.$viuVersion.nupkg"
+}
+elseif (-not $PackagedVuePublish) {
     $requiredPackages += @(
         "Assimalign.Viu.Router.$viuVersion.nupkg",
         "Assimalign.Viu.Browser.Router.$viuVersion.nupkg",
@@ -1160,7 +1164,11 @@ if (-not $HotReload) {
             'packaged-vue-watch-structural-add-delta',
             'packaged-vue-watch-structural-remove-delta',
             'packaged-vue-watch-structural-v-if-delta',
-            'packaged-vue-watch-new-file-new-type-definition-delta')
+            'packaged-vue-watch-new-file-new-type-definition-delta',
+            # [V01.01.12.30.04], #355: these names pin both generated-asset
+            # creation and PreserveEmpty retirement into the packaged watch lane.
+            'packaged-vue-watch-utility-css-new-class',
+            'packaged-vue-watch-utility-css-last-source-removal')
         foreach ($requiredHotReloadScenario in $requiredHotReloadScenarios) {
             $matchingScenarios = @(
                 $hotReloadResult.scenarios |

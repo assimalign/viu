@@ -44,6 +44,23 @@ public sealed class CssHotReloadWorkerTests
                     line => line.Contains(".viu.css|", StringComparison.OrdinalIgnoreCase))
                 .ShouldBe(1);
 
+            var genericResultPath = Path.Combine(context.DirectoryPath, "generic-watch.txt");
+            RunMsBuild(
+                context,
+                "ProbeWatch",
+                new Dictionary<string, string>
+                {
+                    ["DotNetWatchBuild"] = "true",
+                    ["DesignTimeBuild"] = "true",
+                    ["ViuCssHotReloadLaunchWorker"] = "false",
+                    ["ProbeRegisterGeneratedAsset"] = "true",
+                    ["ProbeOutput"] = genericResultPath,
+                });
+            File.ReadAllLines(genericResultPath).ShouldContain(
+                line => line.EndsWith(
+                    "first.generated.css|wwwroot/probe.generated.css",
+                    StringComparison.OrdinalIgnoreCase));
+
             var releaseResultPath = Path.Combine(context.DirectoryPath, "release-watch.txt");
             RunMsBuild(
                 context,
@@ -86,10 +103,10 @@ public sealed class CssHotReloadWorkerTests
         {
             RunMsBuild(
                 context,
-                "_ViuRegenerateCssHotReloadBundles",
+                "ViuGenerateSingleFileComponentCss",
                 new Dictionary<string, string>
                 {
-                    ["ViuCssHotReloadWorker"] = "true",
+                    ["ViuGeneratedAssetHotReload"] = "true",
                 });
             File.ReadAllText(context.BundlePath).ShouldContain("color: red");
 
@@ -127,10 +144,10 @@ public sealed class CssHotReloadWorkerTests
         {
             RunMsBuild(
                 context,
-                "_ViuRegenerateCssHotReloadBundles",
+                "ViuGenerateSingleFileComponentCss",
                 new Dictionary<string, string>
                 {
-                    ["ViuCssHotReloadWorker"] = "true",
+                    ["ViuGeneratedAssetHotReload"] = "true",
                 });
 
             var originalCss = File.ReadAllText(context.BundlePath);
@@ -138,10 +155,10 @@ public sealed class CssHotReloadWorkerTests
 
             RunMsBuild(
                 context,
-                "_ViuRegenerateCssHotReloadBundles",
+                "ViuGenerateSingleFileComponentCss",
                 new Dictionary<string, string>
                 {
-                    ["ViuCssHotReloadWorker"] = "true",
+                    ["ViuGeneratedAssetHotReload"] = "true",
                 });
             File.ReadAllText(context.BundlePath).ShouldBe(originalCss);
             File.GetLastWriteTimeUtc(context.BundlePath).ShouldBe(originalWriteTime);
@@ -152,10 +169,10 @@ public sealed class CssHotReloadWorkerTests
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             RunMsBuild(
                 context,
-                "_ViuRegenerateCssHotReloadBundles",
+                "ViuGenerateSingleFileComponentCss",
                 new Dictionary<string, string>
                 {
-                    ["ViuCssHotReloadWorker"] = "true",
+                    ["ViuGeneratedAssetHotReload"] = "true",
                 });
             new FileInfo(context.BundlePath).Length.ShouldBe(0);
             File.Exists(context.BundlePath + ".hot-reload-empty").ShouldBeTrue();
@@ -180,6 +197,117 @@ public sealed class CssHotReloadWorkerTests
             RunMsBuild(context, "_ViuBundleSingleFileComponentCss", new Dictionary<string, string>());
             File.Exists(context.BundlePath).ShouldBeFalse();
             File.Exists(context.BundlePath + ".hot-reload-empty").ShouldBeFalse();
+        }
+        finally
+        {
+            StopWorker(workerProcess);
+            context.Dispose();
+        }
+    }
+
+    // [V01.01.12.30.04], #355 pins generic graph refresh and batched regeneration.
+    [Fact]
+    public void Worker_GenericGraphChanges_BatchesTargetsAndRefreshesManifestRoots()
+    {
+        var context = TestContext.Create();
+        Process? workerProcess = null;
+        try
+        {
+            var initialManifestRoot = Path.Combine(
+                context.ExternalDirectoryPath,
+                "initial-manifest-root");
+            Directory.CreateDirectory(initialManifestRoot);
+            var initialManifestSource = Path.Combine(
+                initialManifestRoot,
+                "initial.candidate");
+            File.WriteAllText(initialManifestSource, "initial");
+            WriteDependencyManifest(
+                context.DependencyManifestPath,
+                new[] { initialManifestSource },
+                new[] { initialManifestRoot });
+
+            var assets = new[]
+            {
+                new WorkerAsset(
+                    context.FirstGeneratedAssetPath,
+                    Array.Empty<string>(),
+                    new[] { context.ExternalDirectoryPath },
+                    new[] { ".utility" },
+                    "GenerateFirstAsset",
+                    string.Empty,
+                    "wwwroot/first.generated.css",
+                    "Delete"),
+                new WorkerAsset(
+                    context.SecondGeneratedAssetPath,
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    new[] { ".candidate" },
+                    "GenerateSecondAsset",
+                    context.DependencyManifestPath,
+                    "wwwroot/second.generated.css",
+                    "Delete"),
+                new WorkerAsset(
+                    context.ThirdGeneratedAssetPath,
+                    new[] { context.GenericInputPath },
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    "generatefirstasset",
+                    string.Empty,
+                    "wwwroot/third.generated.css",
+                    "Delete"),
+            };
+
+            workerProcess = StartWorker(context, assets);
+            WaitFor(() => File.Exists(context.StatePath), "worker state file");
+
+            File.WriteAllText(
+                Path.Combine(context.ExternalDirectoryPath, "ignored.txt"),
+                "ignored");
+            Thread.Sleep(750);
+            CountCompletedEvents(context.EventLogPath).ShouldBe(0);
+
+            WriteWatchedFile(context.GenericInputPath, "second utility value");
+            WaitForCompletedEventCount(context.EventLogPath, 1);
+            CountSettledEvents(context.EventLogPath).ShouldBe(0);
+            File.Delete(initialManifestSource);
+            WaitForEventCount(context.EventLogPath, 2);
+            File.ReadAllText(context.FirstGeneratedAssetPath)
+                .ShouldContain("second utility value");
+            File.ReadAllText(context.ThirdGeneratedAssetPath)
+                .ShouldContain("second utility value");
+            File.ReadAllText(context.EventLogPath).ShouldContain(
+                "targets:GenerateFirstAsset;GenerateSecondAsset");
+            CountTargetInvocations(context.TargetInvocationLogPath, "first").ShouldBe(2);
+            CountTargetInvocations(context.TargetInvocationLogPath, "second").ShouldBe(2);
+
+            var replacementManifestRoot = Path.Combine(
+                context.ExternalDirectoryPath,
+                "replacement-manifest-root");
+            var replacementManifestSource = Path.Combine(
+                replacementManifestRoot,
+                "replacement.candidate");
+            var missingManifestSource = Path.Combine(
+                context.ExternalDirectoryPath,
+                "currently-missing.candidate");
+            WriteDependencyManifest(
+                context.DependencyManifestPath,
+                new[] { missingManifestSource },
+                new[] { replacementManifestRoot });
+            WaitForEventCount(context.EventLogPath, 3);
+
+            Directory.CreateDirectory(replacementManifestRoot);
+            WaitForEventCount(context.EventLogPath, 4);
+
+            File.WriteAllText(replacementManifestSource, "replacement");
+            WaitForEventCount(context.EventLogPath, 5);
+
+            File.Delete(replacementManifestSource);
+            WaitForEventCount(context.EventLogPath, 6);
+
+            File.WriteAllText(missingManifestSource, "now present");
+            WaitForEventCount(context.EventLogPath, 7);
+            CountTargetInvocations(context.TargetInvocationLogPath, "first").ShouldBe(7);
+            CountTargetInvocations(context.TargetInvocationLogPath, "second").ShouldBe(7);
         }
         finally
         {
@@ -223,9 +351,33 @@ public sealed class CssHotReloadWorkerTests
         File.Move(temporaryPath, path, overwrite: true);
     }
 
-    private static Process StartWorker(TestContext context)
+    private static Process StartWorker(TestContext context) =>
+        StartWorker(
+            context,
+            new[]
+            {
+                new WorkerAsset(
+                    context.BundlePath,
+                    Array.Empty<string>(),
+                    new[] { context.DirectoryPath },
+                    new[] { ".viu", ".vue" },
+                    "ViuGenerateSingleFileComponentCss",
+                    string.Empty,
+                    "wwwroot/Probe.viu.css",
+                    "PreserveEmpty"),
+            });
+
+    private static Process StartWorker(
+        TestContext context,
+        IReadOnlyList<WorkerAsset> assets)
     {
         using var currentProcess = Process.GetCurrentProcess();
+        var configurationFilePath = context.StatePath + ".configuration";
+        WriteWorkerConfiguration(
+            configurationFilePath,
+            context,
+            currentProcess.Id,
+            assets);
         var startInfo = new ProcessStartInfo
         {
             FileName = GetDotNetHostPath(),
@@ -234,24 +386,11 @@ public sealed class CssHotReloadWorkerTests
             CreateNoWindow = false,
         };
         startInfo.ArgumentList.Add(context.WorkerAssemblyPath);
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(context.ProjectPath);
-        startInfo.ArgumentList.Add("--project-directory");
-        startInfo.ArgumentList.Add(context.DirectoryPath);
-        startInfo.ArgumentList.Add("--state-file");
-        startInfo.ArgumentList.Add(context.StatePath);
-        startInfo.ArgumentList.Add("--event-log");
-        startInfo.ArgumentList.Add(context.EventLogPath);
-        startInfo.ArgumentList.Add("--owner-process-id");
-        startInfo.ArgumentList.Add(
-            currentProcess.Id.ToString(CultureInfo.InvariantCulture));
-        startInfo.ArgumentList.Add("--watch-components");
-        startInfo.ArgumentList.Add("--exclude-directory");
-        startInfo.ArgumentList.Add(Path.Combine(context.DirectoryPath, "obj"));
-        startInfo.ArgumentList.Add("--exclude-directory");
-        startInfo.ArgumentList.Add(Path.Combine(context.DirectoryPath, "bin"));
+        startInfo.ArgumentList.Add("--configuration-file");
+        startInfo.ArgumentList.Add(configurationFilePath);
         return Process.Start(startInfo) ??
-            throw new InvalidOperationException("The CSS Hot Reload worker could not be started.");
+            throw new InvalidOperationException(
+                "The Generated Asset Hot Reload worker could not be started.");
     }
 
     private static void RunMsBuild(
@@ -303,8 +442,10 @@ public sealed class CssHotReloadWorkerTests
         try
         {
             WaitFor(
-                () => CountCompletedEvents(eventLogPath) >= count,
-                count.ToString(CultureInfo.InvariantCulture) + " completed regenerations");
+                () => CountCompletedEvents(eventLogPath) >= count &&
+                    CountSettledEvents(eventLogPath) >= count,
+                count.ToString(CultureInfo.InvariantCulture) +
+                    " completed and settled regenerations");
         }
         catch (TimeoutException exception)
         {
@@ -315,6 +456,25 @@ public sealed class CssHotReloadWorkerTests
                 exception.Message + " Observed events: " + events,
                 exception);
         }
+    }
+
+    private static void WaitForCompletedEventCount(string eventLogPath, int count)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (CountCompletedEvents(eventLogPath) >= count)
+            {
+                return;
+            }
+
+            Thread.Sleep(1);
+        }
+
+        throw new TimeoutException(
+            "Timed out waiting for " +
+            count.ToString(CultureInfo.InvariantCulture) +
+            " completed regenerations.");
     }
 
     private static int CountCompletedEvents(string eventLogPath)
@@ -330,6 +490,48 @@ public sealed class CssHotReloadWorkerTests
         {
             return 0;
         }
+    }
+
+    private static int CountSettledEvents(string eventLogPath)
+    {
+        try
+        {
+            return !File.Exists(eventLogPath)
+                ? 0
+                : File.ReadAllLines(eventLogPath)
+                    .Count(line => string.Equals(line, "settled", StringComparison.Ordinal));
+        }
+        catch (IOException)
+        {
+            return 0;
+        }
+    }
+
+    private static int CountTargetInvocations(string path, string target) =>
+        !File.Exists(path)
+            ? 0
+            : File.ReadAllLines(path)
+                .Count(line => string.Equals(line, target, StringComparison.Ordinal));
+
+    private static void WriteDependencyManifest(
+        string path,
+        IEnumerable<string> files,
+        IEnumerable<string> roots)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var lines = new List<string> { "viu-generated-asset-dependencies-v1" };
+        lines.AddRange(files.Select(
+            value => "file:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(value))));
+        lines.AddRange(roots.Select(
+            value => "root:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(value))));
+        WriteWatchedFile(
+            path,
+            string.Join(Environment.NewLine, lines) + Environment.NewLine);
     }
 
     private static void WaitFor(Func<bool> predicate, string description)
@@ -365,6 +567,89 @@ public sealed class CssHotReloadWorkerTests
 
     private static string GetDotNetHostPath() =>
         Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
+
+    private static void WriteWorkerConfiguration(
+        string path,
+        TestContext context,
+        int ownerProcessIdentifier,
+        IEnumerable<WorkerAsset> assets)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var lines = new List<string>
+        {
+            "viu-generated-asset-worker-configuration-v1",
+            EncodeConfigurationValue("project-path", context.ProjectPath),
+            EncodeConfigurationValue("project-directory", context.DirectoryPath),
+            EncodeConfigurationValue("dotnet-host", GetDotNetHostPath()),
+            EncodeConfigurationValue("configuration", "Debug"),
+            EncodeConfigurationValue("target-framework", string.Empty),
+            EncodeConfigurationValue("runtime-identifier", string.Empty),
+            EncodeConfigurationValue("state-file", context.StatePath),
+            EncodeConfigurationValue("event-log", context.EventLogPath),
+            EncodeConfigurationValue(
+                "owner-process-identifier",
+                ownerProcessIdentifier.ToString(CultureInfo.InvariantCulture)),
+            EncodeConfigurationValue("debounce-milliseconds", "50"),
+            EncodeConfigurationValue(
+                "excluded-directory",
+                Path.Combine(context.DirectoryPath, "obj")),
+            EncodeConfigurationValue(
+                "excluded-directory",
+                Path.Combine(context.DirectoryPath, "bin")),
+        };
+
+        foreach (var asset in assets)
+        {
+            lines.Add("asset-begin");
+            lines.Add(EncodeConfigurationValue("identity", asset.Identity));
+            lines.AddRange(asset.WatchFiles.Select(
+                value => EncodeConfigurationValue("watch-file", value)));
+            lines.AddRange(asset.WatchRoots.Select(
+                value => EncodeConfigurationValue("watch-root", value)));
+            lines.AddRange(asset.WatchExtensions.Select(
+                value => EncodeConfigurationValue("watch-extension", value)));
+            lines.Add(EncodeConfigurationValue(
+                "regeneration-target",
+                asset.RegenerationTarget));
+            if (!string.IsNullOrEmpty(asset.DependencyManifestPath))
+            {
+                lines.Add(EncodeConfigurationValue(
+                    "dependency-manifest-path",
+                    asset.DependencyManifestPath));
+            }
+
+            lines.Add(EncodeConfigurationValue(
+                "static-web-asset-path",
+                asset.StaticWebAssetPath));
+            lines.Add(EncodeConfigurationValue(
+                "removal-behavior",
+                asset.RemovalBehavior));
+            lines.Add("asset-end");
+        }
+
+        File.WriteAllLines(
+            path,
+            lines,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static string EncodeConfigurationValue(string name, string value) =>
+        name + ":" + Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
+
+    private sealed record WorkerAsset(
+        string Identity,
+        IReadOnlyList<string> WatchFiles,
+        IReadOnlyList<string> WatchRoots,
+        IReadOnlyList<string> WatchExtensions,
+        string RegenerationTarget,
+        string DependencyManifestPath,
+        string StaticWebAssetPath,
+        string RemovalBehavior);
 
     private sealed class TestContext : IDisposable
     {
@@ -404,6 +689,26 @@ public sealed class CssHotReloadWorkerTests
 
         public string WorkerAssemblyPath { get; }
 
+        public string ExternalDirectoryPath => DirectoryPath + "-external";
+
+        public string GenericInputPath =>
+            Path.Combine(ExternalDirectoryPath, "input.utility");
+
+        public string DependencyManifestPath =>
+            Path.Combine(DirectoryPath, "obj", "dependencies.manifest");
+
+        public string FirstGeneratedAssetPath =>
+            Path.Combine(DirectoryPath, "obj", "first.generated.css");
+
+        public string SecondGeneratedAssetPath =>
+            Path.Combine(DirectoryPath, "obj", "second.generated.css");
+
+        public string ThirdGeneratedAssetPath =>
+            Path.Combine(DirectoryPath, "obj", "third.generated.css");
+
+        public string TargetInvocationLogPath =>
+            Path.Combine(DirectoryPath, "obj", "target-invocations.log");
+
         public static TestContext Create()
         {
             var repositoryDirectory = FindRepositoryDirectory();
@@ -420,6 +725,12 @@ public sealed class CssHotReloadWorkerTests
                 Path.GetTempPath(),
                 "viu-css-hot-reload-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directoryPath);
+            var externalDirectoryPath = directoryPath + "-external";
+            Directory.CreateDirectory(externalDirectoryPath);
+            var genericInputPath = Path.Combine(
+                externalDirectoryPath,
+                "input.utility");
+            File.WriteAllText(genericInputPath, "first utility value");
             var projectPath = Path.Combine(directoryPath, "Probe.proj");
             var indexPath = Path.Combine(directoryPath, "Index.html");
             var componentPath = Path.Combine(directoryPath, "App.vue");
@@ -465,6 +776,21 @@ public sealed class CssHotReloadWorkerTests
                 "    <ViuCssHotReloadEventLog>" +
                 EscapeAttribute(eventLogPath) +
                 "</ViuCssHotReloadEventLog>" + Environment.NewLine +
+                "    <GenericInputPath>" +
+                EscapeAttribute(genericInputPath) +
+                "</GenericInputPath>" + Environment.NewLine +
+                "    <FirstGeneratedAssetPath>" +
+                EscapeAttribute(Path.Combine(directoryPath, "obj", "first.generated.css")) +
+                "</FirstGeneratedAssetPath>" + Environment.NewLine +
+                "    <SecondGeneratedAssetPath>" +
+                EscapeAttribute(Path.Combine(directoryPath, "obj", "second.generated.css")) +
+                "</SecondGeneratedAssetPath>" + Environment.NewLine +
+                "    <ThirdGeneratedAssetPath>" +
+                EscapeAttribute(Path.Combine(directoryPath, "obj", "third.generated.css")) +
+                "</ThirdGeneratedAssetPath>" + Environment.NewLine +
+                "    <TargetInvocationLogPath>" +
+                EscapeAttribute(Path.Combine(directoryPath, "obj", "target-invocations.log")) +
+                "</TargetInvocationLogPath>" + Environment.NewLine +
                 "  </PropertyGroup>" + Environment.NewLine +
                 "  <ItemGroup>" + Environment.NewLine +
                 "    <ViuSingleFileComponent Include=\"App.vue\" />" + Environment.NewLine +
@@ -472,7 +798,27 @@ public sealed class CssHotReloadWorkerTests
                 "  <Target Name=\"ResolveStaticWebAssetsConfiguration\" />" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(componentTargetsPath) + "\" />" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(hotReloadTargetsPath) + "\" />" + Environment.NewLine +
-                "  <Target Name=\"ProbeWatch\" DependsOnTargets=\"_ViuCollectCssHotReloadWatchItems\">" + Environment.NewLine +
+                "  <Target Name=\"RegisterProbeGeneratedAsset\" BeforeTargets=\"ViuCollectGeneratedAssets\" Condition=\"'$(ProbeRegisterGeneratedAsset)' == 'true'\">" + Environment.NewLine +
+                "    <ItemGroup>" + Environment.NewLine +
+                "      <ViuGeneratedAsset Include=\"$(FirstGeneratedAssetPath)\">" + Environment.NewLine +
+                "        <WatchFiles>$(GenericInputPath)</WatchFiles>" + Environment.NewLine +
+                "        <RegenerationTarget>GenerateFirstAsset</RegenerationTarget>" + Environment.NewLine +
+                "        <StaticWebAssetPath>wwwroot/probe.generated.css</StaticWebAssetPath>" + Environment.NewLine +
+                "        <RemovalBehavior>Delete</RemovalBehavior>" + Environment.NewLine +
+                "      </ViuGeneratedAsset>" + Environment.NewLine +
+                "    </ItemGroup>" + Environment.NewLine +
+                "  </Target>" + Environment.NewLine +
+                "  <Target Name=\"GenerateFirstAsset\">" + Environment.NewLine +
+                "    <ReadLinesFromFile File=\"$(GenericInputPath)\"><Output TaskParameter=\"Lines\" ItemName=\"_GenericFirstLines\" /></ReadLinesFromFile>" + Environment.NewLine +
+                "    <WriteLinesToFile File=\"$(FirstGeneratedAssetPath)\" Lines=\"@(_GenericFirstLines)\" Overwrite=\"true\" WriteOnlyWhenDifferent=\"true\" />" + Environment.NewLine +
+                "    <WriteLinesToFile File=\"$(ThirdGeneratedAssetPath)\" Lines=\"@(_GenericFirstLines)\" Overwrite=\"true\" WriteOnlyWhenDifferent=\"true\" />" + Environment.NewLine +
+                "    <WriteLinesToFile File=\"$(TargetInvocationLogPath)\" Lines=\"first\" Overwrite=\"false\" />" + Environment.NewLine +
+                "  </Target>" + Environment.NewLine +
+                "  <Target Name=\"GenerateSecondAsset\">" + Environment.NewLine +
+                "    <WriteLinesToFile File=\"$(SecondGeneratedAssetPath)\" Lines=\"second\" Overwrite=\"true\" WriteOnlyWhenDifferent=\"true\" />" + Environment.NewLine +
+                "    <WriteLinesToFile File=\"$(TargetInvocationLogPath)\" Lines=\"second\" Overwrite=\"false\" />" + Environment.NewLine +
+                "  </Target>" + Environment.NewLine +
+                "  <Target Name=\"ProbeWatch\" DependsOnTargets=\"_ViuCollectGeneratedAssetHotReloadWatchItems\">" + Environment.NewLine +
                 "    <WriteLinesToFile File=\"$(ProbeOutput)\" Lines=\"@(Watch->'%(FullPath)|%(StaticWebAssetPath)')\" Overwrite=\"true\" />" + Environment.NewLine +
                 "  </Target>" + Environment.NewLine +
                 "</Project>" + Environment.NewLine;
@@ -497,6 +843,11 @@ public sealed class CssHotReloadWorkerTests
             if (Directory.Exists(DirectoryPath))
             {
                 Directory.Delete(DirectoryPath, recursive: true);
+            }
+
+            if (Directory.Exists(ExternalDirectoryPath))
+            {
+                Directory.Delete(ExternalDirectoryPath, recursive: true);
             }
         }
 

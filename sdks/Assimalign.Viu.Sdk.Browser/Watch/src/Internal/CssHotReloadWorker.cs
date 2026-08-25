@@ -20,11 +20,11 @@ internal sealed class CssHotReloadWorker
     private readonly ProcessIdentity ownerIdentity;
     private readonly CssHotReloadRegenerator regenerator;
     private readonly CssHotReloadEventLog eventLog;
-    private readonly HashSet<string> explicitWatchFiles;
     private readonly string[] excludedDirectories;
     private readonly object sourceSnapshotSynchronization = new object();
     private Dictionary<string, SourceFileStamp> sourceSnapshot =
         new Dictionary<string, SourceFileStamp>(PathComparer);
+    private WatchGraph watchGraph = WatchGraph.Empty;
     private int changeVersion;
 
     public CssHotReloadWorker(
@@ -35,9 +35,6 @@ internal sealed class CssHotReloadWorker
         this.ownerIdentity = ownerIdentity;
         eventLog = new CssHotReloadEventLog(options.EventLogPath);
         regenerator = new CssHotReloadRegenerator(options, eventLog);
-        explicitWatchFiles = options.ExplicitWatchFiles
-            .Select(Path.GetFullPath)
-            .ToHashSet(PathComparer);
         excludedDirectories = options.ExcludedDirectories
             .Select(EnsureTrailingDirectorySeparator)
             .Distinct(PathComparer)
@@ -51,16 +48,14 @@ internal sealed class CssHotReloadWorker
         using var watcher = CreateWatcher();
         UpdateSourceSnapshot();
         watcher.EnableRaisingEvents = true;
-        var processChangesTask = ProcessChangesAsync(
-            linkedCancellation.Token);
+        var processChangesTask = ProcessChangesAsync(linkedCancellation.Token);
         var monitorSourceSnapshotTask = MonitorSourceSnapshotAsync(
             linkedCancellation.Token);
         Task? monitorLifetimeTask = null;
         try
         {
             WriteStateFile();
-            monitorLifetimeTask = MonitorLifetimeAsync(
-                linkedCancellation.Token);
+            monitorLifetimeTask = MonitorLifetimeAsync(linkedCancellation.Token);
             await Task.WhenAny(
                 processChangesTask,
                 monitorSourceSnapshotTask,
@@ -116,15 +111,12 @@ internal sealed class CssHotReloadWorker
         return watcher;
     }
 
-    private async Task ProcessChangesAsync(
-        CancellationToken cancellationToken)
+    private async Task ProcessChangesAsync(CancellationToken cancellationToken)
     {
         var processedVersion = Volatile.Read(ref changeVersion);
         while (true)
         {
-            await Task.Delay(
-                options.DebounceMilliseconds,
-                cancellationToken);
+            await Task.Delay(options.DebounceMilliseconds, cancellationToken);
             var observedVersion = Volatile.Read(ref changeVersion);
             if (observedVersion == processedVersion)
             {
@@ -133,9 +125,7 @@ internal sealed class CssHotReloadWorker
 
             while (true)
             {
-                await Task.Delay(
-                    options.DebounceMilliseconds,
-                    cancellationToken);
+                await Task.Delay(options.DebounceMilliseconds, cancellationToken);
                 var currentVersion = Volatile.Read(ref changeVersion);
                 if (currentVersion == observedVersion)
                 {
@@ -146,17 +136,21 @@ internal sealed class CssHotReloadWorker
             }
 
             processedVersion = observedVersion;
+            UpdateSourceSnapshot();
             await regenerator.RegenerateAsync(cancellationToken);
+            // Give source writes racing the nested-build process boundary one bounded scheduling
+            // window before reconciliation. Later changes remain covered by snapshot monitoring.
+            await Task.Delay(
+                Math.Min(50, options.DebounceMilliseconds),
+                cancellationToken);
             QueueSourceSnapshotChange();
+            eventLog.Append("settled");
         }
     }
 
-    private async Task MonitorSourceSnapshotAsync(
-        CancellationToken cancellationToken)
+    private async Task MonitorSourceSnapshotAsync(CancellationToken cancellationToken)
     {
-        var interval = Math.Max(
-            250,
-            options.DebounceMilliseconds * 2);
+        var interval = Math.Max(250, options.DebounceMilliseconds * 2);
         while (true)
         {
             await Task.Delay(interval, cancellationToken);
@@ -174,8 +168,7 @@ internal sealed class CssHotReloadWorker
         }
     }
 
-    private async Task MonitorLifetimeAsync(
-        CancellationToken cancellationToken)
+    private async Task MonitorLifetimeAsync(CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -214,51 +207,117 @@ internal sealed class CssHotReloadWorker
             return false;
         }
 
-        if (excludedDirectories.Any(
-                directory => fullPath.StartsWith(directory, PathComparison)))
+        if (IsExcludedPath(fullPath))
         {
             return false;
         }
 
-        if (explicitWatchFiles.Contains(fullPath))
+        lock (sourceSnapshotSynchronization)
         {
-            return true;
-        }
+            if (watchGraph.Files.Contains(fullPath))
+            {
+                return true;
+            }
 
-        return options.WatchComponents && IsComponentFile(fullPath);
+            return watchGraph.Roots.Any(root => root.Matches(fullPath));
+        }
     }
 
-    private Dictionary<string, SourceFileStamp> CaptureSourceSnapshot()
+    private SourceCapture CaptureSourceSnapshot()
     {
+        var graph = CreateWatchGraph();
         var snapshot = new Dictionary<string, SourceFileStamp>(PathComparer);
-        if (options.WatchComponents)
-        {
-            CaptureComponentDirectory(
-                snapshot,
-                options.ProjectDirectory);
-        }
-
-        foreach (var file in explicitWatchFiles)
+        foreach (var file in graph.Files)
         {
             TryAddFileStamp(snapshot, file);
         }
 
-        return snapshot;
+        foreach (var root in graph.Roots)
+        {
+            CaptureRootDirectory(snapshot, root);
+        }
+
+        return new SourceCapture(graph, snapshot);
     }
 
-    private void CaptureComponentDirectory(
-        IDictionary<string, SourceFileStamp> snapshot,
-        string rootDirectory)
+    private WatchGraph CreateWatchGraph()
     {
-        TryAddDirectoryStamp(snapshot, rootDirectory);
-        if (!Directory.Exists(rootDirectory))
+        var files = new HashSet<string>(PathComparer);
+        var roots = new Dictionary<string, HashSet<string>>(PathComparer);
+        foreach (var asset in options.GeneratedAssets)
+        {
+            foreach (var file in asset.WatchFiles)
+            {
+                files.Add(Path.GetFullPath(file));
+            }
+
+            foreach (var root in asset.WatchRoots)
+            {
+                AddWatchRoot(roots, root, asset.WatchExtensions);
+            }
+
+            if (string.IsNullOrEmpty(asset.DependencyManifestPath))
+            {
+                continue;
+            }
+
+            files.Add(asset.DependencyManifestPath);
+            if (!GeneratedAssetDependencyManifest.TryRead(
+                    asset.DependencyManifestPath,
+                    out var manifest,
+                    out var error))
+            {
+                eventLog.Append(
+                    "manifest-error:" +
+                    Path.GetFileName(asset.DependencyManifestPath) +
+                    ":" + error);
+                continue;
+            }
+
+            foreach (var file in manifest.Files)
+            {
+                files.Add(file);
+            }
+
+            foreach (var root in manifest.Roots)
+            {
+                AddWatchRoot(roots, root, asset.WatchExtensions);
+            }
+        }
+
+        return new WatchGraph(
+            files,
+            roots.Select(entry => new WatchRoot(entry.Key, entry.Value)).ToArray());
+    }
+
+    private static void AddWatchRoot(
+        IDictionary<string, HashSet<string>> roots,
+        string path,
+        IEnumerable<string> extensions)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (!roots.TryGetValue(fullPath, out var existingExtensions))
+        {
+            existingExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            roots.Add(fullPath, existingExtensions);
+        }
+
+        existingExtensions.UnionWith(extensions);
+    }
+
+    private void CaptureRootDirectory(
+        IDictionary<string, SourceFileStamp> snapshot,
+        WatchRoot root)
+    {
+        TryAddDirectoryStamp(snapshot, root.Path);
+        if (!Directory.Exists(root.Path))
         {
             return;
         }
 
         var pendingDirectories = new Stack<string>();
         var visitedDirectories = new HashSet<string>(PathComparer);
-        pendingDirectories.Push(rootDirectory);
+        pendingDirectories.Push(root.Path);
         while (pendingDirectories.Count > 0)
         {
             var directory = Path.GetFullPath(pendingDirectories.Pop());
@@ -292,7 +351,7 @@ internal sealed class CssHotReloadWorker
 
             foreach (var file in files)
             {
-                if (IsComponentFile(file))
+                if (root.AcceptsExtension(Path.GetExtension(file)))
                 {
                     TryAddFileStamp(snapshot, file);
                 }
@@ -304,13 +363,14 @@ internal sealed class CssHotReloadWorker
     {
         lock (sourceSnapshotSynchronization)
         {
-            var currentSnapshot = CaptureSourceSnapshot();
-            if (SnapshotsEqual(sourceSnapshot, currentSnapshot))
+            var currentCapture = CaptureSourceSnapshot();
+            watchGraph = currentCapture.Graph;
+            if (SnapshotsEqual(sourceSnapshot, currentCapture.Snapshot))
             {
                 return false;
             }
 
-            sourceSnapshot = currentSnapshot;
+            sourceSnapshot = currentCapture.Snapshot;
             return true;
         }
     }
@@ -319,7 +379,9 @@ internal sealed class CssHotReloadWorker
     {
         lock (sourceSnapshotSynchronization)
         {
-            sourceSnapshot = CaptureSourceSnapshot();
+            var capture = CaptureSourceSnapshot();
+            watchGraph = capture.Graph;
+            sourceSnapshot = capture.Snapshot;
         }
     }
 
@@ -334,19 +396,12 @@ internal sealed class CssHotReloadWorker
         eventLog.Append("snapshot-change");
     }
 
-    private static bool IsComponentFile(string path)
-    {
-        var extension = Path.GetExtension(path);
-        return extension.Equals(".viu", StringComparison.OrdinalIgnoreCase) ||
-            extension.Equals(".vue", StringComparison.OrdinalIgnoreCase);
-    }
+    private bool IsExcludedDirectory(string path) =>
+        IsExcludedPath(EnsureTrailingDirectorySeparator(path));
 
-    private bool IsExcludedDirectory(string path)
-    {
-        var directory = EnsureTrailingDirectorySeparator(path);
-        return excludedDirectories.Any(
-            excluded => directory.StartsWith(excluded, PathComparison));
-    }
+    private bool IsExcludedPath(string path) =>
+        excludedDirectories.Any(
+            excluded => path.StartsWith(excluded, PathComparison));
 
     private static bool IsReparsePoint(string path)
     {
@@ -389,12 +444,9 @@ internal sealed class CssHotReloadWorker
         try
         {
             var information = new DirectoryInfo(path);
-            if (information.Exists)
-            {
-                snapshot[Path.GetFullPath(path)] = new SourceFileStamp(
-                    0,
-                    information.LastWriteTimeUtc.Ticks);
-            }
+            snapshot[Path.GetFullPath(path)] = new SourceFileStamp(
+                -1,
+                information.Exists ? 1 : 0);
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
@@ -508,4 +560,57 @@ internal sealed class CssHotReloadWorker
         long Length,
         long LastWriteTimeUtcTicks);
 
+    private sealed class SourceCapture
+    {
+        public SourceCapture(
+            WatchGraph graph,
+            Dictionary<string, SourceFileStamp> snapshot)
+        {
+            Graph = graph;
+            Snapshot = snapshot;
+        }
+
+        public WatchGraph Graph { get; }
+
+        public Dictionary<string, SourceFileStamp> Snapshot { get; }
+    }
+
+    private sealed class WatchGraph
+    {
+        public static readonly WatchGraph Empty = new WatchGraph(
+            new HashSet<string>(PathComparer),
+            Array.Empty<WatchRoot>());
+
+        public WatchGraph(HashSet<string> files, IReadOnlyList<WatchRoot> roots)
+        {
+            Files = files;
+            Roots = roots;
+        }
+
+        public HashSet<string> Files { get; }
+
+        public IReadOnlyList<WatchRoot> Roots { get; }
+    }
+
+    private sealed class WatchRoot
+    {
+        private readonly HashSet<string> extensions;
+        private readonly string pathWithSeparator;
+
+        public WatchRoot(string path, IEnumerable<string> extensions)
+        {
+            Path = System.IO.Path.GetFullPath(path);
+            pathWithSeparator = EnsureTrailingDirectorySeparator(Path);
+            this.extensions = extensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public string Path { get; }
+
+        public bool Matches(string filePath) =>
+            filePath.StartsWith(pathWithSeparator, PathComparison) &&
+            AcceptsExtension(System.IO.Path.GetExtension(filePath));
+
+        public bool AcceptsExtension(string extension) =>
+            extensions.Contains(extension);
+    }
 }

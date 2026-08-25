@@ -21,6 +21,8 @@ Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.EventLogPath.get -> 
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.EventLogPath.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.ExcludedDirectories.get -> Microsoft.Build.Framework.ITaskItem![]!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.ExcludedDirectories.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.GeneratedAssets.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.GeneratedAssets.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.ProjectDirectory.get -> string!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.ProjectDirectory.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.ProjectPath.get -> string!
@@ -32,10 +34,6 @@ Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.StateFilePath.set ->
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.TargetFramework.get -> string!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.TargetFramework.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.ViuStartCssHotReloadWorker() -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchComponents.get -> bool
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchComponents.set -> void
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchFiles.get -> Microsoft.Build.Framework.ITaskItem![]!
-Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WatchFiles.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WorkerAssemblyPath.get -> string!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker.WorkerAssemblyPath.set -> void
 override Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.Execute() -> bool

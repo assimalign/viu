@@ -10,8 +10,15 @@
     <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
     <ViuCssHotReloadDebounceMilliseconds>75</ViuCssHotReloadDebounceMilliseconds>
     <ViuCssHotReloadEventLog>$(BaseIntermediateOutputPath)viu/css-hot-reload/events.log</ViuCssHotReloadEventLog>
+    <!-- [V01.01.12.30.04], #355: keep this package-boundary watch fixture's utility source set exact. -->
+    <ViuUtilityCssAutomaticSourceDiscovery>false</ViuUtilityCssAutomaticSourceDiscovery>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Assimalign.Viu.UtilityCss.Build"
+                      Version="$(ViuConsumerVersion)"
+                      PrivateAssets="all" />
+    <ViuUtilityCssSource Include="HotReloadPage.vue" />
+    <ViuUtilityCssSource Include="UtilityCandidate.html" />
     <StaticWebAssetFingerprintPattern Include="JS"
                                       Pattern="*.js"
                                       Expression="#[.{fingerprint}]!" />

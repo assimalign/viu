@@ -201,6 +201,24 @@ internal sealed class EndToEndHarness
             browserErrors,
             requestFailures,
             connectedPage => RunScriptSignatureRestartScenarioAsync(connectedPage, session));
+        // [V01.01.12.30.04], #355: run generated-asset creation and retirement after the
+        // existing rude-edit restart so all pre-existing scenarios retain their exact sequence.
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
+            BrowserEngine.Chromium,
+            "packaged-vue-watch-utility-css-new-class",
+            browserErrors,
+            requestFailures,
+            connectedPage => RunUtilityCssNewClassScenarioAsync(connectedPage, session));
+        await RunConnectedHotReloadScenarioAsync(
+            context,
+            page,
+            BrowserEngine.Chromium,
+            "packaged-vue-watch-utility-css-last-source-removal",
+            browserErrors,
+            requestFailures,
+            connectedPage => RunUtilityCssLastSourceRemovalScenarioAsync(connectedPage, session));
         await session.StopAsync();
     }
 
@@ -565,6 +583,165 @@ internal sealed class EndToEndHarness
         session.RequireRunning();
     }
 
+    private static async Task RunUtilityCssNewClassScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v2");
+        await RequireStylesheetRulesAsync(
+            page,
+            ".utilities.css",
+            minimumRuleCount: 1);
+        await RequireClassTokenAsync(page, "utility-probe", "hidden");
+        await RequireComputedDisplayAsync(page, "utility-probe", "none");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "1");
+
+        string documentToken = await SetDocumentTokenAsync(page);
+        await RequireDocumentTokenAsync(page, documentToken);
+        HotReloadProcessSnapshot snapshot = CaptureHotReloadProcessSnapshot(session);
+        byte[] originalBundleContent = await File.ReadAllBytesAsync(
+            session.UtilityBundlePath);
+        Require(
+            !Encoding.UTF8.GetString(originalBundleContent).Contains(
+                "opacity: 0.5;",
+                StringComparison.Ordinal),
+            "The utility bundle already contained the new opacity utility before the edit.");
+        string stylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".utilities.css");
+        Require(
+            !string.IsNullOrEmpty(stylesheetAddress),
+            "The initial utility stylesheet link has no address.");
+        int staticAssetUpdateCount = session.CountOutputLinesContaining(
+            StaticAssetHotReloadCompletionMessage);
+        int completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "<span data-testid=\"utility-style-probe\">",
+            "<span class=\"opacity-50\" data-testid=\"utility-style-probe\">");
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            snapshot,
+            "the new utility class to apply as a managed template delta");
+        await WaitForStaticAssetCompletionAsync(
+            session,
+            staticAssetUpdateCount + 1,
+            "the regenerated utility bundle to reach the browser");
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".utilities.css",
+            stylesheetAddress);
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "0.5");
+        await RequireComputedDisplayAsync(page, "utility-probe", "none");
+
+        byte[] changedBundleContent = await File.ReadAllBytesAsync(
+            session.UtilityBundlePath);
+        Require(
+            !originalBundleContent.SequenceEqual(changedBundleContent),
+            "Adding a new utility class did not rewrite the generated bundle.");
+        Require(
+            Encoding.UTF8.GetString(changedBundleContent).Contains(
+                "opacity: 0.5;",
+                StringComparison.Ordinal),
+            "The regenerated utility bundle does not contain the new opacity declaration.");
+        await RequireDocumentTokenAsync(page, documentToken);
+        session.RequireRunning();
+    }
+
+    private static async Task RunUtilityCssLastSourceRemovalScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "0.5");
+        string documentToken = await SetDocumentTokenAsync(page);
+        await RequireDocumentTokenAsync(page, documentToken);
+
+        HotReloadProcessSnapshot templateSnapshot = CaptureHotReloadProcessSnapshot(session);
+        int staticAssetUpdateCount = session.CountOutputLinesContaining(
+            StaticAssetHotReloadCompletionMessage);
+        int completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "<span class=\"opacity-50\" data-testid=\"utility-style-probe\">",
+            "<span data-testid=\"utility-style-probe\">");
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await RequireAcceptedManagedDeltaAsync(
+            session,
+            templateSnapshot,
+            "the utility-class removal to apply as a managed template delta");
+        await WaitForStaticAssetCompletionAsync(
+            session,
+            staticAssetUpdateCount + 1,
+            "the utility-class removal to reach the browser");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "1");
+        await RequireComputedDisplayAsync(page, "utility-probe", "none");
+        await RequireStylesheetRulesAsync(
+            page,
+            ".utilities.css",
+            minimumRuleCount: 1);
+        await RequireDocumentTokenAsync(page, documentToken);
+
+        await page.Locator("[data-testid='hot-increment']").ClickAsync();
+        await RequireTextAsync(page, "hot-count", "3");
+        HotReloadProcessSnapshot removalSnapshot = CaptureHotReloadProcessSnapshot(session);
+        string stylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".utilities.css");
+        staticAssetUpdateCount = session.CountOutputLinesContaining(
+            StaticAssetHotReloadCompletionMessage);
+        completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+
+        File.Delete(session.UtilityCandidateSourcePath);
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await WaitUntilAsync(
+            () => Task.FromResult(
+                File.Exists(session.UtilityBundlePath)
+                && new FileInfo(session.UtilityBundlePath).Length == 0),
+            "the last utility source removal to preserve an empty hot-reload transport asset",
+            HotReloadAssertionTimeout);
+        await WaitForStaticAssetCompletionAsync(
+            session,
+            staticAssetUpdateCount + 1,
+            "the retired utility bundle to reach the browser");
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".utilities.css",
+            stylesheetAddress);
+        await RequireStylesheetRulesAsync(
+            page,
+            ".utilities.css",
+            minimumRuleCount: 0,
+            exactRuleCount: 0);
+        await RequireClassTokenAsync(page, "utility-probe", "hidden");
+        await RequireComputedDisplayAsync(page, "utility-probe", "block");
+        await Task.Delay(HotReloadNoOperationObservationWindow);
+        RequireStaticAssetOnlyUpdate(
+            session,
+            removalSnapshot,
+            "The last utility source removal");
+        await RequireTextAsync(page, "hot-count", "3");
+        await RequireDocumentTokenAsync(page, documentToken);
+        session.RequireRunning();
+    }
+
     private static async Task NavigateHotReloadAsync(
         IPage page,
         HotReloadWatchSession session)
@@ -639,6 +816,37 @@ internal sealed class EndToEndHarness
         session.RequireRunning();
     }
 
+    private static void RequireStaticAssetOnlyUpdate(
+        HotReloadWatchSession session,
+        HotReloadProcessSnapshot snapshot,
+        string description)
+    {
+        Require(
+            session.CountOutputLinesContaining(ManagedHotReloadCompletionMessage)
+                == snapshot.ManagedCompletionCount,
+            $"{description} triggered a managed hot-reload update.");
+        Require(
+            CountEditAndContinueDiagnostics(session)
+                == snapshot.EditAndContinueDiagnosticCount,
+            $"{description} produced an Edit and Continue diagnostic.");
+        Require(
+            session.CountOutputLinesContaining(
+                "Restart is needed to apply the changes.") == snapshot.RestartCount,
+            $"{description} requested an application restart.");
+        Require(
+            session.CountOutputLinesContaining("App url: http://")
+                == snapshot.ApplicationStartCount,
+            $"{description} restarted the application host.");
+        Require(
+            session.CountOutputLinesContaining("Now listening on:")
+                == snapshot.ReadinessCount,
+            $"{description} restarted the packaged Browser run host.");
+        Require(
+            session.CountOutputLinesContaining("Reloading browser.")
+                == snapshot.BrowserReloadCount,
+            $"{description} reloaded the browser document.");
+    }
+
     private static int CountEditAndContinueDiagnostics(HotReloadWatchSession session) =>
         session.CountOutputLinesContaining("warning ENC")
         + session.CountOutputLinesContaining("error ENC");
@@ -690,6 +898,23 @@ internal sealed class EndToEndHarness
             HotReloadAssertionTimeout);
     }
 
+    private static async Task WaitForStaticAssetCompletionAsync(
+        HotReloadWatchSession session,
+        int expectedCount,
+        string description)
+    {
+        await WaitUntilAsync(
+            () =>
+            {
+                session.RequireRunning();
+                return Task.FromResult(
+                    session.CountOutputLinesContaining(
+                        StaticAssetHotReloadCompletionMessage) >= expectedCount);
+            },
+            description,
+            HotReloadAssertionTimeout);
+    }
+
     private static int ReadCssCompletionCount(string path)
     {
         try
@@ -720,6 +945,41 @@ internal sealed class EndToEndHarness
                 expected,
                 StringComparison.Ordinal),
             $"'{testIdentifier}' display to become '{expected}'",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task RequireClassTokenAsync(
+        IPage page,
+        string testIdentifier,
+        string expectedToken)
+    {
+        await WaitUntilAsync(
+            async () => await page
+                .Locator($"[data-testid='{testIdentifier}']")
+                .EvaluateAsync<bool>(
+                    "(element, token) => element.classList.contains(token)",
+                    expectedToken),
+            $"'{testIdentifier}' to retain the '{expectedToken}' class token",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task RequireComputedStylePropertyAsync(
+        IPage page,
+        string testIdentifier,
+        string propertyName,
+        string expected)
+    {
+        await WaitUntilAsync(
+            async () => string.Equals(
+                await page
+                    .Locator($"[data-testid='{testIdentifier}']")
+                    .EvaluateAsync<string>(
+                        "(element, name) => getComputedStyle(element)"
+                        + ".getPropertyValue(name).trim()",
+                        propertyName),
+                expected,
+                StringComparison.Ordinal),
+            $"'{testIdentifier}' computed {propertyName} to become '{expected}'",
             HotReloadAssertionTimeout);
     }
 
@@ -754,6 +1014,25 @@ internal sealed class EndToEndHarness
             "suffix => [...document.querySelectorAll('link[rel=stylesheet]')]"
             + ".find(candidate => candidate.href.includes(suffix))?.href ?? ''",
             suffix);
+    }
+
+    private static async Task RequireStylesheetAddressChangedAsync(
+        IPage page,
+        string suffix,
+        string previousAddress)
+    {
+        await WaitUntilAsync(
+            async () =>
+            {
+                string currentAddress = await ReadStylesheetAddressAsync(page, suffix);
+                return !string.IsNullOrEmpty(currentAddress)
+                    && !string.Equals(
+                        currentAddress,
+                        previousAddress,
+                        StringComparison.Ordinal);
+            },
+            $"the {suffix} stylesheet link to be replaced",
+            HotReloadAssertionTimeout);
     }
 
     private static async Task RequireDocumentTokenAsync(
