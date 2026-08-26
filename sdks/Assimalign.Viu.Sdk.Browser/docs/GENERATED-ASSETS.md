@@ -73,8 +73,13 @@ Visual Studio instead gives the packaged RunHost its BrowserRefresh websocket en
 key. RunHost consumes the ordinary-build configuration, starts the worker only when no live
 watch-owned worker exists, and bridges the SDK-injected page client through a loopback websocket to
 Visual Studio. Worker-generated updates use the same stable `StaticWebAssetPath` to originate a
-targeted `UpdateStaticFile` message on that local connection. The project-scoped state file and named
-mutex keep both hosts mutually exclusive. Specified by [V01.01.12.30.05], issue #357.
+targeted `UpdateStaticFile` message on that local connection. RunHost also retains every configured or
+reported `.css` route and sends its current update message to each new browser connection, so reloads,
+reconnects, and multiple tabs converge even when regeneration completed with no connected client.
+Non-CSS routes are not replayed on connection because the stock BrowserRefresh client interprets
+their `UpdateStaticFile` message as a document reload rather than an idempotent asset refetch. The
+project-scoped state file and named mutex keep both hosts mutually exclusive. Specified by
+[V01.01.12.30.05], issue #357.
 
 ## Regeneration guarantees
 

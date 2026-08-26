@@ -21,19 +21,23 @@ namespace Assimalign.Viu.Testing.EndToEnd;
 
 // [V01.01.12.30.05], #357: this is the Visual Studio side of the simulated
 // BrowserRefresh topology. The real browser connects to the RunHost's downstream endpoint;
-// this server accepts only the RunHost's authenticated upstream connection.
+// this server accepts the RunHost's authenticated upstream connections.
 internal sealed class VisualStudioBrowserRefreshStubServer : IAsyncDisposable
 {
     private static readonly TimeSpan ProtocolTimeout = TimeSpan.FromSeconds(30);
     private readonly WebApplication _application;
+    private readonly ConcurrentDictionary<long, WebSocket> _connections = [];
+    private readonly object _connectionCountSynchronization = new();
     private readonly CancellationTokenSource _stopping = new();
     private readonly RSA _serverKey;
-    private readonly TaskCompletionSource<WebSocket> _connection = new(
-        TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentQueue<string> _receivedMessages = [];
     private readonly SemaphoreSlim _receivedMessageAvailable = new(0);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
-    private Task? _receiveLoop;
+    private TaskCompletionSource _connectionCountChanged = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _acceptedConnectionCount;
+    private int _disposed;
+    private long _lastConnectionIdentifier;
 
     private VisualStudioBrowserRefreshStubServer(
         WebApplication application,
@@ -47,6 +51,9 @@ internal sealed class VisualStudioBrowserRefreshStubServer : IAsyncDisposable
     }
 
     internal Uri Address { get; }
+
+    internal int AcceptedConnectionCount => Volatile.Read(
+        ref _acceptedConnectionCount);
 
     internal string PublicKey { get; }
 
@@ -102,24 +109,83 @@ internal sealed class VisualStudioBrowserRefreshStubServer : IAsyncDisposable
         }
     }
 
-    internal async Task WaitForAuthenticatedConnectionAsync()
+    internal Task WaitForAuthenticatedConnectionAsync()
+        => WaitForAuthenticatedConnectionCountAsync(1);
+
+    internal async Task WaitForAuthenticatedConnectionCountAsync(
+        int expectedCount)
     {
-        _ = await _connection.Task.WaitAsync(ProtocolTimeout);
+        ArgumentOutOfRangeException.ThrowIfLessThan(expectedCount, 1);
+        DateTime deadline = DateTime.UtcNow + ProtocolTimeout;
+        while (true)
+        {
+            Task connectionCountChanged;
+            lock (_connectionCountSynchronization)
+            {
+                if (_acceptedConnectionCount >= expectedCount)
+                {
+                    return;
+                }
+
+                connectionCountChanged = _connectionCountChanged.Task;
+            }
+
+            TimeSpan remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+
+            try
+            {
+                await connectionCountChanged.WaitAsync(
+                    remaining,
+                    _stopping.Token);
+            }
+            catch (TimeoutException)
+            {
+                break;
+            }
+        }
+
+        throw new TimeoutException(
+            $"Timed out waiting for {expectedCount} authenticated Visual Studio "
+            + "BrowserRefresh bridge connections.");
     }
 
     internal async Task SendAsync(string message)
     {
         ArgumentException.ThrowIfNullOrEmpty(message);
-        WebSocket connection = await _connection.Task.WaitAsync(ProtocolTimeout);
+        await WaitForAuthenticatedConnectionAsync();
         byte[] content = Encoding.UTF8.GetBytes(message);
         await _sendLock.WaitAsync(_stopping.Token);
         try
         {
-            await connection.SendAsync(
-                content,
-                WebSocketMessageType.Text,
-                endOfMessage: true,
-                _stopping.Token);
+            foreach ((long connectionIdentifier, WebSocket connection) in
+                _connections.ToArray())
+            {
+                if (connection.State != WebSocketState.Open)
+                {
+                    RemoveAndDisposeConnection(connectionIdentifier);
+                    continue;
+                }
+
+                try
+                {
+                    await connection.SendAsync(
+                        content,
+                        WebSocketMessageType.Text,
+                        endOfMessage: true,
+                        _stopping.Token);
+                }
+                catch (Exception exception) when (
+                    exception is InvalidOperationException
+                        or ObjectDisposedException
+                        or WebSocketException)
+                {
+                    RemoveAndDisposeConnection(connectionIdentifier);
+                }
+            }
         }
         finally
         {
@@ -157,38 +223,52 @@ internal sealed class VisualStudioBrowserRefreshStubServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _stopping.Cancel();
-        if (_connection.Task.IsCompletedSuccessfully)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
-            WebSocket connection = await _connection.Task;
-            try
+            return;
+        }
+
+        _stopping.Cancel();
+        await _sendLock.WaitAsync();
+        try
+        {
+            foreach (WebSocket connection in _connections.Values)
             {
-                if (connection.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                try
                 {
-                    await connection.CloseOutputAsync(
-                        WebSocketCloseStatus.NormalClosure,
-                        "Harness shutdown",
-                        CancellationToken.None);
+                    if (connection.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                    {
+                        await connection.CloseOutputAsync(
+                            WebSocketCloseStatus.NormalClosure,
+                            "Harness shutdown",
+                            CancellationToken.None);
+                    }
+                }
+                catch (Exception exception) when (
+                    exception is InvalidOperationException
+                        or ObjectDisposedException
+                        or WebSocketException)
+                {
                 }
             }
-            catch (WebSocketException)
-            {
-            }
+        }
+        finally
+        {
+            _sendLock.Release();
         }
 
         await _application.StopAsync();
-        if (_receiveLoop is not null)
+        await _sendLock.WaitAsync();
+        try
         {
-            try
+            foreach (long connectionIdentifier in _connections.Keys.ToArray())
             {
-                await _receiveLoop;
+                RemoveAndDisposeConnection(connectionIdentifier);
             }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (WebSocketException)
-            {
-            }
+        }
+        finally
+        {
+            _sendLock.Release();
         }
 
         await _application.DisposeAsync();
@@ -209,9 +289,6 @@ internal sealed class VisualStudioBrowserRefreshStubServer : IAsyncDisposable
         string[] protocols = context.WebSockets.WebSocketRequestedProtocols.ToArray();
         if (protocols.Length != 1)
         {
-            _connection.TrySetException(
-                new InvalidOperationException(
-                    "The RunHost BrowserRefresh client did not supply exactly one encrypted-secret protocol."));
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
         }
@@ -233,26 +310,85 @@ internal sealed class VisualStudioBrowserRefreshStubServer : IAsyncDisposable
         catch (Exception exception) when (
             exception is FormatException or CryptographicException)
         {
-            _connection.TrySetException(
-                new InvalidOperationException(
-                    "The RunHost BrowserRefresh client supplied an invalid encrypted secret.",
-                    exception));
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
         }
 
         WebSocket connection = await context.WebSockets.AcceptWebSocketAsync(protocol);
-        if (!_connection.TrySetResult(connection))
+        long connectionIdentifier = Interlocked.Increment(
+            ref _lastConnectionIdentifier);
+        try
         {
-            await connection.CloseAsync(
-                WebSocketCloseStatus.PolicyViolation,
-                "Only one upstream connection is accepted.",
-                context.RequestAborted);
-            return;
+            await _sendLock.WaitAsync(_stopping.Token);
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
         }
 
-        _receiveLoop = ReceiveLoopAsync(connection, _stopping.Token);
-        await _receiveLoop;
+        try
+        {
+            if (!_connections.TryAdd(connectionIdentifier, connection))
+            {
+                connection.Dispose();
+                throw new InvalidOperationException(
+                    "The Visual Studio BrowserRefresh stub could not register an authenticated connection.");
+            }
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
+
+        RecordAcceptedConnection();
+        try
+        {
+            await ReceiveLoopAsync(connection, _stopping.Token);
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException
+                or ObjectDisposedException
+                or OperationCanceledException
+                or WebSocketException)
+        {
+        }
+        finally
+        {
+            await _sendLock.WaitAsync();
+            try
+            {
+                RemoveAndDisposeConnection(connectionIdentifier);
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+        }
+    }
+
+    private void RecordAcceptedConnection()
+    {
+        TaskCompletionSource connectionCountChanged;
+        lock (_connectionCountSynchronization)
+        {
+            _acceptedConnectionCount++;
+            connectionCountChanged = _connectionCountChanged;
+            _connectionCountChanged = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        connectionCountChanged.TrySetResult();
+    }
+
+    private void RemoveAndDisposeConnection(long connectionIdentifier)
+    {
+        if (_connections.TryRemove(
+                connectionIdentifier,
+                out WebSocket? removedConnection))
+        {
+            removedConnection.Dispose();
+        }
     }
 
     private async Task ReceiveLoopAsync(

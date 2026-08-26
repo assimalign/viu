@@ -134,22 +134,30 @@ application child receives that local endpoint ahead of the original endpoint fa
 Visual Studio's public key. The SDK-injected BrowserRefresh client therefore keeps
 receiving Visual Studio's managed messages and returning their responses through the bidirectional
 bridge. RunHost can also send the client's existing targeted `UpdateStaticFile` message locally when
-the worker regenerates a registered stylesheet. Component `<style>` edits and utility-source edits
-then replace their linked stylesheets without reloading the document under either F5 or Ctrl+F5.
+the worker regenerates a registered stylesheet. Each page or tab also receives one idempotent
+`UpdateStaticFile` for every managed CSS route when its BrowserRefresh connection opens. A worker
+completion during a reload or other no-client window is therefore not lost: the next connection
+cache-busts the current stylesheet state. Component `<style>` edits and utility-source edits replace
+their linked stylesheets in place unless Visual Studio independently sends a browser-navigation
+message; after that navigation, connection synchronization converges the replacement document.
 Specified by [V01.01.12.30.05], issue #357.
 
-The 2026-08-26 DTE-driven [V01.01.12.30.05] control built the isolated package consumer and
-confirmed, across repeated F5 launches, that the application could start, RunHost created the
-generated-asset worker state, and a separately connected Chromium page received the SDK-injected
-BrowserRefresh script. The final stylesheet-edit control was blocked before navigation by the same
-machine-local JavaScript-adapter failure recorded for [V01.01.12.32]: the adapter queried its private
-Edge debug port at `http://[::1]:63859/json/version`, received HTTP 503 (`This operation was
-aborted.`), and reported that no debuggable target was available. The owner-verification step remains
-exactly: **one F5 delta confirmation on an installation without the JS-adapter fault (any teammate
-machine)**. In that control, save one `.viu` edit that changes a component `<style>` rule and adds a
-utility class, then confirm both linked stylesheets change without replacing the document. The
-automated Visual Studio-shaped Chromium scenario below covers that complete protocol and browser
-behavior independently of the faulty Visual Studio browser launcher.
+The 2026-08-26 owner control on the published beta.9 package reached this path in a real Visual Studio
+F5 session. Saving one `.viu` edit caused an immediate full document refresh; the RunHost-owned worker
+and bridge remained alive, regenerated both CSS bundles correctly several seconds later, and emitted
+their one-shot update, but the replacement page retained its stale stylesheet. An external file write
+in the same live session regenerated and replaced both stylesheets without a document refresh. This
+isolated the defect to delivery across the Visual Studio-triggered reload, rather than worker
+ownership, source detection, regeneration, or the BrowserRefresh CSS client.
+
+RunHost now records completed upstream relay frames as connection identifier plus JSON message type,
+and includes the path only for messages that carry one; it never logs managed-update payloads or
+secrets. The bridge still forwards `Reload`, `RefreshBrowser`, managed-delta, diagnostic, and unknown
+messages unchanged. It does not suppress a `Reload` while CSS regeneration is pending because the
+same `.viu` save can contain a template, script, or rude edit whose fallback genuinely requires that
+navigation. The automated Visual Studio-shaped race below sends an exact upstream `Reload`, proves
+the stock client begins document navigation before regeneration completes, and verifies reconnect
+synchronization against deliberately stale CSS.
 
 The project-scoped worker state and mutex remain the ownership boundary. RunHost starts a worker only
 when no live watch-owned worker exists, so a `dotnet watch` process retains today's flow even though
@@ -157,7 +165,10 @@ it also runs the packaged RunHost. Conversely, direct `dotnet run` without Visua
 BrowserRefresh environment remains a readiness-only RunHost session and does not start the worker.
 The descriptor set comes from the Debug build that launched the session; after changing project
 registration or provider configuration, rebuild and restart so RunHost consumes the new descriptor
-set. A connected page and its injected BrowserRefresh client are required for visible updates.
+set. A page still needs its injected BrowserRefresh client for visible live updates, but it no longer
+needs to be connected at the instant regeneration completes. Connect synchronization is limited to
+`.css` routes because the stock BrowserRefresh protocol treats `UpdateStaticFile` for other extensions
+as a document reload; replaying a generic non-CSS route on every connection would create a loop.
 
 ## Update decisions
 
@@ -239,7 +250,10 @@ performs an ordinary Debug build, launches the packaged RunHost with a protocol-
 Studio-shaped BrowserRefresh endpoint, and connects a real Chromium page to RunHost's rewritten
 loopback endpoint. The upstream stub verifies the encrypted-secret handshake and a bidirectional
 capability request, while the page verifies targeted component and utility `UpdateStaticFile`
-messages from one `.viu` edit, both stylesheet replacements, and retained document identity. The
+messages from one `.viu` edit, both stylesheet replacements, and retained document identity. A second
+scenario sends an upstream `Reload` immediately after another edit, serves stale CSS to the replacement
+document, withholds its BrowserRefresh client until regeneration completes, and then requires both
+connect-time updates and fresh computed styles without manual action. The
 stubbed launch supplies the same hosting-startup assembly, startup hook, virtual directory,
 websocket endpoint, public key, and modifiable-assembly values that cause the stock client to be
 injected in a Visual Studio session. The

@@ -263,6 +263,14 @@ internal sealed class EndToEndHarness
                     page,
                     session,
                     refreshServer));
+            await RunScenarioAsync(
+                browser,
+                BrowserEngine.Chromium,
+                "packaged-vue-run-host-visual-studio-generated-assets-reload-race",
+                page => RunVisualStudioGeneratedAssetReloadRaceScenarioAsync(
+                    page,
+                    session,
+                    refreshServer));
         }
         finally
         {
@@ -284,37 +292,7 @@ internal sealed class EndToEndHarness
         VisualStudioHotReloadSession session,
         VisualStudioBrowserRefreshStubServer refreshServer)
     {
-        await page.AddInitScriptAsync(
-            """
-            (() => {
-                const NativeWebSocket = globalThis.WebSocket;
-                globalThis.__viuBrowserRefreshProbe = {
-                    connections: [],
-                    messages: []
-                };
-                globalThis.WebSocket = new Proxy(NativeWebSocket, {
-                    construct(target, argumentsList) {
-                        const socket = Reflect.construct(target, argumentsList, target);
-                        const protocols = argumentsList.length < 2
-                            ? []
-                            : Array.isArray(argumentsList[1])
-                                ? [...argumentsList[1]]
-                                : [String(argumentsList[1])];
-                        globalThis.__viuBrowserRefreshProbe.connections.push({
-                            url: String(argumentsList[0]),
-                            protocols,
-                            socket
-                        });
-                        socket.addEventListener('message', event => {
-                            if (typeof event.data === 'string') {
-                                globalThis.__viuBrowserRefreshProbe.messages.push(event.data);
-                            }
-                        });
-                        return socket;
-                    }
-                });
-            })();
-            """);
+        await InstallBrowserRefreshProbeAsync(page);
         await NavigateAsync(page, session.Address.AbsoluteUri);
         await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
         await WaitUntilAsync(
@@ -364,8 +342,10 @@ internal sealed class EndToEndHarness
         string capabilityResponse = await refreshServer.WaitForReceivedMessageAsync(
             message => !string.IsNullOrWhiteSpace(message));
         Require(
-            !string.IsNullOrWhiteSpace(capabilityResponse),
-            "The RunHost did not relay the browser's capability response upstream.");
+            !string.IsNullOrWhiteSpace(capabilityResponse)
+                && !capabilityResponse.StartsWith("!", StringComparison.Ordinal),
+            "The RunHost did not relay a successful browser capability response upstream: "
+            + capabilityResponse);
 
         await RequireStylesheetRulesAsync(page, ".viu.css", minimumRuleCount: 1);
         await RequireStylesheetRulesAsync(page, ".utilities.css", minimumRuleCount: 1);
@@ -457,6 +437,237 @@ internal sealed class EndToEndHarness
         await RequireDocumentTokenAsync(page, documentToken);
         session.RequireRunning();
     }
+
+    // [V01.01.12.30.05], #357: hold the replacement document's BrowserRefresh client until
+    // regeneration completes so the worker reports into a real no-client window. The replacement
+    // document receives deliberately stale CSS first; connect synchronization must then converge it.
+    private static async Task RunVisualStudioGeneratedAssetReloadRaceScenarioAsync(
+        IPage page,
+        VisualStudioHotReloadSession session,
+        VisualStudioBrowserRefreshStubServer refreshServer)
+    {
+        await InstallBrowserRefreshProbeAsync(page);
+        int acceptedConnectionCount = refreshServer.AcceptedConnectionCount;
+        await NavigateAsync(page, session.Address.AbsoluteUri);
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await WaitUntilAsync(
+            async () => await page.EvaluateAsync<bool>(
+                "() => globalThis.__viuBrowserRefreshProbe.connections"
+                + ".some(connection => connection.socket.readyState === 1)"),
+            "the reload-race browser to connect to the RunHost BrowserRefresh endpoint",
+            HotReloadAssertionTimeout);
+        await refreshServer.WaitForAuthenticatedConnectionCountAsync(
+            acceptedConnectionCount + 1);
+        acceptedConnectionCount = refreshServer.AcceptedConnectionCount;
+        await RequireStylesheetRulesAsync(page, ".viu.css", minimumRuleCount: 1);
+        await RequireStylesheetRulesAsync(page, ".utilities.css", minimumRuleCount: 1);
+        await page
+            .Locator("[data-testid='utility-style-probe']")
+            .EvaluateAsync<bool>(
+                "element => { element.classList.add('visual-studio-style-probe', 'opacity-75'); "
+                + "return true; }");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "border-left-width",
+            "7px");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "1");
+
+        string documentToken = await SetDocumentTokenAsync(page);
+        byte[] staleComponentBundle = await File.ReadAllBytesAsync(
+            session.ComponentBundlePath);
+        byte[] staleUtilityBundle = await File.ReadAllBytesAsync(
+            session.UtilityBundlePath);
+        string componentStylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".viu.css");
+        string utilityStylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".utilities.css");
+        int completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+        int relayedReloadCount = session.CountOutputLinesContaining(
+            "type=Reload");
+        TaskCompletionSource componentStylesheetServed = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource utilityStylesheetServed = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource browserRefreshScriptRequested = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseBrowserRefreshScript = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await page.RouteAsync(
+            url => HasPathSuffix(url, "/EndToEndHotReloadApp.viu.css"),
+            async route =>
+            {
+                await route.FulfillAsync(
+                    new RouteFulfillOptions
+                    {
+                        BodyBytes = staleComponentBundle,
+                        ContentType = "text/css",
+                        Status = 200,
+                    });
+                componentStylesheetServed.TrySetResult();
+            },
+            new PageRouteOptions { Times = 1 });
+        await page.RouteAsync(
+            url => HasPathSuffix(url, "/EndToEndHotReloadApp.utilities.css"),
+            async route =>
+            {
+                await route.FulfillAsync(
+                    new RouteFulfillOptions
+                    {
+                        BodyBytes = staleUtilityBundle,
+                        ContentType = "text/css",
+                        Status = 200,
+                    });
+                utilityStylesheetServed.TrySetResult();
+            },
+            new PageRouteOptions { Times = 1 });
+        await page.RouteAsync(
+            url => url.Contains(
+                "aspnetcore-browser-refresh",
+                StringComparison.OrdinalIgnoreCase),
+            async route =>
+            {
+                browserRefreshScriptRequested.TrySetResult();
+                await releaseBrowserRefreshScript.Task;
+                await route.ContinueAsync();
+            },
+            new PageRouteOptions { Times = 1 });
+
+        try
+        {
+            Task edit = EditVisualStudioGeneratedAssetSourceForReloadRaceAsync(
+                session.VisualStudioSourcePath);
+            Task reload = refreshServer.SendAsync("{\"type\":\"Reload\"}");
+            await Task.WhenAll(edit, reload);
+            await browserRefreshScriptRequested.Task.WaitAsync(
+                HotReloadAssertionTimeout);
+            await componentStylesheetServed.Task.WaitAsync(
+                HotReloadAssertionTimeout);
+            await utilityStylesheetServed.Task.WaitAsync(
+                HotReloadAssertionTimeout);
+            Require(
+                ReadCssCompletionCount(session.CssEventLogPath) == completionCount,
+                "The reload-race regeneration completed before the replacement client disconnected.");
+            await WaitUntilAsync(
+                () => Task.FromResult(
+                    session.CountOutputLinesContaining("type=Reload")
+                        > relayedReloadCount),
+                "the RunHost bridge to record Visual Studio's upstream Reload message",
+                HotReloadAssertionTimeout);
+
+            await WaitForCssCompletionAsync(session, completionCount + 1);
+            byte[] freshComponentBundle = await File.ReadAllBytesAsync(
+                session.ComponentBundlePath);
+            byte[] freshUtilityBundle = await File.ReadAllBytesAsync(
+                session.UtilityBundlePath);
+            Require(
+                !staleComponentBundle.SequenceEqual(freshComponentBundle),
+                "The reload-race component bundle did not regenerate while the client was absent.");
+            Require(
+                !staleUtilityBundle.SequenceEqual(freshUtilityBundle),
+                "The reload-race utility bundle did not regenerate while the client was absent.");
+            Require(
+                Encoding.UTF8.GetString(freshUtilityBundle).Contains(
+                    "opacity: 0.75;",
+                    StringComparison.Ordinal),
+                "The reload-race utility bundle does not contain the new opacity declaration.");
+        }
+        finally
+        {
+            releaseBrowserRefreshScript.TrySetResult();
+        }
+
+        await refreshServer.WaitForAuthenticatedConnectionCountAsync(
+            acceptedConnectionCount + 1);
+        await WaitUntilAsync(
+            async () => await page.EvaluateAsync<bool>(
+                "() => globalThis.__viuBrowserRefreshProbe.connections"
+                + ".some(connection => connection.socket.readyState === 1)"),
+            "the reloaded browser to reconnect to the RunHost BrowserRefresh endpoint",
+            HotReloadAssertionTimeout);
+        await WaitForStaticFileUpdateAsync(
+            page,
+            "/EndToEndHotReloadApp.viu.css",
+            expectedCount: 1);
+        await WaitForStaticFileUpdateAsync(
+            page,
+            "/EndToEndHotReloadApp.utilities.css",
+            expectedCount: 1);
+        await RequireDocumentReloadAsync(page);
+        await page
+            .Locator("[data-testid='utility-style-probe']")
+            .EvaluateAsync<bool>(
+                "element => { element.classList.add('visual-studio-style-probe', 'opacity-75'); "
+                + "return true; }");
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".viu.css",
+            componentStylesheetAddress);
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".utilities.css",
+            utilityStylesheetAddress);
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "border-left-width",
+            "11px");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "0.75");
+        Require(
+            !string.IsNullOrWhiteSpace(documentToken),
+            "The reload-race document token was not established before the Reload message.");
+        session.RequireRunning();
+    }
+
+    private static async Task InstallBrowserRefreshProbeAsync(IPage page)
+    {
+        await page.AddInitScriptAsync(
+            """
+            (() => {
+                const NativeWebSocket = globalThis.WebSocket;
+                globalThis.__viuBrowserRefreshProbe = {
+                    connections: [],
+                    messages: []
+                };
+                globalThis.WebSocket = new Proxy(NativeWebSocket, {
+                    construct(target, argumentsList) {
+                        const socket = Reflect.construct(target, argumentsList, target);
+                        const protocols = argumentsList.length < 2
+                            ? []
+                            : Array.isArray(argumentsList[1])
+                                ? [...argumentsList[1]]
+                                : [String(argumentsList[1])];
+                        globalThis.__viuBrowserRefreshProbe.connections.push({
+                            url: String(argumentsList[0]),
+                            protocols,
+                            socket
+                        });
+                        socket.addEventListener('message', event => {
+                            if (typeof event.data === 'string') {
+                                globalThis.__viuBrowserRefreshProbe.messages.push(event.data);
+                            }
+                        });
+                        return socket;
+                    }
+                });
+            })();
+            """);
+    }
+
+    private static bool HasPathSuffix(string address, string suffix) =>
+        Uri.TryCreate(address, UriKind.Absolute, out Uri? uri)
+        && uri.AbsolutePath.EndsWith(suffix, StringComparison.Ordinal);
 
     // [V01.01.12.33], #356: exercise the invocation developers type before the explicit-runtime
     // session mutates the connected managed application through its established cumulative sequence.
@@ -1277,6 +1488,26 @@ internal sealed class EndToEndHarness
             source,
             "border-left-width: 1px;",
             "border-left-width: 7px;",
+            path);
+        await File.WriteAllTextAsync(
+            path,
+            source,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static async Task EditVisualStudioGeneratedAssetSourceForReloadRaceAsync(
+        string path)
+    {
+        string source = await File.ReadAllTextAsync(path);
+        source = ReplaceExactlyOnce(
+            source,
+            "<div class=\"opacity-50\">",
+            "<div class=\"opacity-75\">",
+            path);
+        source = ReplaceExactlyOnce(
+            source,
+            "border-left-width: 7px;",
+            "border-left-width: 11px;",
             path);
         await File.WriteAllTextAsync(
             path,

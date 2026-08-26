@@ -68,8 +68,18 @@ internal static class RunHostProcess
         {
             try
             {
+                IReadOnlyList<string> managedStylesheetPaths =
+                    GeneratedAssetWorkerHost.ReadManagedStylesheetPaths(
+                        invocation.GeneratedAssetWorkerConfigurationFilePath);
                 browserRefreshBridge = await BrowserRefreshBridge.StartAsync(
                     browserRefreshEndpoints,
+                    managedStylesheetPaths,
+                    (connectionIdentifier, messageType, path) =>
+                        ReportUpstreamBrowserRefreshMessage(
+                            standardOutput,
+                            connectionIdentifier,
+                            messageType,
+                            path),
                     CancellationToken.None);
                 startInformation.Environment[BrowserRefreshEndpointEnvironmentVariable] =
                     browserRefreshBridge.ChildEndpointList;
@@ -82,6 +92,7 @@ internal static class RunHostProcess
             }
             catch (Exception exception) when (
                 exception is ArgumentException or
+                    InvalidDataException or
                     IOException or
                     InvalidOperationException or
                     NotSupportedException or
@@ -284,6 +295,25 @@ internal static class RunHostProcess
         }
 
         await writer.FlushAsync();
+    }
+
+    private static void ReportUpstreamBrowserRefreshMessage(
+        TextWriter writer,
+        long connectionIdentifier,
+        string messageType,
+        string? path)
+    {
+        try
+        {
+            string pathDetail = path is null ? string.Empty : $"; path={path}";
+            writer.WriteLine(
+                "Viu BrowserRefresh bridge upstream: "
+                + $"connection={connectionIdentifier}; type={messageType}{pathDetail}.");
+        }
+        catch (Exception exception) when (
+            exception is IOException or ObjectDisposedException)
+        {
+        }
     }
 
     private static bool TryReadWasmAppHostAddress(

@@ -27,9 +27,12 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
     private static readonly TimeSpan UpstreamConnectionTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan SocketCloseTimeout = TimeSpan.FromSeconds(1);
     private readonly ConcurrentDictionary<long, BridgedBrowserConnection> _connections = new();
+    private readonly ConcurrentDictionary<string, byte[]> _managedStylesheetUpdateMessages = new(
+        StringComparer.Ordinal);
     private readonly CancellationTokenSource _shutdownCancellationSource = new();
     private readonly WebApplication _application;
     private readonly IReadOnlyList<Uri> _upstreamEndpoints;
+    private readonly Action<long, string, string?>? _upstreamMessageRelayed;
     private readonly string _bridgePath;
     private long _lastConnectionIdentifier;
     private int _disposed;
@@ -37,11 +40,19 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
     private BrowserRefreshBridge(
         WebApplication application,
         IReadOnlyList<Uri> upstreamEndpoints,
-        string bridgePath)
+        string bridgePath,
+        IReadOnlyList<string> managedStaticFilePaths,
+        Action<long, string, string?>? upstreamMessageRelayed)
     {
         _application = application;
         _upstreamEndpoints = upstreamEndpoints;
         _bridgePath = bridgePath;
+        _upstreamMessageRelayed = upstreamMessageRelayed;
+        foreach (string path in managedStaticFilePaths)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+            TrackManagedStylesheet(path, CreateStaticFileUpdateMessage(path));
+        }
     }
 
     internal string ChildEndpointList { get; private set; } = string.Empty;
@@ -53,7 +64,19 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
     internal static async Task<BrowserRefreshBridge> StartAsync(
         string upstreamEndpointList,
         CancellationToken cancellationToken = default)
+        => await StartAsync(
+            upstreamEndpointList,
+            Array.Empty<string>(),
+            upstreamMessageRelayed: null,
+            cancellationToken);
+
+    internal static async Task<BrowserRefreshBridge> StartAsync(
+        string upstreamEndpointList,
+        IReadOnlyList<string> managedStaticFilePaths,
+        Action<long, string, string?>? upstreamMessageRelayed = null,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(managedStaticFilePaths);
         (IReadOnlyList<Uri> endpoints, string normalizedEndpointList) =
             ParseEndpointList(upstreamEndpointList);
         string bridgePath = "/viu-browser-refresh/" + Guid.NewGuid().ToString("N");
@@ -63,7 +86,12 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
             options => options.Listen(IPAddress.Loopback, 0));
 
         WebApplication application = builder.Build();
-        BrowserRefreshBridge bridge = new(application, endpoints, bridgePath);
+        BrowserRefreshBridge bridge = new(
+            application,
+            endpoints,
+            bridgePath,
+            managedStaticFilePaths,
+            upstreamMessageRelayed);
         application.UseWebSockets();
         application.Run(bridge.HandleRequestAsync);
 
@@ -105,6 +133,7 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         byte[] message = CreateStaticFileUpdateMessage(path);
+        TrackManagedStylesheet(path, message);
         int deliveredCount = 0;
         foreach ((long connectionIdentifier, BridgedBrowserConnection connection) in
             _connections.ToArray())
@@ -202,6 +231,17 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
         return buffer.WrittenSpan.ToArray();
     }
 
+    private void TrackManagedStylesheet(string path, byte[] message)
+    {
+        // [V01.01.12.30.05], #357: the stock BrowserRefresh client reloads the document for
+        // non-CSS UpdateStaticFile paths. Replaying those paths on every connection would create
+        // a reload loop, while CSS paths are idempotent cache-busted stylesheet replacements.
+        if (path.EndsWith(".css", StringComparison.Ordinal))
+        {
+            _managedStylesheetUpdateMessages.TryAdd(path, message);
+        }
+    }
+
     private async Task HandleRequestAsync(HttpContext context)
     {
         if (Volatile.Read(ref _disposed) != 0)
@@ -253,7 +293,13 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
             connection = new BridgedBrowserConnection(
                 upstreamSocket,
                 downstreamSocket,
-                SocketCloseTimeout);
+                SocketCloseTimeout,
+                _upstreamMessageRelayed is null
+                    ? null
+                    : (messageType, path) => _upstreamMessageRelayed(
+                        connectionIdentifier,
+                        messageType,
+                        path));
             upstreamSocket = null;
             downstreamSocket = null;
             if (!_connections.TryAdd(connectionIdentifier, connection))
@@ -262,7 +308,13 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
                     "The BrowserRefresh bridge could not register a browser connection.");
             }
 
-            await connection.RunAsync(requestCancellationSource.Token);
+            byte[][] synchronizationMessages = _managedStylesheetUpdateMessages
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Value)
+                .ToArray();
+            await connection.RunAsync(
+                synchronizationMessages,
+                requestCancellationSource.Token);
         }
         catch (Exception exception) when (
             exception is IOException
@@ -331,6 +383,7 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
         private readonly SemaphoreSlim _upstreamSendSemaphore = new(1, 1);
         private readonly WebSocket _downstreamSocket;
         private readonly WebSocket _upstreamSocket;
+        private readonly Action<string, string?>? _upstreamMessageRelayed;
         private readonly TimeSpan _socketCloseTimeout;
         private int _disposed;
         private int _gracefulCloseStarted;
@@ -338,17 +391,29 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
         internal BridgedBrowserConnection(
             WebSocket upstreamSocket,
             WebSocket downstreamSocket,
-            TimeSpan socketCloseTimeout)
+            TimeSpan socketCloseTimeout,
+            Action<string, string?>? upstreamMessageRelayed)
         {
             _upstreamSocket = upstreamSocket;
             _downstreamSocket = downstreamSocket;
             _socketCloseTimeout = socketCloseTimeout;
+            _upstreamMessageRelayed = upstreamMessageRelayed;
         }
 
-        internal async Task RunAsync(CancellationToken cancellationToken)
+        internal async Task RunAsync(
+            IReadOnlyList<byte[]> synchronizationMessages,
+            CancellationToken cancellationToken)
         {
             try
             {
+                foreach (byte[] message in synchronizationMessages)
+                {
+                    if (!await SendDownstreamAsync(message, cancellationToken))
+                    {
+                        return;
+                    }
+                }
+
                 using CancellationTokenSource relayCancellationSource =
                     CancellationTokenSource.CreateLinkedTokenSource(
                         cancellationToken,
@@ -357,11 +422,13 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
                     _upstreamSocket,
                     _downstreamSocket,
                     _downstreamSendSemaphore,
+                    _upstreamMessageRelayed,
                     relayCancellationSource.Token);
                 Task downstreamRelay = RelayMessagesAsync(
                     _downstreamSocket,
                     _upstreamSocket,
                     _upstreamSendSemaphore,
+                    messageRelayed: null,
                     relayCancellationSource.Token);
 
                 await Task.WhenAny(upstreamRelay, downstreamRelay);
@@ -460,6 +527,7 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
             WebSocket source,
             WebSocket destination,
             SemaphoreSlim destinationSendSemaphore,
+            Action<string, string?>? messageRelayed,
             CancellationToken cancellationToken)
         {
             ArrayBufferWriter<byte> message = new(4096);
@@ -498,7 +566,63 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
                     message.WrittenMemory,
                     messageType.GetValueOrDefault(),
                     cancellationToken);
+                if (messageRelayed is not null
+                    && messageType == WebSocketMessageType.Text
+                    && TryReadMessage(
+                        message.WrittenSpan,
+                        out string? relayedMessageType,
+                        out string? relayedPath))
+                {
+                    messageRelayed(relayedMessageType, relayedPath);
+                }
             }
+        }
+
+        private static bool TryReadMessage(
+            ReadOnlySpan<byte> message,
+            out string messageType,
+            out string? path)
+        {
+            messageType = string.Empty;
+            path = null;
+            try
+            {
+                Utf8JsonReader reader = new(
+                    message,
+                    isFinalBlock: true,
+                    state: default);
+                while (reader.Read())
+                {
+                    if (reader.TokenType != JsonTokenType.PropertyName
+                        || reader.CurrentDepth != 1)
+                    {
+                        continue;
+                    }
+
+                    bool isType = reader.ValueTextEquals("type"u8);
+                    bool isPath = reader.ValueTextEquals("path"u8);
+                    if ((!isType && !isPath)
+                        || !reader.Read()
+                        || reader.TokenType != JsonTokenType.String)
+                    {
+                        continue;
+                    }
+
+                    if (isType)
+                    {
+                        messageType = reader.GetString() ?? string.Empty;
+                    }
+                    else
+                    {
+                        path = reader.GetString();
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+            }
+
+            return messageType.Length > 0;
         }
 
         private static async ValueTask SendMessageAsync(

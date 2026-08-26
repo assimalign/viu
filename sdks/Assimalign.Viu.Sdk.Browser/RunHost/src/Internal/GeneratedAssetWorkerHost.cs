@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +12,9 @@ namespace Assimalign.Viu.Sdk.Browser.RunHost;
 
 internal sealed class GeneratedAssetWorkerHost
 {
+    private const string ConfigurationHeader =
+        "viu-generated-asset-worker-configuration-v1";
+    private const string StaticWebAssetPathRecord = "static-web-asset-path:";
     private const string UpdateMarker = "viu-generated-asset-update:";
 
     private readonly Process process;
@@ -69,6 +74,50 @@ internal sealed class GeneratedAssetWorkerHost
         {
             return false;
         }
+    }
+
+    internal static IReadOnlyList<string> ReadManagedStylesheetPaths(
+        string configurationFilePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(configurationFilePath);
+
+        string[] lines = File.ReadAllLines(configurationFilePath);
+        if (lines.Length == 0
+            || !string.Equals(lines[0], ConfigurationHeader, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "Viu Generated Asset Hot Reload configuration has an unsupported header.");
+        }
+
+        List<string> paths = [];
+        foreach (string line in lines)
+        {
+            if (!line.StartsWith(StaticWebAssetPathRecord, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string staticWebAssetPath;
+            try
+            {
+                staticWebAssetPath = Encoding.UTF8.GetString(
+                    Convert.FromBase64String(line.Substring(StaticWebAssetPathRecord.Length)));
+            }
+            catch (FormatException exception)
+            {
+                throw new InvalidDataException(
+                    "Viu Generated Asset Hot Reload configuration contains an invalid static asset path.",
+                    exception);
+            }
+
+            string clientPath = NormalizeClientPath(staticWebAssetPath);
+            if (clientPath.EndsWith(".css", StringComparison.Ordinal))
+            {
+                paths.Add(clientPath);
+            }
+        }
+
+        return paths.Distinct(StringComparer.Ordinal).ToArray();
     }
 
     internal static GeneratedAssetWorkerHost? TryStart(

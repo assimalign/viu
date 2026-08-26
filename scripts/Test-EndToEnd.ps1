@@ -24,8 +24,9 @@
 .PARAMETER HotReload
     Runs the isolated packaged Debug .vue development-loop scenarios instead of the ordinary
     three-scenario published fixture lane. A Visual Studio-shaped session first launches through the
-    packaged RunHost with a protocol-asserting BrowserRefresh endpoint and proves one .viu edit
-    delivers component and utility stylesheet updates in real Chromium ([V01.01.12.30.05], #357).
+    packaged RunHost with a protocol-asserting BrowserRefresh endpoint and proves .viu edits deliver
+    component and utility stylesheet updates in real Chromium, including a reload-before-completion
+    race whose reconnected client converges without manual action ([V01.01.12.30.05], #357).
     The unchanged watch lane
     then proves structural add/remove/v-if managed deltas, new-file NewTypeDefinition application,
     accepted style/template/script updates, automatic browser reload after a script-signature
@@ -1169,6 +1170,7 @@ if (-not $HotReload) {
         # separate while pinning all nine established dotnet-watch scenarios by name.
         $requiredHotReloadScenarios = @(
             'packaged-vue-run-host-visual-studio-generated-assets',
+            'packaged-vue-run-host-visual-studio-generated-assets-reload-race',
             # [V01.01.12.33], #356: the natural watch invocation must launch
             # the worker and deliver both registered generated-asset families.
             'packaged-vue-watch-no-runtime-css-and-utility',

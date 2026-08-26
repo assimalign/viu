@@ -36,7 +36,10 @@ RunHost with a protocol-asserting Visual Studio-shaped BrowserRefresh endpoint. 
 connects to RunHost's rewritten loopback websocket; the harness verifies the encrypted-secret
 upstream handshake, a bidirectional capability request, targeted component and utility
 `UpdateStaticFile` messages from one `.viu` edit, both stylesheet replacements, and retained
-document identity. This coverage is specified by [V01.01.12.30.05], #357.
+document identity. A second Visual Studio-shaped scenario sends an upstream `Reload` before another
+regeneration completes, gives the replacement document stale CSS, withholds its refresh client until
+the worker reports completion, and then requires connect-time synchronization to converge both
+stylesheets without manual action. This coverage is specified by [V01.01.12.30.05], #357.
 
 The mode then runs the unchanged nine scenarios under owned `dotnet watch` processes. Its mounted
 root is a tag-based `.vue` component. The Chromium scenarios prove add-element, remove-element, and

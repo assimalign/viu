@@ -191,6 +191,12 @@ internal sealed class VisualStudioHotReloadSession : IAsyncDisposable
         }
     }
 
+    internal int CountOutputLinesContaining(string text)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(text);
+        return _runOutput.Count(line => line.Contains(text, StringComparison.Ordinal));
+    }
+
     internal async Task StopAsync()
     {
         if (_stopped)

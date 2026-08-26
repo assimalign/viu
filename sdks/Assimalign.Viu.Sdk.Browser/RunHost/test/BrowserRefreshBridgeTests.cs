@@ -130,6 +130,160 @@ public sealed class BrowserRefreshBridgeTests
     }
 
     [Fact]
+    public async Task Connection_ManagedStylesheets_SynchronizesEveryBrowserIndependently()
+    {
+        using CancellationTokenSource cancellationSource = new(TestTimeout);
+        await using BrowserRefreshServerStub upstream =
+            await BrowserRefreshServerStub.StartAsync(cancellationSource.Token);
+        await using BrowserRefreshBridge bridge = await BrowserRefreshBridge.StartAsync(
+            upstream.Endpoint.AbsoluteUri,
+            ["/component.css", "/utilities.css"],
+            cancellationToken: cancellationSource.Token);
+        using ClientWebSocket firstBrowser = new();
+        using ClientWebSocket secondBrowser = new();
+
+        await firstBrowser.ConnectAsync(
+            new Uri(bridge.Endpoint),
+            cancellationSource.Token);
+        await using BrowserRefreshServerStubConnection firstUpstreamConnection =
+            await upstream.AcceptConnectionAsync(cancellationSource.Token);
+        ReceivedWebSocketMessage firstComponentMessage = await ReceiveMessageAsync(
+            firstBrowser,
+            cancellationSource.Token);
+        ReceivedWebSocketMessage firstUtilityMessage = await ReceiveMessageAsync(
+            firstBrowser,
+            cancellationSource.Token);
+
+        await secondBrowser.ConnectAsync(
+            new Uri(bridge.Endpoint),
+            cancellationSource.Token);
+        await using BrowserRefreshServerStubConnection secondUpstreamConnection =
+            await upstream.AcceptConnectionAsync(cancellationSource.Token);
+        ReceivedWebSocketMessage secondComponentMessage = await ReceiveMessageAsync(
+            secondBrowser,
+            cancellationSource.Token);
+        ReceivedWebSocketMessage secondUtilityMessage = await ReceiveMessageAsync(
+            secondBrowser,
+            cancellationSource.Token);
+
+        firstComponentMessage.Text.ShouldBe(
+            "{\"type\":\"UpdateStaticFile\",\"path\":\"/component.css\"}");
+        firstUtilityMessage.Text.ShouldBe(
+            "{\"type\":\"UpdateStaticFile\",\"path\":\"/utilities.css\"}");
+        secondComponentMessage.Text.ShouldBe(firstComponentMessage.Text);
+        secondUtilityMessage.Text.ShouldBe(firstUtilityMessage.Text);
+    }
+
+    [Fact]
+    public async Task BroadcastStaticFileUpdateAsync_NoBrowserConnected_SynchronizesLaterConnection()
+    {
+        using CancellationTokenSource cancellationSource = new(TestTimeout);
+        await using BrowserRefreshServerStub upstream =
+            await BrowserRefreshServerStub.StartAsync(cancellationSource.Token);
+        await using BrowserRefreshBridge bridge = await BrowserRefreshBridge.StartAsync(
+            upstream.Endpoint.AbsoluteUri,
+            cancellationSource.Token);
+
+        int deliveredCount = await bridge.BroadcastStaticFileUpdateAsync(
+            "/generated.css",
+            cancellationSource.Token);
+
+        using ClientWebSocket browser = new();
+        await browser.ConnectAsync(
+            new Uri(bridge.Endpoint),
+            cancellationSource.Token);
+        await using BrowserRefreshServerStubConnection upstreamConnection =
+            await upstream.AcceptConnectionAsync(cancellationSource.Token);
+        ReceivedWebSocketMessage message = await ReceiveMessageAsync(
+            browser,
+            cancellationSource.Token);
+
+        deliveredCount.ShouldBe(0);
+        message.Text.ShouldBe(
+            "{\"type\":\"UpdateStaticFile\",\"path\":\"/generated.css\"}");
+    }
+
+    [Fact]
+    public async Task BroadcastStaticFileUpdateAsync_NonStylesheet_PreservesLiveOnlyDelivery()
+    {
+        using CancellationTokenSource cancellationSource = new(TestTimeout);
+        await using BrowserRefreshServerStub upstream =
+            await BrowserRefreshServerStub.StartAsync(cancellationSource.Token);
+        await using BrowserRefreshBridge bridge = await BrowserRefreshBridge.StartAsync(
+            upstream.Endpoint.AbsoluteUri,
+            ["/generated.js"],
+            cancellationToken: cancellationSource.Token);
+        using ClientWebSocket connectedBrowser = new();
+
+        await connectedBrowser.ConnectAsync(
+            new Uri(bridge.Endpoint),
+            cancellationSource.Token);
+        await using BrowserRefreshServerStubConnection connectedUpstreamConnection =
+            await upstream.AcceptConnectionAsync(cancellationSource.Token);
+        int deliveredCount = await bridge.BroadcastStaticFileUpdateAsync(
+            "/generated.js",
+            cancellationSource.Token);
+        ReceivedWebSocketMessage liveMessage = await ReceiveMessageAsync(
+            connectedBrowser,
+            cancellationSource.Token);
+
+        using ClientWebSocket laterBrowser = new();
+        await laterBrowser.ConnectAsync(
+            new Uri(bridge.Endpoint),
+            cancellationSource.Token);
+        await using BrowserRefreshServerStubConnection laterUpstreamConnection =
+            await upstream.AcceptConnectionAsync(cancellationSource.Token);
+        await laterUpstreamConnection.SendTextFragmentsAsync(
+            ["{\"type\":\"Probe\"}"],
+            cancellationSource.Token);
+        ReceivedWebSocketMessage laterMessage = await ReceiveMessageAsync(
+            laterBrowser,
+            cancellationSource.Token);
+
+        deliveredCount.ShouldBe(1);
+        liveMessage.Text.ShouldBe(
+            "{\"type\":\"UpdateStaticFile\",\"path\":\"/generated.js\"}");
+        laterMessage.Text.ShouldBe("{\"type\":\"Probe\"}");
+    }
+
+    [Fact]
+    public async Task Connection_UpstreamReload_RelaysMessageAndReportsExactType()
+    {
+        using CancellationTokenSource cancellationSource = new(TestTimeout);
+        await using BrowserRefreshServerStub upstream =
+            await BrowserRefreshServerStub.StartAsync(cancellationSource.Token);
+        ConcurrentQueue<(long ConnectionIdentifier, string MessageType, string? Path)>
+            relayedMessages = new();
+        await using BrowserRefreshBridge bridge = await BrowserRefreshBridge.StartAsync(
+            upstream.Endpoint.AbsoluteUri,
+            Array.Empty<string>(),
+            (connectionIdentifier, messageType, path) => relayedMessages.Enqueue(
+                (connectionIdentifier, messageType, path)),
+            cancellationSource.Token);
+        using ClientWebSocket browser = new();
+
+        await browser.ConnectAsync(
+            new Uri(bridge.Endpoint),
+            cancellationSource.Token);
+        await using BrowserRefreshServerStubConnection upstreamConnection =
+            await upstream.AcceptConnectionAsync(cancellationSource.Token);
+        await upstreamConnection.SendTextFragmentsAsync(
+            ["{\"type\":", "\"Reload\"}"],
+            cancellationSource.Token);
+        ReceivedWebSocketMessage message = await ReceiveMessageAsync(
+            browser,
+            cancellationSource.Token);
+        while (relayedMessages.IsEmpty)
+        {
+            await Task.Delay(10, cancellationSource.Token);
+        }
+
+        message.Text.ShouldBe("{\"type\":\"Reload\"}");
+        relayedMessages.Count.ShouldBe(1);
+        relayedMessages.Single().ShouldBe((1, "Reload", null));
+    }
+
+    [Fact]
     public async Task DisposeAsync_ConnectedBrowser_CompletesCloseHandshakesAndRejectsLaterBroadcasts()
     {
         using CancellationTokenSource cancellationSource = new(TestTimeout);
