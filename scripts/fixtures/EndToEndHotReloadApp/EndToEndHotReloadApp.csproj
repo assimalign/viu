@@ -19,6 +19,8 @@
                       PrivateAssets="all" />
     <ViuUtilityCssSource Include="HotReloadPage.vue" />
     <ViuUtilityCssSource Include="UtilityCandidate.html" />
+    <!-- [V01.01.12.30.05], #357: one .viu edit drives both registered CSS asset families. -->
+    <ViuUtilityCssSource Include="VisualStudioGeneratedAssetProbe.viu" />
     <StaticWebAssetFingerprintPattern Include="JS"
                                       Pattern="*.js"
                                       Expression="#[.{fingerprint}]!" />

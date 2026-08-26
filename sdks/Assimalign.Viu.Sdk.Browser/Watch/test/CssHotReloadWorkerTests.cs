@@ -137,6 +137,138 @@ public sealed class CssHotReloadWorkerTests
         }
     }
 
+    // [V01.01.12.30.05], #357: a RunHost-owned worker reports only outputs whose final bytes or
+    // existence changed after a successful nested build.
+    [Fact]
+    public void Worker_ReportUpdates_EmitsOnlyChangedGeneratedAssetRoutes()
+    {
+        var context = TestContext.Create();
+        Process? workerProcess = null;
+        try
+        {
+            RunMsBuild(
+                context,
+                "ViuGenerateSingleFileComponentCss",
+                new Dictionary<string, string>
+                {
+                    ["ViuGeneratedAssetHotReload"] = "true",
+                });
+            workerProcess = StartWorker(
+                context,
+                new[]
+                {
+                    new WorkerAsset(
+                        context.BundlePath,
+                        Array.Empty<string>(),
+                        new[] { context.DirectoryPath },
+                        new[] { ".viu", ".vue" },
+                        "ViuGenerateSingleFileComponentCss",
+                        string.Empty,
+                        "wwwroot/Probe.viu.css",
+                        "PreserveEmpty"),
+                },
+                reportUpdates: true);
+            WaitFor(() => File.Exists(context.StatePath), "worker state file");
+
+            const string changedComponent =
+                "<template><div /></template><style>.component { color: blue; }</style>";
+            WriteWatchedFile(context.ComponentPath, changedComponent);
+            WaitForEventCount(context.EventLogPath, 1);
+            WriteWatchedFile(context.ComponentPath, changedComponent);
+            WaitForEventCount(context.EventLogPath, 2);
+
+            File.Delete(context.StatePath);
+            WaitFor(
+                () =>
+                {
+                    workerProcess.Refresh();
+                    return workerProcess.HasExited;
+                },
+                "reporting worker shutdown");
+            var outputLines = workerProcess.StandardOutput.ReadToEnd()
+                .Split(
+                    new[] { '\r', '\n' },
+                    StringSplitOptions.RemoveEmptyEntries);
+            var expectedMarker =
+                "viu-generated-asset-update:" +
+                Convert.ToBase64String(
+                    Encoding.UTF8.GetBytes("wwwroot/Probe.viu.css"));
+            outputLines.ShouldBe(new[] { expectedMarker });
+        }
+        finally
+        {
+            StopWorker(workerProcess);
+            context.Dispose();
+        }
+    }
+
+    // [V01.01.12.30.05], #357: an ordinary Debug build persists stable descriptors for the
+    // RunHost, while watch, Release, and publish-shaped builds do not emit that artifact.
+    [Fact]
+    public void WorkerConfiguration_OrdinaryDebugBuild_WritesDeterministicallyAndOtherBuildShapesStayInert()
+    {
+        var context = TestContext.Create();
+        try
+        {
+            RunMsBuild(context, "Build", new Dictionary<string, string>());
+
+            File.Exists(context.ConfigurationPath).ShouldBeTrue();
+            var configurationLines = File.ReadAllLines(context.ConfigurationPath);
+            configurationLines[0].ShouldBe("viu-generated-asset-worker-configuration-v1");
+            DecodeConfigurationValues(configurationLines, "static-web-asset-path")
+                .ShouldBe(new[] { "wwwroot/Probe.viu.css" });
+            DecodeConfigurationValues(
+                    configurationLines,
+                    "launcher-process-identifier")
+                .ShouldBeEmpty();
+            DecodeConfigurationValues(
+                    configurationLines,
+                    "owner-process-identifier")
+                .ShouldBeEmpty();
+
+            File.SetLastWriteTimeUtc(
+                context.ConfigurationPath,
+                DateTime.UtcNow.AddMinutes(-5));
+            var retainedWriteTime = File.GetLastWriteTimeUtc(context.ConfigurationPath);
+            RunMsBuild(context, "Build", new Dictionary<string, string>());
+            File.GetLastWriteTimeUtc(context.ConfigurationPath).ShouldBe(retainedWriteTime);
+
+            File.Delete(context.ConfigurationPath);
+            RunMsBuild(
+                context,
+                "Build",
+                new Dictionary<string, string>
+                {
+                    ["Configuration"] = "Release",
+                });
+            File.Exists(context.ConfigurationPath).ShouldBeFalse();
+
+            RunMsBuild(
+                context,
+                "Build",
+                new Dictionary<string, string>
+                {
+                    ["_IsPublishing"] = "true",
+                });
+            File.Exists(context.ConfigurationPath).ShouldBeFalse();
+
+            RunMsBuild(
+                context,
+                "Build",
+                new Dictionary<string, string>
+                {
+                    ["DotNetWatchBuild"] = "true",
+                    ["DesignTimeBuild"] = "true",
+                    ["ViuCssHotReloadLaunchWorker"] = "false",
+                });
+            File.Exists(context.ConfigurationPath).ShouldBeFalse();
+        }
+        finally
+        {
+            context.Dispose();
+        }
+    }
+
     [Fact]
     public void Worker_NoOpRemovalAndShutdown_PreservesComponentCssIncrementalContract()
     {
@@ -371,14 +503,14 @@ public sealed class CssHotReloadWorkerTests
 
     private static Process StartWorker(
         TestContext context,
-        IReadOnlyList<WorkerAsset> assets)
+        IReadOnlyList<WorkerAsset> assets,
+        bool reportUpdates = false)
     {
         using var currentProcess = Process.GetCurrentProcess();
         var configurationFilePath = context.StatePath + ".configuration";
         WriteWorkerConfiguration(
             configurationFilePath,
             context,
-            currentProcess.Id,
             assets);
         var startInfo = new ProcessStartInfo
         {
@@ -386,10 +518,19 @@ public sealed class CssHotReloadWorkerTests
             WorkingDirectory = context.DirectoryPath,
             UseShellExecute = false,
             CreateNoWindow = false,
+            RedirectStandardOutput = reportUpdates,
         };
         startInfo.ArgumentList.Add(context.WorkerAssemblyPath);
         startInfo.ArgumentList.Add("--configuration-file");
         startInfo.ArgumentList.Add(configurationFilePath);
+        startInfo.ArgumentList.Add("--owner-process-identifier");
+        startInfo.ArgumentList.Add(
+            currentProcess.Id.ToString(CultureInfo.InvariantCulture));
+        if (reportUpdates)
+        {
+            startInfo.ArgumentList.Add("--report-updates");
+        }
+
         return Process.Start(startInfo) ??
             throw new InvalidOperationException(
                 "The Generated Asset Hot Reload worker could not be started.");
@@ -573,7 +714,6 @@ public sealed class CssHotReloadWorkerTests
     private static void WriteWorkerConfiguration(
         string path,
         TestContext context,
-        int ownerProcessIdentifier,
         IEnumerable<WorkerAsset> assets)
     {
         var directory = Path.GetDirectoryName(path);
@@ -593,9 +733,6 @@ public sealed class CssHotReloadWorkerTests
             EncodeConfigurationValue("runtime-identifier", string.Empty),
             EncodeConfigurationValue("state-file", context.StatePath),
             EncodeConfigurationValue("event-log", context.EventLogPath),
-            EncodeConfigurationValue(
-                "owner-process-identifier",
-                ownerProcessIdentifier.ToString(CultureInfo.InvariantCulture)),
             EncodeConfigurationValue("debounce-milliseconds", "50"),
             EncodeConfigurationValue(
                 "excluded-directory",
@@ -643,6 +780,14 @@ public sealed class CssHotReloadWorkerTests
     private static string EncodeConfigurationValue(string name, string value) =>
         name + ":" + Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
 
+    private static string[] DecodeConfigurationValues(
+        IEnumerable<string> lines,
+        string name) =>
+        lines.Where(line => line.StartsWith(name + ":", StringComparison.Ordinal))
+            .Select(line => Encoding.UTF8.GetString(
+                Convert.FromBase64String(line.Substring(name.Length + 1))))
+            .ToArray();
+
     private sealed record WorkerAsset(
         string Identity,
         IReadOnlyList<string> WatchFiles,
@@ -686,6 +831,8 @@ public sealed class CssHotReloadWorkerTests
         public string BundlePath { get; }
 
         public string StatePath { get; }
+
+        public string ConfigurationPath => StatePath + ".configuration";
 
         public string EventLogPath { get; }
 
@@ -781,6 +928,9 @@ public sealed class CssHotReloadWorkerTests
                 "    <ViuCssHotReloadStateFile>" +
                 EscapeAttribute(statePath) +
                 "</ViuCssHotReloadStateFile>" + Environment.NewLine +
+                "    <ViuGeneratedAssetWorkerConfigurationFile>" +
+                EscapeAttribute(statePath + ".configuration") +
+                "</ViuGeneratedAssetWorkerConfigurationFile>" + Environment.NewLine +
                 "    <ViuCssHotReloadEventLog>" +
                 EscapeAttribute(eventLogPath) +
                 "</ViuCssHotReloadEventLog>" + Environment.NewLine +
@@ -810,6 +960,7 @@ public sealed class CssHotReloadWorkerTests
                 "  </PropertyGroup>" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(componentTargetsPath) + "\" />" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(hotReloadTargetsPath) + "\" />" + Environment.NewLine +
+                "  <Target Name=\"Build\" />" + Environment.NewLine +
                 "  <Target Name=\"RegisterProbeGeneratedAsset\" BeforeTargets=\"ViuCollectGeneratedAssets\" Condition=\"'$(ProbeRegisterGeneratedAsset)' == 'true'\">" + Environment.NewLine +
                 "    <ItemGroup>" + Environment.NewLine +
                 "      <ViuGeneratedAsset Include=\"$(FirstGeneratedAssetPath)\">" + Environment.NewLine +

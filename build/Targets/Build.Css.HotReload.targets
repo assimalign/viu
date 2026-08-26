@@ -25,10 +25,14 @@
     <ViuCssHotReloadDebounceMilliseconds Condition="'$(ViuCssHotReloadDebounceMilliseconds)' == ''">100</ViuCssHotReloadDebounceMilliseconds>
     <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.dll</ViuCssHotReloadTaskAssembly>
     <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
-    <ViuCssHotReloadStateFile Condition="'$(ViuCssHotReloadStateFile)' == ''">$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)viu\css-hot-reload\worker.state'))</ViuCssHotReloadStateFile>
+    <ViuCssHotReloadStateFile Condition="'$(ViuCssHotReloadStateFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'viu', 'css-hot-reload', 'worker.state'))</ViuCssHotReloadStateFile>
+    <ViuGeneratedAssetWorkerConfigurationFile Condition="'$(ViuGeneratedAssetWorkerConfigurationFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'viu', 'css-hot-reload', 'worker.state.configuration'))</ViuGeneratedAssetWorkerConfigurationFile>
   </PropertyGroup>
 
   <UsingTask TaskName="Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker"
+             AssemblyFile="$(ViuCssHotReloadTaskAssembly)"
+             Condition="'$(ViuCssHotReloadEnabled)' == 'true'" />
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration"
              AssemblyFile="$(ViuCssHotReloadTaskAssembly)"
              Condition="'$(ViuCssHotReloadEnabled)' == 'true'" />
 
@@ -58,9 +62,52 @@
     </ItemGroup>
   </Target>
 
+  <Target Name="_ViuPrepareGeneratedAssetWorkerConfiguration"
+          DependsOnTargets="ViuCollectGeneratedAssets">
+    <ItemGroup>
+      <_ViuGeneratedAssetHotReloadExcludedDirectory Remove="@(_ViuGeneratedAssetHotReloadExcludedDirectory)" />
+      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)'))" />
+      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(BaseOutputPath)'))" />
+      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir).git'))" />
+      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir).vs'))" />
+      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir)node_modules'))" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Visual Studio launches the RunHost after an ordinary build, without dotnet watch's design-time
+       watch-list pass. Persist the same descriptor set for that host while keeping process identity
+       and refresh-session data launch-scoped. The writer compares final bytes so an incremental
+       build does not create a false input change. Specified by [V01.01.12.30.05], issue #357. -->
+  <Target Name="_ViuWriteGeneratedAssetWorkerConfiguration"
+          AfterTargets="Build"
+          Condition="'$(ViuCssHotReloadEnabled)' == 'true'
+              and '$(Configuration)' == 'Debug'
+              and '$(DotNetWatchBuild)' != 'true'
+              and '$(DesignTimeBuild)' != 'true'
+              and '$(ViuGeneratedAssetHotReload)' != 'true'
+              and '$(_IsPublishing)' != 'true'"
+          DependsOnTargets="_ViuPrepareGeneratedAssetWorkerConfiguration">
+    <Delete Files="$(ViuGeneratedAssetWorkerConfigurationFile)"
+            Condition="'@(ViuGeneratedAsset)' == '' and Exists('$(ViuGeneratedAssetWorkerConfigurationFile)')" />
+    <ViuWriteGeneratedAssetWorkerConfiguration
+      Condition="'@(ViuGeneratedAsset)' != ''"
+      ConfigurationFilePath="$(ViuGeneratedAssetWorkerConfigurationFile)"
+      ProjectPath="$(MSBuildProjectFullPath)"
+      ProjectDirectory="$(MSBuildProjectDirectory)"
+      StateFilePath="$(ViuCssHotReloadStateFile)"
+      EventLogPath="$(ViuCssHotReloadEventLog)"
+      DotNetHostPath="$(DotNetHostPath)"
+      Configuration="$(Configuration)"
+      TargetFramework="$(TargetFramework)"
+      RuntimeIdentifier="$(RuntimeIdentifier)"
+      GeneratedAssets="@(ViuGeneratedAsset)"
+      ExcludedDirectories="@(_ViuGeneratedAssetHotReloadExcludedDirectory)"
+      DebounceMilliseconds="$(ViuCssHotReloadDebounceMilliseconds)" />
+  </Target>
+
   <Target Name="_ViuCollectGeneratedAssetHotReloadWatchItems"
           Condition="'$(ViuCssHotReloadEnabled)' == 'true' and '$(DotNetWatchBuild)' == 'true' and '$(DesignTimeBuild)' == 'true' and '$(ViuGeneratedAssetHotReload)' != 'true'"
-          DependsOnTargets="ViuCollectGeneratedAssets">
+          DependsOnTargets="_ViuPrepareGeneratedAssetWorkerConfiguration">
     <ItemGroup>
       <!-- StaticWebAssetPath deliberately starts at wwwroot/: dotnet watch strips that prefix and
            sends UpdateStaticFile for the same stable route used by the host page. -->
@@ -69,11 +116,6 @@
              Condition="'%(ViuGeneratedAsset.StaticWebAssetPath)' != ''"
              KeepDuplicates="false" />
 
-      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)'))" />
-      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(BaseOutputPath)'))" />
-      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir).git'))" />
-      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir).vs'))" />
-      <_ViuGeneratedAssetHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir)node_modules'))" />
     </ItemGroup>
 
     <ViuStartCssHotReloadWorker

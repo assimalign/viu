@@ -2,3 +2,30 @@ Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StaticWebAssetEndpoints.
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StaticWebAssetEndpoints.set -> void
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StylesheetLinks.get -> Microsoft.Build.Framework.ITaskItem![]!
 Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink.StylesheetLinks.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.Configuration.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.Configuration.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ConfigurationFilePath.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ConfigurationFilePath.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.DebounceMilliseconds.get -> int
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.DebounceMilliseconds.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.DotNetHostPath.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.DotNetHostPath.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.EventLogPath.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.EventLogPath.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ExcludedDirectories.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ExcludedDirectories.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.GeneratedAssets.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.GeneratedAssets.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ProjectDirectory.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ProjectDirectory.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ProjectPath.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ProjectPath.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.RuntimeIdentifier.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.RuntimeIdentifier.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.StateFilePath.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.StateFilePath.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.TargetFramework.get -> string!
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.TargetFramework.set -> void
+Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.ViuWriteGeneratedAssetWorkerConfiguration() -> void
+override Assimalign.Viu.Sdk.Browser.Tasks.ViuWriteGeneratedAssetWorkerConfiguration.Execute() -> bool

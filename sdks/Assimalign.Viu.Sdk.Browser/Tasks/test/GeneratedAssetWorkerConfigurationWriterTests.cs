@@ -46,6 +46,17 @@ public sealed class GeneratedAssetWorkerConfigurationWriterTests
             DecodeValues(lines, "static-web-asset-path").ShouldBe(
                 new[] { "wwwroot/generated.css" });
             DecodeValues(lines, "removal-behavior").ShouldBe(new[] { "Delete" });
+            DecodeValues(lines, "launcher-process-identifier").ShouldBeEmpty();
+            DecodeValues(lines, "owner-process-identifier").ShouldBeEmpty();
+
+            File.SetLastWriteTimeUtc(
+                configurationPath,
+                DateTime.UtcNow.AddMinutes(-5));
+            var retainedWriteTime = File.GetLastWriteTimeUtc(configurationPath);
+
+            Write(directory, asset);
+
+            File.GetLastWriteTimeUtc(configurationPath).ShouldBe(retainedWriteTime);
         }
         finally
         {
@@ -156,7 +167,6 @@ public sealed class GeneratedAssetWorkerConfigurationWriterTests
             string.Empty,
             Path.Combine(directory, "obj", "worker.state"),
             Path.Combine(directory, "obj", "worker.events"),
-            Environment.ProcessId,
             100,
             new[] { asset },
             Array.Empty<ITaskItem>());

@@ -22,14 +22,19 @@
     Adds Chromium boot-to-interactive warm-up and measured runs and writes stable JSON.
 
 .PARAMETER HotReload
-    Runs the isolated packaged Debug .vue watch scenarios instead of the ordinary three-scenario
-    published fixture lane. This mode proves structural add/remove/v-if managed deltas, new-file
-    NewTypeDefinition application, accepted style/template/script updates, and automatic browser
-    reload after a script-signature rude-edit restart. It also proves generated utility CSS creation
-    and last-source retirement through the generic generated-asset seam ([V01.01.12.30.04], #355).
+    Runs the isolated packaged Debug .vue development-loop scenarios instead of the ordinary
+    three-scenario published fixture lane. A Visual Studio-shaped session first launches through the
+    packaged RunHost with a protocol-asserting BrowserRefresh endpoint and proves one .viu edit
+    delivers component and utility stylesheet updates in real Chromium ([V01.01.12.30.05], #357).
+    The unchanged watch lane
+    then proves structural add/remove/v-if managed deltas, new-file NewTypeDefinition application,
+    accepted style/template/script updates, automatic browser reload after a script-signature
+    rude-edit restart, generated utility CSS creation, and last-source retirement through the
+    generic generated-asset seam ([V01.01.12.30.04], #355).
     One session omits the runtime argument and proves component and utility stylesheet live swaps
     through the natural Browser SDK invocation ([V01.01.12.33], #356).
-    It requires Chromium and owns the complete dotnet-watch process tree for its staged consumer.
+    It requires Chromium and owns the complete RunHost and dotnet-watch process trees for its staged
+    consumer.
 
 .PARAMETER StartupResultsPath
     Destination for startup measurement JSON.
@@ -1160,9 +1165,10 @@ if (-not $HotReload) {
             -Raw `
             -LiteralPath $hotReloadResultPath |
             ConvertFrom-Json
-        # [V01.01.06.14], #350, [SFC-CG-4]: keep every structural delta case in
-        # the packaged Mono-WASM lane even if the harness scenario list changes.
+        # [V01.01.12.30.05], #357: keep the new Visual Studio-shaped RunHost case
+        # separate while pinning all nine established dotnet-watch scenarios by name.
         $requiredHotReloadScenarios = @(
+            'packaged-vue-run-host-visual-studio-generated-assets',
             # [V01.01.12.33], #356: the natural watch invocation must launch
             # the worker and deliver both registered generated-asset families.
             'packaged-vue-watch-no-runtime-css-and-utility',
@@ -1170,10 +1176,17 @@ if (-not $HotReload) {
             'packaged-vue-watch-structural-remove-delta',
             'packaged-vue-watch-structural-v-if-delta',
             'packaged-vue-watch-new-file-new-type-definition-delta',
+            'packaged-vue-watch-css-and-remount',
+            'packaged-vue-watch-script-signature-restart-reload',
             # [V01.01.12.30.04], #355: these names pin both generated-asset
             # creation and PreserveEmpty retirement into the packaged watch lane.
             'packaged-vue-watch-utility-css-new-class',
             'packaged-vue-watch-utility-css-last-source-removal')
+        if (@($hotReloadResult.scenarios).Count -ne $requiredHotReloadScenarios.Count) {
+            $actualScenarioCount = @($hotReloadResult.scenarios).Count
+            throw "Expected exactly $($requiredHotReloadScenarios.Count) hot-reload scenarios; " +
+                "found $actualScenarioCount."
+        }
         foreach ($requiredHotReloadScenario in $requiredHotReloadScenarios) {
             $matchingScenarios = @(
                 $hotReloadResult.scenarios |
@@ -1181,7 +1194,8 @@ if (-not $HotReload) {
                         $_.scenario -eq $requiredHotReloadScenario
                     })
             if ($matchingScenarios.Count -ne 1) {
-                throw "Expected exactly one hot-reload result for '$requiredHotReloadScenario'; found $($matchingScenarios.Count)."
+                throw "Expected exactly one hot-reload result for " +
+                    "'$requiredHotReloadScenario'; found $($matchingScenarios.Count)."
             }
             if (-not $matchingScenarios[0].succeeded) {
                 throw "The required hot-reload scenario failed: $requiredHotReloadScenario"

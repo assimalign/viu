@@ -37,6 +37,8 @@ internal sealed class CssHotReloadOptions
 
     public int DebounceMilliseconds { get; private set; } = 100;
 
+    public bool ReportUpdates { get; private set; }
+
     public IReadOnlyList<GeneratedAssetDescriptor> GeneratedAssets { get; private set; } =
         Array.Empty<GeneratedAssetDescriptor>();
 
@@ -52,7 +54,7 @@ internal sealed class CssHotReloadOptions
         ArgumentNullException.ThrowIfNull(errorWriter);
 
         options = new CssHotReloadOptions();
-        if (arguments.Length != 2 ||
+        if (arguments.Length < 2 ||
             !string.Equals(
                 arguments[0],
                 "--configuration-file",
@@ -64,12 +66,97 @@ internal sealed class CssHotReloadOptions
             return false;
         }
 
+        int? launcherProcessIdentifierOverride = null;
+        int? ownerProcessIdentifierOverride = null;
+        var reportUpdates = false;
+        for (var index = 2; index < arguments.Length; index++)
+        {
+            if (string.Equals(arguments[index], "--report-updates", StringComparison.Ordinal))
+            {
+                reportUpdates = true;
+                continue;
+            }
+
+            var isLauncherProcessIdentifier = string.Equals(
+                arguments[index],
+                "--launcher-process-identifier",
+                StringComparison.Ordinal);
+            var isOwnerProcessIdentifier = string.Equals(
+                arguments[index],
+                "--owner-process-identifier",
+                StringComparison.Ordinal);
+            if ((!isLauncherProcessIdentifier && !isOwnerProcessIdentifier) ||
+                index + 1 >= arguments.Length ||
+                !TryParsePositiveInteger(arguments[++index], out var processIdentifier))
+            {
+                errorWriter.WriteLine(
+                    "Viu Generated Asset Hot Reload received invalid launch arguments.");
+                return false;
+            }
+
+            if (isLauncherProcessIdentifier)
+            {
+                if (launcherProcessIdentifierOverride is not null)
+                {
+                    errorWriter.WriteLine(
+                        "Viu Generated Asset Hot Reload received duplicate launcher process identifiers.");
+                    return false;
+                }
+
+                launcherProcessIdentifierOverride = processIdentifier;
+            }
+            else
+            {
+                if (ownerProcessIdentifierOverride is not null)
+                {
+                    errorWriter.WriteLine(
+                        "Viu Generated Asset Hot Reload received duplicate owner process identifiers.");
+                    return false;
+                }
+
+                ownerProcessIdentifierOverride = processIdentifier;
+            }
+        }
+
+        if (launcherProcessIdentifierOverride is not null &&
+            ownerProcessIdentifierOverride is not null)
+        {
+            errorWriter.WriteLine(
+                "Viu Generated Asset Hot Reload requires one launch-time process identity.");
+            return false;
+        }
+
         try
         {
-            return TryReadConfiguration(
+            if (!TryReadConfiguration(
                 Path.GetFullPath(arguments[1]),
                 errorWriter,
-                options);
+                options))
+            {
+                return false;
+            }
+
+            if (launcherProcessIdentifierOverride is not null)
+            {
+                options.LauncherProcessIdentifier = launcherProcessIdentifierOverride;
+                options.OwnerProcessIdentifier = null;
+            }
+            else if (ownerProcessIdentifierOverride is not null)
+            {
+                options.OwnerProcessIdentifier = ownerProcessIdentifierOverride;
+                options.LauncherProcessIdentifier = null;
+            }
+
+            if (options.OwnerProcessIdentifier is null &&
+                options.LauncherProcessIdentifier is null)
+            {
+                return ConfigurationError(
+                    errorWriter,
+                    "must declare an owner or launcher process identifier at launch time");
+            }
+
+            options.ReportUpdates = reportUpdates;
+            return true;
         }
         catch (Exception exception) when (
             exception is IOException or
@@ -230,14 +317,6 @@ internal sealed class CssHotReloadOptions
             return ConfigurationError(
                 errorWriter,
                 "must declare the project, state file, and at least one asset");
-        }
-
-        if (options.OwnerProcessIdentifier is null &&
-            options.LauncherProcessIdentifier is null)
-        {
-            return ConfigurationError(
-                errorWriter,
-                "must declare an owner or launcher process identifier");
         }
 
         options.GeneratedAssets = generatedAssets;

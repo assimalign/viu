@@ -27,7 +27,6 @@ internal static class GeneratedAssetWorkerConfigurationWriter
         string runtimeIdentifier,
         string stateFilePath,
         string eventLogPath,
-        int launcherProcessIdentifier,
         int debounceMilliseconds,
         IEnumerable<ITaskItem> generatedAssets,
         IEnumerable<ITaskItem> excludedDirectories)
@@ -44,9 +43,6 @@ internal static class GeneratedAssetWorkerConfigurationWriter
             Encode("runtime-identifier", runtimeIdentifier),
             Encode("state-file", ResolvePath(stateFilePath, fullProjectDirectory)),
             Encode("event-log", ResolveOptionalTaskPath(eventLogPath, fullProjectDirectory)),
-            Encode(
-                "launcher-process-identifier",
-                launcherProcessIdentifier.ToString(CultureInfo.InvariantCulture)),
             Encode(
                 "debounce-milliseconds",
                 Math.Max(1, debounceMilliseconds).ToString(CultureInfo.InvariantCulture)),
@@ -166,10 +162,16 @@ internal static class GeneratedAssetWorkerConfigurationWriter
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllLines(
-            configurationFilePath,
-            lines,
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var content = string.Join(Environment.NewLine, lines) + Environment.NewLine;
+        var bytes = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+            .GetBytes(content);
+        if (File.Exists(configurationFilePath) &&
+            File.ReadAllBytes(configurationFilePath).SequenceEqual(bytes))
+        {
+            return;
+        }
+
+        File.WriteAllBytes(configurationFilePath, bytes);
     }
 
     private static void AddEncodedValues(

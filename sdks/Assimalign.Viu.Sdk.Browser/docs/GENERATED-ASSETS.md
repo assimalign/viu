@@ -1,9 +1,10 @@
 # Generated-asset hot reload
 
 `Assimalign.Viu.Sdk.Browser` exposes a versioned MSBuild seam for build extensions whose generated
-static assets must be regenerated during `dotnet watch`. The seam is a development-time build
-contract: it does not add a runtime API, a JavaScript transport, or an application asset. The
-existing .NET watch `UpdateStaticFile` transport remains the browser boundary.
+static assets must be regenerated during an active Browser development session. The seam is a
+development-time build contract: it does not add a runtime API, a JavaScript transport, or an
+application asset. The existing BrowserRefresh client's targeted `UpdateStaticFile` message remains
+the browser boundary under both `dotnet watch` and Visual Studio.
 
 This contract is version 1 and is specified by [V01.01.12.30.04], issue #355, under [PKG-4].
 The Browser SDK advertises it with:
@@ -50,17 +51,36 @@ The item contract is:
 | `WatchExtensions` | Semicolon-separated extensions accepted below `WatchRoots` and dependency-manifest roots. Each value includes its leading period. Required when any root is declared. |
 | `RegenerationTarget` | Required public MSBuild target. The worker batches every distinct declared target into one nested build. |
 | `DependencyManifestPath` | Optional absolute path to the version-1 dependency manifest described below. The provider owns and updates the file. |
-| `StaticWebAssetPath` | Required stable route beginning with `wwwroot/`. The Browser SDK copies it to the generated asset's `@(Watch)` item so .NET watch sends `UpdateStaticFile` for that route. |
+| `StaticWebAssetPath` | Required stable route beginning with `wwwroot/`. The Browser SDK copies it to the generated asset's `@(Watch)` item for .NET watch and gives the same route to a Visual Studio-shaped RunHost session; either host sends `UpdateStaticFile` for that route. |
 | `RemovalBehavior` | Required `Delete` or `PreserveEmpty`. `PreserveEmpty` is the stylesheet-safe removal protocol described below. |
 
 At least one exact file, root, or dependency manifest must describe the asset's inputs. Paths and
 target names are provider-owned public values; consumers of the seam never reference a provider's
 private target, property, or resolved-item name.
 
+## Host discovery
+
+An ordinary Debug build with generated-asset hot reload enabled materializes the collected
+descriptors in a deterministic worker configuration below `obj/viu/css-hot-reload/`. The file is an
+internal host-discovery artifact, not an additional provider contract: providers continue to declare
+only `@(ViuGeneratedAsset)`. The SDK byte-compares the complete configuration and preserves its
+timestamp when the descriptors are unchanged. Worker configuration and state paths are resolved
+against `MSBuildProjectDirectory`, so a Visual Studio solution working directory cannot merge two
+projects into one ownership scope. The build itself does not leave a worker running.
+
+The `dotnet watch` design-time watch-list pass starts its worker through the established watch path.
+Visual Studio instead gives the packaged RunHost its BrowserRefresh websocket endpoint and public
+key. RunHost consumes the ordinary-build configuration, starts the worker only when no live
+watch-owned worker exists, and bridges the SDK-injected page client through a loopback websocket to
+Visual Studio. Worker-generated updates use the same stable `StaticWebAssetPath` to originate a
+targeted `UpdateStaticFile` message on that local connection. The project-scoped state file and named
+mutex keep both hosts mutually exclusive. Specified by [V01.01.12.30.05], issue #357.
+
 ## Regeneration guarantees
 
-The Browser SDK starts one worker for the project, merges every asset's watched inputs, and applies
-one quiet period to a burst of file-system events. One nested MSBuild invocation runs the distinct
+The active Browser development host starts one worker for the project, merges every asset's watched
+inputs, and applies one quiet period to a burst of file-system events. One nested MSBuild invocation
+runs the distinct
 `RegenerationTarget` values with project-reference builds disabled and with:
 
 ```xml
@@ -110,8 +130,11 @@ self-triggering loops and reads declared dependency manifests explicitly instead
 
 ## Compatibility and lifecycle
 
-The contract is collected only by the Debug `dotnet watch` design-time watch-list build. Release
-builds, ordinary builds, Visual Studio Hot Reload without a watch process, and hosts that do not
-advertise version 1 continue to use each provider's ordinary build-time target. A breaking metadata,
-manifest, driver-property, or lifecycle change requires a new seam version; exact-version provider
-guards keep incompatible SDK and add-on versions inert.
+The contract is collected into the worker configuration by ordinary Debug builds and by the Debug
+`dotnet watch` design-time watch-list build. An ordinary build alone only writes that discovery
+artifact. RunHost starts the Visual Studio worker only when BrowserRefresh is present; a direct
+`dotnet run` without that environment remains inert. Release builds and publish do not emit the
+configuration or launch a worker, and hosts that do not advertise version 1 continue to use each
+provider's ordinary build-time target. A breaking metadata, manifest, driver-property, or lifecycle
+change requires a new seam version; exact-version provider guards keep incompatible SDK and add-on
+versions inert.

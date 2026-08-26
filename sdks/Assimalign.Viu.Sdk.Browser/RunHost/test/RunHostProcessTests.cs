@@ -114,6 +114,45 @@ public sealed class RunHostProcessTests
         standardError.ToString().ShouldContain("Usage:");
     }
 
+    [Fact]
+    public async Task RunAsync_InvalidBrowserRefreshEndpoint_LaunchesChildWithFallback()
+    {
+        using TestProject project = TestProject.Create("fallback child started");
+        string configurationFilePath = project.CreateFile(
+            "worker.configuration",
+            "configuration");
+        string stateFilePath = project.GetPath("worker.state");
+        using StringWriter standardOutput = new(CultureInfo.InvariantCulture);
+        using StringWriter standardError = new(CultureInfo.InvariantCulture);
+        const string environmentVariable = "ASPNETCORE_AUTO_RELOAD_WS_ENDPOINT";
+        string? previousEndpoint = Environment.GetEnvironmentVariable(
+            environmentVariable);
+        Environment.SetEnvironmentVariable(
+            environmentVariable,
+            "http://127.0.0.1:51235/not-a-websocket");
+        try
+        {
+            int exitCode = await RunHostProcess.RunAsync(
+                project.CreateArguments(
+                    typeof(RunHostProcess).Assembly.Location,
+                    configurationFilePath,
+                    stateFilePath),
+                standardOutput,
+                standardError);
+
+            exitCode.ShouldBe(0);
+            standardOutput.ToString().ShouldContain("fallback child started");
+            standardError.ToString().ShouldContain(
+                "the application will use the original host refresh endpoint");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(
+                environmentVariable,
+                previousEndpoint);
+        }
+    }
+
     private static int CountOccurrences(string value, string search)
     {
         int count = 0;
@@ -155,6 +194,32 @@ public sealed class RunHostProcessTests
             "-verbosity:minimal",
             "-target:RunHostProbe",
         ];
+
+        internal IReadOnlyList<string> CreateArguments(
+            string workerAssemblyPath,
+            string configurationFilePath,
+            string stateFilePath) =>
+        [
+            "--generated-asset-worker-assembly",
+            workerAssemblyPath,
+            "--generated-asset-worker-configuration",
+            configurationFilePath,
+            "--generated-asset-worker-state",
+            stateFilePath,
+            .. CreateArguments(),
+        ];
+
+        internal string CreateFile(string name, string content)
+        {
+            string path = GetPath(name);
+            File.WriteAllText(
+                path,
+                content,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            return path;
+        }
+
+        internal string GetPath(string name) => Path.Combine(DirectoryPath, name);
 
         public void Dispose()
         {

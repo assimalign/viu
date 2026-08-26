@@ -1,0 +1,10 @@
+<template>
+    <div>Visual Studio generated-asset probe</div>
+</template>
+
+<style>
+.visual-studio-style-probe {
+    border-left-style: solid;
+    border-left-width: 1px;
+}
+</style>

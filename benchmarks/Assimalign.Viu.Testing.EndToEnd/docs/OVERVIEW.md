@@ -30,9 +30,17 @@ through the installed SDK/framework packages, requires a non-empty component-CSS
 and scans both generated sources and the published consumer assembly for absent Debug-only
 hot-reload metadata in Release and AOT output.
 
-The separate `-HotReload` mode stages one package-only Debug Browser application and starts it under
-an owned `dotnet watch` process. Its mounted root is a tag-based `.vue` component. The Chromium
-scenarios prove add-element, remove-element, and `v-if` template edits apply as managed deltas,
+The separate `-HotReload` mode stages one package-only Debug Browser application. Before starting
+watch, it performs an ordinary Debug build and launches the application through the packaged
+RunHost with a protocol-asserting Visual Studio-shaped BrowserRefresh endpoint. A real Chromium page
+connects to RunHost's rewritten loopback websocket; the harness verifies the encrypted-secret
+upstream handshake, a bidirectional capability request, targeted component and utility
+`UpdateStaticFile` messages from one `.viu` edit, both stylesheet replacements, and retained
+document identity. This coverage is specified by [V01.01.12.30.05], #357.
+
+The mode then runs the unchanged nine scenarios under owned `dotnet watch` processes. Its mounted
+root is a tag-based `.vue` component. The Chromium scenarios prove add-element, remove-element, and
+`v-if` template edits apply as managed deltas,
 remount only the affected component, and preserve the connected document. Adding a new canonical
 `.viu` file exercises the runtime's `NewTypeDefinition` path without remounting the unrelated root.
 The lane also pins component-stylesheet replacement without document navigation, semantic no-op
@@ -45,6 +53,5 @@ connected-document scenarios add a never-before-generated utility class to the m
 observe the regenerated stylesheet and Chromium computed style without a restart, then delete the
 last source contributing a utility rule and observe the empty retirement update without a managed
 delta or state loss. This generated-asset coverage is specified by [V01.01.12.30.04], #355.
-This opt-in mode never changes the ordinary
-three-scenario-per-engine matrix. These Phase 2 guarantees are specified by [V01.01.06.14], #350,
-and [SFC-CG-4].
+This opt-in mode never changes the ordinary three-scenario-per-engine matrix. These Phase 2
+guarantees are specified by [V01.01.06.14], #350, and [SFC-CG-4].

@@ -11,6 +11,7 @@ namespace Assimalign.Viu.Sdk.CssHotReload;
 
 internal sealed class CssHotReloadWorker
 {
+    private const string GeneratedAssetUpdateMarker = "viu-generated-asset-update:";
     private static readonly StringComparer PathComparer =
         OperatingSystem.IsWindows()
             ? StringComparer.OrdinalIgnoreCase
@@ -136,8 +137,16 @@ internal sealed class CssHotReloadWorker
             }
 
             processedVersion = observedVersion;
+            var generatedAssetOutputSnapshots = options.ReportUpdates
+                ? CaptureGeneratedAssetOutputSnapshots()
+                : Array.Empty<GeneratedAssetOutputSnapshot>();
             UpdateSourceSnapshot();
-            await regenerator.RegenerateAsync(cancellationToken);
+            var regenerationSucceeded = await regenerator.RegenerateAsync(cancellationToken);
+            if (regenerationSucceeded && options.ReportUpdates)
+            {
+                ReportGeneratedAssetUpdates(generatedAssetOutputSnapshots);
+            }
+
             // Give source writes racing the nested-build process boundary one bounded scheduling
             // window before reconciliation. Later changes remain covered by snapshot monitoring.
             await Task.Delay(
@@ -481,6 +490,82 @@ internal sealed class CssHotReloadWorker
         Interlocked.Increment(ref changeVersion);
     }
 
+    private GeneratedAssetOutputSnapshot[] CaptureGeneratedAssetOutputSnapshots()
+    {
+        var snapshots = new GeneratedAssetOutputSnapshot[options.GeneratedAssets.Count];
+        for (var index = 0; index < options.GeneratedAssets.Count; index++)
+        {
+            snapshots[index] = CaptureGeneratedAssetOutputSnapshot(
+                options.GeneratedAssets[index]);
+        }
+
+        return snapshots;
+    }
+
+    private GeneratedAssetOutputSnapshot CaptureGeneratedAssetOutputSnapshot(
+        GeneratedAssetDescriptor generatedAsset)
+    {
+        try
+        {
+            if (!File.Exists(generatedAsset.Identity))
+            {
+                return new GeneratedAssetOutputSnapshot(
+                    true,
+                    false,
+                    Array.Empty<byte>());
+            }
+
+            return new GeneratedAssetOutputSnapshot(
+                true,
+                true,
+                File.ReadAllBytes(generatedAsset.Identity));
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            eventLog.Append(
+                "asset-read-error:" +
+                Path.GetFileName(generatedAsset.Identity) +
+                ":" +
+                exception.GetType().Name);
+            return new GeneratedAssetOutputSnapshot(
+                false,
+                false,
+                Array.Empty<byte>());
+        }
+    }
+
+    private void ReportGeneratedAssetUpdates(
+        IReadOnlyList<GeneratedAssetOutputSnapshot> previousSnapshots)
+    {
+        var reportedUpdate = false;
+        for (var index = 0; index < options.GeneratedAssets.Count; index++)
+        {
+            var generatedAsset = options.GeneratedAssets[index];
+            var previousSnapshot = previousSnapshots[index];
+            var currentSnapshot = CaptureGeneratedAssetOutputSnapshot(generatedAsset);
+            if (!previousSnapshot.Captured ||
+                !currentSnapshot.Captured ||
+                (previousSnapshot.Exists == currentSnapshot.Exists &&
+                    (!currentSnapshot.Exists ||
+                        previousSnapshot.Bytes.SequenceEqual(currentSnapshot.Bytes))))
+            {
+                continue;
+            }
+
+            Console.Out.WriteLine(
+                GeneratedAssetUpdateMarker +
+                Convert.ToBase64String(
+                    Encoding.UTF8.GetBytes(generatedAsset.StaticWebAssetPath)));
+            reportedUpdate = true;
+        }
+
+        if (reportedUpdate)
+        {
+            Console.Out.Flush();
+        }
+    }
+
     private void WriteStateFile()
     {
         var directory = Path.GetDirectoryName(options.StateFilePath);
@@ -559,6 +644,11 @@ internal sealed class CssHotReloadWorker
     private readonly record struct SourceFileStamp(
         long Length,
         long LastWriteTimeUtcTicks);
+
+    private readonly record struct GeneratedAssetOutputSnapshot(
+        bool Captured,
+        bool Exists,
+        byte[] Bytes);
 
     private sealed class SourceCapture
     {

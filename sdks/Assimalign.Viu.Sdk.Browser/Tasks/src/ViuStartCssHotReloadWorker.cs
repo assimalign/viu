@@ -18,9 +18,10 @@ namespace Assimalign.Viu.Sdk.Browser.Tasks;
 /// <remarks>
 /// The task waits until the worker records its process identity before returning. This lets the worker
 /// capture the owning <c>dotnet watch</c> process while the short-lived watch-list MSBuild process is
-/// still alive. A project-scoped state file and the worker's named mutex prevent duplicate workers.
-/// The task serializes the public <c>ViuGeneratedAsset</c> contract to a private, project-scoped
-/// worker configuration so provider metadata never depends on command-line quoting.
+/// still alive. The launcher identity is passed separately from the deterministic, project-scoped
+/// configuration, which serializes the public <c>ViuGeneratedAsset</c> contract without depending on
+/// command-line quoting. A project-scoped state file and the worker's named mutex prevent duplicate
+/// workers.
 /// Specified by <c>[V01.01.12.30.04]</c> (#355).
 /// </remarks>
 public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
@@ -144,6 +145,7 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
 
             var dotNetHostPath = ResolveDotNetHostPath();
             var configurationFilePath = StateFilePath + ".configuration";
+            var launcherProcessIdentifier = GetCurrentProcessIdentifier();
             GeneratedAssetWorkerConfigurationWriter.Write(
                 configurationFilePath,
                 ProjectPath,
@@ -154,14 +156,14 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
                 RuntimeIdentifier,
                 StateFilePath,
                 EventLogPath,
-                GetCurrentProcessIdentifier(),
                 DebounceMilliseconds,
                 GeneratedAssets,
                 ExcludedDirectories);
 
             var startInfo = CreateStartInfo(
                 configurationFilePath,
-                dotNetHostPath);
+                dotNetHostPath,
+                launcherProcessIdentifier);
             using var process = Process.Start(startInfo);
             if (process is null)
             {
@@ -210,13 +212,16 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
 
     private ProcessStartInfo CreateStartInfo(
         string configurationFilePath,
-        string dotNetHostPath)
+        string dotNetHostPath,
+        int launcherProcessIdentifier)
     {
         var arguments = new List<string>
         {
             WorkerAssemblyPath,
             "--configuration-file",
             configurationFilePath,
+            "--launcher-process-identifier",
+            launcherProcessIdentifier.ToString(CultureInfo.InvariantCulture),
         };
 
         var startInfo = new ProcessStartInfo

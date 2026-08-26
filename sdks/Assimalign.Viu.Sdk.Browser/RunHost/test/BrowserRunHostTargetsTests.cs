@@ -48,6 +48,42 @@ public sealed class BrowserRunHostTargetsTests
     }
 
     [Theory]
+    [InlineData("Debug", true)]
+    [InlineData("Release", false)]
+    public void ComputeRunArguments_BuildConfiguration_InjectsWorkerArgumentsOnlyForDebug(
+        string configuration,
+        bool expectsWorkerArguments)
+    {
+        using TargetTestProject project = TargetTestProject.Create(
+            enabled: true,
+            configuration: configuration);
+
+        IReadOnlyList<string> lines = project.Run();
+
+        string workerArguments = expectsWorkerArguments
+            ? "--generated-asset-worker-assembly \"worker-assembly.dll\" "
+                + "--generated-asset-worker-configuration \"worker.configuration\" "
+                + "--generated-asset-worker-state \"worker.state\" "
+            : string.Empty;
+        lines.ShouldContain(
+            $"arguments=exec \"{project.RunHostAssemblyPath}\" {workerArguments}-- "
+            + "\"original-command\" exec \"original host.dll\" --flag");
+    }
+
+    [Fact]
+    public void CommonProps_RelativeIntermediatePath_AnchorsWorkerFilesToProjectDirectory()
+    {
+        using TargetTestProject project = TargetTestProject.Create(
+            enabled: true,
+            useDefaultWorkerPaths: true);
+
+        IReadOnlyList<string> lines = project.Run();
+
+        lines.ShouldContain($"state={project.ExpectedStateFilePath}");
+        lines.ShouldContain($"configuration={project.ExpectedConfigurationFilePath}");
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, true)]
     public void ComputeRunArguments_DisabledOrAlreadyConfigured_DoesNotWrap(
@@ -82,6 +118,16 @@ public sealed class BrowserRunHostTargetsTests
 
         internal string RunHostAssemblyPath { get; }
 
+        internal string ExpectedConfigurationFilePath =>
+            ExpectedStateFilePath + ".configuration";
+
+        internal string ExpectedStateFilePath => Path.Combine(
+            DirectoryPath,
+            "obj",
+            "viu",
+            "css-hot-reload",
+            "worker.state");
+
         private string DirectoryPath { get; }
 
         private string ProjectPath { get; }
@@ -91,7 +137,9 @@ public sealed class BrowserRunHostTargetsTests
         internal static TargetTestProject Create(
             bool enabled,
             bool alreadyConfigured = false,
-            bool deferRunCommand = false)
+            bool deferRunCommand = false,
+            string configuration = "",
+            bool useDefaultWorkerPaths = false)
         {
             string repositoryDirectory = FindRepositoryDirectory();
             string targetsPath = Path.Combine(
@@ -100,6 +148,12 @@ public sealed class BrowserRunHostTargetsTests
                 "Assimalign.Viu.Sdk.Browser",
                 "Targets",
                 "Assimalign.Viu.Sdk.Browser.WebAssembly.targets");
+            string commonPropsPath = Path.Combine(
+                repositoryDirectory,
+                "sdks",
+                "Assimalign.Viu.Sdk.Browser",
+                "Targets",
+                "Assimalign.Viu.Sdk.Browser.Common.props");
             string runHostAssemblyPath = typeof(RunHostProcess).Assembly.Location;
             string directoryPath = Path.Combine(
                 Path.GetTempPath(),
@@ -115,6 +169,14 @@ public sealed class BrowserRunHostTargetsTests
                 + "    <OutputType>Exe</OutputType>" + Environment.NewLine
                 + "    <_IsExecutable>true</_IsExecutable>" + Environment.NewLine
                 + "    <WasmGenerateAppBundle>false</WasmGenerateAppBundle>" + Environment.NewLine
+                + "    <BaseIntermediateOutputPath>obj\\</BaseIntermediateOutputPath>" + Environment.NewLine
+                + $"    <Configuration>{Escape(configuration)}</Configuration>" + Environment.NewLine
+                + "    <ViuCssHotReloadEnabled>true</ViuCssHotReloadEnabled>" + Environment.NewLine
+                + (useDefaultWorkerPaths
+                    ? string.Empty
+                    : "    <ViuCssHotReloadWorkerAssembly>worker-assembly.dll</ViuCssHotReloadWorkerAssembly>" + Environment.NewLine
+                        + "    <ViuGeneratedAssetWorkerConfigurationFile>worker.configuration</ViuGeneratedAssetWorkerConfigurationFile>" + Environment.NewLine
+                        + "    <ViuCssHotReloadStateFile>worker.state</ViuCssHotReloadStateFile>" + Environment.NewLine)
                 + $"    <ViuBrowserRunHostReadinessEnabled>{enabled.ToString().ToLowerInvariant()}</ViuBrowserRunHostReadinessEnabled>" + Environment.NewLine
                 + $"    <_ViuBrowserRunHostConfigured>{alreadyConfigured.ToString().ToLowerInvariant()}</_ViuBrowserRunHostConfigured>" + Environment.NewLine
                 + $"    <ViuBrowserRunHostAssembly>{Escape(runHostAssemblyPath)}</ViuBrowserRunHostAssembly>" + Environment.NewLine
@@ -134,6 +196,7 @@ public sealed class BrowserRunHostTargetsTests
                         + "    </PropertyGroup>" + Environment.NewLine
                         + "  </Target>" + Environment.NewLine
                     : "  <Target Name=\"ComputeRunArguments\" />" + Environment.NewLine)
+                + $"  <Import Project=\"{Escape(commonPropsPath)}\" />" + Environment.NewLine
                 + $"  <Import Project=\"{Escape(targetsPath)}\" />" + Environment.NewLine
                 + "  <Target Name=\"Probe\" DependsOnTargets=\"ComputeRunArguments\">" + Environment.NewLine
                 + "    <ItemGroup>" + Environment.NewLine
@@ -141,6 +204,8 @@ public sealed class BrowserRunHostTargetsTests
                 + "      <_ProbeLine Include=\"arguments=$(RunArguments)\" />" + Environment.NewLine
                 + "      <_ProbeLine Include=\"working=$(RunWorkingDirectory)\" />" + Environment.NewLine
                 + "      <_ProbeLine Include=\"configured=$(_ViuBrowserRunHostConfigured)\" />" + Environment.NewLine
+                + "      <_ProbeLine Include=\"state=$(ViuCssHotReloadStateFile)\" />" + Environment.NewLine
+                + "      <_ProbeLine Include=\"configuration=$(ViuGeneratedAssetWorkerConfigurationFile)\" />" + Environment.NewLine
                 + "    </ItemGroup>" + Environment.NewLine
                 + "    <WriteLinesToFile File=\"$(ProbeOutput)\" Lines=\"@(_ProbeLine)\" Overwrite=\"true\" Encoding=\"UTF-8\" />" + Environment.NewLine
                 + "  </Target>" + Environment.NewLine

@@ -11,6 +11,14 @@ namespace Assimalign.Viu.Sdk.Browser.RunHost;
 internal static class RunHostProcess
 {
     private const string ArgumentSeparator = "--";
+    private const string BrowserRefreshEndpointEnvironmentVariable =
+        "ASPNETCORE_AUTO_RELOAD_WS_ENDPOINT";
+    private const string GeneratedAssetWorkerAssemblyArgument =
+        "--generated-asset-worker-assembly";
+    private const string GeneratedAssetWorkerConfigurationArgument =
+        "--generated-asset-worker-configuration";
+    private const string GeneratedAssetWorkerStateArgument =
+        "--generated-asset-worker-state";
     private const string WasmAppHostAddressPrefix = "App url:";
     private static readonly TimeSpan GracefulTerminationTimeout = TimeSpan.FromSeconds(3);
 
@@ -23,85 +31,241 @@ internal static class RunHostProcess
         ArgumentNullException.ThrowIfNull(standardOutput);
         ArgumentNullException.ThrowIfNull(standardError);
 
-        if (arguments.Count < 2
-            || !string.Equals(arguments[0], ArgumentSeparator, StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(arguments[1]))
+        if (!TryParseInvocation(arguments, out RunHostInvocation? invocation)
+            || invocation is null)
         {
             await standardError.WriteLineAsync(
-                "Usage: Assimalign.Viu.Sdk.Browser.RunHost -- <command> [arguments]");
+                "Usage: Assimalign.Viu.Sdk.Browser.RunHost "
+                + "[--generated-asset-worker-assembly <path> "
+                + "--generated-asset-worker-configuration <path> "
+                + "--generated-asset-worker-state <path>] "
+                + "-- <command> [arguments]");
             return 2;
         }
 
         ProcessStartInfo startInformation = new()
         {
-            FileName = arguments[1],
+            FileName = invocation.Command,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        for (int index = 2; index < arguments.Count; index++)
+        foreach (string argument in invocation.CommandArguments)
         {
-            startInformation.ArgumentList.Add(arguments[index]);
+            startInformation.ArgumentList.Add(argument);
         }
 
-        using Process process = new() { StartInfo = startInformation };
-        if (!process.Start())
+        BrowserRefreshBridge? browserRefreshBridge = null;
+        string? browserRefreshEndpoints = Environment.GetEnvironmentVariable(
+            BrowserRefreshEndpointEnvironmentVariable);
+        if (invocation.GeneratedAssetWorkerAssemblyPath is not null
+            && invocation.GeneratedAssetWorkerConfigurationFilePath is not null
+            && invocation.GeneratedAssetWorkerStateFilePath is not null
+            && File.Exists(invocation.GeneratedAssetWorkerConfigurationFilePath)
+            && !GeneratedAssetWorkerHost.IsWorkerActive(
+                invocation.GeneratedAssetWorkerStateFilePath)
+            && !string.IsNullOrWhiteSpace(browserRefreshEndpoints))
         {
-            await standardError.WriteLineAsync(
-                $"Could not start the Browser application run command '{startInformation.FileName}'.");
-            return 1;
-        }
-
-        int cancellationCount = 0;
-        ConsoleCancelEventHandler cancellationHandler = (_, eventArguments) =>
-        {
-            eventArguments.Cancel = true;
-            if (Interlocked.Increment(ref cancellationCount) == 1)
+            try
             {
-                ScheduleForcedTermination(process);
+                browserRefreshBridge = await BrowserRefreshBridge.StartAsync(
+                    browserRefreshEndpoints,
+                    CancellationToken.None);
+                startInformation.Environment[BrowserRefreshEndpointEnvironmentVariable] =
+                    browserRefreshBridge.ChildEndpointList;
+                _ = GeneratedAssetWorkerHost.TryStart(
+                    invocation.GeneratedAssetWorkerAssemblyPath,
+                    invocation.GeneratedAssetWorkerConfigurationFilePath,
+                    browserRefreshBridge.SendUpdateStaticFileAsync,
+                    standardOutput,
+                    standardError);
             }
-            else
+            catch (Exception exception) when (
+                exception is ArgumentException or
+                    IOException or
+                    InvalidOperationException or
+                    NotSupportedException or
+                    System.Net.Sockets.SocketException or
+                    UnauthorizedAccessException)
             {
-                TryTerminateProcessTree(process);
-            }
-        };
-        EventHandler processExitHandler = (_, _) => TryTerminateProcessTree(process);
-        PosixSignalRegistration? terminationRegistration = null;
-
-        Console.CancelKeyPress += cancellationHandler;
-        AppDomain.CurrentDomain.ProcessExit += processExitHandler;
-        if (!OperatingSystem.IsWindows())
-        {
-            terminationRegistration = PosixSignalRegistration.Create(
-                PosixSignal.SIGTERM,
-                context =>
+                startInformation.Environment[BrowserRefreshEndpointEnvironmentVariable] =
+                    browserRefreshEndpoints;
+                if (browserRefreshBridge is not null)
                 {
-                    context.Cancel = true;
-                    TrySendTerminationSignal(process);
-                    ScheduleForcedTermination(process);
-                });
+                    try
+                    {
+                        await browserRefreshBridge.DisposeAsync();
+                    }
+                    catch (Exception disposalException) when (
+                        disposalException is IOException or
+                            InvalidOperationException or
+                            ObjectDisposedException)
+                    {
+                        await standardError.WriteLineAsync(
+                            "Viu Generated Asset Hot Reload could not fully dispose its failed "
+                            + "BrowserRefresh bridge: "
+                            + disposalException.Message);
+                    }
+                }
+
+                await standardError.WriteLineAsync(
+                    "Viu Generated Asset Hot Reload could not start its BrowserRefresh bridge; "
+                    + "the application will use the original host refresh endpoint. "
+                    + exception.Message);
+                browserRefreshBridge = null;
+            }
         }
 
         try
         {
-            Task standardOutputTask = ForwardLinesAsync(
-                process.StandardOutput,
-                standardOutput);
-            Task standardErrorTask = ForwardLinesAsync(
-                process.StandardError,
-                standardError);
+            using Process process = new() { StartInfo = startInformation };
+            if (!process.Start())
+            {
+                await standardError.WriteLineAsync(
+                    $"Could not start the Browser application run command '{startInformation.FileName}'.");
+                return 1;
+            }
 
-            await process.WaitForExitAsync();
-            await Task.WhenAll(standardOutputTask, standardErrorTask);
-            return process.ExitCode;
+            int cancellationCount = 0;
+            ConsoleCancelEventHandler cancellationHandler = (_, eventArguments) =>
+            {
+                eventArguments.Cancel = true;
+                if (Interlocked.Increment(ref cancellationCount) == 1)
+                {
+                    ScheduleForcedTermination(process);
+                }
+                else
+                {
+                    TryTerminateProcessTree(process);
+                }
+            };
+            EventHandler processExitHandler = (_, _) => TryTerminateProcessTree(process);
+            PosixSignalRegistration? terminationRegistration = null;
+
+            Console.CancelKeyPress += cancellationHandler;
+            AppDomain.CurrentDomain.ProcessExit += processExitHandler;
+            if (!OperatingSystem.IsWindows())
+            {
+                terminationRegistration = PosixSignalRegistration.Create(
+                    PosixSignal.SIGTERM,
+                    context =>
+                    {
+                        context.Cancel = true;
+                        TrySendTerminationSignal(process);
+                        ScheduleForcedTermination(process);
+                    });
+            }
+
+            try
+            {
+                Task standardOutputTask = ForwardLinesAsync(
+                    process.StandardOutput,
+                    standardOutput);
+                Task standardErrorTask = ForwardLinesAsync(
+                    process.StandardError,
+                    standardError);
+
+                await process.WaitForExitAsync();
+                await Task.WhenAll(standardOutputTask, standardErrorTask);
+                return process.ExitCode;
+            }
+            finally
+            {
+                terminationRegistration?.Dispose();
+                AppDomain.CurrentDomain.ProcessExit -= processExitHandler;
+                Console.CancelKeyPress -= cancellationHandler;
+                TryTerminateProcessTree(process);
+            }
         }
         finally
         {
-            terminationRegistration?.Dispose();
-            AppDomain.CurrentDomain.ProcessExit -= processExitHandler;
-            Console.CancelKeyPress -= cancellationHandler;
-            TryTerminateProcessTree(process);
+            if (browserRefreshBridge is not null)
+            {
+                await browserRefreshBridge.DisposeAsync();
+            }
         }
+    }
+
+    private static bool TryParseInvocation(
+        IReadOnlyList<string> arguments,
+        out RunHostInvocation? invocation)
+    {
+        string? workerAssemblyPath = null;
+        string? workerConfigurationFilePath = null;
+        string? workerStateFilePath = null;
+        int index = 0;
+        while (index < arguments.Count
+            && !string.Equals(
+                arguments[index],
+                ArgumentSeparator,
+                StringComparison.Ordinal))
+        {
+            string argument = arguments[index];
+            if (index + 1 >= arguments.Count
+                || string.IsNullOrWhiteSpace(arguments[index + 1]))
+            {
+                invocation = null;
+                return false;
+            }
+
+            if (string.Equals(
+                    argument,
+                    GeneratedAssetWorkerAssemblyArgument,
+                    StringComparison.Ordinal))
+            {
+                workerAssemblyPath = arguments[index + 1];
+            }
+            else if (string.Equals(
+                    argument,
+                    GeneratedAssetWorkerConfigurationArgument,
+                    StringComparison.Ordinal))
+            {
+                workerConfigurationFilePath = arguments[index + 1];
+            }
+            else if (string.Equals(
+                    argument,
+                    GeneratedAssetWorkerStateArgument,
+                    StringComparison.Ordinal))
+            {
+                workerStateFilePath = arguments[index + 1];
+            }
+            else
+            {
+                invocation = null;
+                return false;
+            }
+
+            index += 2;
+        }
+
+        if (index + 1 >= arguments.Count
+            || !string.Equals(
+                arguments[index],
+                ArgumentSeparator,
+                StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(arguments[index + 1])
+            || (workerAssemblyPath is null) != (workerConfigurationFilePath is null)
+            || (workerAssemblyPath is null) != (workerStateFilePath is null))
+        {
+            invocation = null;
+            return false;
+        }
+
+        List<string> commandArguments = [];
+        for (int argumentIndex = index + 2;
+            argumentIndex < arguments.Count;
+            argumentIndex++)
+        {
+            commandArguments.Add(arguments[argumentIndex]);
+        }
+
+        invocation = new RunHostInvocation(
+            arguments[index + 1],
+            commandArguments,
+            workerAssemblyPath,
+            workerConfigurationFilePath,
+            workerStateFilePath);
+        return true;
     }
 
     private static async Task ForwardLinesAsync(
@@ -190,4 +354,11 @@ internal static class RunHostProcess
         {
         }
     }
+
+    private sealed record RunHostInvocation(
+        string Command,
+        IReadOnlyList<string> CommandArguments,
+        string? GeneratedAssetWorkerAssemblyPath,
+        string? GeneratedAssetWorkerConfigurationFilePath,
+        string? GeneratedAssetWorkerStateFilePath);
 }

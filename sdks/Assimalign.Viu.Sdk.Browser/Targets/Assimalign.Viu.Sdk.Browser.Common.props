@@ -9,6 +9,8 @@
         <ViuInjectCssBundleLinkTaskAssembly Condition="'$(ViuInjectCssBundleLinkTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuInjectCssBundleLinkTaskAssembly>
         <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuCssHotReloadTaskAssembly>
         <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(MSBuildThisFileDirectory)..\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
+        <ViuCssHotReloadStateFile Condition="'$(ViuCssHotReloadStateFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'viu', 'css-hot-reload', 'worker.state'))</ViuCssHotReloadStateFile>
+        <ViuGeneratedAssetWorkerConfigurationFile Condition="'$(ViuGeneratedAssetWorkerConfigurationFile)' == ''">$(ViuCssHotReloadStateFile).configuration</ViuGeneratedAssetWorkerConfigurationFile>
         <ViuBrowserRunHostAssembly Condition="'$(ViuBrowserRunHostAssembly)' == ''">$(MSBuildThisFileDirectory)..\RunHost\Assimalign.Viu.Sdk.Browser.RunHost.dll</ViuBrowserRunHostAssembly>
         <ViuBrowserRunHostReadinessEnabled Condition="'$(ViuBrowserRunHostReadinessEnabled)' == ''">true</ViuBrowserRunHostReadinessEnabled>
         <MetadataUpdaterSupport Condition="'$(MetadataUpdaterSupport)' == '' and '$(Configuration)' == 'Debug' and '$(WasmEnableHotReload)' != 'false'">true</MetadataUpdaterSupport>

@@ -19,8 +19,9 @@
         <_ViuBrowserOriginalRunArguments>$(RunArguments)</_ViuBrowserOriginalRunArguments>
         <_ViuBrowserRunHostCommand Condition="'$(DOTNET_HOST_PATH)' != '' and Exists('$(DOTNET_HOST_PATH)')">$(DOTNET_HOST_PATH)</_ViuBrowserRunHostCommand>
         <_ViuBrowserRunHostCommand Condition="'$(_ViuBrowserRunHostCommand)' == ''">dotnet</_ViuBrowserRunHostCommand>
+        <_ViuBrowserGeneratedAssetRunHostArguments Condition="'$(Configuration)' == 'Debug' and '$(ViuCssHotReloadEnabled)' != 'false'">--generated-asset-worker-assembly &quot;$(ViuCssHotReloadWorkerAssembly)&quot; --generated-asset-worker-configuration &quot;$(ViuGeneratedAssetWorkerConfigurationFile)&quot; --generated-asset-worker-state &quot;$(ViuCssHotReloadStateFile)&quot; </_ViuBrowserGeneratedAssetRunHostArguments>
         <RunCommand>$(_ViuBrowserRunHostCommand)</RunCommand>
-        <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; -- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
+        <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; $(_ViuBrowserGeneratedAssetRunHostArguments)-- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
         <_ViuBrowserRunHostConfigured>true</_ViuBrowserRunHostConfigured>
     </PropertyGroup>
 
@@ -37,8 +38,9 @@
             <_ViuBrowserOriginalRunArguments>$(RunArguments)</_ViuBrowserOriginalRunArguments>
             <_ViuBrowserRunHostCommand Condition="'$(DOTNET_HOST_PATH)' != '' and Exists('$(DOTNET_HOST_PATH)')">$(DOTNET_HOST_PATH)</_ViuBrowserRunHostCommand>
             <_ViuBrowserRunHostCommand Condition="'$(_ViuBrowserRunHostCommand)' == ''">dotnet</_ViuBrowserRunHostCommand>
+            <_ViuBrowserGeneratedAssetRunHostArguments Condition="'$(Configuration)' == 'Debug' and '$(ViuCssHotReloadEnabled)' != 'false'">--generated-asset-worker-assembly &quot;$(ViuCssHotReloadWorkerAssembly)&quot; --generated-asset-worker-configuration &quot;$(ViuGeneratedAssetWorkerConfigurationFile)&quot; --generated-asset-worker-state &quot;$(ViuCssHotReloadStateFile)&quot; </_ViuBrowserGeneratedAssetRunHostArguments>
             <RunCommand>$(_ViuBrowserRunHostCommand)</RunCommand>
-            <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; -- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
+            <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; $(_ViuBrowserGeneratedAssetRunHostArguments)-- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
             <_ViuBrowserRunHostConfigured>true</_ViuBrowserRunHostConfigured>
         </PropertyGroup>
         <Error Condition="'$(_ViuBrowserOriginalRunCommand)' == ''"

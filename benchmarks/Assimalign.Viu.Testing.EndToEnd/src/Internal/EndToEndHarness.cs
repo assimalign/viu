@@ -89,6 +89,7 @@ internal sealed class EndToEndHarness
         string projectPath,
         string viuVersion)
     {
+        await RunVisualStudioHotReloadScenarioAsync(projectPath, viuVersion);
         await RunNaiveInvocationHotReloadScenarioAsync(projectPath, viuVersion);
 
         string chromiumArtifactDirectory = Path.Combine(
@@ -222,6 +223,239 @@ internal sealed class EndToEndHarness
             requestFailures,
             connectedPage => RunUtilityCssLastSourceRemovalScenarioAsync(connectedPage, session));
         await session.StopAsync();
+    }
+
+    // [V01.01.12.30.05], #357: this must run before any dotnet-watch process. The freshly staged
+    // project then proves an ordinary Debug build emitted the configuration consumed by RunHost.
+    private async Task RunVisualStudioHotReloadScenarioAsync(
+        string projectPath,
+        string viuVersion)
+    {
+        string artifactDirectory = Path.Combine(
+            _options.ArtifactDirectory,
+            "chromium",
+            "visual-studio");
+        await using VisualStudioBrowserRefreshStubServer refreshServer =
+            await VisualStudioBrowserRefreshStubServer.StartAsync();
+        await using VisualStudioHotReloadSession session = new(
+            projectPath,
+            viuVersion,
+            artifactDirectory);
+        byte[] originalVisualStudioSourceContent = await File.ReadAllBytesAsync(
+            session.VisualStudioSourcePath);
+        try
+        {
+            await session.StartAsync(refreshServer);
+            Console.WriteLine(
+                $"Visual Studio-shaped hot-reload fixture: {session.Address}");
+
+            using IPlaywright playwright = await Playwright.CreateAsync();
+            await using IBrowser browser = await playwright.Chromium.LaunchAsync(
+                new BrowserTypeLaunchOptions
+                {
+                    Headless = !_options.Headed,
+                });
+            await RunScenarioAsync(
+                browser,
+                BrowserEngine.Chromium,
+                "packaged-vue-run-host-visual-studio-generated-assets",
+                page => RunVisualStudioGeneratedAssetScenarioAsync(
+                    page,
+                    session,
+                    refreshServer));
+        }
+        finally
+        {
+            try
+            {
+                await session.StopAsync();
+            }
+            finally
+            {
+                await File.WriteAllBytesAsync(
+                    session.VisualStudioSourcePath,
+                    originalVisualStudioSourceContent);
+            }
+        }
+    }
+
+    private static async Task RunVisualStudioGeneratedAssetScenarioAsync(
+        IPage page,
+        VisualStudioHotReloadSession session,
+        VisualStudioBrowserRefreshStubServer refreshServer)
+    {
+        await page.AddInitScriptAsync(
+            """
+            (() => {
+                const NativeWebSocket = globalThis.WebSocket;
+                globalThis.__viuBrowserRefreshProbe = {
+                    connections: [],
+                    messages: []
+                };
+                globalThis.WebSocket = new Proxy(NativeWebSocket, {
+                    construct(target, argumentsList) {
+                        const socket = Reflect.construct(target, argumentsList, target);
+                        const protocols = argumentsList.length < 2
+                            ? []
+                            : Array.isArray(argumentsList[1])
+                                ? [...argumentsList[1]]
+                                : [String(argumentsList[1])];
+                        globalThis.__viuBrowserRefreshProbe.connections.push({
+                            url: String(argumentsList[0]),
+                            protocols,
+                            socket
+                        });
+                        socket.addEventListener('message', event => {
+                            if (typeof event.data === 'string') {
+                                globalThis.__viuBrowserRefreshProbe.messages.push(event.data);
+                            }
+                        });
+                        return socket;
+                    }
+                });
+            })();
+            """);
+        await NavigateAsync(page, session.Address.AbsoluteUri);
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await WaitUntilAsync(
+            async () => await page
+                .Locator("script[src*='aspnetcore-browser-refresh']")
+                .CountAsync() == 1,
+            "the SDK-injected BrowserRefresh client script",
+            HotReloadAssertionTimeout);
+        await WaitUntilAsync(
+            async () => await page.EvaluateAsync<bool>(
+                "() => globalThis.__viuBrowserRefreshProbe.connections"
+                + ".some(connection => connection.socket.readyState === 1)"),
+            "the browser to connect to the RunHost BrowserRefresh endpoint",
+            HotReloadAssertionTimeout);
+        await refreshServer.WaitForAuthenticatedConnectionAsync();
+
+        string downstreamAddress = await page.EvaluateAsync<string>(
+            "() => globalThis.__viuBrowserRefreshProbe.connections"
+            + ".find(connection => connection.socket.readyState === 1)?.url ?? ''");
+        Require(
+            !string.IsNullOrEmpty(downstreamAddress),
+            "The BrowserRefresh client did not expose its connected endpoint.");
+        Require(
+            Uri.TryCreate(downstreamAddress, UriKind.Absolute, out Uri? downstreamUri)
+                && downstreamUri.IsLoopback,
+            "The RunHost BrowserRefresh endpoint was not bound to loopback.");
+        Require(
+            !string.Equals(
+                downstreamAddress,
+                refreshServer.Address.AbsoluteUri,
+                StringComparison.OrdinalIgnoreCase),
+            "The browser connected directly to the Visual Studio stub instead of the RunHost bridge.");
+        int downstreamProtocolCount = await page.EvaluateAsync<int>(
+            "() => globalThis.__viuBrowserRefreshProbe.connections"
+            + ".find(connection => connection.socket.readyState === 1)?.protocols.length ?? 0");
+        Require(
+            downstreamProtocolCount == 1,
+            "The RunHost did not preserve Visual Studio's encrypted BrowserRefresh protocol for the page.");
+        string downstreamProtocol = await page.EvaluateAsync<string>(
+            "() => globalThis.__viuBrowserRefreshProbe.connections"
+            + ".find(connection => connection.socket.readyState === 1)?.protocols[0] ?? ''");
+        Require(
+            !string.IsNullOrWhiteSpace(downstreamProtocol),
+            "The page's Visual Studio BrowserRefresh protocol was empty.");
+
+        await refreshServer.SendAsync("{\"type\":\"GetApplyUpdateCapabilities\"}");
+        string capabilityResponse = await refreshServer.WaitForReceivedMessageAsync(
+            message => !string.IsNullOrWhiteSpace(message));
+        Require(
+            !string.IsNullOrWhiteSpace(capabilityResponse),
+            "The RunHost did not relay the browser's capability response upstream.");
+
+        await RequireStylesheetRulesAsync(page, ".viu.css", minimumRuleCount: 1);
+        await RequireStylesheetRulesAsync(page, ".utilities.css", minimumRuleCount: 1);
+        await RequireComputedDisplayAsync(page, "hot-shell", "grid");
+        string documentToken = await SetDocumentTokenAsync(page);
+        await page
+            .Locator("[data-testid='utility-style-probe']")
+            .EvaluateAsync<bool>(
+                "element => { element.classList.add('visual-studio-style-probe', 'opacity-50'); "
+                + "return true; }");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "border-left-width",
+            "1px");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "1");
+
+        byte[] originalComponentBundle = await File.ReadAllBytesAsync(
+            session.ComponentBundlePath);
+        byte[] originalUtilityBundle = await File.ReadAllBytesAsync(
+            session.UtilityBundlePath);
+        Require(
+            !Encoding.UTF8.GetString(originalUtilityBundle).Contains(
+                "opacity: 0.5;",
+                StringComparison.Ordinal),
+            "The utility bundle already contained the Visual Studio scenario's new class.");
+        string componentStylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".viu.css");
+        string utilityStylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".utilities.css");
+        int componentUpdateCount = await CountStaticFileUpdatesAsync(
+            page,
+            "/EndToEndHotReloadApp.viu.css");
+        int utilityUpdateCount = await CountStaticFileUpdatesAsync(
+            page,
+            "/EndToEndHotReloadApp.utilities.css");
+        int completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+
+        await EditVisualStudioGeneratedAssetSourceAsync(
+            session.VisualStudioSourcePath);
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await WaitForStaticFileUpdateAsync(
+            page,
+            "/EndToEndHotReloadApp.viu.css",
+            componentUpdateCount + 1);
+        await WaitForStaticFileUpdateAsync(
+            page,
+            "/EndToEndHotReloadApp.utilities.css",
+            utilityUpdateCount + 1);
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".viu.css",
+            componentStylesheetAddress);
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".utilities.css",
+            utilityStylesheetAddress);
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "border-left-width",
+            "7px");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "0.5");
+        byte[] changedComponentBundle = await File.ReadAllBytesAsync(
+            session.ComponentBundlePath);
+        byte[] changedUtilityBundle = await File.ReadAllBytesAsync(
+            session.UtilityBundlePath);
+        Require(
+            !originalComponentBundle.SequenceEqual(changedComponentBundle),
+            "The Visual Studio-shaped .viu style edit did not rewrite the component bundle.");
+        Require(
+            !originalUtilityBundle.SequenceEqual(changedUtilityBundle),
+            "The Visual Studio-shaped .viu utility edit did not rewrite the utility bundle.");
+        Require(
+            Encoding.UTF8.GetString(changedUtilityBundle).Contains(
+                "opacity: 0.5;",
+                StringComparison.Ordinal),
+            "The Visual Studio-shaped utility bundle does not contain the new opacity declaration.");
+        await RequireDocumentTokenAsync(page, documentToken);
+        session.RequireRunning();
     }
 
     // [V01.01.12.33], #356: exercise the invocation developers type before the explicit-runtime
@@ -1031,6 +1265,45 @@ internal sealed class EndToEndHarness
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    private static async Task EditVisualStudioGeneratedAssetSourceAsync(string path)
+    {
+        string source = await File.ReadAllTextAsync(path);
+        source = ReplaceExactlyOnce(
+            source,
+            "<div>",
+            "<div class=\"opacity-50\">",
+            path);
+        source = ReplaceExactlyOnce(
+            source,
+            "border-left-width: 1px;",
+            "border-left-width: 7px;",
+            path);
+        await File.WriteAllTextAsync(
+            path,
+            source,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static string ReplaceExactlyOnce(
+        string source,
+        string oldText,
+        string newText,
+        string path)
+    {
+        int firstIndex = source.IndexOf(oldText, StringComparison.Ordinal);
+        if (firstIndex < 0
+            || source.IndexOf(
+                oldText,
+                firstIndex + oldText.Length,
+                StringComparison.Ordinal) >= 0)
+        {
+            throw new InvalidOperationException(
+                $"Expected exactly one '{oldText}' occurrence in staged source {path}.");
+        }
+
+        return source[..firstIndex] + newText + source[(firstIndex + oldText.Length)..];
+    }
+
     private static async Task RewriteSourceWithoutContentChangeAsync(string path)
     {
         string source = await File.ReadAllTextAsync(path);
@@ -1052,6 +1325,44 @@ internal sealed class EndToEndHarness
                     ReadCssCompletionCount(session.CssEventLogPath) >= expectedCount);
             },
             $"CSS regeneration completion {expectedCount}",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task WaitForCssCompletionAsync(
+        VisualStudioHotReloadSession session,
+        int expectedCount)
+    {
+        await WaitUntilAsync(
+            () =>
+            {
+                session.RequireRunning();
+                return Task.FromResult(
+                    ReadCssCompletionCount(session.CssEventLogPath) >= expectedCount);
+            },
+            $"Visual Studio-shaped CSS regeneration completion {expectedCount}",
+            HotReloadAssertionTimeout);
+    }
+
+    private static async Task<int> CountStaticFileUpdatesAsync(
+        IPage page,
+        string expectedPath)
+    {
+        return await page.EvaluateAsync<int>(
+            "path => globalThis.__viuBrowserRefreshProbe.messages.reduce((count, message) => { "
+            + "try { const payload = JSON.parse(message); "
+            + "return count + (payload.type === 'UpdateStaticFile' && payload.path === path ? 1 : 0); } "
+            + "catch { return count; } }, 0)",
+            expectedPath);
+    }
+
+    private static async Task WaitForStaticFileUpdateAsync(
+        IPage page,
+        string expectedPath,
+        int expectedCount)
+    {
+        await WaitUntilAsync(
+            async () => await CountStaticFileUpdatesAsync(page, expectedPath) >= expectedCount,
+            $"BrowserRefresh UpdateStaticFile for '{expectedPath}'",
             HotReloadAssertionTimeout);
     }
 
