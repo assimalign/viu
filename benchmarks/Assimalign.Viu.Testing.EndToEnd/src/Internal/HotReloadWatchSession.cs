@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -91,7 +92,7 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
 
     internal string WorkerStatePath { get; }
 
-    internal async Task StartAsync()
+    internal async Task StartAsync(bool includeExplicitRuntimeIdentifier = true)
     {
         RequireFile(ProjectPath, "hot-reload fixture project");
         RequireFile(MainSourcePath, "mounted .vue source");
@@ -108,21 +109,32 @@ internal sealed class HotReloadWatchSession : IAsyncDisposable
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
-        foreach (string argument in new[]
-        {
+        List<string> arguments =
+        [
             "watch",
             "--verbose",
             "--project",
             ProjectPath,
             "--configuration",
             "Debug",
-            "--runtime",
-            "browser-wasm",
             "--non-interactive",
             "--launch-profile",
             "EndToEndHotReloadApp",
             "--no-restore",
-        })
+        ];
+        if (includeExplicitRuntimeIdentifier)
+        {
+            int insertionIndex = arguments.IndexOf("--non-interactive");
+            arguments.Insert(insertionIndex, "--runtime");
+            arguments.Insert(insertionIndex + 1, "browser-wasm");
+        }
+        else
+        {
+            // [V01.01.12.33], #356: exercise the exact natural command documented for consumers.
+            arguments.Add("run");
+        }
+
+        foreach (string argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }

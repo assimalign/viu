@@ -89,6 +89,8 @@ internal sealed class EndToEndHarness
         string projectPath,
         string viuVersion)
     {
+        await RunNaiveInvocationHotReloadScenarioAsync(projectPath, viuVersion);
+
         string chromiumArtifactDirectory = Path.Combine(
             _options.ArtifactDirectory,
             "chromium");
@@ -220,6 +222,59 @@ internal sealed class EndToEndHarness
             requestFailures,
             connectedPage => RunUtilityCssLastSourceRemovalScenarioAsync(connectedPage, session));
         await session.StopAsync();
+    }
+
+    // [V01.01.12.33], #356: exercise the invocation developers type before the explicit-runtime
+    // session mutates the connected managed application through its established cumulative sequence.
+    private async Task RunNaiveInvocationHotReloadScenarioAsync(
+        string projectPath,
+        string viuVersion)
+    {
+        string artifactDirectory = Path.Combine(
+            _options.ArtifactDirectory,
+            "chromium",
+            "no-runtime");
+        await using HotReloadWatchSession session = new(
+            projectPath,
+            viuVersion,
+            artifactDirectory);
+        byte[] originalMainSourceContent = await File.ReadAllBytesAsync(
+            session.MainSourcePath);
+        byte[] originalUtilityCandidateSourceContent = await File.ReadAllBytesAsync(
+            session.UtilityCandidateSourcePath);
+        try
+        {
+            await session.StartAsync(includeExplicitRuntimeIdentifier: false);
+            Console.WriteLine($"No-runtime hot-reload fixture: {session.Address}");
+
+            using IPlaywright playwright = await Playwright.CreateAsync();
+            await using IBrowser browser = await playwright.Chromium.LaunchAsync(
+                new BrowserTypeLaunchOptions
+                {
+                    Headless = !_options.Headed,
+                });
+            await RunScenarioAsync(
+                browser,
+                BrowserEngine.Chromium,
+                "packaged-vue-watch-no-runtime-css-and-utility",
+                page => RunNaiveInvocationCssScenarioAsync(page, session));
+        }
+        finally
+        {
+            try
+            {
+                await session.StopAsync();
+            }
+            finally
+            {
+                await File.WriteAllBytesAsync(
+                    session.MainSourcePath,
+                    originalMainSourceContent);
+                await File.WriteAllBytesAsync(
+                    session.UtilityCandidateSourcePath,
+                    originalUtilityCandidateSourceContent);
+            }
+        }
     }
 
     private static async Task RunStructuralAddScenarioAsync(
@@ -505,6 +560,108 @@ internal sealed class EndToEndHarness
             "2",
             HotReloadAssertionTimeout);
         await RequireDocumentTokenAsync(page, documentToken);
+        session.RequireRunning();
+    }
+
+    private static async Task RunNaiveInvocationCssScenarioAsync(
+        IPage page,
+        HotReloadWatchSession session)
+    {
+        await NavigateHotReloadAsync(page, session);
+        await RequireTextAsync(page, "hot-heading", "Hot reload template v1");
+        await RequireStylesheetRulesAsync(page, ".viu.css", minimumRuleCount: 1);
+        await RequireStylesheetRulesAsync(page, ".utilities.css", minimumRuleCount: 1);
+        await RequireComputedDisplayAsync(page, "hot-shell", "grid");
+
+        string documentToken = await SetDocumentTokenAsync(page);
+        byte[] originalComponentBundle = await File.ReadAllBytesAsync(
+            session.ComponentBundlePath);
+        string componentStylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".viu.css");
+        int staticAssetUpdateCount = session.CountOutputLinesContaining(
+            StaticAssetHotReloadCompletionMessage);
+        int completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+
+        await ReplaceSourceTextAsync(
+            session.MainSourcePath,
+            "display: grid;",
+            "display: flex;");
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await WaitForStaticAssetCompletionAsync(
+            session,
+            staticAssetUpdateCount + 1,
+            "the no-runtime component stylesheet swap to reach the browser");
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".viu.css",
+            componentStylesheetAddress);
+        await RequireComputedDisplayAsync(page, "hot-shell", "flex");
+        byte[] changedComponentBundle = await File.ReadAllBytesAsync(
+            session.ComponentBundlePath);
+        Require(
+            !originalComponentBundle.SequenceEqual(changedComponentBundle),
+            "The no-runtime component style edit did not rewrite the generated bundle.");
+        await RequireDocumentTokenAsync(page, documentToken);
+
+        await page
+            .Locator("[data-testid='utility-style-probe']")
+            .EvaluateAsync<bool>(
+                "element => { element.classList.add('opacity-50'); return true; }");
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "1");
+        byte[] originalUtilityBundle = await File.ReadAllBytesAsync(
+            session.UtilityBundlePath);
+        Require(
+            !Encoding.UTF8.GetString(originalUtilityBundle).Contains(
+                "opacity: 0.5;",
+                StringComparison.Ordinal),
+            "The utility bundle already contained the no-runtime scenario's new class.");
+        string utilityStylesheetAddress = await ReadStylesheetAddressAsync(
+            page,
+            ".utilities.css");
+        HotReloadProcessSnapshot utilitySnapshot = CaptureHotReloadProcessSnapshot(session);
+        staticAssetUpdateCount = session.CountOutputLinesContaining(
+            StaticAssetHotReloadCompletionMessage);
+        completionCount = ReadCssCompletionCount(session.CssEventLogPath);
+
+        await ReplaceSourceTextAsync(
+            session.UtilityCandidateSourcePath,
+            "class=\"hidden\"",
+            "class=\"hidden opacity-50\"");
+        await WaitForCssCompletionAsync(session, completionCount + 1);
+        await WaitForStaticAssetCompletionAsync(
+            session,
+            staticAssetUpdateCount + 1,
+            "the no-runtime utility stylesheet regeneration to reach the browser");
+        await RequireStylesheetAddressChangedAsync(
+            page,
+            ".utilities.css",
+            utilityStylesheetAddress);
+        await RequireComputedStylePropertyAsync(
+            page,
+            "utility-style-probe",
+            "opacity",
+            "0.5");
+        byte[] changedUtilityBundle = await File.ReadAllBytesAsync(
+            session.UtilityBundlePath);
+        Require(
+            !originalUtilityBundle.SequenceEqual(changedUtilityBundle),
+            "The no-runtime utility class edit did not rewrite the generated bundle.");
+        Require(
+            Encoding.UTF8.GetString(changedUtilityBundle).Contains(
+                "opacity: 0.5;",
+                StringComparison.Ordinal),
+            "The no-runtime utility bundle does not contain the new opacity declaration.");
+        await RequireDocumentTokenAsync(page, documentToken);
+        await Task.Delay(HotReloadNoOperationObservationWindow);
+        RequireStaticAssetOnlyUpdate(
+            session,
+            utilitySnapshot,
+            "The no-runtime utility class edit");
         session.RequireRunning();
     }
 

@@ -27,6 +27,8 @@
     NewTypeDefinition application, accepted style/template/script updates, and automatic browser
     reload after a script-signature rude-edit restart. It also proves generated utility CSS creation
     and last-source retirement through the generic generated-asset seam ([V01.01.12.30.04], #355).
+    One session omits the runtime argument and proves component and utility stylesheet live swaps
+    through the natural Browser SDK invocation ([V01.01.12.33], #356).
     It requires Chromium and owns the complete dotnet-watch process tree for its staged consumer.
 
 .PARAMETER StartupResultsPath
@@ -1161,6 +1163,9 @@ if (-not $HotReload) {
         # [V01.01.06.14], #350, [SFC-CG-4]: keep every structural delta case in
         # the packaged Mono-WASM lane even if the harness scenario list changes.
         $requiredHotReloadScenarios = @(
+            # [V01.01.12.33], #356: the natural watch invocation must launch
+            # the worker and deliver both registered generated-asset families.
+            'packaged-vue-watch-no-runtime-css-and-utility',
             'packaged-vue-watch-structural-add-delta',
             'packaged-vue-watch-structural-remove-delta',
             'packaged-vue-watch-structural-v-if-delta',

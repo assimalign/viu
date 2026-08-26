@@ -16,8 +16,10 @@ namespace Assimalign.Viu.Sdk.CssHotReload.Tests;
 
 public sealed class CssHotReloadWorkerTests
 {
+    // [V01.01.12.33], #356: dotnet watch must see the collector before it captures
+    // CustomCollectWatchItems while importing Microsoft.Common targets.
     [Fact]
-    public void WatchCollection_DebugDotNetWatch_RegistersComponentStylesheetAsStaticFile()
+    public void WatchCollection_EarlyBrowserImport_RegistersComponentStylesheetAsStaticFile()
     {
         var context = TestContext.Create();
         try
@@ -751,6 +753,12 @@ public sealed class CssHotReloadWorkerTests
                 "build",
                 "Targets",
                 "Build.Css.HotReload.targets");
+            var browserCommonPropsPath = Path.Combine(
+                repositoryDirectory,
+                "sdks",
+                "Assimalign.Viu.Sdk.Browser",
+                "Targets",
+                "Assimalign.Viu.Sdk.Browser.Common.props");
             var projectText =
                 "<Project>" + Environment.NewLine +
                 "  <PropertyGroup>" + Environment.NewLine +
@@ -796,6 +804,10 @@ public sealed class CssHotReloadWorkerTests
                 "    <ViuSingleFileComponent Include=\"App.vue\" />" + Environment.NewLine +
                 "  </ItemGroup>" + Environment.NewLine +
                 "  <Target Name=\"ResolveStaticWebAssetsConfiguration\" />" + Environment.NewLine +
+                "  <Import Project=\"" + EscapeAttribute(browserCommonPropsPath) + "\" />" + Environment.NewLine +
+                "  <PropertyGroup>" + Environment.NewLine +
+                "    <_CapturedCustomCollectWatchItems>$(CustomCollectWatchItems)</_CapturedCustomCollectWatchItems>" + Environment.NewLine +
+                "  </PropertyGroup>" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(componentTargetsPath) + "\" />" + Environment.NewLine +
                 "  <Import Project=\"" + EscapeAttribute(hotReloadTargetsPath) + "\" />" + Environment.NewLine +
                 "  <Target Name=\"RegisterProbeGeneratedAsset\" BeforeTargets=\"ViuCollectGeneratedAssets\" Condition=\"'$(ProbeRegisterGeneratedAsset)' == 'true'\">" + Environment.NewLine +
@@ -818,7 +830,7 @@ public sealed class CssHotReloadWorkerTests
                 "    <WriteLinesToFile File=\"$(SecondGeneratedAssetPath)\" Lines=\"second\" Overwrite=\"true\" WriteOnlyWhenDifferent=\"true\" />" + Environment.NewLine +
                 "    <WriteLinesToFile File=\"$(TargetInvocationLogPath)\" Lines=\"second\" Overwrite=\"false\" />" + Environment.NewLine +
                 "  </Target>" + Environment.NewLine +
-                "  <Target Name=\"ProbeWatch\" DependsOnTargets=\"_ViuCollectGeneratedAssetHotReloadWatchItems\">" + Environment.NewLine +
+                "  <Target Name=\"ProbeWatch\" DependsOnTargets=\"$(_CapturedCustomCollectWatchItems)\">" + Environment.NewLine +
                 "    <WriteLinesToFile File=\"$(ProbeOutput)\" Lines=\"@(Watch->'%(FullPath)|%(StaticWebAssetPath)')\" Overwrite=\"true\" />" + Environment.NewLine +
                 "  </Target>" + Environment.NewLine +
                 "</Project>" + Environment.NewLine;

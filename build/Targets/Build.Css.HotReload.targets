@@ -32,10 +32,6 @@
              AssemblyFile="$(ViuCssHotReloadTaskAssembly)"
              Condition="'$(ViuCssHotReloadEnabled)' == 'true'" />
 
-  <PropertyGroup Condition="'$(ViuCssHotReloadEnabled)' == 'true'">
-    <CustomCollectWatchItems>$(CustomCollectWatchItems);_ViuCollectGeneratedAssetHotReloadWatchItems</CustomCollectWatchItems>
-  </PropertyGroup>
-
   <!-- Public extension hook. A seam-v1 provider declares a registration target with
        BeforeTargets="ViuCollectGeneratedAssets" and adds its documented @(ViuGeneratedAsset) item
        there. The empty target gives providers a stable hook without naming either side's internals. -->

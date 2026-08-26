@@ -14,11 +14,29 @@ Use a Debug Browser application whose project starts with:
 <Project Sdk="Assimalign.Viu.Sdk.Browser">
 ```
 
-From the application directory, run:
+From the application directory, either of these starts the supported watch loop:
 
 ```powershell
 dotnet watch
+dotnet watch run
 ```
+
+From another directory, select the Browser application explicitly:
+
+```powershell
+dotnet watch --project .\path\to\Application.csproj run
+```
+
+The Browser SDK supplies the `browser-wasm` runtime identifier required by its WebAssembly
+application model. No `--runtime` argument is required for the generated-asset worker, component
+stylesheet replacement, or utility stylesheet regeneration. An invocation that states the same
+runtime explicitly remains supported:
+
+```powershell
+dotnet watch --runtime browser-wasm run
+```
+
+Specified by [V01.01.12.33], issue #356.
 
 The `viu-app` template supplies one active launch profile with `launchBrowser=true` and a pinned
 `applicationUrl`. Existing applications must add the same shape themselves; the SDK deliberately
@@ -186,10 +204,12 @@ publish budget. The opt-in
 a `.vue`-only package consumer, requires its component-CSS asset, and scans generated and
 published code for absent Debug-only metadata; add `-Aot` to exercise the same boundary after AOT
 compilation. The separate `scripts/Test-EndToEnd.ps1 -HotReload -Configuration Debug` lane starts
-an isolated packaged consumer under `dotnet watch` and uses a connected Chromium page to prove a
-structural rude edit restarts on the same port and automatically reloads to new content without
-manual navigation, component stylesheet replacement, accepted-update document identity,
-mounted-state survival, template/script remount, semantic no-op suppression, a never-before-used
-utility class becoming styled live, and last-utility-source retirement. These opt-in modes
+isolated packaged consumers under natural and explicit-runtime `dotnet watch` invocations. A
+connected Chromium page proves a structural rude edit restarts on the same port and automatically
+reloads to new content without manual navigation. The lane also proves worker launch without an
+explicit runtime argument, component stylesheet replacement and utility new-class generation in
+that natural invocation, accepted-update document identity, mounted-state survival, template/script
+remount, semantic no-op suppression, a never-before-used utility class becoming styled live, and
+last-utility-source retirement. These opt-in modes
 remain separate from the ordinary three-scenario browser matrix because the live lane mutates staged
 sources and owns a long-lived watch process tree.

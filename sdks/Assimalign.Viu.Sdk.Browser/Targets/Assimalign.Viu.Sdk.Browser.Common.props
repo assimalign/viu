@@ -12,5 +12,11 @@
         <ViuBrowserRunHostAssembly Condition="'$(ViuBrowserRunHostAssembly)' == ''">$(MSBuildThisFileDirectory)..\RunHost\Assimalign.Viu.Sdk.Browser.RunHost.dll</ViuBrowserRunHostAssembly>
         <ViuBrowserRunHostReadinessEnabled Condition="'$(ViuBrowserRunHostReadinessEnabled)' == ''">true</ViuBrowserRunHostReadinessEnabled>
         <MetadataUpdaterSupport Condition="'$(MetadataUpdaterSupport)' == '' and '$(Configuration)' == 'Debug' and '$(WasmEnableHotReload)' != 'false'">true</MetadataUpdaterSupport>
+        <!-- dotnet watch captures $(CustomCollectWatchItems) while Microsoft.Common targets are
+             imported. Register the Browser SDK's generated-asset collector from this early props
+             import so every GenerateWatchList evaluation invokes it. The target retains the
+             Debug, watch, and design-time conditions that keep ordinary build and publish inert.
+             Specified by [V01.01.12.33], issue #356. -->
+        <CustomCollectWatchItems>$(CustomCollectWatchItems);_ViuCollectGeneratedAssetHotReloadWatchItems</CustomCollectWatchItems>
     </PropertyGroup>
 </Project>
