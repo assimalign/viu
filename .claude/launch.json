@@ -10,7 +10,7 @@
     {
       "name": "viu-docs",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "../viu-docs/app/ViuDocs"],
+      "runtimeArgs": ["run", "--project", "../viu-docs/app/ViuDocs.Server"],
       "port": 5179
     }
   ]
