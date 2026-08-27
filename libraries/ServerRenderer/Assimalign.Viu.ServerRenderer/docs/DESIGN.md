@@ -44,7 +44,14 @@ the exact ServerRenderer package. Generated component registrations are collecte
 `GeneratedViuServerRenders`; the host calls that catalog explicitly and supplies the resulting
 registry to `ServerRenderAdaptor<TContext>`. Client-only generation has no server branch, while a
 dual-target project emits both profiles from the same parsed template in deterministic order
-(`[SSR-TARGET-1]` through `[SSR-TARGET-3]`).
+(`[SSR-TARGET-1]` through `[SSR-TARGET-4]`).
+
+`ServerRenderRegistry` deliberately separates composition from concurrent serving. Registration
+and lookup are synchronized while the registry is mutable, preserving existing single-threaded
+populate-and-render use. `Freeze` is an explicit, idempotent publication boundary: it creates one
+immutable registration snapshot, rejects every later registration with `InvalidOperationException`,
+and makes resolution against the safely published snapshot lock-free. A host must cross that
+boundary before sharing one registry between concurrent requests (`[SSR-TARGET-4]`).
 
 A registry-selected direct body is one atomic output transaction. It writes into a buffered
 `SsrRenderState` with a child `SsrContext`; successful completion commits context contributions and
@@ -77,6 +84,35 @@ strategy parameters remain invocation metadata used by the client host. An async
 owns the outer marker and strips the strategy from its resolved target, preventing nested duplicate
 boundaries (`[SSR-MARKERS-1]`, `[HYD-LAZY-1]`, `[HYD-LAZY-2]`).
 
+## Streaming document composition
+
+`RenderDocumentAsync` composes a host-owned shell around the ordinary progressive root render. It
+does not introduce a document parser or a second serializer. After scope creation, identity checks,
+and root validation, `IServerRenderDocumentShell.WritePrefixAsync` writes through the same
+`IServerRenderOutput` as the body. An internal tracker flushes only non-empty content that the shell
+has not already flushed, so an empty prefix does not force transport commitment. The main render
+then retains every component-subtree flush and destination-backpressure boundary from `[SSR-1]`.
+
+After the body succeeds and `SsrContext` has resolved every teleport, `WriteSuffixAsync` receives a
+stable read-only target-to-payload map rather than the whole render context. That narrow contract
+keeps state handoff outside document composition. The shell owns target order and markup, looks up
+each host-defined marker explicitly, and emits its matching payload verbatim; Viu's payload already
+contains the hydration anchor required by `[SSR-MARKERS-2]` and `[HYD-6]`. Pending suffix content is
+flushed before scope teardown (`[SSR-14]`).
+
+The adaptor borrows both shell and output and never disposes either. A request-specific shell may
+capture host document data; an instance reused concurrently must synchronize its own mutable state.
+Prefix, body, output, or cancellation failure skips the suffix, while suffix failure follows the
+ordinary adaptor failure path. The output's host-authoritative `ResponseCommitted` value remains the
+only fallback-policy signal throughout all three phases; the tracker's pending-write bookkeeping is
+used only to decide whether a shell phase needs a flush (`[SSR-12]`, `[SSR-14]`).
+
+This seam intentionally supports only post-render teleport points in the suffix. Once prefix bytes
+have streamed, neither Viu nor the shell can insert a payload into them, including into an already
+closed `<head>`. An earlier target requires the host to buffer that document region or perform a
+render prepass; arbitrary backpatching and a speculative multi-channel renderer remain outside this
+design (`[SSR-14]`).
+
 ## Composition, ownership, and AOT
 
 The application supplies a component factory, nullable services, state registry, directives, and
@@ -90,9 +126,13 @@ stack. A typed `ServerRenderRequest<TContext>` carries the root plus the host's 
 `IServerRenderRequestScopeFactory<TContext>` must return an async-disposable scope containing a fresh
 `ServerRenderApplication` and `SsrContext`. The adaptor invokes the factory once, consumes both weak
 identities before validating that the application uses the requested root, streams through
-`IServerRenderOutput`, and disposes the scope on success, failure, or cancellation. Consuming both
-identities matters because a rejected scope is disposed and neither object may safely reappear.
-Weak identity tracking prevents reuse without retaining completed requests (`[V01.01.07.04]`).
+`IServerRenderOutput`, and calls `DisposeAsync(CancellationToken)` with the original request token on
+success, failure, cancellation, and partial output. A token-aware override may interrupt cancellable
+teardown work but must still release every resource it owns. The default interface member delegates
+to parameterless `IAsyncDisposable.DisposeAsync`, preserving existing implementations that have no
+abort-aware cleanup. Consuming both identities matters because a rejected scope is disposed and
+neither object may safely reappear. Weak identity tracking prevents reuse without retaining
+completed requests (`[SSR-11]`, `[SSR-13]`, `[V01.01.07.04]`).
 
 Both renderer entry paths call `RuntimeExecution.EnterExecutionFlow` before user component code.
 That public lease composes the public Core, Reactivity, and State flow boundaries, supplies
@@ -102,11 +142,13 @@ logical state. This closes ambient cross-request races without making a request 
 thread-safe (`[EXE-1]`, `[SSR-9]`).
 
 `ServerRenderResult` separates render execution from host policy. It reports the exception and
-whether content started, allowing a downstream server to choose its own status and error page.
-Request cancellation remains an `OperationCanceledException`, because it belongs to the host's
-abort path rather than its failure-response path. The output's `WriteAsync` and `FlushAsync` are both
-awaited; component-subtree flush boundaries therefore preserve progressive delivery and the host's
-backpressure.
+snapshots `IServerRenderOutput.ResponseCommitted` after scope teardown. That monotonic value belongs
+to the downstream transport: an attempted write or an accepted flush never establishes commitment
+by inference, and false guarantees that accepted content can still be discarded for a clean
+replacement response. Request cancellation remains an `OperationCanceledException`, because it
+belongs to the host's abort path rather than its failure-response path. The output's `WriteAsync`
+and `FlushAsync` are both awaited; component-subtree flush boundaries therefore preserve
+progressive delivery and the host's backpressure (`[SSR-12]`).
 
 The generic hydration handoff is `SsrStateIsland`. It accepts only explicitly serialized JSON,
 normalizes it through reflection-free System.Text.Json metadata, and emits
@@ -128,4 +170,5 @@ factory-returned scope for one invocation; it never owns the output or prescribe
 ServerRenderer does not own browser application lifetime, DOM hydration, client directives,
 transition timing, or persistent mounted state. The runtime-tree entry point has no compiled
 scope-identifier input; scoped identifiers are emitted only by the server compiler profile
-(`[SSR-COMPILE-3]`).
+(`[SSR-COMPILE-3]`). The document-shell seam does not parse templates, buffer the completed body,
+or support random-access insertion into a prefix that has already streamed (`[SSR-14]`).

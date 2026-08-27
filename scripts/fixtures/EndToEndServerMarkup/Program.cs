@@ -37,10 +37,10 @@ internal static class Program
                 result.Failure);
         }
 
-        if (!result.ResponseStarted || requestScopeFactory.DisposalCount != 1)
+        if (output.Content.Length == 0 || requestScopeFactory.DisposalCount != 1)
         {
             throw new InvalidOperationException(
-                "ServerRenderAdaptor did not stream and dispose exactly one request scope.");
+                "ServerRenderAdaptor did not produce output and dispose exactly one request scope.");
         }
 
         string outputPath = Path.GetFullPath(arguments[0]);
@@ -130,6 +130,9 @@ internal static class Program
         private readonly StringBuilder _content = new();
 
         internal string Content => _content.ToString();
+
+        // A memory buffer is always replaceable, so the response is never committed ([SSR-12]).
+        public bool ResponseCommitted => false;
 
         public ValueTask WriteAsync(
             ReadOnlyMemory<char> content,

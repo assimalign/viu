@@ -7,8 +7,9 @@ namespace Assimalign.Viu.ServerRenderer;
 /// </summary>
 /// <remarks>
 /// A generated assembly catalog populates the registry at the host composition root. Resolution
-/// performs no assembly scanning, method inspection, or dynamic activation. Specified by
-/// <c>[SSR-TARGET-2]</c> and <c>[SSR-TARGET-3]</c>.
+/// performs no assembly scanning, method inspection, or dynamic activation. A shared
+/// <see cref="ServerRenderRegistry"/> must be frozen before concurrent request resolution.
+/// Specified by <c>[SSR-TARGET-2]</c> through <c>[SSR-TARGET-4]</c>.
 /// </remarks>
 public interface IServerRenderRegistry
 {

@@ -1619,6 +1619,13 @@ changes; a handled exception emits `<!---->`, while an unhandled exception is re
 component without a server registration uses ordinary tree traversal; the runtime never searches for
 a replacement.
 
+`[SSR-TARGET-4]` `ServerRenderRegistry` has a mutable composition phase and an explicit, idempotent
+`Freeze` transition. Freezing publishes one complete immutable registration snapshot. Registration
+after that transition throws `InvalidOperationException`; resolution against the frozen snapshot is
+lock-free and safe for concurrent requests. A host MUST freeze a shared registry before serving
+requests concurrently. Mutable registration and lookup remain supported for single-threaded
+composition and rendering.
+
 ### 11.2 The hydration marker protocol
 
 `[SSR-MARKERS-1]` These strings are a **cross-package contract**. Changing one is a breaking change
@@ -1747,9 +1754,28 @@ its application root is the request root, streams through `IServerRenderOutput`,
 and disposes the scope on success, render/output failure, cancellation, and partial response. It has
 no HTTP status, header, route, or framework policy.
 
-`[SSR-12]` Ordinary adaptor failures return `ServerRenderResult` with the failure and whether output
-had started, allowing the downstream host to choose its response policy. Request cancellation
-propagates as `OperationCanceledException`; it is never converted into an ordinary failure result.
+`[SSR-12]` `IServerRenderOutput.ResponseCommitted` is the downstream host's authoritative,
+monotonic report that the response can no longer be wholly replaced. An attempted write or accepted
+flush does not itself establish commitment. Ordinary adaptor failures return `ServerRenderResult`
+with the failure and a snapshot of that host-reported state, allowing the downstream host to emit a
+clean failure response whenever commitment remains false. Request cancellation propagates as
+`OperationCanceledException`; it is never converted into an ordinary failure result.
+
+`[SSR-13]` The adaptor passes the original request cancellation token to
+`IServerRenderRequestScope.DisposeAsync(CancellationToken)` on every teardown path. A token-aware
+scope observes request abort while still releasing all owned resources. The default interface
+implementation delegates to `IAsyncDisposable.DisposeAsync()` so an existing scope that has no
+abort-aware teardown remains valid.
+
+`[SSR-14]` `RenderDocumentAsync` surrounds the ordinary progressive main render with an
+`IServerRenderDocumentShell`. After scope creation and root validation, the adaptor writes and
+flushes a non-empty shell prefix before rendering the root. After the main render has completed and
+all teleport buffers have resolved, it supplies the stable target-to-payload map to the shell suffix
+and flushes any suffix content. The suffix is the host's post-render teleport emission seam: it may
+splice each payload verbatim at host-defined markers. Prefix, render, output, or cancellation failure
+skips the suffix; suffix failure is an ordinary output failure. This minimal seam cannot splice into
+an already streamed prefix or head. Such earlier emission points require a host buffer or a render
+prepass and remain outside this contract.
 
 *Authority: `libraries/ServerRenderer/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Runtime/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;

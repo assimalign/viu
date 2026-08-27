@@ -106,6 +106,9 @@ internal sealed class TextBufferOutput : IServerRenderOutput
 
     internal string Content => _content.ToString();
 
+    // A memory buffer is always replaceable, so the response is never committed ([SSR-12]).
+    public bool ResponseCommitted => false;
+
     public ValueTask WriteAsync(
         ReadOnlyMemory<char> content,
         CancellationToken cancellationToken = default)

@@ -11,10 +11,23 @@ namespace Assimalign.Viu.ServerRenderer;
 /// <remarks>
 /// The renderer borrows the output and never closes or disposes it. Each flush is awaited so the
 /// host's own buffering and backpressure policy remains authoritative. Specified by
-/// <c>[SSR-1]</c>, <c>[SSR-8]</c>, and <c>[SSR-11]</c>.
+/// <c>[SSR-1]</c>, <c>[SSR-8]</c>, <c>[SSR-11]</c>, and <c>[SSR-12]</c>.
 /// </remarks>
 public interface IServerRenderOutput
 {
+    /// <summary>
+    /// Gets whether the host response has crossed the point where it can no longer be wholly
+    /// replaced.
+    /// </summary>
+    /// <remarks>
+    /// The value is host-authoritative and monotonic. <see langword="false"/> guarantees that the
+    /// host can still discard accepted content and send a clean replacement response; an attempted
+    /// write or flush does not make the value true unless the host's transport actually commits.
+    /// Reading this property performs no input/output and does not throw. The explicit signal keeps
+    /// response policy at the hosting boundary. Specified by <c>[SSR-12]</c>.
+    /// </remarks>
+    bool ResponseCommitted { get; }
+
     /// <summary>Writes one non-empty serialized markup chunk to the host response.</summary>
     /// <param name="content">The serialized character content.</param>
     /// <param name="cancellationToken">Cancellation propagated from the host request.</param>

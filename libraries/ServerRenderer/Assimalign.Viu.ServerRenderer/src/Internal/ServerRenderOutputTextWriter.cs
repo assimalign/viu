@@ -17,21 +17,12 @@ internal sealed class ServerRenderOutputTextWriter : TextWriter
         _output = output;
     }
 
-    internal bool ResponseStarted { get; private set; }
-
     public override Encoding Encoding => Encoding.UTF8;
 
     public override Task WriteAsync(
         ReadOnlyMemory<char> buffer,
-        CancellationToken cancellationToken = default)
-    {
-        if (buffer.Length > 0)
-        {
-            ResponseStarted = true;
-        }
-
-        return _output.WriteAsync(buffer, cancellationToken).AsTask();
-    }
+        CancellationToken cancellationToken = default) =>
+        _output.WriteAsync(buffer, cancellationToken).AsTask();
 
     public override Task FlushAsync(CancellationToken cancellationToken) =>
         _output.FlushAsync(cancellationToken).AsTask();

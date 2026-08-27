@@ -15,7 +15,7 @@ namespace Assimalign.Viu.ServerRenderer;
 /// application, reactive-service, teleport, and hydration-state bleed between requests. Ordinary
 /// failures are returned for host mapping; request cancellation propagates. The renderer also
 /// selects fresh logical Core, Reactivity, State, and scheduler bookkeeping for every call.
-/// Specified by <c>[EXE-1]</c>, <c>[SSR-1]</c>, and <c>[SSR-8]</c> through <c>[SSR-12]</c>.
+/// Specified by <c>[EXE-1]</c>, <c>[SSR-1]</c>, and <c>[SSR-8]</c> through <c>[SSR-14]</c>.
 /// </remarks>
 public sealed class ServerRenderAdaptor<TContext>
     where TContext : notnull
@@ -40,8 +40,9 @@ public sealed class ServerRenderAdaptor<TContext>
     /// </param>
     /// <remarks>
     /// Supplying the catalog selects compiler-produced bodies for registered component subtrees and
-    /// preserves traversal for unregistered values. The adaptor performs no assembly discovery.
-    /// Specified by <c>[SSR-TARGET-2]</c> and <c>[SSR-TARGET-3]</c>.
+    /// preserves traversal for unregistered values. A registry shared across concurrent requests
+    /// must be frozen before it is supplied. The adaptor performs no assembly discovery. Specified
+    /// by <c>[SSR-TARGET-2]</c> through <c>[SSR-TARGET-4]</c>.
     /// </remarks>
     public ServerRenderAdaptor(
         IServerRenderRequestScopeFactory<TContext> requestScopeFactory,
@@ -64,18 +65,61 @@ public sealed class ServerRenderAdaptor<TContext>
     /// A completion or failure result the host maps to its own response policy. Cancellation throws
     /// instead of becoming a failure result.
     /// </returns>
-    public async ValueTask<ServerRenderResult> RenderAsync(
+    public ValueTask<ServerRenderResult> RenderAsync(
         ServerRenderRequest<TContext> request,
         IServerRenderOutput output,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(output);
+        return RenderCoreAsync(
+            request,
+            output,
+            documentShell: null,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Streams a host-owned document prefix, the Viu root, and a teleport-aware document suffix
+    /// within one request scope.
+    /// </summary>
+    /// <param name="request">The root component and host-defined request context.</param>
+    /// <param name="output">The borrowed host response output shared by every document phase.</param>
+    /// <param name="documentShell">The borrowed prefix and suffix writer for this document.</param>
+    /// <param name="cancellationToken">Cancellation propagated from the host request.</param>
+    /// <returns>
+    /// A completion or failure result after the scope is disposed. Cancellation throws instead of
+    /// becoming a failure result.
+    /// </returns>
+    /// <remarks>
+    /// A non-empty prefix is flushed before component execution. The suffix runs only after the
+    /// main render succeeds and receives the completed teleport map; it is skipped after prefix or
+    /// render failure. The adaptor borrows and never disposes the shell. Specified by
+    /// <c>[SSR-11]</c> through <c>[SSR-14]</c>.
+    /// </remarks>
+    public ValueTask<ServerRenderResult> RenderDocumentAsync(
+        ServerRenderRequest<TContext> request,
+        IServerRenderOutput output,
+        IServerRenderDocumentShell documentShell,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(documentShell);
+        return RenderCoreAsync(request, output, documentShell, cancellationToken);
+    }
+
+    private async ValueTask<ServerRenderResult> RenderCoreAsync(
+        ServerRenderRequest<TContext> request,
+        IServerRenderOutput output,
+        IServerRenderDocumentShell? documentShell,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         IServerRenderRequestScope? scope = null;
         SsrContext? context = null;
-        ServerRenderOutputTextWriter? writer = null;
+        ServerRenderOutputTracker trackedOutput = new(output);
         Exception? failure = null;
         ExceptionDispatchInfo? cancellation = null;
 
@@ -102,7 +146,16 @@ public sealed class ServerRenderAdaptor<TContext>
                     "The request-scope application must use the request's root component instance.");
             }
 
-            writer = new ServerRenderOutputTextWriter(output);
+            if (documentShell is not null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await documentShell.WritePrefixAsync(
+                    trackedOutput,
+                    cancellationToken).ConfigureAwait(false);
+                await trackedOutput.FlushPendingAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            ServerRenderOutputTextWriter writer = new(trackedOutput);
             if (_serverRenders is null)
             {
                 await ServerRenderer.RenderToStreamAsync(
@@ -120,6 +173,16 @@ public sealed class ServerRenderAdaptor<TContext>
                     context,
                     cancellationToken).ConfigureAwait(false);
             }
+
+            if (documentShell is not null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await documentShell.WriteSuffixAsync(
+                    trackedOutput,
+                    context.Teleports,
+                    cancellationToken).ConfigureAwait(false);
+                await trackedOutput.FlushPendingAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
@@ -135,7 +198,7 @@ public sealed class ServerRenderAdaptor<TContext>
             {
                 try
                 {
-                    await scope.DisposeAsync().ConfigureAwait(false);
+                    await scope.DisposeAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException exception)
                     when (cancellationToken.IsCancellationRequested)
@@ -156,7 +219,6 @@ public sealed class ServerRenderAdaptor<TContext>
         return new ServerRenderResult(
             context,
             failure,
-            writer?.ResponseStarted ?? false);
+            trackedOutput.ResponseCommitted);
     }
-
 }

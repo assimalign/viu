@@ -256,7 +256,7 @@ public sealed class ServerRenderAdaptorTests
         first.Succeeded.ShouldBeTrue();
         firstOutput.Text.ShouldBe("fresh-once");
         second.Succeeded.ShouldBeFalse();
-        second.ResponseStarted.ShouldBeFalse();
+        second.ResponseCommitted.ShouldBeFalse();
         second.Failure.ShouldBeOfType<InvalidOperationException>();
         second.Failure!.Message.ShouldContain("cannot be reused");
         secondOutput.Text.ShouldBeEmpty();
@@ -286,7 +286,7 @@ public sealed class ServerRenderAdaptorTests
 
         first.Succeeded.ShouldBeTrue();
         second.Succeeded.ShouldBeFalse();
-        second.ResponseStarted.ShouldBeFalse();
+        second.ResponseCommitted.ShouldBeFalse();
         second.Failure.ShouldBeOfType<InvalidOperationException>();
         second.Failure!.Message.ShouldContain("SsrContext");
         factory.CreatedScopes.Count.ShouldBe(2);
@@ -427,12 +427,16 @@ public sealed class ServerRenderAdaptorTests
         await Should.ThrowAsync<OperationCanceledException>(
             async () => await rendering.WaitAsync(TimeSpan.FromSeconds(5)));
         await componentDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        factory.CreatedScopes.ShouldHaveSingleItem().DisposeCount.ShouldBe(1);
+        // [SSR-13] flows the exact request-abort token through request-scope teardown.
+        TestRequestScope scope = factory.CreatedScopes.ShouldHaveSingleItem();
+        scope.DisposeCount.ShouldBe(1);
+        scope.DisposalCancellationToken.ShouldBe(cancellationSource.Token);
+        scope.DisposalCancellationToken.IsCancellationRequested.ShouldBeTrue();
         output.Text.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task RenderAsync_RenderFailureAfterProgress_ReturnsHostMappableFailureAndDisposesScope()
+    public async Task RenderAsync_RenderFailureAfterBufferedProgress_ReportsHostUncommittedState()
     {
         ComponentReference rootReference = ComponentReference.ForName("failure-root");
         ComponentReference firstReference = ComponentReference.ForName("failure-first");
@@ -455,7 +459,7 @@ public sealed class ServerRenderAdaptorTests
         DelegateRequestScopeFactory<string> factory = new(
             (request, _) => CreateScope(request, components));
         FakeServerHost<string> host = new(factory);
-        RecordingServerRenderOutput output = new();
+        RecordingServerRenderOutput output = new(commitOnFlush: false);
         ServerRenderRequest<string> request = new(
             new ComponentNode(rootReference),
             "failure");
@@ -463,7 +467,8 @@ public sealed class ServerRenderAdaptorTests
         ServerRenderResult result = await host.RenderAsync(request, output);
 
         result.Succeeded.ShouldBeFalse();
-        result.ResponseStarted.ShouldBeTrue();
+        // [SSR-12] trusts the buffered host's commitment state, not Viu's attempted writes.
+        result.ResponseCommitted.ShouldBeFalse();
         result.Failure.ShouldBeOfType<InvalidOperationException>();
         result.Failure!.Message.ShouldBe("render failure");
         output.Text.ShouldBe("<main>progress");
@@ -486,10 +491,75 @@ public sealed class ServerRenderAdaptorTests
         ServerRenderResult result = await host.RenderAsync(request, output);
 
         result.Succeeded.ShouldBeFalse();
-        result.ResponseStarted.ShouldBeTrue();
+        result.ResponseCommitted.ShouldBeTrue();
         result.Failure.ShouldBeOfType<InvalidOperationException>();
         result.Failure!.Message.ShouldBe("scope disposal failure");
         output.Text.ShouldBe("content");
+        factory.CreatedScopes.ShouldHaveSingleItem().DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RenderDocumentAsync_PrefixMainAndTeleportSuffix_StreamInOrder()
+    {
+        ComponentReference componentReference = ComponentReference.ForName("document-root");
+        TaskCompletionSource prefetchStarted = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releasePrefetch = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        ComponentFactory components = new();
+        components.Register(Registration(
+            componentReference,
+            context =>
+            {
+                context.Lifecycle.OnServerPrefetch(async cancellationToken =>
+                {
+                    prefetchStarted.TrySetResult();
+                    await releasePrefetch.Task.WaitAsync(cancellationToken);
+                });
+                return _ => new FragmentNode(
+                [
+                    new TextNode("main-content"),
+                    new TeleportNode("#modal", [new TextNode("teleported")]),
+                ]);
+            }));
+        DelegateRequestScopeFactory<string> factory = new(
+            (request, _) => CreateScope(request, components));
+        FakeServerHost<string> host = new(factory);
+        RecordingServerRenderOutput output = new();
+        TeleportDocumentShell documentShell = new("#modal");
+        ServerRenderRequest<string> request = new(
+            new ComponentNode(componentReference),
+            "document");
+
+        Task<ServerRenderResult> rendering = host.RenderDocumentAsync(
+            request,
+            output,
+            documentShell).AsTask();
+        await prefetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // [SSR-14] flushes the shell prefix before the main component begins producing output.
+        output.Text.ShouldBe("<!doctype html><html><body><main id=\"app\">");
+        output.FlushCount.ShouldBe(1);
+        documentShell.SuffixInvocationCount.ShouldBe(0);
+        rendering.IsCompleted.ShouldBeFalse();
+
+        releasePrefetch.TrySetResult();
+        ServerRenderResult result = await rendering.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Succeeded.ShouldBeTrue(result.Failure?.ToString());
+        result.ResponseCommitted.ShouldBeTrue();
+        documentShell.SuffixInvocationCount.ShouldBe(1);
+        // [SSR-14] exposes completed teleport payloads only to the post-render suffix.
+        output.Text.ShouldBe(
+            "<!doctype html><html><body><main id=\"app\">"
+            + HydrationMarkers.FragmentStart
+            + "main-content"
+            + HydrationMarkers.TeleportStart
+            + HydrationMarkers.TeleportEnd
+            + HydrationMarkers.FragmentEnd
+            + "</main><aside id=\"modal\">teleported"
+            + HydrationMarkers.TeleportAnchor
+            + "</aside></body></html>");
         factory.CreatedScopes.ShouldHaveSingleItem().DisposeCount.ShouldBe(1);
     }
 
@@ -629,6 +699,13 @@ public sealed class ServerRenderAdaptorTests
             IServerRenderOutput output,
             CancellationToken cancellationToken = default) =>
             _adaptor.RenderAsync(request, output, cancellationToken);
+
+        internal ValueTask<ServerRenderResult> RenderDocumentAsync(
+            ServerRenderRequest<TContext> request,
+            IServerRenderOutput output,
+            IServerRenderDocumentShell documentShell,
+            CancellationToken cancellationToken = default) =>
+            _adaptor.RenderDocumentAsync(request, output, documentShell, cancellationToken);
     }
 
     private sealed class DelegateRequestScopeFactory<TContext> :
@@ -665,6 +742,7 @@ public sealed class ServerRenderAdaptorTests
     private sealed class TestRequestScope : IServerRenderRequestScope
     {
         private readonly Func<ValueTask>? _dispose;
+        private CancellationToken _disposalCancellationToken;
         private int _disposeCount;
 
         internal TestRequestScope(
@@ -679,12 +757,17 @@ public sealed class ServerRenderAdaptorTests
 
         internal int DisposeCount => Volatile.Read(ref _disposeCount);
 
+        internal CancellationToken DisposalCancellationToken => _disposalCancellationToken;
+
         public ServerRenderApplication Application { get; }
 
         public SsrContext RenderContext { get; }
 
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync() => DisposeAsync(CancellationToken.None);
+
+        public async ValueTask DisposeAsync(CancellationToken cancellationToken)
         {
+            _disposalCancellationToken = cancellationToken;
             Interlocked.Increment(ref _disposeCount);
             if (_dispose is not null)
             {
@@ -698,17 +781,24 @@ public sealed class ServerRenderAdaptorTests
         private readonly object _synchronization = new();
         private readonly StringBuilder _text = new();
         private readonly TaskCompletionSource? _releaseFirstFlush;
+        private readonly bool _commitOnFlush;
         private int _flushCount;
+        private int _responseCommitted;
 
-        internal RecordingServerRenderOutput(TaskCompletionSource? releaseFirstFlush = null)
+        internal RecordingServerRenderOutput(
+            TaskCompletionSource? releaseFirstFlush = null,
+            bool commitOnFlush = true)
         {
             _releaseFirstFlush = releaseFirstFlush;
+            _commitOnFlush = commitOnFlush;
         }
 
         internal TaskCompletionSource FirstWrite { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
         internal int FlushCount => Volatile.Read(ref _flushCount);
+
+        public bool ResponseCommitted => Volatile.Read(ref _responseCommitted) == 1;
 
         internal string Text
         {
@@ -735,34 +825,81 @@ public sealed class ServerRenderAdaptorTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask FlushAsync(CancellationToken cancellationToken = default)
+        public async ValueTask FlushAsync(CancellationToken cancellationToken = default)
         {
             int count = Interlocked.Increment(ref _flushCount);
             if (count == 1 && _releaseFirstFlush is not null)
             {
-                return new ValueTask(_releaseFirstFlush.Task.WaitAsync(cancellationToken));
+                await _releaseFirstFlush.Task.WaitAsync(cancellationToken);
             }
 
-            return ValueTask.CompletedTask;
+            if (_commitOnFlush)
+            {
+                Volatile.Write(ref _responseCommitted, 1);
+            }
         }
     }
 
     private sealed class TextWriterServerRenderOutput : IServerRenderOutput
     {
         private readonly TextWriter _writer;
+        private bool _responseCommitted;
 
         internal TextWriterServerRenderOutput(TextWriter writer)
         {
             _writer = writer;
         }
 
+        public bool ResponseCommitted => _responseCommitted;
+
         public ValueTask WriteAsync(
             ReadOnlyMemory<char> content,
             CancellationToken cancellationToken = default) =>
             new(_writer.WriteAsync(content, cancellationToken));
 
-        public ValueTask FlushAsync(CancellationToken cancellationToken = default) =>
-            new(_writer.FlushAsync(cancellationToken));
+        public async ValueTask FlushAsync(CancellationToken cancellationToken = default)
+        {
+            await _writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _responseCommitted = true;
+        }
+    }
+
+    private sealed class TeleportDocumentShell : IServerRenderDocumentShell
+    {
+        private readonly string _target;
+
+        internal TeleportDocumentShell(string target)
+        {
+            _target = target;
+        }
+
+        internal int SuffixInvocationCount { get; private set; }
+
+        public ValueTask WritePrefixAsync(
+            IServerRenderOutput output,
+            CancellationToken cancellationToken = default) =>
+            output.WriteAsync(
+                "<!doctype html><html><body><main id=\"app\">".AsMemory(),
+                cancellationToken);
+
+        public async ValueTask WriteSuffixAsync(
+            IServerRenderOutput output,
+            IReadOnlyDictionary<string, string> teleports,
+            CancellationToken cancellationToken = default)
+        {
+            SuffixInvocationCount++;
+            await output.WriteAsync(
+                "</main><aside id=\"modal\">".AsMemory(),
+                cancellationToken);
+            if (teleports.TryGetValue(_target, out string? content))
+            {
+                await output.WriteAsync(content.AsMemory(), cancellationToken);
+            }
+
+            await output.WriteAsync(
+                "</aside></body></html>".AsMemory(),
+                cancellationToken);
+        }
     }
 
     private sealed class ParallelArrival

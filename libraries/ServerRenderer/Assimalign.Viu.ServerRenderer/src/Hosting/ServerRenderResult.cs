@@ -15,11 +15,11 @@ public sealed class ServerRenderResult
     internal ServerRenderResult(
         SsrContext? context,
         Exception? failure,
-        bool responseStarted)
+        bool responseCommitted)
     {
         Context = context;
         Failure = failure;
-        ResponseStarted = responseStarted;
+        ResponseCommitted = responseCommitted;
     }
 
     /// <summary>Gets whether rendering and request-scope disposal both completed successfully.</summary>
@@ -29,11 +29,16 @@ public sealed class ServerRenderResult
     public Exception? Failure { get; }
 
     /// <summary>
-    /// Gets whether the adaptor attempted to write any response content before completion or
-    /// failure was known.
+    /// Gets the host-reported response commitment state observed after rendering and scope
+    /// teardown.
     /// </summary>
-    /// <remarks>A host uses this signal to decide whether its status and headers can still change.</remarks>
-    public bool ResponseStarted { get; }
+    /// <remarks>
+    /// <see langword="false"/> guarantees that the host can still discard accepted content and
+    /// send a clean replacement response. The value is copied from
+    /// <see cref="IServerRenderOutput.ResponseCommitted"/> and is never inferred from attempted
+    /// writes. Specified by <c>[SSR-12]</c>.
+    /// </remarks>
+    public bool ResponseCommitted { get; }
 
     /// <summary>
     /// Gets the request-owned render context when scope creation reached that point, including
