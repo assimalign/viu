@@ -38,6 +38,49 @@ public sealed class RunHostProcessTests
     }
 
     [Fact]
+    public async Task RunAsync_CustomReadinessPrefix_ForwardsOutputAndMirrorsReadiness()
+    {
+        using TestProject project = TestProject.Create(
+            "Cohesion app url: http://127.0.0.1:51235/",
+            "ordinary output");
+        using StringWriter standardOutput = new(CultureInfo.InvariantCulture);
+        using StringWriter standardError = new(CultureInfo.InvariantCulture);
+
+        int exitCode = await RunHostProcess.RunAsync(
+            project.CreateArguments("Cohesion app url:"),
+            standardOutput,
+            standardError);
+
+        exitCode.ShouldBe(0);
+        string output = standardOutput.ToString();
+        output.ShouldContain("Cohesion app url: http://127.0.0.1:51235/");
+        output.ShouldContain("Now listening on: http://127.0.0.1:51235/");
+        output.ShouldContain("ordinary output");
+        CountOccurrences(output, "Now listening on:").ShouldBe(1);
+        standardError.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_DotNetWatchReadinessLine_ForwardsWithoutDoubleMirroring()
+    {
+        using TestProject project = TestProject.Create(
+            "Now listening on: http://127.0.0.1:51235/");
+        using StringWriter standardOutput = new(CultureInfo.InvariantCulture);
+        using StringWriter standardError = new(CultureInfo.InvariantCulture);
+
+        int exitCode = await RunHostProcess.RunAsync(
+            project.CreateArguments("Now listening on:"),
+            standardOutput,
+            standardError);
+
+        exitCode.ShouldBe(0);
+        CountOccurrences(
+            standardOutput.ToString(),
+            "Now listening on:").ShouldBe(1);
+        standardError.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task RunAsync_InvalidAddresses_ForwardsWithoutReadinessMarkers()
     {
         using TestProject project = TestProject.Create(
@@ -193,6 +236,13 @@ public sealed class RunHostProcessTests
             "-nologo",
             "-verbosity:minimal",
             "-target:RunHostProbe",
+        ];
+
+        internal IReadOnlyList<string> CreateArguments(string readinessPrefix) =>
+        [
+            "--readiness-prefix",
+            readinessPrefix,
+            .. CreateArguments(),
         ];
 
         internal IReadOnlyList<string> CreateArguments(

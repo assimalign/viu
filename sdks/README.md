@@ -52,6 +52,11 @@ transitive component-library style flow, generated-asset hot reload, and publish
 The complete route, ordering, fingerprint, and compression contract is documented in
 [Browser SDK CSS delivery](Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md).
 
+`ViuBrowserDevServer` defaults to `WasmAppHost`; set it to `Custom` with
+`ViuBrowserDevServerCommand` and `ViuBrowserDevServerArguments` to replace the child server while
+retaining the SDK RunHost. The readiness and HTTP-host obligations are documented in the
+[Browser development loop](Assimalign.Viu.Sdk.Browser/docs/DEVELOPMENT-LOOP.md#replace-the-development-server).
+
 Pin the SDK selected by the project inline, for example
 `Sdk="Assimalign.Viu.Sdk.Browser/10.0.1-preview.2"`, or in `global.json`:
 

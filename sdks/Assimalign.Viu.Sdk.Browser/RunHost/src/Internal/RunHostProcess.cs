@@ -19,7 +19,9 @@ internal static class RunHostProcess
         "--generated-asset-worker-configuration";
     private const string GeneratedAssetWorkerStateArgument =
         "--generated-asset-worker-state";
-    private const string WasmAppHostAddressPrefix = "App url:";
+    private const string DefaultReadinessPrefix = "App url:";
+    private const string DotNetWatchReadinessPrefix = "Now listening on:";
+    private const string ReadinessPrefixArgument = "--readiness-prefix";
     private static readonly TimeSpan GracefulTerminationTimeout = TimeSpan.FromSeconds(3);
 
     internal static async Task<int> RunAsync(
@@ -36,6 +38,7 @@ internal static class RunHostProcess
         {
             await standardError.WriteLineAsync(
                 "Usage: Assimalign.Viu.Sdk.Browser.RunHost "
+                + "[--readiness-prefix <text>] "
                 + "[--generated-asset-worker-assembly <path> "
                 + "--generated-asset-worker-configuration <path> "
                 + "--generated-asset-worker-state <path>] "
@@ -171,10 +174,12 @@ internal static class RunHostProcess
             {
                 Task standardOutputTask = ForwardLinesAsync(
                     process.StandardOutput,
-                    standardOutput);
+                    standardOutput,
+                    invocation.ReadinessPrefix);
                 Task standardErrorTask = ForwardLinesAsync(
                     process.StandardError,
-                    standardError);
+                    standardError,
+                    invocation.ReadinessPrefix);
 
                 await process.WaitForExitAsync();
                 await Task.WhenAll(standardOutputTask, standardErrorTask);
@@ -204,6 +209,7 @@ internal static class RunHostProcess
         string? workerAssemblyPath = null;
         string? workerConfigurationFilePath = null;
         string? workerStateFilePath = null;
+        string readinessPrefix = DefaultReadinessPrefix;
         int index = 0;
         while (index < arguments.Count
             && !string.Equals(
@@ -240,6 +246,13 @@ internal static class RunHostProcess
             {
                 workerStateFilePath = arguments[index + 1];
             }
+            else if (string.Equals(
+                    argument,
+                    ReadinessPrefixArgument,
+                    StringComparison.Ordinal))
+            {
+                readinessPrefix = arguments[index + 1];
+            }
             else
             {
                 invocation = null;
@@ -273,6 +286,7 @@ internal static class RunHostProcess
         invocation = new RunHostInvocation(
             arguments[index + 1],
             commandArguments,
+            readinessPrefix,
             workerAssemblyPath,
             workerConfigurationFilePath,
             workerStateFilePath);
@@ -281,16 +295,22 @@ internal static class RunHostProcess
 
     private static async Task ForwardLinesAsync(
         StreamReader reader,
-        TextWriter writer)
+        TextWriter writer,
+        string? readinessPrefix)
     {
         while (await reader.ReadLineAsync() is string line)
         {
             await writer.WriteLineAsync(line);
-            if (TryReadWasmAppHostAddress(line, out string? address))
+            if (readinessPrefix is not null
+                && !StartsWithReadinessPrefix(line, DotNetWatchReadinessPrefix)
+                && TryReadReadinessAddress(
+                    line,
+                    readinessPrefix,
+                    out string? address))
             {
                 // [V01.01.12.31], #349: dotnet-watch 10.0.302 recognizes this readiness
-                // marker but not the equivalent marker emitted by WasmAppHost.
-                await writer.WriteLineAsync($"Now listening on: {address}");
+                // marker but not the configurable equivalent marker mirrored here.
+                await writer.WriteLineAsync($"{DotNetWatchReadinessPrefix} {address}");
             }
         }
 
@@ -316,18 +336,26 @@ internal static class RunHostProcess
         }
     }
 
-    private static bool TryReadWasmAppHostAddress(
+    private static bool StartsWithReadinessPrefix(
         string line,
+        string readinessPrefix) =>
+        line.AsSpan().TrimStart().StartsWith(
+            readinessPrefix,
+            StringComparison.Ordinal);
+
+    private static bool TryReadReadinessAddress(
+        string line,
+        string readinessPrefix,
         out string? address)
     {
         ReadOnlySpan<char> content = line.AsSpan().TrimStart();
-        if (!content.StartsWith(WasmAppHostAddressPrefix, StringComparison.Ordinal))
+        if (!content.StartsWith(readinessPrefix, StringComparison.Ordinal))
         {
             address = null;
             return false;
         }
 
-        string candidate = content[WasmAppHostAddressPrefix.Length..]
+        string candidate = content[readinessPrefix.Length..]
             .Trim()
             .ToString();
         if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri? addressUri)
@@ -388,6 +416,7 @@ internal static class RunHostProcess
     private sealed record RunHostInvocation(
         string Command,
         IReadOnlyList<string> CommandArguments,
+        string ReadinessPrefix,
         string? GeneratedAssetWorkerAssemblyPath,
         string? GeneratedAssetWorkerConfigurationFilePath,
         string? GeneratedAssetWorkerStateFilePath);

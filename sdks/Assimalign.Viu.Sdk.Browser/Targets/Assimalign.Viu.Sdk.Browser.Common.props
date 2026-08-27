@@ -1,6 +1,16 @@
 <Project>
     <PropertyGroup>
         <_ViuBrowserSdk>true</_ViuBrowserSdk>
+        <!-- Browser development-server replacement contract extending [V01.01.12.31], #349. -->
+        <ViuBrowserDevServer Condition="'$(ViuBrowserDevServer)' == ''">WasmAppHost</ViuBrowserDevServer>
+        <ViuBrowserDevServerCommand Condition="'$(ViuBrowserDevServerCommand)' == ''" />
+        <ViuBrowserDevServerArguments Condition="'$(ViuBrowserDevServerArguments)' == ''" />
+        <ViuBrowserDevServerReadinessPrefix Condition="'$(ViuBrowserDevServerReadinessPrefix)' == ''">App url:</ViuBrowserDevServerReadinessPrefix>
+        <!-- Deviates from the repo Microsoft-private-property ownership rule per design decision:
+             _WebAssemblyUserRunParameters is the WebAssembly SDK's sanctioned never-set-in-box
+             escape hatch. Microsoft.AspNetCore.Components.Gateway targets establish the
+             first-party precedent. -->
+        <_WebAssemblyUserRunParameters Condition="'$(ViuBrowserDevServer)' == 'Custom'">true</_WebAssemblyUserRunParameters>
         <!-- Public generated-asset hot-reload contract advertised by the Browser SDK.
              Exact-version consumers remain inert when this value is absent or incompatible.
              Specified by [V01.01.12.30.04], issue #355. -->

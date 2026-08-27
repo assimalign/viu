@@ -8,8 +8,21 @@
     <PropertyGroup Condition="'$(_ViuBrowserSdk)' == 'true'
         and '$(RuntimeIdentifier)' == 'browser-wasm'
         and '$(_IsExecutable)' == 'true'
+        and '$(ViuBrowserDevServer)' == 'Custom'">
+        <!-- Seed the replacement before the evaluation-time RunHost hook captures Run*. The
+             ComputeRunArguments hook repeats this assignment for hosts that finalize Run* later.
+             Extends [V01.01.12.31], #349. -->
+        <RunCommand>$(ViuBrowserDevServerCommand)</RunCommand>
+        <RunArguments>$(ViuBrowserDevServerArguments)</RunArguments>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(_ViuBrowserSdk)' == 'true'
+        and '$(RuntimeIdentifier)' == 'browser-wasm'
+        and '$(_IsExecutable)' == 'true'
         and '$(ViuBrowserRunHostReadinessEnabled)' == 'true'
         and '$(_ViuBrowserRunHostConfigured)' != 'true'
+        and ('$(ViuBrowserDevServer)' == 'WasmAppHost'
+            or '$(ViuBrowserDevServer)' == 'Custom')
         and '$(RunCommand)' != ''">
         <!-- The installed browser workload can pre-set WasmGenerateAppBundle=false even though the
              executable ultimately runs through WasmAppHost. Gate on the Viu Browser app shape.
@@ -19,11 +32,23 @@
         <_ViuBrowserOriginalRunArguments>$(RunArguments)</_ViuBrowserOriginalRunArguments>
         <_ViuBrowserRunHostCommand Condition="'$(DOTNET_HOST_PATH)' != '' and Exists('$(DOTNET_HOST_PATH)')">$(DOTNET_HOST_PATH)</_ViuBrowserRunHostCommand>
         <_ViuBrowserRunHostCommand Condition="'$(_ViuBrowserRunHostCommand)' == ''">dotnet</_ViuBrowserRunHostCommand>
+        <_ViuBrowserDevServerReadinessRunHostArguments Condition="'$(ViuBrowserDevServer)' == 'Custom' and '$(ViuBrowserDevServerReadinessPrefix)' != 'App url:'">--readiness-prefix &quot;$(ViuBrowserDevServerReadinessPrefix)&quot; </_ViuBrowserDevServerReadinessRunHostArguments>
         <_ViuBrowserGeneratedAssetRunHostArguments Condition="'$(Configuration)' == 'Debug' and '$(ViuCssHotReloadEnabled)' != 'false'">--generated-asset-worker-assembly &quot;$(ViuCssHotReloadWorkerAssembly)&quot; --generated-asset-worker-configuration &quot;$(ViuGeneratedAssetWorkerConfigurationFile)&quot; --generated-asset-worker-state &quot;$(ViuCssHotReloadStateFile)&quot; </_ViuBrowserGeneratedAssetRunHostArguments>
         <RunCommand>$(_ViuBrowserRunHostCommand)</RunCommand>
-        <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; $(_ViuBrowserGeneratedAssetRunHostArguments)-- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
+        <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; $(_ViuBrowserDevServerReadinessRunHostArguments)$(_ViuBrowserGeneratedAssetRunHostArguments)-- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
         <_ViuBrowserRunHostConfigured>true</_ViuBrowserRunHostConfigured>
     </PropertyGroup>
+
+    <Target Name="_ViuValidateBrowserDevServer"
+            BeforeTargets="Build;ComputeRunArguments"
+            Condition="'$(_ViuBrowserSdk)' == 'true'
+                and '$(RuntimeIdentifier)' == 'browser-wasm'
+                and '$(_IsExecutable)' == 'true'">
+        <Error Condition="'$(ViuBrowserDevServer)' != 'WasmAppHost' and '$(ViuBrowserDevServer)' != 'Custom'"
+               Text="The Viu Browser dev server '$(ViuBrowserDevServer)' is not supported. Set ViuBrowserDevServer to 'WasmAppHost' or 'Custom'." />
+        <Error Condition="'$(ViuBrowserDevServer)' == 'Custom' and '$(ViuBrowserDevServerCommand)' == ''"
+               Text="ViuBrowserDevServerCommand must be set when ViuBrowserDevServer is 'Custom'." />
+    </Target>
 
     <!-- Keep the target seam for hosts that defer Run* computation to ComputeRunArguments. -->
     <Target Name="_ViuConfigureBrowserRunHost"
@@ -31,21 +56,29 @@
             Condition="'$(_ViuBrowserSdk)' == 'true'
                 and '$(RuntimeIdentifier)' == 'browser-wasm'
                 and '$(_IsExecutable)' == 'true'
-                and '$(ViuBrowserRunHostReadinessEnabled)' == 'true'
-                and '$(_ViuBrowserRunHostConfigured)' != 'true'">
+                and '$(_ViuBrowserRunHostConfigured)' != 'true'
+                and ('$(ViuBrowserRunHostReadinessEnabled)' == 'true'
+                    or '$(ViuBrowserDevServer)' != 'WasmAppHost')">
+        <Error Condition="'$(ViuBrowserDevServer)' != 'WasmAppHost' and '$(ViuBrowserDevServer)' != 'Custom'"
+               Text="The Viu Browser dev server '$(ViuBrowserDevServer)' is not supported. Set ViuBrowserDevServer to 'WasmAppHost' or 'Custom'." />
+        <Error Condition="'$(ViuBrowserDevServer)' == 'Custom' and '$(ViuBrowserDevServerCommand)' == ''"
+               Text="ViuBrowserDevServerCommand must be set when ViuBrowserDevServer is 'Custom'." />
         <PropertyGroup>
+            <RunCommand Condition="'$(ViuBrowserDevServer)' == 'Custom'">$(ViuBrowserDevServerCommand)</RunCommand>
+            <RunArguments Condition="'$(ViuBrowserDevServer)' == 'Custom'">$(ViuBrowserDevServerArguments)</RunArguments>
             <_ViuBrowserOriginalRunCommand>$(RunCommand)</_ViuBrowserOriginalRunCommand>
             <_ViuBrowserOriginalRunArguments>$(RunArguments)</_ViuBrowserOriginalRunArguments>
             <_ViuBrowserRunHostCommand Condition="'$(DOTNET_HOST_PATH)' != '' and Exists('$(DOTNET_HOST_PATH)')">$(DOTNET_HOST_PATH)</_ViuBrowserRunHostCommand>
             <_ViuBrowserRunHostCommand Condition="'$(_ViuBrowserRunHostCommand)' == ''">dotnet</_ViuBrowserRunHostCommand>
+            <_ViuBrowserDevServerReadinessRunHostArguments Condition="'$(ViuBrowserDevServer)' == 'Custom' and '$(ViuBrowserDevServerReadinessPrefix)' != 'App url:'">--readiness-prefix &quot;$(ViuBrowserDevServerReadinessPrefix)&quot; </_ViuBrowserDevServerReadinessRunHostArguments>
             <_ViuBrowserGeneratedAssetRunHostArguments Condition="'$(Configuration)' == 'Debug' and '$(ViuCssHotReloadEnabled)' != 'false'">--generated-asset-worker-assembly &quot;$(ViuCssHotReloadWorkerAssembly)&quot; --generated-asset-worker-configuration &quot;$(ViuGeneratedAssetWorkerConfigurationFile)&quot; --generated-asset-worker-state &quot;$(ViuCssHotReloadStateFile)&quot; </_ViuBrowserGeneratedAssetRunHostArguments>
-            <RunCommand>$(_ViuBrowserRunHostCommand)</RunCommand>
-            <RunArguments>exec &quot;$(ViuBrowserRunHostAssembly)&quot; $(_ViuBrowserGeneratedAssetRunHostArguments)-- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
-            <_ViuBrowserRunHostConfigured>true</_ViuBrowserRunHostConfigured>
+            <RunCommand Condition="'$(ViuBrowserRunHostReadinessEnabled)' == 'true'">$(_ViuBrowserRunHostCommand)</RunCommand>
+            <RunArguments Condition="'$(ViuBrowserRunHostReadinessEnabled)' == 'true'">exec &quot;$(ViuBrowserRunHostAssembly)&quot; $(_ViuBrowserDevServerReadinessRunHostArguments)$(_ViuBrowserGeneratedAssetRunHostArguments)-- &quot;$(_ViuBrowserOriginalRunCommand)&quot; $(_ViuBrowserOriginalRunArguments)</RunArguments>
+            <_ViuBrowserRunHostConfigured Condition="'$(ViuBrowserRunHostReadinessEnabled)' == 'true'">true</_ViuBrowserRunHostConfigured>
         </PropertyGroup>
-        <Error Condition="'$(_ViuBrowserOriginalRunCommand)' == ''"
+        <Error Condition="'$(ViuBrowserRunHostReadinessEnabled)' == 'true' and '$(_ViuBrowserOriginalRunCommand)' == ''"
                Text="The Viu Browser run host cannot wrap an empty WebAssembly RunCommand." />
-        <Error Condition="!Exists('$(ViuBrowserRunHostAssembly)')"
+        <Error Condition="'$(ViuBrowserRunHostReadinessEnabled)' == 'true' and !Exists('$(ViuBrowserRunHostAssembly)')"
                Text="The Viu Browser run host is missing at $(ViuBrowserRunHostAssembly). Restore a complete Assimalign.Viu.Sdk.Browser package." />
     </Target>
 
