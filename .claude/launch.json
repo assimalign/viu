@@ -6,6 +6,12 @@
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "../viu-examples/examples/Assimalign.Viu.Showcase"],
       "port": 5178
+    },
+    {
+      "name": "viu-docs",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "../viu-docs/app/ViuDocs"],
+      "port": 5179
     }
   ]
 }
