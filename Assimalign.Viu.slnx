@@ -56,8 +56,6 @@
 	</Folder>
 	<Folder Name="/viu/.github/workflows/">
 		<File Path=".github/workflows/analyzers.yml" />
-		<File Path=".github/workflows/benchmarks.yml" />
-		<File Path=".github/workflows/budget-gates.yml" />
 		<File Path=".github/workflows/libraries.yml" />
 		<File Path=".github/workflows/packaging.yml" />
 		<File Path=".github/workflows/release.yml" />
@@ -166,26 +164,10 @@
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Watch/src/Assimalign.Viu.Sdk.CssHotReload.csproj" />
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.Benchmarks/">
-		<Project Path="benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj" />
-	</Folder>
-	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.Benchmarks.Tests/">
-		<Project Path="benchmarks/Assimalign.Viu.Testing.Benchmarks.Tests/Assimalign.Viu.Testing.Benchmarks.Tests.csproj" />
-	</Folder>
-	<Folder Name="/viu/benchmarks/baselines/">
-		<File Path="benchmarks/baselines/InteropCounts.json" />
-	</Folder>
 	<Folder Name="/viu/scripts/">
 		<File Path="scripts/Install-Local.ps1" />
-		<File Path="scripts/Measure-PublishBudget.ps1" />
 		<File Path="scripts/Test-Templates.ps1" />
 		<File Path="scripts/Test-NoNodeToolchain.ps1" />
-	</Folder>
-	<Folder Name="/viu/scripts/budgets/">
-		<File Path="scripts/budgets/PublishBudgets.json" />
-	</Folder>
-	<Folder Name="/viu/scripts/tests/Assimalign.Viu.PublishBudget.Tests/">
-		<Project Path="scripts/tests/Assimalign.Viu.PublishBudget.Tests/Assimalign.Viu.PublishBudget.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/extensions/VisualStudio/">
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx" />

@@ -46,9 +46,10 @@
         <!-- Visual Studio hosts and their editor-neutral language services are developed together
              under extensions/ and use the same by-name reference conventions as other code areas. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)extensions\**\*.csproj" />
-        <!-- Benchmarks are a first-class non-shipping code area ([V01.01.11.04], #88), like analyzers:
-             indexing them lets the benchmark test project take a by-name compile reference to the
-             benchmark app, and lets both resolve the runtime libraries they measure. -->
+        <!-- The performance benchmark suite moved to the sibling assimalign/viu-benchmarks repository
+             ([V01.01.11.04], #88), so this root now indexes only the packaged-consumer end-to-end
+             harness. It is kept a first-class code area, like analyzers, so the harness can resolve
+             runtime libraries by name if it ever needs to. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)benchmarks\**\*.csproj" />
         <_ViuProject Update="@(_ViuProject)" ProjectId="%(_ViuProject.Filename)" ProjectPath="%(_ViuProject.Identity)" />
 

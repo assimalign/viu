@@ -16,4 +16,5 @@ None. The last parked workflow, `budget-gates.yml`, was re-activated into
 `scripts/budgets/PublishBudgets.json` was re-baselined against the measured `EndToEndBrowserApp`
 packaged-consumer fixture (size and `boot-to-interactive` startup, with recorded provenance) and
 both checkers plus deliberate regressions were verified. Its parked-era rationale lives in this
-file's git history.
+file's git history. It has since moved, with the benchmark suite, to the sibling
+`viu-benchmarks` repository.

@@ -958,7 +958,8 @@ allocator MUST advance past the maximum handle in each snapshot so a later manag
 collide.
 
 `[RND-IO-5]` Interop-call counts are a **gated budget**, not an aspiration:
-`benchmarks/baselines/InteropCounts.json` records the expected counts and a delta fails CI
+the sibling `viu-benchmarks` repository's `benchmarks/baselines/InteropCounts.json` records the
+expected counts and a delta fails CI there
 ([§17](#17-conformance-and-how-behavior-is-pinned)).
 
 *Authority: `libraries/Runtime/Assimalign.Viu.Core/src/Rendering/Renderer{TNode}.cs` (`Patch`, `Mount`,
@@ -2119,10 +2120,10 @@ it move together.
 | `Assimalign.Viu.Sdk.Browser.Tasks.Tests` | Pure host-page stylesheet injection: close-tag placement, href idempotency, comment handling, newline preservation, and missing-head behavior |
 | `Assimalign.Viu.DevTools.Tests` | Handshake/version handling, unknown-message tolerance, bounded post-flush batches, weak live-tree identity and keyed reorder, safe snapshots, custom inspectors/layers, and one corpus over both transports [DVT-2]–[DVT-7] |
 | `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; isolated Browser-SDK consumers pin library-only and library-before-app link delivery, both `OverrideHtmlAssetPlaceholders` states in Build and Publish, labeled fingerprint resolution plus explicit-href precedence, byte-equivalent identity/gzip/brotli outputs through trimmed and AOT publish, and complete removal of a disabled DevTools package and asset [DVT-1] |
-| `scripts/Test-EndToEnd.ps1`, `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance; the isolated Chromium watch lane pins component-stylesheet replacement, a no-write/no-managed-update semantic no-op, and mounted `.vue` remount behavior [V01.01.12.05.02] |
-| `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
-| `.github/workflows/{libraries,tooling,analyzers}.yml` and `benchmarks.yml` | Live per-area CI plus the interop budget gate |
-| `.github/workflows/budget-gates.yml` | Live pull-request trimmed-publish/size and trim-warning checks, with scheduled/on-demand WebAssembly AOT and real-browser `boot-to-interactive` startup lanes |
+| `scripts/Test-EndToEnd.ps1` here, plus `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` in the sibling `viu-benchmarks` repository | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance; the isolated Chromium watch lane pins component-stylesheet replacement, a no-write/no-managed-update semantic no-op, and mounted `.vue` remount behavior [V01.01.12.05.02] |
+| `benchmarks/baselines/InteropCounts.json` (in `viu-benchmarks`) | Interop-call counts; a delta fails the gate [RND-IO-5] |
+| `.github/workflows/{libraries,tooling,analyzers}.yml` here, and `benchmarks.yml` in `viu-benchmarks` | Live per-area CI plus the interop budget gate |
+| `.github/workflows/budget-gates.yml` (in `viu-benchmarks`) | Live pull-request trimmed-publish/size and trim-warning checks, with scheduled/on-demand WebAssembly AOT and real-browser `boot-to-interactive` startup lanes |
 
 The frozen Tailwind CSS v4.3.3 vectors under
 `libraries/Utilities/Assimalign.Viu.UtilityCss/conformance/` validate the standalone add-on. They
@@ -2190,7 +2191,8 @@ as a Viu design decision recorded here or in an ADR.
 lands in this specification.**
 
 `[PERF-3]` A finding MUST NOT be adopted without a measured delta against
-`benchmarks/Assimalign.Viu.Testing.Benchmarks` and/or `benchmarks/baselines/InteropCounts.json`.
+the sibling `viu-benchmarks` repository's `benchmarks/Assimalign.Viu.Testing.Benchmarks` and/or
+`benchmarks/baselines/InteropCounts.json`.
 
 `[PERF-4]` Matching an external project's semantics, API, or behavior is **out of scope** for that
 channel and MUST NOT be raised through it.

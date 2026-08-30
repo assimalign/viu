@@ -1,8 +1,10 @@
 # Assimalign.Viu.Testing.EndToEnd
 
 This test-only executable drives Viu exclusively from the browser side through Playwright .NET. It
-is under `benchmarks/` because browser orchestration, trace capture, startup measurement, and the
-loopback static server form Viu's executable performance and end-to-end verification harness. It is never
+is a test harness, not a benchmark. It sits under `benchmarks/` for historical reasons — the
+performance benchmark suite that once shared the folder now lives in the sibling
+`viu-benchmarks` repository, and browser orchestration, trace capture, startup measurement, and the
+loopback static server stayed here because they need this repository's source. It is never
 packed and no shipping library references it. Purpose-built package-consumer applications remain
 under `scripts/fixtures/`, beside the script that stages them.
 
@@ -23,8 +25,10 @@ network requests fail that scenario.
 Startup mode performs one or more warm-up loads followed by at least ten fresh-context
 boot-to-interactive measurements in Chromium. A sample stops only after the increment click is
 acknowledged by the reactive count, proving event dispatch and update readiness. Its JSON result is
-the machine-readable input to the scheduled startup-budget lane. The separately exposed
-publish-only mode reuses exactly the same isolated package-consumer preparation for trimmed-size
+the machine-readable input to the scheduled startup-budget lane, which is enforced from the sibling
+`viu-benchmarks` repository (`scripts/Test-StartupBudget.ps1`). The separately exposed
+publish-only mode reuses exactly the same isolated package-consumer preparation for that
+repository's trimmed-size
 and AOT budget lanes. Its `-PackagedVuePublish` selection publishes a `.vue`-only Browser fixture
 through the installed SDK/framework packages, requires a non-empty component-CSS bundle,
 and scans both generated sources and the published consumer assembly for absent Debug-only

@@ -130,12 +130,14 @@ These eight dated decisions define Viu's C# and WebAssembly architecture:
    scope. Recorded as a founding ADR and refined by `[V01.01.15]`.
 6. **Trimming/AOT-safe everywhere.** No reflection-based serialization, no dynamic codegen, and no
    linker-unfriendly activation. The publish budgets are live CI gates in
-   [`budget-gates.yml`](../.github/workflows/budget-gates.yml): trimmed payload size and trim
+   `budget-gates.yml` in the sibling `viu-benchmarks` repository: trimmed payload size and trim
    warnings on relevant pull requests, WebAssembly AOT publication and real-browser
    `boot-to-interactive` startup on scheduled/on-demand lanes — all enforced against the measured
-   `EndToEndBrowserApp` baselines and reviewed ceilings in `scripts/budgets/PublishBudgets.json`
+   `EndToEndBrowserApp` baselines and reviewed ceilings in that repository's
+   `scripts/budgets/PublishBudgets.json`
    (re-baselined 2026-08-09 under `[V01.01.12.26]`/#320 and `[V01.01.12.06.01]`/#182; CI never
-   rewrites the manifest). Deterministic interop counts remain a per-PR gate in `benchmarks.yml`
+   rewrites the manifest). Deterministic interop counts remain a gate in that repository's
+   `benchmarks.yml`
    under [RND-IO-5].
 7. **Cohesion integration at MVP.** Viu will integrate with the Cohesion platform
    (`assimalign/cohesion`) as MVP approaches — apps served by Cohesion Web, SSR hosted in-process

@@ -273,7 +273,8 @@ launch a worker, the generator omits its metadata handler and marker members, an
 `Watch/Assimalign.Viu.Sdk.CssHotReload.*` nor
 `RunHost/Assimalign.Viu.Sdk.Browser.RunHost.*` is copied into application publish output.
 The platform browser-refresh channel is supplied only by the active development host. Release and
-AOT output are checked through `scripts/Measure-PublishBudget.ps1` against the reviewed manifest in
+AOT output are checked in the sibling `viu-benchmarks` repository, through its
+`scripts/Measure-PublishBudget.ps1` against the reviewed manifest in its
 `scripts/budgets/PublishBudgets.json`.
 
 `ViuEmitHotReloadMetadata=true` is an explicit diagnostic opt-in that overrides the ordinary

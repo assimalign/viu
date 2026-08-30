@@ -75,7 +75,8 @@ Append only. Never edit a decided row — supersede it with a new row that cites
    execution — not from architectural similarity. "They do it and we look like them" is not an
    applicability argument; "this removes N interop crossings per keyed reorder, and our command
    buffer already carries the opcode" is.
-3. **Measured impact** MUST cite a run against `benchmarks/Assimalign.Viu.Testing.Benchmarks` and/or
+3. **Measured impact** MUST cite a run against the sibling `viu-benchmarks` repository's
+   `benchmarks/Assimalign.Viu.Testing.Benchmarks` and/or
    `benchmarks/baselines/InteropCounts.json`. **An unmeasured finding cannot be adopted**
    (`[PERF-3]`). Record the harness, the machine class, and whether the run was AOT or interpreted.
 4. **Decision** is exactly one of `Adopted`, `Rejected`, `Deferred`, `Not applicable`, with a
@@ -111,7 +112,8 @@ Every scheduled and out-of-band review gets a row, including reviews that found 
 
 - [`docs/SPECIFICATION.md`](SPECIFICATION.md) §18 — the normative statement this document implements.
 - [`docs/adr/`](adr/) — where an architecturally significant adoption is recorded.
-- `benchmarks/Assimalign.Viu.Testing.Benchmarks`, `benchmarks/baselines/InteropCounts.json`,
+- In the sibling `viu-benchmarks` repository: `benchmarks/Assimalign.Viu.Testing.Benchmarks`,
+  `benchmarks/baselines/InteropCounts.json`, and
   `scripts/Measure-PublishBudget.ps1` — the measurement gates a finding must clear.
 - [`.claude/rules/documentation.md`](../.claude/rules/documentation.md) — why an adopted technique is
   documented in Viu's terms.

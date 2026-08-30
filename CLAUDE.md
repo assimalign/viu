@@ -34,14 +34,17 @@ reload.
   framework surface; consumer MSBuild integration arrives separately through #346.
 - `extensions/` — ecosystem integration points: `VisualStudio/`, `VisualStudioCode/`, and `dotnet/`;
   templates live at `extensions/dotnet/Assimalign.Viu.Templates`.
-- `benchmarks/Assimalign.Viu.Testing.EndToEnd/` — real-browser end-to-end harness.
+- `benchmarks/Assimalign.Viu.Testing.EndToEnd/` — real-browser end-to-end harness. It is a test
+  harness, not a benchmark; the folder name is historical.
 - `sdks/<SdkId>/Tasks/{src,test}` — SDK task projects.
 - `../viu-examples/` — external packaged-consumer WASM showcase (separate repository)
+- `../viu-benchmarks/` — every benchmark and performance budget (separate repository)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
 - `.claude/rules/` — the canonical working conventions for this repo (auto-load by path):
   `general-rules` (C# style, Abstraction/Internal folders, whole-word naming, explicit usings, AOT),
   `build-system` (central `build/`, `ViuProjectReference`/`ViuPackageReference`), `testing`,
-  `documentation`, `deviations`, `checklist`, and `workflow` (branches, WBS, scope creep)
+  `benchmarks` (all benchmarks and budgets live in `../viu-benchmarks`), `documentation`,
+  `deviations`, `checklist`, and `workflow` (branches, WBS, scope creep)
 
 ## Build and test
 
