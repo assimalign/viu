@@ -208,9 +208,9 @@ $expectedSymbolPackageFiles = @(
         } |
         ForEach-Object { "$_.$Version.snupkg" }
 )
-# [V01.01.12.30] adds the standalone UtilityCss packages to the 18-main/12-symbol release set.
-$expectedMainPackageCount = 18
-$expectedSymbolPackageCount = 12
+# [V01.01.08.08] adds the standalone FileRouting library: one main and one symbol package on top of the [V01.01.12.30] 18-main/12-symbol set.
+$expectedMainPackageCount = 19
+$expectedSymbolPackageCount = 13
 if ($expectedPackageFiles.Count -ne $expectedMainPackageCount) {
     throw "The release contract requires $expectedMainPackageCount main packages, but the configured inventory contains $($expectedPackageFiles.Count)."
 }

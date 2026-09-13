@@ -1,0 +1,15 @@
+<template>
+<article>{{ Identifier }}</article>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+
+    [Parameter("id")]
+    public string Identifier { get; set; } = string.Empty;
+}
+
+@route {
+    path = "/custom/:id";
+    name = "custom";
+}

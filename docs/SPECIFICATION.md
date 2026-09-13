@@ -1789,6 +1789,12 @@ prepass and remain outside this contract.
 
 ## 12. Routing
 
+> **Standalone add-on — non-normative for Viu core.**
+> [`Assimalign.Viu.FileRouting`](../libraries/Utilities/Assimalign.Viu.FileRouting/docs/DESIGN.md)
+> derives ordinary, eager `RouteRecord` tables from page folders at build time. It remains outside
+> every Viu SDK and framework surface and adds no core routing semantics; matching, parameter
+> forwarding, and explicit `RouterView` depth continue to use the contracts below.
+
 `[RTR-1]` The router **core is host-free**. `RouteMatcher` / `IRouteMatcher`, `RouteRecord`,
 `RouteLocation`, `RouteParameters`, `PathMatchingOptions`, and the ranked path parser run in a plain
 .NET test host using no other Viu library.

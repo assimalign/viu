@@ -1,0 +1,6 @@
+<template>
+<section class="blog-archive">Archive</section>
+</template>
+
+@script {
+}

@@ -1,5 +1,5 @@
 # Build+test lane for the Viu source generators ([V01.01.12.02.02]). The generators ship inside the
-# Assimalign.Viu.App targeting pack rather than as standalone NuGet packages, so this root never
+# Assimalign.Viu.App targeting pack or an opt-in add-on package, so this root never
 # publishes and the job keeps contents:read only.
 #
 # Matrix rows name the project and carry its explicit repository-relative folder path. The shared
@@ -53,6 +53,8 @@ jobs:
             fail-fast: false
             matrix:
                 include:
+                    - project: "Assimalign.Viu.Generators.FileRouting"
+                      path: "analyzers/Assimalign.Viu.Generators.FileRouting"
                     - project: "Assimalign.Viu.Generators.Reactive"
                       path: "analyzers/Assimalign.Viu.Generators.Reactive"
                     - project: "Assimalign.Viu.Generators.Syntax"

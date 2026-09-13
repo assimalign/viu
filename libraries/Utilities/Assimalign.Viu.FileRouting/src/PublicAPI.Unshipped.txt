@@ -1,0 +1,10 @@
+#nullable enable
+Assimalign.Viu.FileRouting.FileRouteDescriptor
+Assimalign.Viu.FileRouting.FileRouteDescriptor.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.FileRouting.FileRouteDescriptor!>!
+Assimalign.Viu.FileRouting.FileRouteDescriptor.ComponentName.get -> string!
+Assimalign.Viu.FileRouting.FileRouteDescriptor.FileRouteDescriptor(string! path, string! name, string! componentName, bool forwardParameters = false, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.FileRouting.FileRouteDescriptor!>? children = null) -> void
+Assimalign.Viu.FileRouting.FileRouteDescriptor.ForwardParameters.get -> bool
+Assimalign.Viu.FileRouting.FileRouteDescriptor.Name.get -> string!
+Assimalign.Viu.FileRouting.FileRouteDescriptor.Path.get -> string!
+Assimalign.Viu.FileRouting.FileRoutes
+static Assimalign.Viu.FileRouting.FileRoutes.Create(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.FileRouting.FileRouteDescriptor!>! descriptors) -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Router.RouteRecord!>!

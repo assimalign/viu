@@ -162,6 +162,7 @@ jobs:
             'Assimalign.Viu.App.Browser.Ref.*.nupkg',
             'Assimalign.Viu.App.Browser.Runtime.browser-wasm.*.nupkg',
             'Assimalign.Viu.UtilityCss.Build.*.nupkg',
+            'Assimalign.Viu.FileRouting.*.nupkg',
             'Assimalign.Viu.Templates.*.nupkg'
           )
           foreach ($pattern in $expected) {
@@ -444,6 +445,51 @@ jobs:
             }
             finally {
               $reader.Dispose()
+            }
+          }
+
+          # FileRouting remains a separate package, with exactly its minimal parser closure.
+          $fileRoutingPackage = Get-SingleViuPackage -PackageId 'Assimalign.Viu.FileRouting'
+          $fileRoutingArchive = [System.IO.Compression.ZipFile]::OpenRead($fileRoutingPackage.FullName)
+          try {
+            Assert-ArchiveEntries `
+              -Archive $fileRoutingArchive `
+              -Package $fileRoutingPackage `
+              -EntryNames @(
+                'lib/net10.0/Assimalign.Viu.FileRouting.dll',
+                'build/Assimalign.Viu.FileRouting.props',
+                'analyzers/dotnet/cs/Assimalign.Viu.Generators.FileRouting.dll',
+                'analyzers/dotnet/cs/Assimalign.Viu.Syntax.dll',
+                'analyzers/dotnet/cs/Assimalign.Viu.Syntax.SingleFileComponent.dll'
+              )
+            $fileRoutingAnalyzerNames = @(
+              $fileRoutingArchive.Entries |
+                Where-Object { $_.FullName.StartsWith('analyzers/', [System.StringComparison]::Ordinal) } |
+                ForEach-Object Name |
+                Sort-Object
+            )
+            $fileRoutingExpectedAnalyzerNames = @(
+              'Assimalign.Viu.Generators.FileRouting.dll',
+              'Assimalign.Viu.Syntax.dll',
+              'Assimalign.Viu.Syntax.SingleFileComponent.dll'
+            ) | Sort-Object
+            if (@(Compare-Object $fileRoutingExpectedAnalyzerNames $fileRoutingAnalyzerNames).Count -ne 0) {
+              throw 'FileRouting must ship only its generator and the two public parser assemblies.'
+            }
+          }
+          finally {
+            $fileRoutingArchive.Dispose()
+          }
+          foreach ($frameworkOrSdkPackage in @(
+              $referencePackage, $browserReferencePackage, $runtimePackage, $sdkPackage, $browserSdkPackage)) {
+            $frameworkOrSdkArchive = [System.IO.Compression.ZipFile]::OpenRead($frameworkOrSdkPackage.FullName)
+            try {
+              if (@($frameworkOrSdkArchive.Entries | Where-Object { $_.FullName -like '*FileRouting*' }).Count -ne 0) {
+                throw "$($frameworkOrSdkPackage.Name) must not carry the standalone FileRouting add-on."
+              }
+            }
+            finally {
+              $frameworkOrSdkArchive.Dispose()
             }
           }
 

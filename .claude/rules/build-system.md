@@ -49,6 +49,9 @@ project ships only source and its DLL.
   `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}` and is independently published. It stays
   outside every Viu SDK and framework surface; consumer build-time integration arrives separately
   through [V01.01.12.30] (#346).
+- The standalone FileRouting add-on lives beside UtilityCss at
+  `libraries/Utilities/Assimalign.Viu.FileRouting/{src,test}`. Its package carries its own analyzer
+  and consumer properties; it remains outside every Viu SDK and framework surface.
 - Ecosystem integrations live under `extensions/{VisualStudio|VisualStudioCode|dotnet}`; the templates
   project is `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives under
   `benchmarks/Assimalign.Viu.Testing.EndToEnd`. SDK task projects use

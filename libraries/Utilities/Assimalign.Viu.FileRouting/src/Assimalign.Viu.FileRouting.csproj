@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- Deviates from the repo central package README rule per [V01.01.08.08] (#361):
+         the one-reference routing integration requires a package-specific consumer quickstart. -->
+    <ViuPackageReadmeSource>$(MSBuildProjectDirectory)\..\README.md</ViuPackageReadmeSource>
+    <Description>Standalone folder-based routing for Viu, with eager route tables generated at build time.</Description>
+    <PackageTags>Viu;Routing;WebAssembly;SourceGenerator</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Router" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Generators.FileRouting" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Deviates from the repo two homes rule per [V01.01.08.08] (#361):
+         this independently installed package owns its opt-in consumer properties outside the Viu SDKs. -->
+    <None Include="..\build\Assimalign.Viu.FileRouting.props"
+          Pack="true"
+          PackagePath="build/Assimalign.Viu.FileRouting.props" />
+  </ItemGroup>
+</Project>

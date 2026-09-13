@@ -52,7 +52,8 @@ direct Viu project dependencies.
 
 The current library areas are `Browser/` (Browser and Browser.Router), `DevTools/` (DevTools and
 Testing), `Router/`, `Runtime/` (Components, Core, Reactivity, and State), `ServerRenderer/`, and
-`Syntax/` (the five Syntax libraries).
+`Syntax/` (the five Syntax libraries), plus `Utilities/` for standalone add-ons including UtilityCss
+and FileRouting, which generates eager route tables without joining an SDK or framework surface.
 
 | Area | Public library | Role | Direct Viu dependencies |
 | --- | --- | --- | --- |
@@ -341,6 +342,9 @@ completed P0–P6 sequence, and verification record remain in
 | `V01.01.07.05` | Implement static prerendering (SSG) | W06 | P006 |
 
 ### [V01.01.08] Framework - Router (W04, P003)
+
+The standalone `Assimalign.Viu.FileRouting` Utilities add-on produces ordinary eager `RouteRecord`
+tables from page folders and leaves Router's matching and explicit-depth semantics unchanged.
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |

@@ -438,4 +438,30 @@
 	<Folder Name="/viu/libraries/DevTools/Assimalign.Viu.Testing/test/">
 		<Project Path="libraries/DevTools/Assimalign.Viu.Testing/test/Assimalign.Viu.Testing.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.FileRouting/">
+		<File Path="libraries/Utilities/Assimalign.Viu.FileRouting/README.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.FileRouting/docs/">
+		<File Path="libraries/Utilities/Assimalign.Viu.FileRouting/docs/DESIGN.md" />
+		<File Path="libraries/Utilities/Assimalign.Viu.FileRouting/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.FileRouting/build/">
+		<File Path="libraries/Utilities/Assimalign.Viu.FileRouting/build/Assimalign.Viu.FileRouting.props" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.FileRouting/src/">
+		<Project Path="libraries/Utilities/Assimalign.Viu.FileRouting/src/Assimalign.Viu.FileRouting.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Utilities/Assimalign.Viu.FileRouting/test/">
+		<Project Path="libraries/Utilities/Assimalign.Viu.FileRouting/test/Assimalign.Viu.FileRouting.Tests.csproj" />
+	</Folder>
+	<Folder Name="/viu/analyzers/Assimalign.Viu.Generators.FileRouting/docs/">
+		<File Path="analyzers/Assimalign.Viu.Generators.FileRouting/docs/DIAGNOSTICS.md" />
+	</Folder>
+	<Folder Name="/viu/analyzers/Assimalign.Viu.Generators.FileRouting/src/">
+		<Project Path="analyzers/Assimalign.Viu.Generators.FileRouting/src/Assimalign.Viu.Generators.FileRouting.csproj" />
+	</Folder>
+	<Folder Name="/viu/analyzers/Assimalign.Viu.Generators.FileRouting/test/">
+		<Project Path="analyzers/Assimalign.Viu.Generators.FileRouting/test/Assimalign.Viu.Generators.FileRouting.Tests.csproj" />
+		<Project Path="analyzers/Assimalign.Viu.Generators.FileRouting/test/Assimalign.Viu.Generators.FileRouting.CompiledFixtureTests/Assimalign.Viu.Generators.FileRouting.CompiledFixtureTests.csproj" />
+	</Folder>
 </Solution>

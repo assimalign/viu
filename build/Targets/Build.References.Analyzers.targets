@@ -123,4 +123,8 @@
             Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Generators.Syntax.props')" />
     <Import Project="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Generators.Syntax.targets"
             Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Generators.Syntax.targets')" />
+    <!-- FileRouting is an opt-in standalone add-on. Import its shipped consumer properties for
+         dogfooding; the existing Syntax SDK imports above remain the sole AdditionalFiles owner. -->
+    <Import Project="$(ViuRepositoryDirectory)libraries\Utilities\Assimalign.Viu.FileRouting\build\Assimalign.Viu.FileRouting.props"
+            Condition="'$(ViuUseFileRouting)' == 'true'" />
 </Project>

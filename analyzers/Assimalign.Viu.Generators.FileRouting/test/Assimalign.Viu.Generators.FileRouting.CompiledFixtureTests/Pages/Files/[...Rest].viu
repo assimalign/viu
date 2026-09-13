@@ -1,0 +1,10 @@
+<template>
+<section class="files-page">{{ Rest }}</section>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+
+    [Parameter("rest")]
+    public string Rest { get; set; } = string.Empty;
+}

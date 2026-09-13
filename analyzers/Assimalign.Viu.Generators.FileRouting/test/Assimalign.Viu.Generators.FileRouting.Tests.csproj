@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Assimalign.Viu.Generators.FileRouting.CompiledFixtureTests/**" />
+    <None Remove="Assimalign.Viu.Generators.FileRouting.CompiledFixtureTests/**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <ViuPrivateProjectReference Include="Assimalign.Viu.Generators.FileRouting" />
+  </ItemGroup>
+</Project>

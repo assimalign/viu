@@ -58,6 +58,8 @@ jobs:
                       path: "libraries/Runtime/Assimalign.Viu.Core"
                     - project: "Assimalign.Viu.DevTools"
                       path: "libraries/DevTools/Assimalign.Viu.DevTools"
+                    - project: "Assimalign.Viu.FileRouting"
+                      path: "libraries/Utilities/Assimalign.Viu.FileRouting"
                     - project: "Assimalign.Viu.Reactivity"
                       path: "libraries/Runtime/Assimalign.Viu.Reactivity"
                     - project: "Assimalign.Viu.Router"

@@ -1,0 +1,6 @@
+<template>
+<aside>A component outside Pages is not a route</aside>
+</template>
+
+@script {
+}

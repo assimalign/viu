@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsPackable>false</IsPackable>
+    <!-- The two public container parsers load beside the generator in the consumer analyzer host. -->
+    <ViuAnalyzerBundlesProjectReferenceOutputs>true</ViuAnalyzerBundlesProjectReferenceOutputs>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

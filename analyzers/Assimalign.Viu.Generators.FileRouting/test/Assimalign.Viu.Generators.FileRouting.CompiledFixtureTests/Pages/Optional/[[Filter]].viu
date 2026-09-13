@@ -1,0 +1,10 @@
+<template>
+<section class="optional-page">{{ Filter }}</section>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+
+    [Parameter("filter")]
+    public string Filter { get; set; } = string.Empty;
+}

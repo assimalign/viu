@@ -1,0 +1,10 @@
+<template>
+<article class="blog-post">{{ Slug }}</article>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+
+    [Parameter("slug")]
+    public string Slug { get; set; } = string.Empty;
+}

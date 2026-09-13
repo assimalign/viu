@@ -1,0 +1,14 @@
+<Project>
+  <!-- Deviates from the repo two homes rule per [V01.01.08.08] (#361):
+       standalone package consumer wiring stays outside the Viu SDK and framework surfaces.
+       In-repo ViuUseFileRouting consumers import this same file. The Viu SDK already owns
+       .viu/.vue AdditionalFiles and the visible RootNamespace/ProjectDir properties. -->
+  <PropertyGroup>
+    <ViuFileRoutingEnabled Condition="'$(ViuFileRoutingEnabled)' == ''">true</ViuFileRoutingEnabled>
+    <ViuFileRoutingPagesDirectory Condition="'$(ViuFileRoutingPagesDirectory)' == ''">Pages</ViuFileRoutingPagesDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="ViuFileRoutingEnabled" />
+    <CompilerVisibleProperty Include="ViuFileRoutingPagesDirectory" />
+  </ItemGroup>
+</Project>

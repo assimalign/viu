@@ -1,0 +1,6 @@
+<template>
+<main class="blog-layout"><h1>Blog</h1><RouterView :depth="1" /></main>
+</template>
+
+@script {
+}

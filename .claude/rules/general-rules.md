@@ -41,6 +41,9 @@ core compatibility target (owner decision, 2026-08-13).
   consumer MSBuild integration arrives separately through [V01.01.12.30] (#346). Utility CSS remains
   non-normative for Viu core. Component `<style>` CSS remains fully supported, including scoping,
   bundling, and hot reload.
+- `libraries/Utilities/Assimalign.Viu.FileRouting/{src,test}` is the independently published,
+  host-free folder-routing add-on beside UtilityCss. Its generator ships in its own package;
+  it remains outside every Viu SDK and framework surface and produces ordinary eager route records.
 - Ecosystem integration points live under `extensions/`: `VisualStudio/`, `VisualStudioCode/`, and
   `dotnet/`. The dotnet templates project is
   `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives at
