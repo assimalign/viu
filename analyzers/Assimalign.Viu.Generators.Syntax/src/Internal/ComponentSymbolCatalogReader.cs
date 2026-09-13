@@ -15,7 +15,8 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// <c>[Parameter]</c> survives into the assembly, so a package's component surface is readable by the
 /// consumer's template compiler. A parameterless component still contributes its identity. A component
 /// that declares parameters imperatively also contributes identity, but its arbitrary <c>Parameters</c>
-/// collection marks the surface unknown and suppresses parameter checks ([SFC-USE-5]).
+/// collection or static <c>Registration</c> contract marks an unattributed surface unknown and
+/// suppresses parameter checks ([CMP-26], [SFC-USE-5]).
 /// <para>
 /// The scan is bounded on purpose. It returns immediately when the compilation does not reference
 /// <c>Assimalign.Viu.Components</c> at all, and it walks only assemblies that reference that library, so
@@ -26,6 +27,7 @@ internal static class ComponentSymbolCatalogReader
 {
     private const string ComponentsAssemblyName = "Assimalign.Viu.Components";
     private const string ComponentInterfaceName = "Assimalign.Viu.Components.IComponent";
+    private const string ComponentRegistrationName = "Assimalign.Viu.Components.ComponentRegistration";
     private const string ParameterAttributeName = "Assimalign.Viu.Components.ParameterAttribute";
 
     /// <summary>Reads every statically declared component surface visible to <paramref name="compilation"/>.</summary>
@@ -38,13 +40,19 @@ internal static class ComponentSymbolCatalogReader
     {
         var componentInterface = compilation.GetTypeByMetadataName(ComponentInterfaceName);
         var parameterAttribute = compilation.GetTypeByMetadataName(ParameterAttributeName);
+        var componentRegistration = compilation.GetTypeByMetadataName(ComponentRegistrationName);
         if (componentInterface is null || parameterAttribute is null)
         {
             return EquatableArray<ComponentDeclarationEntry>.Empty;
         }
 
         var entries = new List<ComponentDeclarationEntry>();
-        var context = new ScanContext(componentInterface, parameterAttribute, entries, cancellationToken);
+        var context = new ScanContext(
+            componentInterface,
+            parameterAttribute,
+            componentRegistration,
+            entries,
+            cancellationToken);
         ScanAssembly(compilation.Assembly, context);
         foreach (var reference in compilation.References)
         {
@@ -120,10 +128,19 @@ internal static class ComponentSymbolCatalogReader
 
         List<ComponentParameterDeclaration>? parameters = null;
         var declaresImperativeParameters = false;
+        var declaresRegistration = false;
         foreach (var member in type.GetMembers())
         {
-            if (member is not IPropertySymbol property || property.IsStatic)
+            if (member is not IPropertySymbol property)
             {
+                continue;
+            }
+
+            if (property.IsStatic)
+            {
+                declaresRegistration |=
+                    string.Equals(property.Name, "Registration", StringComparison.Ordinal) &&
+                    SymbolEqualityComparer.Default.Equals(property.Type, context.ComponentRegistration);
                 continue;
             }
 
@@ -144,7 +161,11 @@ internal static class ComponentSymbolCatalogReader
                 ? EquatableArray<ComponentParameterDeclaration>.Empty
                 : new EquatableArray<ComponentParameterDeclaration>(parameters.ToArray()))
         {
-            IsParameterSurfaceKnown = !declaresImperativeParameters,
+            // [V01.01.08.03.02] A hand-authored registration carries an arbitrary contract, not an
+            // empty declaration. Metadata cannot expose its initializer; only attributed parameters
+            // make that surface readable ([CMP-26], [SFC-USE-5]). Keep its identity in either case.
+            IsParameterSurfaceKnown =
+                !declaresImperativeParameters && (!declaresRegistration || parameters is not null),
         });
     }
 
@@ -229,12 +250,15 @@ internal static class ComponentSymbolCatalogReader
     private readonly struct ScanContext(
         INamedTypeSymbol componentInterface,
         INamedTypeSymbol parameterAttribute,
+        INamedTypeSymbol? componentRegistration,
         List<ComponentDeclarationEntry> entries,
         CancellationToken cancellationToken)
     {
         public INamedTypeSymbol ComponentInterface { get; } = componentInterface;
 
         public INamedTypeSymbol ParameterAttribute { get; } = parameterAttribute;
+
+        public INamedTypeSymbol? ComponentRegistration { get; } = componentRegistration;
 
         public List<ComponentDeclarationEntry> Entries { get; } = entries;
 

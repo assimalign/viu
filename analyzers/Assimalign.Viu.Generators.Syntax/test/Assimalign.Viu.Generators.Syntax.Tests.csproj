@@ -22,5 +22,6 @@
          the composed .viu parser runs in-process. The OutputItemType="Analyzer" reference form cannot be
          compiled against, so — like Reactivity.Generators.Tests — this is a private project reference. -->
     <ViuPrivateProjectReference Include="Assimalign.Viu.Generators.Syntax" />
+    <ViuProjectReference Include="Assimalign.Viu.Router" />
   </ItemGroup>
 </Project>

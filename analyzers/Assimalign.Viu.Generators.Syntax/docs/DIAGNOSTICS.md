@@ -255,7 +255,12 @@ resolution failure.
 `VIU1401`–`VIU1403` require a component's parameter surface to be **statically readable**, which
 means attribute-declared (`[CMP-26]`). A component that builds its `Parameters` collection
 imperatively carries nothing a compiler can read — the collection is arbitrary C# — so only its
-parameter checks are skipped. Static identity is still required and can report `VIU1404`/`VIU1405`.
+parameter checks are skipped. The same applies to a hand-authored `IComponent` exposing a static
+`Registration` property of type `ComponentRegistration` without attributed parameters: its contract
+is arbitrary C#, and a referenced assembly exposes no initializer to inspect. An absent attribute
+list does not prove that contract declares zero parameters. This includes `RouterView`'s `depth`
+and `RouterLink`'s `to`, `replace`, `activeClass`, and `exactActiveClass`
+([V01.01.08.03.02], issue #359). Static identity is still required and can report `VIU1404`/`VIU1405`.
 
 After identity resolves, an argument-less `v-bind="…"` spread or dynamic `:[name]` argument, a bound
 expression that is not a C# literal, and a hyphenated attribute name suppress only checks requiring

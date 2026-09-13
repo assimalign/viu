@@ -14,6 +14,17 @@ namespace Assimalign.Viu.Router.Tests;
 public class RouterViewTests
 {
     [Fact]
+    public void RouterView_Registration_DeclaresOptionalDepthWithZeroDefault()
+    {
+        // [RTR-4] and [V01.01.08.03.02]: tooling changes preserve the runtime outlet contract.
+        ComponentParameter parameter = RouterView.Registration.Contract.Parameters.ShouldHaveSingleItem();
+
+        parameter.Name.ShouldBe("depth");
+        parameter.IsRequired.ShouldBeFalse();
+        parameter.DefaultFactory.ShouldNotBeNull().Invoke().ShouldBe(0);
+    }
+
+    [Fact]
     public async Task RouterView_RendersMatchedComponent_AndSwapsReactivelyOnNavigation()
     {
         TrackingComponent viewA = LabelView("a");

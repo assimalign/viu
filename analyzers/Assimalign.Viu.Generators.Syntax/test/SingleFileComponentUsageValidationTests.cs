@@ -348,6 +348,30 @@ public sealed class SingleFileComponentUsageValidationTests
         outcome.Diagnostics.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void ReferencedParameterlessComponent_UnrelatedRegistrationProperty_DoesNotSuppressUnknownParameter()
+    {
+        // [SFC-USE-2], [V01.01.08.03.02] An unrelated member named Registration does not declare
+        // an imperative component contract, so the known empty parameter surface remains validated.
+        var reference = CompilePackagedComponent();
+
+        var outcome = GeneratorTestHarness.RunAll(
+            [
+                ($"{ProjectDirectory}/Consumer.viu",
+                    "<template>\n" +
+                    "    <EmptyPackagedCard unknown=\"y\" />\n" +
+                    "</template>\n"),
+            ],
+            RootNamespace,
+            ProjectDirectory,
+            reference);
+
+        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VIU1401");
+        diagnostic.GetMessage().ShouldContain("'unknown'");
+        diagnostic.GetMessage().ShouldContain("declares no parameters");
+    }
+
     // Runs the declaring FeatureCard plus a consumer template that writes `usage`, and returns the
     // diagnostics. The declaring component itself is well-formed, so every diagnostic comes from the
     // usage under test.
@@ -380,6 +404,8 @@ public sealed class SingleFileComponentUsageValidationTests
                 public sealed class ComponentContext { }
 
                 public sealed class ComponentRenderFrame { }
+
+                public sealed class ComponentRegistration { }
 
                 public delegate object ComponentRenderer(ComponentRenderFrame frame);
 
@@ -414,6 +440,9 @@ public sealed class SingleFileComponentUsageValidationTests
                     Assimalign.Viu.Components.ComponentBase,
                     Assimalign.Viu.Components.IComponent
                 {
+                    public static Assimalign.Viu.Components.ComponentRegistration Registration { get; }
+                        = new Assimalign.Viu.Components.ComponentRegistration();
+
                     public Assimalign.Viu.Components.ComponentRenderer Setup(
                         Assimalign.Viu.Components.ComponentContext context)
                     {
@@ -432,6 +461,8 @@ public sealed class SingleFileComponentUsageValidationTests
                     Assimalign.Viu.Components.ComponentBase,
                     Assimalign.Viu.Components.IComponent
                 {
+                    public static object Registration { get; } = new object();
+
                     public Assimalign.Viu.Components.ComponentRenderer Setup(
                         Assimalign.Viu.Components.ComponentContext context)
                     {
