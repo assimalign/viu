@@ -71,6 +71,16 @@ internal static class SingleFileComponentDiagnosticAdapter
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1004"));
 
+    /// <summary>A generated type still collides after namespace disambiguation ([SFC-CG-10]).</summary>
+    internal static readonly DiagnosticDescriptor ConflictingComponentIdentity = new(
+        id: "VIU1005",
+        title: "Conflicting generated component identity",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1005"));
+
     /// <summary>A recoverable error reported by the dispatched template parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateError = new(
         id: "VIU1101",
@@ -300,6 +310,7 @@ internal static class SingleFileComponentDiagnosticAdapter
             "VIU1002" => SingleFileComponentWarning,
             "VIU1003" => SingleFileComponentInformation,
             "VIU1004" => ConflictingComponentFormats,
+            "VIU1005" => ConflictingComponentIdentity,
             "VIU1101" => TemplateError,
             "VIU1102" => TemplateWarning,
             "VIU1103" => TemplateInformation,

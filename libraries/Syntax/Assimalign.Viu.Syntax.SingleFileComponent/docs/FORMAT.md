@@ -63,6 +63,42 @@ template block (a `<style>`-only CSS-bundle unit, or a `@script`-only partial) s
 class — no component bridge — so it keeps compiling exactly as before. This library still only
 *slices*; the bridge is emitted by the generator that consumes the descriptor.
 
+### Generated C# identity and sibling layouts
+
+The compiler derives the partial class from the sanitized, keyword-escaped file base name and its
+namespace from the root namespace plus sanitized directory segments. Under `[SFC-CG-10]`
+([V01.01.06.16], #363), when that type name equals a namespace needed by another emitted component,
+only the colliding component moves into a `GeneratedComponents` leaf beneath its original namespace:
+
+| Source | Generated type with root namespace `Root` |
+| --- | --- |
+| `Pages/Blog.viu` | `Root.Pages.GeneratedComponents.Blog` |
+| `Pages/Blog/Entry.viu` | `Root.Pages.Blog.Entry` |
+| `Pages/About.viu` | `Root.Pages.About` |
+
+The same rule applies to `.vue` inputs and to deeper or sanitized directory-name collisions; shadowed
+`.vue` peers do not count. An empty directory contributes no generated namespace. Resolution uses the
+host-supplied component paths with no filesystem access and is independent of file enumeration order.
+Class names and `ComponentReference.ForName("Blog")` registration remain unchanged: `<Blog />` and
+FileRouting still refer to `Blog`. Hint names remain path-derived under `[SFC-CG-5]`, including the
+unchanged `Pages.Blog.SingleFileComponent.g.cs` hint in this example.
+
+**Decision:** a universal generated leaf would migrate every component; a class suffix would split
+class names from registration names; suffixing the directory namespace would migrate all descendants.
+Moving only the colliding component preserves the most existing identities and keeps naming a pure
+string operation. The full alternatives and constraints are recorded in the
+[compiler design](../../../../tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md).
+Residual duplicate types or type/namespace collisions (including names involving `GeneratedComponents`,
+lossy sanitization, and linked files) report a located Error `VIU1005` and omit the conflicting generated
+scaffolds; rename a component or directory to distinguish them.
+
+**Migration:** an existing collision-free component set keeps all namespaces and hints. Adding a
+descendant can relocate a previously compiled layout; removing the last conflicting namespace restores
+its original location. Update direct C# references and companion partial-class namespaces for that layout,
+then rebuild consuming assemblies and restart the application. Generated type identity is a contract
+with previously compiled output, so this change is not an in-place hot-reload rename. Children and
+registered-name/template-tag references need no migration. See specification §8.5 `[SFC-CG-10]`.
+
 ### Container-format mapping
 
 | `.viu`                           | `.vue` compatibility input       | Meaning in Viu                                    |

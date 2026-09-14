@@ -31,6 +31,9 @@ types remain internal, and only the projection core's own tests receive friend a
   path-derived and readable; `SelectCaseCollidingPaths` takes the whole emitted set and reports which
   components must add the path-hash discriminator, because Roslyn's `AddSource` treats hint names
   differing only by case as one name (`[SFC-CG-5]`, [V01.01.06.10.01]).
+  `SelectNamespaceCollidingPaths` identifies only the components that need the `GeneratedComponents`
+  leaf namespace; `SelectIdentityCollidingPaths` identifies residual conflicts for located `VIU1005`
+  errors and scaffold omission (`[SFC-CG-10]`, [V01.01.06.16]). Both use supplied paths only.
 - **`SingleFileComponentDiagnostics`** — the host-neutral VIU diagnostic catalog (`VIU1001` …
   `VIU1405`) and the block-to-file position composition; each host materializes at its own edge (the
   generator's Roslyn adapter, the language service's LSP mapping).

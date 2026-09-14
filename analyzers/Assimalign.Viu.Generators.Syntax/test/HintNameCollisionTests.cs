@@ -9,6 +9,8 @@ using Shouldly;
 
 using Xunit;
 
+using Assimalign.Viu.Compiler.SingleFileComponent;
+
 namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 // End-to-end pins for hint-name uniqueness through the real generator driver: Roslyn's AddSource
@@ -20,10 +22,11 @@ public sealed class HintNameCollisionTests
     private const string Source = "<template>\n    <div>x</div>\n</template>\n";
 
     [Fact]
-    public void TwoFilesOutsideProjectDirectory_WithTheSameLeafName_BothEmit()
+    public void TwoFilesOutsideProjectDirectory_WithTheSameLeafName_ReportTypeCollisionWithDistinctHints()
     {
         // Linked files outside the project directory cannot use a relative path in the hint, so the
-        // path-hash disambiguator must keep them apart.
+        // path-hash disambiguator keeps their hints apart, while [SFC-CG-10] reports their identical
+        // generated type identities before conflicting C# can be emitted.
         var fileA = new InMemoryAdditionalText("C:/other/A/Button.viu", Source);
         var fileB = new InMemoryAdditionalText("C:/other/B/Button.viu", Source);
         var driver = GeneratorTestHarness.CreateDriver(
@@ -33,11 +36,15 @@ public sealed class HintNameCollisionTests
         var result = driver.GetRunResult().Results[0];
 
         result.Exception.ShouldBeNull();
-        ComponentSources(result).Count.ShouldBe(2);
+        ComponentSources(result).ShouldBeEmpty();
+        result.Diagnostics.Length.ShouldBe(2);
+        result.Diagnostics.ShouldAllBe(diagnostic => diagnostic.Id == "VIU1005");
+        SingleFileComponentNameResolver.Resolve(fileA.Path, "C:/proj", "Demo").HintName
+            .ShouldNotBe(SingleFileComponentNameResolver.Resolve(fileB.Path, "C:/proj", "Demo").HintName);
     }
 
     [Fact]
-    public void TwoFilesWhoseNamesSanitizeToTheSameIdentifier_BothEmit()
+    public void TwoFilesWhoseNamesSanitizeToTheSameIdentifier_ReportTypeCollisionWithDistinctHints()
     {
         // Foo-Bar.viu and Foo_Bar.viu both sanitize to the class name Foo_Bar; the lossy
         // sanitization triggers the path-hash disambiguator on the hint name.
@@ -50,7 +57,11 @@ public sealed class HintNameCollisionTests
         var result = driver.GetRunResult().Results[0];
 
         result.Exception.ShouldBeNull();
-        ComponentSources(result).Count.ShouldBe(2);
+        ComponentSources(result).ShouldBeEmpty();
+        result.Diagnostics.Length.ShouldBe(2);
+        result.Diagnostics.ShouldAllBe(diagnostic => diagnostic.Id == "VIU1005");
+        SingleFileComponentNameResolver.Resolve(fileA.Path, "C:/proj", "Demo").HintName
+            .ShouldNotBe(SingleFileComponentNameResolver.Resolve(fileB.Path, "C:/proj", "Demo").HintName);
     }
 
     [Fact]

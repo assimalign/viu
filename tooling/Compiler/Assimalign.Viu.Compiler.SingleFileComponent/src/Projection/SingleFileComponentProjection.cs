@@ -44,6 +44,7 @@ public static class SingleFileComponentProjection
         {
             var parse = VueParser.ParseComponent(input.Text, cancellationToken);
             var diagnostics = new List<DiagnosticInfo>();
+            AddIdentityDiagnostic(input, diagnostics);
             AddParseDiagnostics(input, parse, diagnostics);
 
             SingleFileComponentScriptBlock? script = null;
@@ -80,6 +81,7 @@ public static class SingleFileComponentProjection
 
         var viuParse = Parser.ParseComponent(input.Text, cancellationToken);
         var viuDiagnostics = new List<DiagnosticInfo>();
+        AddIdentityDiagnostic(input, viuDiagnostics);
         AddParseDiagnostics(input, viuParse, viuDiagnostics);
         return BuildResult(
             input,
@@ -97,6 +99,24 @@ public static class SingleFileComponentProjection
                 scriptSetup: null,
                 viuParse.Descriptor.Styles),
             cancellationToken);
+    }
+
+    private static void AddIdentityDiagnostic(
+        SingleFileComponentProjectionInput input,
+        List<DiagnosticInfo> diagnostics)
+    {
+        if (input.HasIdentityCollision)
+        {
+            var identity = string.IsNullOrEmpty(input.Namespace)
+                ? input.ClassName
+                : input.Namespace + "." + input.ClassName;
+            diagnostics.Add(SingleFileComponentDiagnostics.CreateFileRule(
+                SingleFileComponentDiagnostics.ConflictingComponentIdentity,
+                "Generated component identity '" + identity +
+                "' conflicts with another generated type or namespace after disambiguation. " +
+                "Rename the component or directory to make the generated identities distinct.",
+                input.FilePath));
+        }
     }
 
     private static SingleFileComponentProjectionResult BuildResult(

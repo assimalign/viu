@@ -1263,6 +1263,31 @@ so a remount after an accepted delta reads the updated count without rerunning t
 Generator tests compare the complete body-elided type and preserve all initializers across each
 structural edit [V01.01.06.14] (#350).
 
+`[SFC-CG-10]` **Generated C# identity.** Start with the root namespace plus sanitized, keyword-escaped
+project-relative directory segments, and the sanitized, keyword-escaped file base name as the partial
+class. Compare that fully qualified type with every prefix of the namespaces required by the emitted
+component file set, using ordinal C# identifier identity (an `@` escape does not change an identifier).
+Only a component whose type collides moves into a fixed `GeneratedComponents` leaf beneath its original
+namespace. For example, `Pages/Blog.viu` beside `Pages/Blog/Entry.viu` generates
+`Root.Pages.GeneratedComponents.Blog` and `Root.Pages.Blog.Entry`. The rule applies identically to
+`.viu` and `.vue`; shadowed `.vue` peers [VUE-7] do not participate. It uses supplied paths only, never
+filesystem enumeration. An empty directory does not declare a generated namespace.
+
+Class names, `ComponentReference.ForName(<sanitized base name>)` registration, template-tag names, and
+[SFC-CG-5] hint names do not change. Components without a type/namespace collision keep their previous
+namespace. After this single relocation pass, duplicate generated types or remaining type/namespace
+collisions report located `VIU1005` errors on every participating source; their scaffolds and catalog
+registrations MUST be omitted instead of producing C# CS0101 [V01.01.06.16] (#363).
+
+**Migration and compiled-output stability.** Generated type identity is a contract with previously
+compiled output. This rule changes no identity in an existing collision-free component set. Adding a
+descendant component can relocate an already compiled sibling layout; removing the final conflicting
+namespace restores its original namespace. Update direct C# type references and companion partial-class
+namespaces for that layout, then rebuild consuming assemblies and restart the application. Its children
+keep their previous identities. Registered-name/template-tag consumers need no migration. No blanket
+namespace migration applies; see the compiler's
+[decision record](../tooling/Compiler/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md).
+
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost
 expression and closed with `#line default`. The span form is required because a render expression is
@@ -1329,6 +1354,12 @@ own assembly; external parser extensibility goes through the generic parser regi
 by injecting variants into those trees. CSS record roots remain mechanically derivable, so every
 CSS writer and rewriter MUST handle each supported built-in variant explicitly and throw
 `InvalidOperationException` for an unsupported node rather than silently dropping or copying it.
+
+`[SFC-DIAG-4]` **Residual generated identity collisions.** `VIU1005` is an Error located at the start
+of each conflicting component file after [SFC-CG-10] disambiguation. It identifies the generated type
+and asks the author to rename a component or directory. This includes lossy sanitization, linked files
+that resolve to one type, and collisions involving the `GeneratedComponents` leaf. Hint uniqueness is
+a separate contract and cannot make two identical C# type identities valid.
 
 ### 8.8 Component-usage validation
 

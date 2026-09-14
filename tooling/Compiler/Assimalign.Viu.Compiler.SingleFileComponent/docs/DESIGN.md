@@ -49,6 +49,55 @@ Diagnostics are therefore **host-neutral by design**: the projection returns `Di
 each host materializes at its own edge. The 1:1 adapter coverage is pinned by
 `SingleFileComponentDiagnosticAdapterTests`.
 
+## Sibling file/directory identity ([V01.01.06.16], issue #363)
+
+`Pages/Blog.viu` and `Pages/Blog/Entry.viu` previously declared both a class and a namespace named
+`Root.Pages.Blog`, which C# rejects with CS0101. Generated identity is a compiled-output contract,
+so the decision prioritizes preserving every noncolliding identity and the pure string resolver.
+
+| Option | Evaluation |
+| --- | --- |
+| Put every component in a fixed generated leaf namespace | Simple single-path derivation, but changes every existing component namespace and companion partial/type reference. A user directory with the leaf's name can still collide unless it is reserved or escaped. Rejected for unnecessary migration. |
+| Suffix only the colliding class | Preserves other files, but separates C# class identity from the registration/display name and expands the projection/emitter contract. Requires the same file-set knowledge and still needs residual validation. Rejected in favor of keeping class names stable. |
+| Suffix colliding directory namespaces | Moves every descendant, including already valid components. Adding one layout causes wider identity churn. Rejected. |
+| Move only the colliding component into a fixed leaf namespace | Selected: preserves descendant namespaces, class names, registration, and hints; only the conflicting layout's containing namespace changes. |
+
+The shared resolver first derives the existing names for all emitted `.viu`/`.vue` paths, excluding
+shadowed compatibility peers. It compares fully qualified types with every generated namespace prefix
+using ordinal C# identifier identity, including keyword escape normalization. Each conflicting type
+moves once into `<original namespace>.GeneratedComponents` (or `GeneratedComponents` at global scope).
+Thus the example becomes `Root.Pages.GeneratedComponents.Blog` plus `Root.Pages.Blog.Entry`.
+Sanitized directories and deeper descendants participate, not just literal immediate sibling paths.
+No I/O or directory probing is needed: an empty directory contributes no C# namespace.
+
+A second pass detects duplicate types and residual type/namespace collisions, including a user path
+that occupies the generated leaf, two lossy names such as `Foo-Bar`/`Foo_Bar`, or linked files that
+collapse to the same namespace/class. Every participating source gets located Error `VIU1005`; the
+generator omits its scaffold and registration. There is no recursive suffix selection or arbitrary
+numeric tie-breaker whose result might depend on file enumeration order. `GeneratedComponents` is not
+a newly forbidden author name; conflicting arrangements are diagnosed explicitly.
+
+The file-set selectors return ordinally sorted paths. Hosts supply the same set to the shared resolver;
+the generator stores only value-equatable collision facts and the editor receives the project component
+paths through its host context. Content edits do not change identity or invalidate unrelated projections.
+The original resolver overloads remain available for a single isolated path; a project-aware host must
+also supply the namespace-discriminator fact. Public API baselines record this additive contract.
+
+**Host inventory follow-up:** the language server currently discovers the default on-disk component
+source cone from restore artifacts; it does not evaluate MSBuild items (the [V01.01.12.23], #259
+host decision). Custom `AdditionalFiles` removals or linked inputs outside that cone can therefore make
+its inventory differ from the build. The shared resolver agrees for equal supplied sets; exact custom
+item evaluation needs an SDK-produced evaluated component manifest consumed by the server. That host
+inventory work is separate from this compiler fix and remains a follow-up.
+
+**Migration:** no namespace or hint changes for an existing collision-free component set. Adding a
+descendant can move a previously compiled sibling layout, and removing the final conflict moves it back.
+Update that layout's C# companion partial namespace and direct type references and perform a full rebuild
+and application restart. Registration remains `ComponentReference.ForName(<sanitized base name>)`, so
+template tags and FileRouting's registered-name references keep working. This is specified by
+`[SFC-CG-10]`, `[SFC-CG-5]`, and `[SFC-DIAG-4]`; the author-facing migration is in
+[FORMAT.md](../../../../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md).
+
 ## Static component identity ([V01.01.05.11], issue #329)
 
 The projection collects authored static component tags before transforming the AST, then the generator

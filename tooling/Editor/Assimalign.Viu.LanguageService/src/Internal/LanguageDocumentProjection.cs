@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 using Assimalign.Viu.Compiler.Css;
@@ -25,25 +26,143 @@ internal static class LanguageDocumentProjection
         CancellationToken cancellationToken)
     {
         var filePath = GetFilePath(document.DocumentUri);
-        var name = SingleFileComponentNameResolver.Resolve(
-            filePath,
-            context?.ProjectDirectory,
-            context?.RootNamespace);
-        var input = new SingleFileComponentProjectionInput(
+        var input = CreateInput(
             document.Syntax.Format == LanguageDocumentFormat.Vue
                 ? SingleFileComponentFormat.Vue
                 : SingleFileComponentFormat.Viu,
             filePath,
-            GetLeafFileName(filePath),
             document.Text,
+            context);
+        return SingleFileComponentProjection.Project(input, cancellationToken);
+    }
+
+    internal static SingleFileComponentProjectionInput CreateInput(
+        SingleFileComponentFormat format,
+        string filePath,
+        string text,
+        LanguageProjectContext? context)
+    {
+        var componentPaths = GetComponentPaths(filePath, context);
+        var identityPath = ResolveIdentityPath(filePath, componentPaths);
+        var canonicalBasePaths = new HashSet<string>(SingleFileComponentPathComparison.Comparer);
+        foreach (var path in componentPaths)
+        {
+            if (path.EndsWith(".viu", StringComparison.OrdinalIgnoreCase))
+            {
+                canonicalBasePaths.Add(GetComponentBasePath(path));
+            }
+        }
+
+        var emittedPaths = new List<string>(componentPaths.Length);
+        foreach (var path in componentPaths)
+        {
+            if (!HasCanonicalPeer(path, canonicalBasePaths))
+            {
+                emittedPaths.Add(path);
+            }
+        }
+
+        var caseCollisions = SingleFileComponentNameResolver.SelectCaseCollidingPaths(
+            emittedPaths, context?.ProjectDirectory);
+        var namespaceCollisions = SingleFileComponentNameResolver.SelectNamespaceCollidingPaths(
+            emittedPaths, context?.ProjectDirectory, context?.RootNamespace);
+        var identityCollisions = SingleFileComponentNameResolver.SelectIdentityCollidingPaths(
+            emittedPaths, context?.ProjectDirectory, context?.RootNamespace);
+        var name = SingleFileComponentNameResolver.Resolve(
+            identityPath,
+            context?.ProjectDirectory,
+            context?.RootNamespace,
+            ContainsPath(caseCollisions, identityPath),
+            ContainsPath(namespaceCollisions, identityPath));
+        return new SingleFileComponentProjectionInput(
+            format,
+            filePath,
+            GetLeafFileName(filePath),
+            text,
             name.Namespace,
             name.ClassName,
             name.HintName,
-            CssComponentHash.Resolve(filePath, context?.ProjectDirectory),
+            CssComponentHash.Resolve(identityPath, context?.ProjectDirectory),
             HotReloadComponentIdentifier: null,
-            HasCanonicalPeer: false);
-        return SingleFileComponentProjection.Project(input, cancellationToken);
+            HasCanonicalPeer: HasCanonicalPeer(filePath, canonicalBasePaths))
+        {
+            HasIdentityCollision = ContainsPath(identityCollisions, identityPath),
+        };
     }
+
+    internal static string[] GetComponentPaths(string filePath, LanguageProjectContext? context)
+    {
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        if (context is not null)
+        {
+            var declaredPaths = new List<string>(context.ComponentFilePaths.Count);
+            foreach (var path in context.ComponentFilePaths)
+            {
+                var normalizedPath = path.Replace('\\', '/');
+                declaredPaths.Add(normalizedPath);
+                paths.Add(normalizedPath);
+            }
+
+            foreach (var document in context.SourceDocuments)
+            {
+                if (document.IsComponent)
+                {
+                    paths.Add(ResolveIdentityPath(document.FilePath, declaredPaths));
+                }
+            }
+        }
+
+        // The open URI can spell a Windows path differently from the host's inventory. Reuse a
+        // unique declared identity, while preserving explicit case-different component entries.
+        paths.Add(ResolveIdentityPath(filePath, paths));
+        var orderedPaths = new string[paths.Count];
+        paths.CopyTo(orderedPaths);
+        Array.Sort(orderedPaths, StringComparer.Ordinal);
+        return orderedPaths;
+    }
+
+    private static string ResolveIdentityPath(string filePath, IEnumerable<string> componentPaths)
+    {
+        var normalizedPath = filePath.Replace('\\', '/');
+        string? matchingPath = null;
+        var matchCount = 0;
+        foreach (var path in componentPaths)
+        {
+            if (string.Equals(path, normalizedPath, StringComparison.Ordinal))
+            {
+                return path;
+            }
+
+            if (SingleFileComponentPathComparison.Comparer.Equals(path, normalizedPath))
+            {
+                matchingPath = path;
+                matchCount++;
+            }
+        }
+
+        return matchCount == 1 ? matchingPath! : normalizedPath;
+    }
+
+    private static bool ContainsPath(string[] paths, string filePath)
+    {
+        var normalizedPath = filePath.Replace('\\', '/');
+        foreach (var path in paths)
+        {
+            if (string.Equals(path, normalizedPath, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasCanonicalPeer(string filePath, HashSet<string> canonicalBasePaths)
+        => filePath.EndsWith(".vue", StringComparison.OrdinalIgnoreCase) &&
+            canonicalBasePaths.Contains(GetComponentBasePath(filePath));
+
+    private static string GetComponentBasePath(string filePath)
+        => filePath.Replace('\\', '/').Substring(0, filePath.Length - ".viu".Length);
 
     /// <summary>Resolves an editor URI into the file path used by projection and line mapping.</summary>
     /// <param name="documentUri">The editor document URI.</param>

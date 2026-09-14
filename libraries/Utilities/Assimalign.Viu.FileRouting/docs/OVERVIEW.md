@@ -22,12 +22,10 @@ Pages with route parameters forward the resolved values through
 the accepted argument names (`[CMP-26]`). Layout nesting is expressed as ordinary child records and
 the author's explicit `RouterView` depths, with no hidden component-tree dependency channel.
 
-The current component compiler produces a C# type/namespace collision for a sibling-file layout
-and its same-named folder. That existing compiler boundary prevents those physical layout trees
-from compiling through both generators; use flat pages and manually composed nested descriptors
-until the separate namespace-generation follow-up. The route generator and runtime already support
-the nested table shape. [DESIGN.md](DESIGN.md#current-component-compiler-layout-limitation) records
-the scope and evidence.
+Sibling layout files compile beside their same-named folders under `[SFC-CG-10]`
+([V01.01.06.16], #363). The compiled fixture exercises generated default, static, and parameterized
+children through the Testing host. [DESIGN.md](DESIGN.md#compiled-sibling-layouts) describes the
+fixture and explicit outlet registration.
 
 Descriptor construction snapshots child lists, and conversion creates independent record trees.
 There is no runtime reflection, code generation, assembly scanning, JSON, browser dependency, or

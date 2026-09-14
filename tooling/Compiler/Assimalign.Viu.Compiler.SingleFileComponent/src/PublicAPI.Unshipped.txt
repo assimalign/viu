@@ -13,3 +13,9 @@ Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentProjectionInput.S
 Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentProjectionInput.Deconstruct(out Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentFormat Format, out string! FilePath, out string! FileName, out string! Text, out string? Namespace, out string! ClassName, out string! HintName, out string! CssHashSalt, out string? HotReloadComponentIdentifier, out bool HasCanonicalPeer) -> void
 Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentProjectionInput.CssHashSalt.get -> string!
 Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentProjectionInput.CssHashSalt.init -> void
+Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentProjectionInput.HasIdentityCollision.get -> bool
+Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentProjectionInput.HasIdentityCollision.init -> void
+static readonly Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentDiagnostics.ConflictingComponentIdentity -> Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentDiagnosticDescriptor!
+static Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentNameResolver.Resolve(string! filePath, string? projectDirectory, string? rootNamespace, bool requiresCaseDiscriminator, bool requiresNamespaceDiscriminator) -> Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentName
+static Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentNameResolver.SelectIdentityCollidingPaths(System.Collections.Generic.IReadOnlyList<string!>! componentPaths, string? projectDirectory, string? rootNamespace) -> string![]!
+static Assimalign.Viu.Compiler.SingleFileComponent.SingleFileComponentNameResolver.SelectNamespaceCollidingPaths(System.Collections.Generic.IReadOnlyList<string!>! componentPaths, string? projectDirectory, string? rootNamespace) -> string![]!

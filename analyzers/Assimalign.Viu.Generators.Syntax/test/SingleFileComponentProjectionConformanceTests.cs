@@ -161,6 +161,60 @@ public sealed class SingleFileComponentProjectionConformanceTests
         libraryDiagnostics.ShouldBe(generatorDiagnostics);
     }
 
+    [Theory]
+    [InlineData("Blog.viu", "Blog/Entry.vue")]
+    [InlineData("Blog.vue", "Blog/Entry.viu")]
+    public void Project_SiblingLayout_UsesTheSameNamespaceSelectionInBothHosts(
+        string layoutPath,
+        string childPath)
+    {
+        // [SFC-PIPE-2] and [SFC-CG-10] The shared projection receives the same collision-selected
+        // identity from each host; the relocated scaffold and unaffected child must match exactly.
+        string[] paths = [ProjectDirectory + "/" + layoutPath, ProjectDirectory + "/" + childPath];
+        string[] selected = SingleFileComponentNameResolver.SelectNamespaceCollidingPaths(
+            paths, ProjectDirectory, RootNamespace);
+        GeneratorOutcome outcome = GeneratorTestHarness.RunAll(
+            paths.Select(path => (path, StaticTemplateSource)).ToArray(), RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        foreach (string path in paths)
+        {
+            SingleFileComponentName names = SingleFileComponentNameResolver.Resolve(
+                path, ProjectDirectory, RootNamespace, requiresCaseDiscriminator: false,
+                requiresNamespaceDiscriminator: selected.Contains(path, StringComparer.Ordinal));
+            SingleFileComponentProjectionInput input = CreateInput(path, StaticTemplateSource, null)
+                with { Namespace = names.Namespace };
+            SingleFileComponentProjectionResult result = SingleFileComponentProjection.Project(input, CancellationToken.None);
+
+            GeneratorTestHarness.GeneratedSource(outcome, names.HintName)
+                .ShouldBe(SingleFileComponentSourceEmitter.Emit(result.Model).Replace("\r\n", "\n"));
+            result.Diagnostics.ShouldBeEmpty();
+        }
+    }
+
+    [Theory]
+    [InlineData("Foo-Bar.viu", "Foo_Bar.vue")]
+    [InlineData("Foo-Bar.vue", "Foo_Bar.viu")]
+    public void Project_ResidualTypeCollision_ReportsTheSameLocatedDiagnosticsInBothHosts(
+        string firstPath,
+        string secondPath)
+    {
+        string[] paths = [ProjectDirectory + "/" + firstPath, ProjectDirectory + "/" + secondPath];
+        GeneratorOutcome outcome = GeneratorTestHarness.RunAll(
+            paths.Select(path => (path, StaticTemplateSource)).ToArray(), RootNamespace, ProjectDirectory);
+
+        outcome.Sources.ShouldBeEmpty();
+        foreach (string path in paths)
+        {
+            SingleFileComponentProjectionInput input = CreateInput(path, StaticTemplateSource, null)
+                with { HasIdentityCollision = true };
+            SingleFileComponentProjectionResult result = SingleFileComponentProjection.Project(input, CancellationToken.None);
+
+            result.Diagnostics.Select(Describe).ShouldBe(outcome.Diagnostics
+                .Where(diagnostic => diagnostic.Location.GetLineSpan().Path == path).Select(Describe));
+        }
+    }
+
     // Mirrors the generator's ReadFile: the same name resolution, CSS name hashing, format
     // detection, and hot-reload gating over the same two build properties.
     private static SingleFileComponentProjectionInput CreateInput(string path, string content, string? configuration)

@@ -40,6 +40,13 @@ public readonly record struct SingleFileComponentProjectionInput(
     bool HasCanonicalPeer)
 {
     /// <summary>
+    /// Whether the emitted component set still contains a duplicate type or a type/namespace collision
+    /// after namespace disambiguation. Hosts compute this from paths; projection reports a located
+    /// error and build hosts must omit the conflicting scaffold. Specified by <c>[SFC-CG-10]</c>.
+    /// </summary>
+    public bool HasIdentityCollision { get; init; }
+
+    /// <summary>
     /// Whether the consuming project explicitly targets server rendering and therefore requires a
     /// second, direct-markup render body in addition to the ordinary virtual-node render body.
     /// The value is project-scoped so individual component files cannot select divergent profiles.

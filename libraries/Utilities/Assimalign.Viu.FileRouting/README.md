@@ -73,18 +73,13 @@ The application renders the first matched record with `<RouterView/>` (depth 0).
 at depth 0 must contain `<RouterView :depth="1"/>`; a layout at depth 1 uses depth 2. The generator
 documents each layout's required child-outlet depth in its output, but does not modify templates.
 
-**Current compiler limitation:** a sibling-file layout such as `Pages/Blog.viu` plus
-`Pages/Blog/Entry.viu` produces a C# type/namespace collision in the unchanged component compiler.
-FileRouting generates and tests the nested route table, but this physical layout cannot yet compile
-through both generators. Use flat pages and manually compose nested descriptors until component
-namespace generation receives a separate fix. See [the design limitation](docs/DESIGN.md#current-component-compiler-layout-limitation).
-
 A layout template writes the literal outlet `<RouterView :depth="1"/>`. Since [V01.01.08.03.02]
 (#359) the syntax checker reads RouterView's hand-authored registration as an opaque contract, so
 the usage compiles without `VIU1401`. Register the name `RouterView` as an alias of
 `RouterView.Registration` in the component factory, because compiled component tags resolve by
 registered name. The [compiled fixture](../../../analyzers/Assimalign.Viu.Generators.FileRouting/test/Assimalign.Viu.Generators.FileRouting.CompiledFixtureTests/README.md)
-demonstrates the working setup.
+demonstrates a compiled `Pages/Blog.viu` sibling layout, its generated default and parameterized
+child routes, and nested outlet rendering through the Testing host ([V01.01.06.16], #363).
 
 See [overview](docs/OVERVIEW.md), [design and exact conventions](docs/DESIGN.md), and
 [generator diagnostics](../../../analyzers/Assimalign.Viu.Generators.FileRouting/docs/DIAGNOSTICS.md).

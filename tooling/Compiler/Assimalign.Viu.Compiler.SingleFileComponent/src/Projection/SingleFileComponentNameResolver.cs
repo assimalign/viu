@@ -21,11 +21,18 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// selects those components and <see cref="Resolve(string, string?, string?, bool)"/> gives each of them
 /// the path-hash discriminator ([V01.01.06.10.01]).
 /// </para>
+/// <para>
+/// Generated type identity is specified by <c>[SFC-CG-10]</c>. A component whose original type name
+/// equals a namespace prefix emitted by another component moves into a <c>GeneratedComponents</c>
+/// child namespace. <see cref="SelectNamespaceCollidingPaths"/> selects only those components;
+/// unaffected types, class names, registration names, and hint names retain their existing identities.
+/// </para>
 /// </summary>
 public static class SingleFileComponentNameResolver
 {
     private const string ViuExtension = ".viu";
     private const string VueExtension = ".vue";
+    private const string GeneratedNamespaceSegment = "GeneratedComponents";
 
     /// <summary>
     /// Resolves the namespace, class name, and hint name for <paramref name="filePath"/>, taking the
@@ -55,6 +62,26 @@ public static class SingleFileComponentNameResolver
         string? projectDirectory,
         string? rootNamespace,
         bool requiresCaseDiscriminator)
+        => Resolve(filePath, projectDirectory, rootNamespace, requiresCaseDiscriminator, requiresNamespaceDiscriminator: false);
+
+    /// <summary>
+    /// Resolves generated type and hint names using the compilation's collision selections. Only a
+    /// type selected by <see cref="SelectNamespaceCollidingPaths"/> acquires the
+    /// <c>GeneratedComponents</c> child namespace; its class and registration names remain unchanged
+    /// (<c>[SFC-CG-10]</c>). Namespace selection never changes the hint name (<c>[SFC-CG-5]</c>).
+    /// </summary>
+    /// <param name="filePath">The absolute <c>.viu</c> or <c>.vue</c> file path.</param>
+    /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
+    /// <param name="rootNamespace">The consuming project's root namespace, or <see langword="null"/> when unknown.</param>
+    /// <param name="requiresCaseDiscriminator">Whether <see cref="SelectCaseCollidingPaths"/> selected this file for a hint-name discriminator.</param>
+    /// <param name="requiresNamespaceDiscriminator">Whether <see cref="SelectNamespaceCollidingPaths"/> selected this file for the generated child namespace.</param>
+    /// <returns>The resolved names, derived entirely from the supplied strings and collision selections.</returns>
+    public static SingleFileComponentName Resolve(
+        string filePath,
+        string? projectDirectory,
+        string? rootNamespace,
+        bool requiresCaseDiscriminator,
+        bool requiresNamespaceDiscriminator)
     {
         var normalizedPath = filePath.Replace('\\', '/');
 
@@ -67,6 +94,13 @@ public static class SingleFileComponentNameResolver
 
         var namespaceValue = BuildNamespace(rootNamespace, relativeDirectory);
         var hintName = BuildHintName(relativeDirectory, baseName, normalizedPath, requiresCaseDiscriminator);
+
+        if (requiresNamespaceDiscriminator)
+        {
+            namespaceValue = string.IsNullOrEmpty(namespaceValue)
+                ? GeneratedNamespaceSegment
+                : namespaceValue + "." + GeneratedNamespaceSegment;
+        }
 
         return new SingleFileComponentName(namespaceValue, className, hintName);
     }
@@ -127,6 +161,144 @@ public static class SingleFileComponentNameResolver
         }
 
         var result = colliding.ToArray();
+        Array.Sort(result, StringComparer.Ordinal);
+        return result;
+    }
+
+    /// <summary>
+    /// Selects components whose original fully qualified type names equal a generated namespace
+    /// prefix. C# identity comparison is ordinal and ignores verbatim-identifier escapes; directory
+    /// sanitization uses the same rule as emission. Only these components move under
+    /// <c>GeneratedComponents</c>, preserving every previously noncolliding type (<c>[SFC-CG-10]</c>).
+    /// No directory is inspected: only the supplied emitted component paths contribute namespaces.
+    /// </summary>
+    /// <param name="componentPaths">All paths the compilation emits, excluding shadowed <c>.vue</c> peers under <c>[VUE-7]</c>.</param>
+    /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
+    /// <param name="rootNamespace">The consuming project's root namespace, or <see langword="null"/> when unknown.</param>
+    /// <returns>The selected paths in ordinal order, independent of input enumeration order; empty when no type conflicts with a namespace.</returns>
+    public static string[] SelectNamespaceCollidingPaths(
+        IReadOnlyList<string> componentPaths,
+        string? projectDirectory,
+        string? rootNamespace)
+    {
+        var namespacePrefixes = new HashSet<string>(StringComparer.Ordinal);
+        var names = new SingleFileComponentName[componentPaths.Count];
+        for (var index = 0; index < componentPaths.Count; index++)
+        {
+            names[index] = Resolve(componentPaths[index], projectDirectory, rootNamespace);
+            foreach (var namespacePrefix in EnumerateNamespacePrefixes(names[index].Namespace))
+            {
+                namespacePrefixes.Add(namespacePrefix);
+            }
+        }
+
+        var selected = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < componentPaths.Count; index++)
+        {
+            if (namespacePrefixes.Contains(GetTypeIdentity(names[index])))
+            {
+                selected.Add(componentPaths[index]);
+            }
+        }
+
+        return SortPaths(selected);
+    }
+
+    /// <summary>
+    /// Selects every participant in a generated type collision that remains after applying
+    /// <see cref="SelectNamespaceCollidingPaths"/>. This includes duplicate sanitized type names and
+    /// types conflicting with any final namespace prefix, including the fixed
+    /// <c>GeneratedComponents</c> segment. Hosts report a located error and suppress these components
+    /// instead of emitting conflicting C# declarations (<c>[SFC-CG-10]</c>).
+    /// </summary>
+    /// <param name="componentPaths">All paths the compilation emits, excluding shadowed <c>.vue</c> peers under <c>[VUE-7]</c>.</param>
+    /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
+    /// <param name="rootNamespace">The consuming project's root namespace, or <see langword="null"/> when unknown.</param>
+    /// <returns>Every contributing path in ordinal order, independent of input enumeration order; empty when final generated identities are distinct.</returns>
+    public static string[] SelectIdentityCollidingPaths(
+        IReadOnlyList<string> componentPaths,
+        string? projectDirectory,
+        string? rootNamespace)
+    {
+        var namespaceCollidingPaths = new HashSet<string>(
+            SelectNamespaceCollidingPaths(componentPaths, projectDirectory, rootNamespace),
+            StringComparer.Ordinal);
+        var typePaths = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var namespacePaths = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var path in componentPaths)
+        {
+            var names = Resolve(
+                path,
+                projectDirectory,
+                rootNamespace,
+                requiresCaseDiscriminator: false,
+                requiresNamespaceDiscriminator: namespaceCollidingPaths.Contains(path));
+            AddIdentityPath(typePaths, GetTypeIdentity(names), path);
+            foreach (var namespacePrefix in EnumerateNamespacePrefixes(names.Namespace))
+            {
+                AddIdentityPath(namespacePaths, namespacePrefix, path);
+            }
+        }
+
+        var selected = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var type in typePaths)
+        {
+            if (type.Value.Count > 1)
+            {
+                selected.UnionWith(type.Value);
+            }
+
+            if (namespacePaths.TryGetValue(type.Key, out var contributors))
+            {
+                selected.UnionWith(type.Value);
+                selected.UnionWith(contributors);
+            }
+        }
+
+        return SortPaths(selected);
+    }
+
+    private static string GetTypeIdentity(SingleFileComponentName names)
+        => (string.IsNullOrEmpty(names.Namespace)
+            ? names.ClassName
+            : names.Namespace + "." + names.ClassName).Replace("@", string.Empty);
+
+    private static IEnumerable<string> EnumerateNamespacePrefixes(string? namespaceValue)
+    {
+        if (string.IsNullOrEmpty(namespaceValue))
+        {
+            yield break;
+        }
+
+        var identity = namespaceValue!.Replace("@", string.Empty);
+        var length = identity.Length;
+        while (length > 0)
+        {
+            yield return identity.Substring(0, length);
+            length = identity.LastIndexOf('.', length - 1);
+        }
+    }
+
+    private static void AddIdentityPath(Dictionary<string, List<string>> identities, string identity, string path)
+    {
+        if (!identities.TryGetValue(identity, out var paths))
+        {
+            paths = new List<string>();
+            identities.Add(identity, paths);
+        }
+
+        paths.Add(path);
+    }
+
+    private static string[] SortPaths(HashSet<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var result = new string[paths.Count];
+        paths.CopyTo(result);
         Array.Sort(result, StringComparer.Ordinal);
         return result;
     }

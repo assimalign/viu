@@ -202,6 +202,58 @@ public class LanguageServerSemanticStatusTests
         }
     }
 
+    [Fact]
+    public void Read_ComponentPathSet_IncludesLiveLayoutAndRefreshesWhenNestedComponentAppears()
+    {
+        // The complete path set is a naming input even though live text is excluded from the disk
+        // source cone. Its cache stamp must change on add/remove. [SFC-CG-10], [V01.01.06.16]
+        var directory = Path.Combine(AppContext.BaseDirectory, "identity-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var projectFilePath = Path.Combine(directory, "Application.csproj");
+            File.WriteAllText(projectFilePath, "<Project Sdk=\"Assimalign.Viu.Sdk\" />");
+            var pagesDirectory = Path.Combine(directory, "Pages");
+            Directory.CreateDirectory(pagesDirectory);
+            var layoutPath = Path.Combine(pagesDirectory, "Blog.viu");
+            File.WriteAllText(layoutPath, "<template><div /></template>\n");
+            WriteMinimalResolvableAssetsFile(directory);
+            File.SetLastWriteTimeUtc(projectFilePath, DateTime.UtcNow.AddMinutes(-10));
+            var reader = new ViuProjectContextReader();
+            var documentUri = new Uri(layoutPath).AbsoluteUri;
+
+            var initial = reader.Read(documentUri).Context;
+            initial.ShouldNotBeNull();
+            initial.ComponentFilePaths.ShouldBe([layoutPath]);
+            initial.SourceDocuments.ShouldBeEmpty();
+
+            var nestedDirectory = Path.Combine(pagesDirectory, "Blog");
+            Directory.CreateDirectory(nestedDirectory);
+            var entryPath = Path.Combine(nestedDirectory, "Entry.viu");
+            File.WriteAllText(entryPath, "<template><span /></template>\n");
+
+            var expanded = reader.Read(documentUri).Context;
+            expanded.ShouldNotBeNull();
+            expanded.ComponentFilePaths.ShouldContain(layoutPath);
+            expanded.ComponentFilePaths.ShouldContain(entryPath);
+            expanded.SourceDocuments.Select(document => document.FilePath).ShouldBe([entryPath]);
+            expanded.CacheStamp.ShouldNotBe(initial.CacheStamp);
+
+            File.Delete(entryPath);
+            var restored = reader.Read(documentUri).Context;
+            restored.ShouldNotBeNull();
+            restored.ComponentFilePaths.ShouldBe([layoutPath]);
+            restored.SourceDocuments.ShouldBeEmpty();
+            restored.CacheStamp.ShouldNotBe(expanded.CacheStamp);
+        }
+        finally
+        {
+            Path.GetFullPath(directory).StartsWith(
+                Path.GetFullPath(AppContext.BaseDirectory), StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string CreateFixtureRoot(string scenario)
     {
         var directory = Path.Combine(

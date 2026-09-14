@@ -27,6 +27,7 @@ public sealed class SingleFileComponentDiagnosticCatalogTests
             ("VIU1002", SingleFileComponentDiagnosticSeverity.Warning),
             ("VIU1003", SingleFileComponentDiagnosticSeverity.Information),
             ("VIU1004", SingleFileComponentDiagnosticSeverity.Error),
+            ("VIU1005", SingleFileComponentDiagnosticSeverity.Error),
             ("VIU1101", SingleFileComponentDiagnosticSeverity.Error),
             ("VIU1102", SingleFileComponentDiagnosticSeverity.Warning),
             ("VIU1103", SingleFileComponentDiagnosticSeverity.Information),

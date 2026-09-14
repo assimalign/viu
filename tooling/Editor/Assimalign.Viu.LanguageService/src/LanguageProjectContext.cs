@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Assimalign.Viu.LanguageService;
@@ -43,4 +44,14 @@ public sealed record LanguageProjectContext(
     IReadOnlyList<string> ReferenceAssemblyPaths,
     IReadOnlyList<LanguageProjectSourceDocument> SourceDocuments,
     IReadOnlyList<string> PreprocessorSymbols,
-    string CacheStamp);
+    string CacheStamp)
+{
+    /// <summary>
+    /// Gets the complete component path set, including the live document, so every sibling projection
+    /// uses the build's generated identity rules. A host may omit this list when all component paths
+    /// are present in <see cref="SourceDocuments"/> except the live document. Component identities
+    /// retain ordinal path case; canonical-peer matching follows the host platform. Specified by <c>[SFC-CG-5]</c>,
+    /// <c>[SFC-CG-10]</c>, and <c>[VUE-7]</c>.
+    /// </summary>
+    public IReadOnlyList<string> ComponentFilePaths { get; init; } = Array.Empty<string>();
+}

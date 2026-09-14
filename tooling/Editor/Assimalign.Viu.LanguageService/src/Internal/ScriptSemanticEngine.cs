@@ -1455,8 +1455,11 @@ internal sealed class ScriptSemanticEngine
             documentFilePath,
             documentText,
             context,
+            out var shouldEmit,
             cancellationToken);
-        var generatedText = SingleFileComponentSourceEmitter.Emit(projection.Model);
+        var generatedText = shouldEmit
+            ? SingleFileComponentSourceEmitter.Emit(projection.Model)
+            : string.Empty;
         var mapper = GeneratedScriptDocumentMapper.Create(
             documentText,
             generatedText,
@@ -1474,7 +1477,8 @@ internal sealed class ScriptSemanticEngine
             compilation.GetSemanticModel(tree),
             tree.GetRoot(cancellationToken),
             mapper,
-            projection);
+            projection,
+            shouldEmit);
     }
 
     // Classifies the completion position from the parsed generated tree: returns false for a dot
@@ -1765,6 +1769,11 @@ internal sealed class ScriptSemanticEngine
         string liveDocumentFilePath,
         CancellationToken cancellationToken)
     {
+        context = context with
+        {
+            ComponentFilePaths = LanguageDocumentProjection.GetComponentPaths(
+                liveDocumentFilePath, context),
+        };
         var key = new ProjectCompilationKey(
             context.ProjectFilePath,
             liveDocumentFilePath);
@@ -1970,8 +1979,15 @@ internal sealed class ScriptSemanticEngine
                 document.FilePath,
                 document.Text,
                 context,
+                out var shouldEmit,
                 cancellationToken);
-            text = SingleFileComponentSourceEmitter.Emit(projection.Value.Model);
+            text = shouldEmit
+                ? SingleFileComponentSourceEmitter.Emit(projection.Value.Model)
+                : string.Empty;
+            if (!shouldEmit)
+            {
+                projection = null;
+            }
         }
         else
         {
@@ -1994,28 +2010,20 @@ internal sealed class ScriptSemanticEngine
     // derivation the Assimalign.Viu.Generators.Syntax source generator composes, fed the same
     // ProjectDirectory/RootNamespace the build publishes — identical generated text by
     // construction. Hot-reload metadata stays off (the deterministic Release shape) and the
-    // canonical-peer filter is a multi-file generator concern the projection never reads.
+    // emitted path set supplies both canonical-peer and namespace-collision decisions [SFC-CG-10].
     private static SingleFileComponentProjectionResult ProjectComponent(
         string filePath,
         string text,
         LanguageProjectContext context,
+        out bool shouldEmit,
         CancellationToken cancellationToken)
     {
-        var name = SingleFileComponentNameResolver.Resolve(
-            filePath,
-            context.ProjectDirectory,
-            context.RootNamespace);
-        var input = new SingleFileComponentProjectionInput(
+        var input = LanguageDocumentProjection.CreateInput(
             GetComponentFormat(filePath),
             filePath,
-            GetLeafFileName(filePath),
             text,
-            name.Namespace,
-            name.ClassName,
-            name.HintName,
-            CssComponentHash.Resolve(filePath, context.ProjectDirectory),
-            HotReloadComponentIdentifier: null,
-            HasCanonicalPeer: false);
+            context);
+        shouldEmit = !input.HasCanonicalPeer && !input.HasIdentityCollision;
         return SingleFileComponentProjection.Project(input, cancellationToken);
     }
 
@@ -2054,9 +2062,12 @@ internal sealed class ScriptSemanticEngine
             cancellationToken);
         var declarations = new List<TemplateComponentDeclaration>(stableDeclarations.Count + 1);
         declarations.AddRange(stableDeclarations);
-        AppendProjectedComponentContract(
-            declarations,
-            request.Projection.Model);
+        if (request.ShouldEmit)
+        {
+            AppendProjectedComponentContract(
+                declarations,
+                request.Projection.Model);
+        }
         declarations.Sort(static (left, right) => string.CompareOrdinal(
             left.CompilerDeclaration.Name,
             right.CompilerDeclaration.Name));
@@ -2137,12 +2148,6 @@ internal sealed class ScriptSemanticEngine
             ? SingleFileComponentFormat.Vue
             : SingleFileComponentFormat.Viu;
 
-    private static string GetLeafFileName(string filePath)
-    {
-        var lastSeparator = filePath.LastIndexOfAny(['/', '\\']);
-        return lastSeparator >= 0 ? filePath.Substring(lastSeparator + 1) : filePath;
-    }
-
     private static string GetDocumentFilePath(string documentUri)
         => Uri.TryCreate(documentUri, UriKind.Absolute, out var uri) && uri.IsFile
             ? uri.LocalPath
@@ -2159,6 +2164,11 @@ internal sealed class ScriptSemanticEngine
     {
         var builder = new StringBuilder();
         builder.Append(context.RootNamespace).Append('\n').Append(context.ProjectDirectory);
+        foreach (var path in context.ComponentFilePaths)
+        {
+            builder.Append('\n').Append("component|").Append(path);
+        }
+
         foreach (var symbol in context.PreprocessorSymbols)
         {
             builder.Append('\n').Append("symbol|").Append(symbol);
@@ -2306,7 +2316,8 @@ internal sealed class ScriptSemanticEngine
         SemanticModel SemanticModel,
         SyntaxNode Root,
         GeneratedScriptDocumentMapper Mapper,
-        SingleFileComponentProjectionResult Projection);
+        SingleFileComponentProjectionResult Projection,
+        bool ShouldEmit);
 
     /// <summary>Identifies one project cone after excluding its current live document.</summary>
     private readonly record struct ProjectCompilationKey(

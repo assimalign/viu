@@ -63,6 +63,17 @@ public static class SingleFileComponentDiagnostics
         DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
         HelpLink: HelpLink("VIU1004"));
 
+    /// <summary>
+    /// Generated types still collide with a type or namespace after the selective namespace rule.
+    /// Reported at the source file so authors can rename it before C# emission. Specified by
+    /// <c>[SFC-CG-10]</c> and <c>[SFC-DIAG-4]</c>.
+    /// </summary>
+    public static readonly SingleFileComponentDiagnosticDescriptor ConflictingComponentIdentity = new(
+        Id: "VIU1005",
+        Title: "Conflicting generated component identity",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1005"));
+
     /// <summary>A recoverable error reported by the dispatched template parse.</summary>
     public static readonly SingleFileComponentDiagnosticDescriptor TemplateError = new(
         Id: "VIU1101",
@@ -226,6 +237,7 @@ public static class SingleFileComponentDiagnostics
         SingleFileComponentWarning,
         SingleFileComponentInformation,
         ConflictingComponentFormats,
+        ConflictingComponentIdentity,
         TemplateError,
         TemplateWarning,
         TemplateInformation,

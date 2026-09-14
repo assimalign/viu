@@ -33,13 +33,16 @@ internal static class LanguageDiagnosticProvider
             cancellationToken.ThrowIfCancellationRequested();
             // The incremental syntax workspace remains authoritative for container recovery and
             // tag-based compatibility. Re-running the full projection over an incomplete edit can
-            // produce secondary VIU10xx, VIU1201-VIU1203, or VIU1206 errors that replace or duplicate
-            // those stable diagnostics. The build's VIU1204, VIU1205, and VIU1207-VIU1209 rules are
+            // produce secondary VIU1001-VIU1004, VIU1201-VIU1203, or VIU1206 errors that replace or
+            // duplicate those stable diagnostics. VIU1005 is a compilation-wide identity error,
+            // absent from container recovery, and must reach the author [SFC-DIAG-4].
+            // The build's VIU1204, VIU1205, and VIU1207-VIU1209 rules are
             // primary authored-member diagnostics and are additive alongside the nested template/style
             // bands; VIU14xx is appended below after a compilation-wide catalog resolves.
             if (diagnostic.Descriptor.Id.StartsWith("VIU11", StringComparison.Ordinal) ||
                 diagnostic.Descriptor.Id.StartsWith("VIU13", StringComparison.Ordinal) ||
                 diagnostic.Descriptor.Id is
+                    "VIU1005" or
                     "VIU1204" or
                     "VIU1205" or
                     "VIU1207" or

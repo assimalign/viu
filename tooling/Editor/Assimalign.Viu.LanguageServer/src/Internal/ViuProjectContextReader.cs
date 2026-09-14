@@ -87,7 +87,10 @@ internal sealed class ViuProjectContextReader
                 ViuProjectPreprocessorSymbols.Derive(
                     assets.TargetFramework,
                     assets.Configuration),
-                assets.CacheStamp);
+                assets.CacheStamp)
+            {
+                ComponentFilePaths = assets.ComponentFilePaths,
+            };
             return (context, assets.Status);
         }
         finally

@@ -78,16 +78,14 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 IsEnabled(serverRendering));
         });
 
-        // The multi-file view: .vue shadowing [VUE-7] and hint-name case collisions [SFC-CG-5] are both
-        // facts about the SET of component files, so they are resolved once per set — keyed on the
-        // project directory alone, never on the whole option record, so an unrelated property change
-        // cannot invalidate it.
+        // The multi-file view resolves shadowing, hint names, and generated C# identity once per set.
+        // Only naming options participate; unrelated configuration changes preserve this cache.
         var fileSet = context.AdditionalTextsProvider
             .Where(static text => IsSingleFileComponentFile(text.Path))
             .Select(static (text, _) => text.Path)
             .Collect()
-            .Combine(projectOptions.Select(static (options, _) => options.ProjectDirectory))
-            .Select(static (pair, _) => CreateFileSet(pair.Left, pair.Right));
+            .Combine(projectOptions.Select(static (options, _) => (options.ProjectDirectory, options.RootNamespace)))
+            .Select(static (pair, _) => CreateFileSet(pair.Left, pair.Right.ProjectDirectory, pair.Right.RootNamespace));
 
         var files = context.AdditionalTextsProvider
             .Where(static text => IsSingleFileComponentFile(text.Path))
@@ -106,6 +104,8 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 SingleFileComponentProjection.Project(file, cancellationToken))
             .WithTrackingName(ModelTrackingName);
 
+        var emittedResults = results.Where(static result => !HasIdentityCollision(result));
+
         var collisions = files
             .Where(static file => file.HasCanonicalPeer)
             .Select(static (file, _) => SingleFileComponentDiagnostics.CreateFileRule(
@@ -117,7 +117,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         // [SFC-CG-3]/[SFC-CG-4] Each per-file scaffold stays on its independent output branch. A
         // separate collected branch emits the one assembly catalog and the tier-three glue once;
         // changes here never cause another component's source file to be re-emitted.
-        var generatedComponents = results
+        var generatedComponents = emittedResults
             .Where(static result => result.Model.RenderBody is not null)
             .Select(static (result, _) => new GeneratedComponentRegistration(
                 result.Model.Namespace,
@@ -137,7 +137,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         // so an edit to one .viu still re-emits only that file and every other file's scaffold stays
         // strictly cached; only the validation branch — which produces diagnostics, never source — sees
         // the compilation-wide catalog.
-        var localDeclarations = results
+        var localDeclarations = emittedResults
             .Select(static (result, _) => new ComponentDeclarationEntry(
                 result.Model.ClassName,
                 result.Model.Declarations.Parameters)
@@ -155,7 +155,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(results, static (production, result) => Execute(production, result));
         context.RegisterSourceOutput(
-            results.Combine(catalog),
+            emittedResults.Combine(catalog),
             static (production, pair) => ValidateComponentUsages(production, pair.Left, pair.Right));
         context.RegisterSourceOutput(collisions, static (production, diagnostic) =>
             production.ReportDiagnostic(SingleFileComponentDiagnosticAdapter.ToDiagnostic(diagnostic)));
@@ -204,7 +204,8 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             additionalText.Path,
             options.ProjectDirectory,
             options.RootNamespace,
-            fileSet.RequiresCaseDiscriminator(additionalText.Path));
+            fileSet.RequiresCaseDiscriminator(additionalText.Path),
+            fileSet.RequiresNamespaceDiscriminator(additionalText.Path));
         var localHashSalt = CssComponentHash.Resolve(additionalText.Path, options.ProjectDirectory);
         var format = IsVueFile(additionalText.Path)
             ? SingleFileComponentFormat.Vue
@@ -226,6 +227,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             HasCanonicalPeer(format, additionalText.Path, fileSet))
         {
             EmitServerRendering = options.EmitServerRendering,
+            HasIdentityCollision = fileSet.HasIdentityCollision(additionalText.Path),
         };
     }
 
@@ -244,14 +246,16 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     private static bool IsEnabled(string? configuredValue) =>
         string.Equals(configuredValue, "true", StringComparison.OrdinalIgnoreCase);
 
-    // Resolves the two cross-file facts for one compilation's component files: the canonical .viu base
+    // Resolves the cross-file facts for one compilation's component files: the canonical .viu base
     // paths a .vue peer is shadowed by [VUE-7], and the components whose readable hint names would
-    // collide under Roslyn's case-insensitive AddSource comparison [SFC-CG-5]. Shadowed .vue files are
+    // collide under Roslyn's case-insensitive AddSource comparison [SFC-CG-5], and generated type and
+    // namespace collisions [SFC-CG-10]. Shadowed .vue files are
     // excluded from the collision input because they emit nothing — counting one would discriminate the
     // canonical .viu component that suppressed it, churning an identity that never collided.
     private static SingleFileComponentFileSet CreateFileSet(
         ImmutableArray<string> componentPaths,
-        string? projectDirectory)
+        string? projectDirectory,
+        string? rootNamespace)
     {
         if (componentPaths.IsDefaultOrEmpty)
         {
@@ -273,6 +277,8 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
 
         var canonicalSet = new SingleFileComponentFileSet(
             new EquatableArray<string>(canonicalBasePaths.ToArray()),
+            EquatableArray<string>.Empty,
+            EquatableArray<string>.Empty,
             EquatableArray<string>.Empty);
 
         var emittedPaths = new List<string>(orderedPaths.Length);
@@ -288,7 +294,11 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         return new SingleFileComponentFileSet(
             canonicalSet.CanonicalBasePaths,
             new EquatableArray<string>(
-                SingleFileComponentNameResolver.SelectCaseCollidingPaths(emittedPaths, projectDirectory)));
+                SingleFileComponentNameResolver.SelectCaseCollidingPaths(emittedPaths, projectDirectory)),
+            new EquatableArray<string>(
+                SingleFileComponentNameResolver.SelectNamespaceCollidingPaths(emittedPaths, projectDirectory, rootNamespace)),
+            new EquatableArray<string>(
+                SingleFileComponentNameResolver.SelectIdentityCollidingPaths(emittedPaths, projectDirectory, rootNamespace)));
     }
 
     private static bool HasCanonicalPeer(
@@ -313,7 +323,23 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             context.ReportDiagnostic(SingleFileComponentDiagnosticAdapter.ToDiagnostic(diagnostic));
         }
 
-        context.AddSource(result.Model.HintName, SingleFileComponentSourceEmitter.Emit(result.Model));
+        if (!HasIdentityCollision(result))
+        {
+            context.AddSource(result.Model.HintName, SingleFileComponentSourceEmitter.Emit(result.Model));
+        }
+    }
+
+    private static bool HasIdentityCollision(SingleFileComponentProjectionResult result)
+    {
+        foreach (var diagnostic in result.Diagnostics)
+        {
+            if (diagnostic.Descriptor == SingleFileComponentDiagnostics.ConflictingComponentIdentity)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Merges the two declaration sources into one resolvable catalog. The .viu components being generated

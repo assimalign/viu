@@ -1,0 +1,10 @@
+<template>
+<section class="blog-home">Blog home</section>
+</template>
+
+@script {
+}
+
+@route {
+    path = "";
+}

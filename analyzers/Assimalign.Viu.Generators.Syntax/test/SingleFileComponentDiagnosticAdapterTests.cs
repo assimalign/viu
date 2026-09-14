@@ -22,8 +22,8 @@ public sealed class SingleFileComponentDiagnosticAdapterTests
     [Fact]
     public void ToDescriptor_CoversEveryNeutralCatalogEntry_WithIdenticalIdentity()
     {
-        // The catalog is exactly the 24 descriptors recorded by analyzer release tracking.
-        SingleFileComponentDiagnostics.Catalog.Count.ShouldBe(24);
+        // The catalog is exactly the 25 descriptors recorded by analyzer release tracking.
+        SingleFileComponentDiagnostics.Catalog.Count.ShouldBe(25);
 
         foreach (var descriptor in SingleFileComponentDiagnostics.Catalog)
         {

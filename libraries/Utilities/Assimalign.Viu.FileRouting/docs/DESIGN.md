@@ -118,30 +118,23 @@ normally shadows the `.vue` peer under `[VUE-7]`, so that specific pair would no
 duplicate registration at startup. Requiring one page input makes FileRouting's discovery
 unambiguous; it is a stricter add-on convention, not a change to container or parser semantics.
 
-## Current component compiler layout limitation
+## Compiled sibling layouts
 
-The real compiled fixture exposed an existing C# identity collision: `Pages/Blog.viu` emits a
-`RootNamespace.Pages.Blog` type, while `Pages/Blog/Entry.viu` emits the
-`RootNamespace.Pages.Blog` namespace. C# rejects the compilation with CS0101. Unique component
-basenames alone do not solve a layout's type colliding with its child namespace.
+The compiled fixture includes `Pages/Blog.viu` alongside `Pages/Blog/Archive.viu` and
+`Pages/Blog/[Slug].viu`. The component compiler disambiguates the layout's generated C# identity
+under `[SFC-CG-10]` and [V01.01.06.16] (#363), while preserving its `Blog` registration name.
+FileRouting continues to emit the same names and ordinary relative child descriptors.
 
-The route generator's sibling-layout convention and descriptor nesting remain implemented and
-pinned by in-memory generator and runtime tests. Physical sibling-file layout trees cannot yet
-compile through the unchanged syntax compiler. The passing compiled fixture therefore covers flat
-generated routes plus hand-authored nested descriptor rendering through the Testing host. Consumers
-can use the same approach to compose nested routes from uniquely named components in flat folders.
+`Pages/Blog/BlogHome.viu` declares an empty path override, so the generated table also exercises
+the `blog-index` default child while keeping the root `Index.viu` registration unique. Tests
+resolve `/blog`, `/blog/archive`, and `/blog/:slug` through the generated parent record and render
+the nested outlet through the Testing host, including parent and parameter-only child retention.
 
-Changing the syntax compiler's namespace or class identity would cross this task's prohibited core
-change boundary and can affect existing generated names. It is a required follow-up before the
-physical layout convention can be shipped as a working end-to-end authoring path. No core or syntax
-generator file is changed here, and the add-on does not silently rewrite component namespaces.
-
-The literal layout outlet `<RouterView :depth="1"/>` compiles cleanly. Since [V01.01.08.03.02]
-(#359) the syntax usage checker treats a hand-authored `ComponentRegistration` contract as an
-unreadable parameter surface rather than an empty one, so the explicit-depth rule needs no dynamic
-component workaround. The compiled fixture registers the name `RouterView` with the ordinary
-RouterView registration's contract and activator, because compiled component tags resolve by
-registered name, and pins real nested rendering at depth 1 without suppressing diagnostics.
+The layout writes the literal outlet `<RouterView :depth="1"/>`. Since [V01.01.08.03.02]
+(#359), its hand-authored registration is an opaque parameter contract for the syntax checker.
+The compiled fixture registers the name `RouterView` with the ordinary RouterView registration's
+contract and activator, because compiled component tags resolve by registered name. This setup
+compiles without suppressing diagnostics.
 
 ## Optional route block
 

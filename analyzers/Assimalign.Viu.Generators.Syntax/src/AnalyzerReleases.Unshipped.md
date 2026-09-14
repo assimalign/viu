@@ -9,6 +9,7 @@ VIU1001 | Assimalign.Viu.Generators.Syntax | Error | Single-file component parse
 VIU1002 | Assimalign.Viu.Generators.Syntax | Warning | Single-file component parse warning, including ignored scoped styles in .vue ([V01.01.06.17])
 VIU1003 | Assimalign.Viu.Generators.Syntax | Info | Single-file component parse information
 VIU1004 | Assimalign.Viu.Generators.Syntax | Error | Canonical .viu and compatibility .vue files conflict
+VIU1005 | Assimalign.Viu.Generators.Syntax | Error | Generated component type or namespace still conflicts after disambiguation ([V01.01.06.16])
 VIU1101 | Assimalign.Viu.Generators.Syntax | Error | Single-file component template parse error
 VIU1102 | Assimalign.Viu.Generators.Syntax | Warning | Single-file component template parse warning
 VIU1103 | Assimalign.Viu.Generators.Syntax | Info | Single-file component template parse information

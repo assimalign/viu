@@ -61,6 +61,7 @@ severity tier its own stable ID.
 | --- | --- | --- | --- |
 | `.viu` or `.vue` block container | `VIU1001` | `VIU1002` | `VIU1003` |
 | conflicting `.viu` and `.vue` sources | `VIU1004` | — | — |
+| conflicting generated component identities | `VIU1005` | — | — |
 | dispatched template parse | `VIU1101` | `VIU1102` | `VIU1103` |
 | `@script` C# parse | `VIU1201` | `VIU1202` | `VIU1203` |
 | script generated-member and compatibility contract | `VIU1204`–`VIU1206` | — | — |
@@ -113,6 +114,20 @@ block-container parser.
 Conflicting component formats — a compatibility `.vue` file has a same-directory, same-base canonical
 `.viu` file. The `.viu` source wins deterministically; the `.vue` file reports this error and emits no
 second partial class.
+
+### VIU1005
+
+Conflicting generated component identity — Error, located at line 1, column 1 of every participating
+`.viu`/`.vue` source. After the selective `GeneratedComponents` namespace relocation in `[SFC-CG-10]`,
+two component paths still resolve to one C# type, or a type still equals a required namespace. Examples
+include `Foo-Bar.viu` beside `Foo_Bar.viu`, same-named linked files outside the project directory, and
+an authored path that conflicts with the generated leaf namespace. Rename a component or directory to
+make the identities distinct. All participating scaffolds and catalog registrations are omitted so the
+failure is reported on source files instead of surfacing as CS0101 in generated C#.
+
+Hint-name uniqueness `[SFC-CG-5]` remains separate: different hint names do not make duplicate C# types
+valid. This rule concerns the emitted component set; ordinary C# declarations and companion partials
+remain checked by the C# compiler. Specified by `[SFC-DIAG-4]`, [V01.01.06.16] (#363).
 
 ### VIU1101
 
