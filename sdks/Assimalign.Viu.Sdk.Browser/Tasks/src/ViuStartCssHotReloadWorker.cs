@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -23,6 +24,9 @@ namespace Assimalign.Viu.Sdk.Browser.Tasks;
 /// command-line quoting. A project-scoped state file and the worker's named mutex prevent duplicate
 /// workers.
 /// Specified by <c>[V01.01.12.30.04]</c> (#355).
+/// Linux readiness compares the kernel process start token rather than a wall-clock estimate.
+/// Failed startup includes the state path and bounded standard-output and standard-error tails.
+/// Specified by <c>[V01.01.12.05.03]</c> (#370).
 /// </remarks>
 public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
 {
@@ -104,7 +108,7 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
             return true;
         }
 
-        if (TryReadLiveWorker(StateFilePath, out var existingProcessIdentifier))
+        if (CssHotReloadWorkerState.TryReadLiveWorker(StateFilePath, out var existingProcessIdentifier))
         {
             Log.LogMessage(
                 MessageImportance.Low,
@@ -164,17 +168,26 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
                 configurationFilePath,
                 dotNetHostPath,
                 launcherProcessIdentifier);
-            using var process = Process.Start(startInfo);
-            if (process is null)
+            // A host failure can precede the worker opening its files. Do not report an earlier
+            // session's output as evidence for this launch.
+            File.WriteAllText(StateFilePath + ".stdout.log", string.Empty);
+            File.WriteAllText(StateFilePath + ".stderr.log", string.Empty);
+            var diagnostics = new CssHotReloadWorkerDiagnostics();
+            using var process = new Process { StartInfo = startInfo };
+            process.OutputDataReceived += (_, arguments) => diagnostics.AppendStandardOutput(arguments.Data);
+            process.ErrorDataReceived += (_, arguments) => diagnostics.AppendStandardError(arguments.Data);
+            if (!process.Start())
             {
                 Log.LogError("Viu Generated Asset Hot Reload worker could not be started.");
                 return false;
             }
 
-            var readyDeadline = DateTime.UtcNow.AddSeconds(5);
-            while (DateTime.UtcNow < readyDeadline)
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            var readyTimer = Stopwatch.StartNew();
+            while (readyTimer.Elapsed < TimeSpan.FromSeconds(5))
             {
-                if (TryReadLiveWorker(StateFilePath, out var workerProcessIdentifier))
+                if (CssHotReloadWorkerState.TryReadLiveWorker(StateFilePath, out var workerProcessIdentifier))
                 {
                     Log.LogMessage(
                         MessageImportance.Normal,
@@ -186,24 +199,28 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
 
                 if (process.HasExited)
                 {
+                    process.WaitForExit();
                     Log.LogError(
-                        "Viu Generated Asset Hot Reload worker exited before initialization with code {0}.",
-                        process.ExitCode);
+                        "Viu Generated Asset Hot Reload worker exited before initialization with code {0}.{1}{2}",
+                        process.ExitCode, Environment.NewLine, diagnostics.FormatFailure(StateFilePath));
                     return false;
                 }
 
                 Thread.Sleep(25);
             }
 
+            StopUninitializedWorker(process);
             Log.LogError(
-                "Viu Generated Asset Hot Reload worker did not initialize within five seconds.");
+                "Viu Generated Asset Hot Reload worker did not initialize within five seconds.{0}{1}",
+                Environment.NewLine, diagnostics.FormatFailure(StateFilePath));
             return false;
         }
         catch (Exception exception) when (
             exception is ArgumentException or
                 InvalidOperationException or
                 IOException or
-                UnauthorizedAccessException)
+                UnauthorizedAccessException or
+                Win32Exception)
         {
             Log.LogErrorFromException(exception, showStackTrace: false);
             return false;
@@ -230,9 +247,14 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
             Arguments = JoinArguments(arguments),
             WorkingDirectory = ProjectDirectory,
             UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
             CreateNoWindow = true,
         };
         startInfo.EnvironmentVariables["VIU_GENERATED_ASSET_HOT_RELOAD"] = "1";
+        // The worker switches to durable writers before publishing readiness. Its later output
+        // must survive disposal of these startup pipes and exit of the watch-list MSBuild process.
+        startInfo.EnvironmentVariables["VIU_GENERATED_ASSET_HOT_RELOAD_OUTPUT"] = StateFilePath;
         return startInfo;
     }
 
@@ -255,56 +277,24 @@ public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
         return process.Id;
     }
 
-    private static bool TryReadLiveWorker(
-        string stateFilePath,
-        out int processIdentifier)
+    private static void StopUninitializedWorker(Process process)
     {
-        processIdentifier = 0;
         try
         {
-            if (!File.Exists(stateFilePath))
+            if (!process.HasExited)
             {
-                return false;
+                process.Kill();
             }
 
-            var processStartTicks = 0L;
-            foreach (var line in File.ReadAllLines(stateFilePath))
+            if (process.WaitForExit(1000))
             {
-                if (line.StartsWith("worker=", StringComparison.Ordinal))
-                {
-                    int.TryParse(
-                        line.Substring("worker=".Length),
-                        NumberStyles.None,
-                        CultureInfo.InvariantCulture,
-                        out processIdentifier);
-                }
-                else if (line.StartsWith("worker-start=", StringComparison.Ordinal))
-                {
-                    long.TryParse(
-                        line.Substring("worker-start=".Length),
-                        NumberStyles.None,
-                        CultureInfo.InvariantCulture,
-                        out processStartTicks);
-                }
+                process.WaitForExit();
             }
-
-            if (processIdentifier <= 0 || processStartTicks <= 0)
-            {
-                return false;
-            }
-
-            using var process = Process.GetProcessById(processIdentifier);
-            return !process.HasExited &&
-                process.StartTime.ToUniversalTime().Ticks == processStartTicks;
         }
         catch (Exception exception) when (
-            exception is ArgumentException or
-                InvalidOperationException or
-                IOException or
-                UnauthorizedAccessException)
+            exception is InvalidOperationException or Win32Exception or NotSupportedException)
         {
-            processIdentifier = 0;
-            return false;
+            // Preserve the readiness failure and diagnostics if the worker exits during cleanup.
         }
     }
 

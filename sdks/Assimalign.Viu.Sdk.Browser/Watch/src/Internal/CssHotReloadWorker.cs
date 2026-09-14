@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -577,14 +578,22 @@ internal sealed class CssHotReloadWorker
         using var currentProcess = Process.GetCurrentProcess();
         var text =
             "worker=" +
-            currentProcess.Id +
+            currentProcess.Id.ToString(CultureInfo.InvariantCulture) +
             Environment.NewLine +
             "worker-start=" +
-            currentProcess.StartTime.ToUniversalTime().Ticks +
+            currentProcess.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture) +
             Environment.NewLine +
             "owner=" +
-            ownerIdentity.ProcessIdentifier +
+            ownerIdentity.ProcessIdentifier.ToString(CultureInfo.InvariantCulture) +
             Environment.NewLine;
+        if (OperatingSystem.IsLinux())
+        {
+            text += "worker-start-clock-ticks=" +
+                ProcessLifetime.ReadLinuxStartClockTicks(currentProcess.Id)
+                    .ToString(CultureInfo.InvariantCulture) +
+                Environment.NewLine;
+        }
+
         File.WriteAllText(
             options.StateFilePath,
             text,

@@ -10,6 +10,31 @@ internal static class Program
 {
     public static int Main(string[] arguments)
     {
+        CssHotReloadDiagnosticOutput? diagnosticOutput;
+        try
+        {
+            diagnosticOutput = CssHotReloadDiagnosticOutput.CreateFromEnvironment();
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or
+                IOException or
+                NotSupportedException or
+                UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine(
+                "Viu Generated Asset Hot Reload could not open diagnostic output: " +
+                exception.Message);
+            return 5;
+        }
+
+        using (diagnosticOutput)
+        {
+            return Run(arguments);
+        }
+    }
+
+    private static int Run(string[] arguments)
+    {
         if (!CssHotReloadOptions.TryParse(
                 arguments,
                 Console.Error,

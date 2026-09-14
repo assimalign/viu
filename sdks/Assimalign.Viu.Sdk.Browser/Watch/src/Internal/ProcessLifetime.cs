@@ -49,6 +49,33 @@ internal static partial class ProcessLifetime
             identity.StartTimeUtcTicks == current.StartTimeUtcTicks;
     }
 
+    public static long ReadLinuxStartClockTicks(int processIdentifier)
+    {
+        // [V01.01.12.05.03], #370: /proc field 22 is stable across observing processes.
+        // Process.StartTime uses a process-local boot-time estimate on Linux and cannot serve
+        // as an exact cross-process identity. The process name may itself contain spaces or ')'.
+        var status = File.ReadAllText(
+            "/proc/" + processIdentifier.ToString(CultureInfo.InvariantCulture) + "/stat");
+        var processNameEnd = status.LastIndexOf(')');
+        if (processNameEnd >= 0 && processNameEnd + 2 < status.Length)
+        {
+            var fields = status.Substring(processNameEnd + 2)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length > 19 &&
+                long.TryParse(
+                    fields[19],
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var startClockTicks) &&
+                startClockTicks > 0)
+            {
+                return startClockTicks;
+            }
+        }
+
+        throw new IOException("The Linux process start-clock identity could not be read.");
+    }
+
     public static bool TryGetParentProcessIdentifier(
         int processIdentifier,
         out int parentProcessIdentifier)

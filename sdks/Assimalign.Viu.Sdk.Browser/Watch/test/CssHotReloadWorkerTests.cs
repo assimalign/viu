@@ -16,6 +16,167 @@ namespace Assimalign.Viu.Sdk.CssHotReload.Tests;
 
 public sealed class CssHotReloadWorkerTests
 {
+    // [V01.01.12.05.03], #370: the launcher compares a Linux kernel start-clock identity,
+    // while existing state-file consumers retain the wall-clock field.
+    [Fact]
+    public void Worker_Readiness_PreservesWallClockIdentityAndPublishesLinuxStartClockTicks()
+    {
+        var context = TestContext.Create();
+        Process? workerProcess = null;
+        try
+        {
+            workerProcess = StartWorker(context);
+            WaitFor(() => File.Exists(context.StatePath), "worker state file");
+            var lines = File.ReadAllLines(context.StatePath);
+            lines.ShouldContain(line => line.StartsWith("worker-start=", StringComparison.Ordinal));
+            if (OperatingSystem.IsLinux())
+            {
+                var processStatus = File.ReadAllText(
+                    "/proc/" + workerProcess.Id.ToString(CultureInfo.InvariantCulture) + "/stat");
+                var fields = processStatus.Substring(processStatus.LastIndexOf(')') + 2)
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                lines.ShouldContain("worker-start-clock-ticks=" + fields[19]);
+            }
+            else
+            {
+                lines.ShouldNotContain(line => line.StartsWith(
+                    "worker-start-clock-ticks=",
+                    StringComparison.Ordinal));
+            }
+        }
+        finally
+        {
+            StopWorker(workerProcess);
+            context.Dispose();
+        }
+    }
+
+    // [V01.01.12.05.03], #370: console capture starts before argument validation, and failure
+    // to open either diagnostic file must remain visible through the original startup stderr.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Worker_DiagnosticStartup_CapturesArgumentFailureOrReportsLogOpenFailure(bool blockErrorLog)
+    {
+        var context = TestContext.Create();
+        Process? workerProcess = null;
+        try
+        {
+            var outputPrefix = Path.Combine(context.DirectoryPath, "diagnostics", "worker");
+            if (blockErrorLog)
+            {
+                Directory.CreateDirectory(outputPrefix + ".stderr.log");
+            }
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = GetDotNetHostPath(),
+                WorkingDirectory = context.DirectoryPath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            startInfo.Environment["VIU_GENERATED_ASSET_HOT_RELOAD_OUTPUT"] = outputPrefix;
+            startInfo.ArgumentList.Add(context.WorkerAssemblyPath);
+            startInfo.ArgumentList.Add("--unknown-option");
+            workerProcess = Process.Start(startInfo);
+            workerProcess.ShouldNotBeNull();
+            workerProcess.WaitForExit(10000).ShouldBeTrue();
+            workerProcess.StandardOutput.ReadToEnd().ShouldBeEmpty();
+            var startupError = workerProcess.StandardError.ReadToEnd();
+            if (blockErrorLog)
+            {
+                workerProcess.ExitCode.ShouldBe(5);
+                startupError.ShouldContain("could not open diagnostic output");
+            }
+            else
+            {
+                workerProcess.ExitCode.ShouldBe(2);
+                startupError.ShouldBeEmpty();
+                var errorBytes = File.ReadAllBytes(outputPrefix + ".stderr.log");
+                Encoding.UTF8.GetString(errorBytes).ShouldContain("Viu Generated Asset Hot Reload");
+                errorBytes.Take(3).ShouldNotBe(new byte[] { 0xef, 0xbb, 0xbf });
+                File.ReadAllBytes(outputPrefix + ".stdout.log").ShouldBeEmpty();
+            }
+        }
+        finally
+        {
+            StopWorker(workerProcess);
+            context.Dispose();
+        }
+    }
+
+    // [V01.01.12.05.03], #370: after readiness, the worker's output must survive closure of
+    // the launcher pipes and its diagnostic environment must not reach nested MSBuild.
+    [Fact]
+    public void Worker_DiagnosticOutput_ClosedLauncherPipesPreserveRegenerationAndFailureDiagnostics()
+    {
+        var context = TestContext.Create();
+        Process? workerProcess = null;
+        try
+        {
+            var diagnosticTarget =
+                "<Target Name=\"ProbeDiagnosticRegeneration\">" +
+                "<Error Condition=\"'$(VIU_GENERATED_ASSET_HOT_RELOAD_OUTPUT)' != ''\" " +
+                "Text=\"inherited diagnostic environment\" />" +
+                "<CallTarget Targets=\"ViuGenerateSingleFileComponentCss\" />" +
+                "<Error Condition=\"Exists('fail-regeneration')\" " +
+                "Text=\"expected diagnostic regeneration failure\" />" +
+                "</Target>";
+            File.WriteAllText(
+                context.ProjectPath,
+                File.ReadAllText(context.ProjectPath).Replace(
+                    "</Project>",
+                    diagnosticTarget + "</Project>",
+                    StringComparison.Ordinal));
+            var outputPrefix = Path.Combine(context.DirectoryPath, "obj", "worker-output");
+            workerProcess = StartWorker(
+                context,
+                new[]
+                {
+                    new WorkerAsset(
+                        context.BundlePath,
+                        new[] { context.ComponentPath },
+                        Array.Empty<string>(),
+                        Array.Empty<string>(),
+                        "ProbeDiagnosticRegeneration",
+                        string.Empty,
+                        "wwwroot/Probe.viu.css",
+                        "PreserveEmpty"),
+                },
+                reportUpdates: true,
+                diagnosticOutputPrefix: outputPrefix);
+            WaitFor(() => File.Exists(context.StatePath), "worker state file");
+            workerProcess.StandardOutput.Dispose();
+            workerProcess.StandardError.Dispose();
+
+            WriteWatchedFile(
+                context.ComponentPath,
+                "<template><div /></template><style>.component { color: blue; }</style>");
+            WaitForEventCount(context.EventLogPath, 1);
+            File.ReadAllText(context.BundlePath).ShouldContain("color: blue");
+            ReadDiagnosticOutput(outputPrefix + ".stdout.log")
+                .ShouldContain("viu-generated-asset-update:");
+
+            File.WriteAllText(Path.Combine(context.DirectoryPath, "fail-regeneration"), "");
+            WriteWatchedFile(
+                context.ComponentPath,
+                "<template><div /></template><style>.component { color: green; }</style>");
+            WaitForEventCount(context.EventLogPath, 2);
+            var errorOutput = ReadDiagnosticOutput(outputPrefix + ".stderr.log");
+            errorOutput.ShouldContain("expected diagnostic regeneration failure");
+            errorOutput.ShouldNotContain("inherited diagnostic environment");
+            workerProcess.Refresh();
+            workerProcess.HasExited.ShouldBeFalse();
+        }
+        finally
+        {
+            StopWorker(workerProcess);
+            context.Dispose();
+        }
+    }
+
     // [V01.01.12.33], #356: dotnet watch must see the collector before it captures
     // CustomCollectWatchItems while importing Microsoft.Common targets.
     [Fact]
@@ -504,7 +665,8 @@ public sealed class CssHotReloadWorkerTests
     private static Process StartWorker(
         TestContext context,
         IReadOnlyList<WorkerAsset> assets,
-        bool reportUpdates = false)
+        bool reportUpdates = false,
+        string? diagnosticOutputPrefix = null)
     {
         using var currentProcess = Process.GetCurrentProcess();
         var configurationFilePath = context.StatePath + ".configuration";
@@ -518,8 +680,15 @@ public sealed class CssHotReloadWorkerTests
             WorkingDirectory = context.DirectoryPath,
             UseShellExecute = false,
             CreateNoWindow = false,
-            RedirectStandardOutput = reportUpdates,
+            RedirectStandardOutput = reportUpdates || diagnosticOutputPrefix is not null,
+            RedirectStandardError = diagnosticOutputPrefix is not null,
         };
+        startInfo.Environment.Remove("VIU_GENERATED_ASSET_HOT_RELOAD_OUTPUT");
+        if (diagnosticOutputPrefix is not null)
+        {
+            startInfo.Environment["VIU_GENERATED_ASSET_HOT_RELOAD_OUTPUT"] = diagnosticOutputPrefix;
+        }
+
         startInfo.ArgumentList.Add(context.WorkerAssemblyPath);
         startInfo.ArgumentList.Add("--configuration-file");
         startInfo.ArgumentList.Add(configurationFilePath);
@@ -707,6 +876,17 @@ public sealed class CssHotReloadWorkerTests
         File.Exists(path)
             ? File.ReadAllLines(path)
             : Array.Empty<string>();
+
+    private static string ReadDiagnosticOutput(string path)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
 
     private static string GetDotNetHostPath() =>
         Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
