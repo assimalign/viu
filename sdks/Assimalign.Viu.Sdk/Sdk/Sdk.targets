@@ -8,4 +8,6 @@
             Condition="Exists('..\Targets\Assimalign.Viu.Sdk.ComponentStyles.targets')" />
     <Import Project="..\Targets\Assimalign.Viu.Sdk.RuntimeInspection.targets"
             Condition="Exists('..\Targets\Assimalign.Viu.Sdk.RuntimeInspection.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.StaticPrerender.targets"
+            Condition="Exists('..\Targets\Assimalign.Viu.Sdk.StaticPrerender.targets')" />
 </Project>

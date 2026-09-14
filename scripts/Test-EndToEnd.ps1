@@ -6,7 +6,8 @@
     Packs the current Viu libraries, SDKs, targeting packs, and Browser runtime pack; stages
     purpose-built external consumers behind an isolated global.json and NuGet configuration;
     publishes trimmed output; generates the hydration document through the packaged
-    ServerRenderAdaptor; serves both applications; and drives them through Playwright .NET.
+    ServerRenderAdaptor; publishes root and nested static prerender routes through the base SDK;
+    serves the applications; and drives them through Playwright .NET.
 
     The full browser matrix is intentionally on-demand/nightly rather than a per-pull-request
     cost. The same isolated publish path also feeds the publish-size, AOT, and startup gates.
@@ -23,7 +24,7 @@
 
 .PARAMETER HotReload
     Runs the isolated packaged Debug .vue development-loop scenarios instead of the ordinary
-    three-scenario published fixture lane. A Visual Studio-shaped session first launches through the
+    five-scenario published fixture lane. A Visual Studio-shaped session first launches through the
     packaged RunHost with a protocol-asserting BrowserRefresh endpoint and proves .viu edits deliver
     component and utility stylesheet updates in real Chromium, including a reload-before-completion
     race whose reconnected client converges without manual action ([V01.01.12.30.05], #357).
@@ -500,7 +501,10 @@ else {
         'EndToEndBrowserApp',
         'EndToEndHydrationApp',
         'EndToEndHydrationShared',
-        'EndToEndServerMarkup')
+        'EndToEndServerMarkup',
+        'EndToEndPrerenderApp',
+        'EndToEndPrerenderHost',
+        'EndToEndPrerenderShared')
 }
 foreach ($fixtureName in $fixtureNames) {
     Copy-Item `
@@ -635,7 +639,8 @@ if ($SkipPackRestore) {
     else {
         @(
             (Join-Path $fixtureStageDirectory 'EndToEndBrowserApp/EndToEndBrowserApp.csproj'),
-            (Join-Path $fixtureStageDirectory 'EndToEndHydrationApp/EndToEndHydrationApp.csproj'))
+            (Join-Path $fixtureStageDirectory 'EndToEndHydrationApp/EndToEndHydrationApp.csproj'),
+            (Join-Path $fixtureStageDirectory 'EndToEndPrerenderApp/EndToEndPrerenderApp.csproj'))
     }
     foreach ($stagedBrowserProject in $stagedBrowserProjects) {
         $projectContent = [System.IO.File]::ReadAllText($stagedBrowserProject)
@@ -742,6 +747,9 @@ $hydrationProject = Join-Path `
 $serverMarkupProject = Join-Path `
     $fixtureStageDirectory `
     'EndToEndServerMarkup/EndToEndServerMarkup.csproj'
+$prerenderProject = Join-Path `
+    $fixtureStageDirectory `
+    'EndToEndPrerenderApp/EndToEndPrerenderApp.csproj'
 $restoreProperties = @(
     "-p:ViuConsumerVersion=$viuVersion",
     '-p:NuGetAudit=false',
@@ -995,6 +1003,46 @@ if (-not $HotReload) {
     if (-not [System.IO.File]::Exists((Join-Path $hydrationWebRoot 'index.html'))) {
         throw 'The hydration publish did not contain adaptor-generated index.html.'
     }
+
+    Invoke-DotNet `
+        -Description 'Restoring the packaged EndToEndPrerenderApp fixture' `
+        -Arguments (@(
+            'restore',
+            $prerenderProject) + $fixtureRestoreArguments + $restoreProperties)
+    $prerenderPublishDirectory = Join-Path $temporaryRootPath 'publish/EndToEndPrerenderApp'
+    Invoke-DotNet `
+        -Description 'Publishing EndToEndPrerenderApp and generating static routes (trimmed)' `
+        -Arguments (@(
+            'publish',
+            $prerenderProject,
+            '--configuration',
+            $Configuration,
+            '--no-restore',
+            '-warnaserror',
+            '--output',
+            $prerenderPublishDirectory,
+            '-p:PublishTrimmed=true',
+            '-p:TrimMode=full',
+            '-p:RunAOTCompilation=false',
+            '-p:ViuRunAotCompilation=false',
+            "-p:RestoreConfigFile=$nugetConfigurationPath") + $restoreProperties)
+    $prerenderWebRoot = Join-Path $prerenderPublishDirectory 'wwwroot'
+    foreach ($routeDocument in @('index.html', 'guide/intro/index.html')) {
+        $routeDocumentPath = Join-Path $prerenderWebRoot $routeDocument
+        if (-not [System.IO.File]::Exists($routeDocumentPath)) {
+            throw "Static prerender did not emit route document: $routeDocumentPath"
+        }
+        $routeDocumentText = [System.IO.File]::ReadAllText($routeDocumentPath)
+        foreach ($requiredMarkup in @('data-viu-state', '<!--[-->', '<!--]-->', 'server:')) {
+            if (-not $routeDocumentText.Contains($requiredMarkup, [System.StringComparison]::Ordinal)) {
+                throw "Static prerender document '$routeDocument' lacks '$requiredMarkup'."
+            }
+        }
+        if ($routeDocumentText.Contains('#[.{fingerprint}]', [System.StringComparison]::Ordinal)) {
+            throw "Static prerender document '$routeDocument' retained an unresolved asset placeholder."
+        }
+        Write-Host "Verified static prerender document: $routeDocumentPath" -ForegroundColor Green
+    }
 }
 
     $harnessProject = Join-Path `
@@ -1117,6 +1165,8 @@ if (-not $HotReload) {
         $harnessArguments.Add($browserWebRoot)
         $harnessArguments.Add('--hydration-root')
         $harnessArguments.Add($hydrationWebRoot)
+        $harnessArguments.Add('--prerender-root')
+        $harnessArguments.Add($prerenderWebRoot)
     }
     foreach ($argument in @(
             '--artifacts',

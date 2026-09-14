@@ -1,4 +1,31 @@
 #nullable enable
+Assimalign.Viu.ServerRenderer.FileSystemStaticSiteOutput
+Assimalign.Viu.ServerRenderer.FileSystemStaticSiteOutput.FileSystemStaticSiteOutput(string! directory) -> void
+Assimalign.Viu.ServerRenderer.FileSystemStaticSiteOutput.WriteAsync(string! relativePath, string! document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<string!>
+Assimalign.Viu.ServerRenderer.HostPageDocumentShell
+Assimalign.Viu.ServerRenderer.HostPageDocumentShell.HostPageDocumentShell(string! hostPage, string! mountSelector = "#app") -> void
+Assimalign.Viu.ServerRenderer.HostPageDocumentShell.WritePrefixAsync(Assimalign.Viu.ServerRenderer.IServerRenderOutput! output, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.ServerRenderer.HostPageDocumentShell.WriteSuffixAsync(Assimalign.Viu.ServerRenderer.IServerRenderOutput! output, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! teleports, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.ServerRenderer.IStaticSiteOutput
+Assimalign.Viu.ServerRenderer.IStaticSiteOutput.WriteAsync(string! relativePath, string! document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<string!>
+Assimalign.Viu.ServerRenderer.StaticSiteFile
+Assimalign.Viu.ServerRenderer.StaticSiteFile.Location.get -> string!
+Assimalign.Viu.ServerRenderer.StaticSiteFile.RelativePath.get -> string!
+Assimalign.Viu.ServerRenderer.StaticSiteFile.Route.get -> string!
+Assimalign.Viu.ServerRenderer.StaticSiteGenerationException
+Assimalign.Viu.ServerRenderer.StaticSiteGenerationException.Route.get -> string!
+Assimalign.Viu.ServerRenderer.StaticSiteGenerationException.StaticSiteGenerationException(string! route, System.Exception! innerException) -> void
+Assimalign.Viu.ServerRenderer.StaticSiteGenerator
+Assimalign.Viu.ServerRenderer.StaticSiteGenerator.StaticSiteGenerator(System.Func<Assimalign.Viu.Components.VirtualNode!>! rootFactory, Assimalign.Viu.ServerRenderer.IServerRenderRequestScopeFactory<Assimalign.Viu.ServerRenderer.StaticSiteRouteContext!>! requestScopeFactory, System.Func<string!, Assimalign.Viu.Router.IRouterHistory!>? historyFactory = null, Assimalign.Viu.ServerRenderer.IServerRenderRegistry? serverRenders = null) -> void
+Assimalign.Viu.ServerRenderer.StaticSiteGenerator.GenerateAsync(System.Collections.Generic.IEnumerable<string!>! routes, Assimalign.Viu.ServerRenderer.IServerRenderDocumentShell! documentShell, Assimalign.Viu.ServerRenderer.IStaticSiteOutput! output, string! basePath = "/", System.Action<Assimalign.Viu.ServerRenderer.StaticSiteFile!>? fileEmitted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Assimalign.Viu.ServerRenderer.StaticSiteFile!>!>!
+Assimalign.Viu.ServerRenderer.StaticSiteGeneratorHost
+static Assimalign.Viu.ServerRenderer.StaticSiteGeneratorHost.RunAsync(string![]! arguments, System.Func<Assimalign.Viu.ServerRenderer.StaticSiteGenerator!>! configure, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Assimalign.Viu.ServerRenderer.StaticSitePath
+static Assimalign.Viu.ServerRenderer.StaticSitePath.GetRelativePath(string! route) -> string!
+Assimalign.Viu.ServerRenderer.StaticSiteRouteContext
+Assimalign.Viu.ServerRenderer.StaticSiteRouteContext.BasePath.get -> string!
+Assimalign.Viu.ServerRenderer.StaticSiteRouteContext.History.get -> Assimalign.Viu.Router.IRouterHistory!
+Assimalign.Viu.ServerRenderer.StaticSiteRouteContext.Route.get -> string!
 Assimalign.Viu.ServerRenderer.CompiledServerRender
 Assimalign.Viu.ServerRenderer.CompiledServerComponentRender
 *REMOVED*Assimalign.Viu.ServerRenderer.SsrContext.State.get -> System.Collections.Generic.IDictionary<string!, object?>!

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <DefineConstants>$(DefineConstants);STATIC_PRERENDER_HOST</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Package-only host intentionally exercises the published consumer boundary (#68). -->
+    <PackageReference Include="Assimalign.Viu.ServerRenderer" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
+    <Compile Include="../EndToEndPrerenderShared/*.cs" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

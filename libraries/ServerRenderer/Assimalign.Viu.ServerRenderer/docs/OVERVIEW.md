@@ -1,5 +1,33 @@
 # Assimalign.Viu.ServerRenderer
 
+## Static prerendering
+
+`StaticSiteGenerator` turns an explicit route list into complete hydratable documents. Each route
+receives a fresh memory history, request scope, application, and render context. The scope composes
+its Router over `StaticSiteRouteContext.History` and exposes it through application services; the
+generator awaits readiness and renders through `ServerRenderAdaptor<StaticSiteRouteContext>`.
+The scope owns its Router and services; the generator disposes history after scope teardown.
+No Core or Router API change is required. ServerRenderer now depends on the host-neutral Router
+package for this optional entry point ([SSG-1], [RTR-3]).
+
+`HostPageDocumentShell` splits the **published** host page around `#app` (or another simple `#id`),
+replacing only its children. Import maps, WebAssembly bootstrap scripts, and fingerprinted assets
+remain untouched. Use deployment-correct absolute asset paths or a `<base href="/">` for nested
+routes. The default shell rejects teleport output; custom shells retain the existing suffix seam.
+The ordinary renderer supplies markers and the request-state island; Browser hydration restores
+state before taking its mount snapshot ([SSG-3], [SSG-4], [HYD-8]).
+
+`IStaticSiteOutput` receives complete documents. `FileSystemStaticSiteOutput` writes UTF-8 without
+a byte-order mark, maps root to `index.html` and nested routes to their directory's `index.html`,
+and removes stale compressed versions of replaced host pages. Unsafe paths and collisions fail.
+Each emitted file is reported; the first failure names its route and preserves earlier successes
+([SSG-2], [SSG-5]).
+
+An application's console server project calls `StaticSiteGeneratorHost.RunAsync(args, configure)`.
+The base SDK can invoke that built executable after publish. See the
+[static prerender guide](../../../../sdks/Assimalign.Viu.Sdk/docs/STATIC-PRERENDER.md) for properties,
+command-line usage, and the packaged root/nested-route fixture ([SSG-6], [V01.01.07.05], #68).
+
 ServerRenderer is Viu's host-neutral WHATWG HTML serialization host. Its public entry points accept
 either an immutable `ServerRenderApplication` or a primitive `VirtualNode` tree and render to a
 string or a caller-owned `TextWriter`. Streaming flushes at completed component-subtree boundaries,

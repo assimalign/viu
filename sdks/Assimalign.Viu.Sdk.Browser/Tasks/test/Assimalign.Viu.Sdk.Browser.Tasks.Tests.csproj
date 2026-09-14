@@ -13,5 +13,6 @@
     </ItemGroup>
     <ItemGroup>
         <ViuProjectReference Include="Assimalign.Viu.Sdk.Browser.Tasks" />
+        <ViuProjectReference Include="Assimalign.Viu.Sdk.Tasks" />
     </ItemGroup>
 </Project>

@@ -1,0 +1,18 @@
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.ApplicationAssemblyPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.ApplicationAssemblyPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.BasePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.BasePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.DotNetHostPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.DotNetHostPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.HostPagePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.HostPagePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.OutputDirectory.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.OutputDirectory.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.ProjectDirectory.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.ProjectDirectory.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.Routes.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.Routes.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.RoutesFilePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.RoutesFilePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender.ViuRunStaticPrerender() -> void

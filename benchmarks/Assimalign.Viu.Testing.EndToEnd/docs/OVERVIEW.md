@@ -9,9 +9,9 @@ packed and no shipping library references it. Purpose-built package-consumer app
 under `scripts/fixtures/`, beside the script that stages them.
 
 `scripts/Test-EndToEnd.ps1` is the supported entry point. It packs the current Viu SDK/framework
-set, creates an isolated external-consumer restore boundary, publishes trimmed Browser and
-hydration applications, generates hydration markup through the packaged
-`ServerRenderAdaptor<TContext>`, installs the selected Playwright browsers, serves both published
+set, creates an isolated external-consumer restore boundary, publishes trimmed Browser,
+hydration, and static prerender applications, generates hydration markup through the packaged
+`ServerRenderAdaptor<TContext>`, installs the selected Playwright browsers, serves the published
 `wwwroot` trees, and runs the same scenarios in Chromium, Firefox, and WebKit.
 
 Scenarios cover clean boot, router navigation with manual saved-position restoration, click and
@@ -21,6 +21,17 @@ scheduler/`NextTickAsync` ordering, Browser adoption of server-rendered nodes, a
 hydration through `IntersectionObserver`. A failed scenario records its engine and name and retains
 a full-page screenshot plus Playwright trace. Unexpected browser console/page errors and failed
 network requests fail that scenario.
+
+The two static prerender scenarios publish `EndToEndPrerenderApp` with
+`ViuStaticPrerender=true`. The packaged base SDK builds and invokes the package-only server host,
+which emits `/` and `/guide/intro` from the fingerprinted published host page. The script checks
+both files for hydration markers and a state island. Each browser navigates directly to one emitted
+route, verifies the original heading identity and server-provided state, and observes zero DOM
+mutations during hydration except the required state-island removal ([HYD-4], [HYD-8]). A subsequent
+click proves the adopted button is interactive. The shared explicit component registrations use
+`RouterView`, a parameterized nested route, a navigation guard, and a source-generated JSON context;
+the server creates a new application, router, and state registry for each route. Specified by
+[V01.01.07.05], #68.
 
 Startup mode performs one or more warm-up loads followed by at least ten fresh-context
 boot-to-interactive measurements in Chromium. A sample stops only after the increment click is
@@ -60,5 +71,5 @@ connected-document scenarios add a never-before-generated utility class to the m
 observe the regenerated stylesheet and Chromium computed style without a restart, then delete the
 last source contributing a utility rule and observe the empty retirement update without a managed
 delta or state loss. This generated-asset coverage is specified by [V01.01.12.30.04], #355.
-This opt-in mode never changes the ordinary three-scenario-per-engine matrix. These Phase 2
+This opt-in mode never changes the ordinary five-scenario-per-engine matrix. These Phase 2
 guarantees are specified by [V01.01.06.14], #350, and [SFC-CG-4].

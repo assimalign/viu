@@ -163,7 +163,46 @@ dynamic activation. State payload capture requires an `IStateStorePayloadRegistr
 registry that materializes stores without that contract fails instead of emitting an incomplete
 payload (`[EXE-4]`).
 
-## Non-goals
+## Static document generation
+
+Static prerendering is a host over the existing request adaptor, not a second rendering engine
+([SSG-1] through [SSG-6], [V01.01.07.05], #68). It adds a dependency on host-neutral Router so that
+memory history, readiness, parameter binding, and guards use the public routing contract. Root
+components and request scopes come from explicit application factories. No web-framework types,
+runtime assembly discovery, reflection serialization, or Core/Router source changes are needed.
+
+The generator is sequential and borrows its shell/output. It enters a logical execution flow for
+each route, seeds a fresh memory history, and awaits the Router exposed by application services.
+Readiness failures dispose the factory-returned scope before ownership can pass to the adaptor.
+Ordinary rendering uses `RenderDocumentAsync`, including identity checks, prefetch, generated server
+registrations when provided, state capture, and cleanup. History is disposed only after the scope
+and its Router. Successful redirects render at the originally requested file path; unmatched route
+policy remains in the application.
+
+Static publication buffers one document until the entire render and teardown succeed. This bounds
+retained markup to one page and prevents a failed render from replacing a published host page.
+`IStaticSiteOutput` separates storage from rendering; filesystem output writes a temporary sibling
+then replaces the target. A route list is not a whole-site transaction: completed files remain on
+failure, and removed routes are not deleted. Portable path checks and case-insensitive collision
+detection prevent traversal and query/fragment aliases from silently overwriting another page.
+Filesystem output removes stale `.gz`/`.br` sidecars; a deployment may recompress generated pages
+after prerendering. Consumers must not mutate the output tree concurrently.
+
+`HostPageDocumentShell` deliberately preserves source slices instead of serializing a parsed DOM.
+It scans enough host markup to locate one explicit container and its matching closing tag, including
+quoted attributes, comments, raw text, and inert templates. It accepts a documented simple `#id`
+grammar and well-formed explicit mount markup; it does not implement a CSS engine or browser HTML
+error recovery. It replaces loading children while preserving published asset placeholders and
+fingerprints exactly. Asset bases and client hydration settings remain application configuration.
+Teleports require an application-supplied shell because implicit target placement could violate
+[HYD-6]. The default shell fails visibly when teleport output is present.
+
+The console helper is convenience composition over the generator and published-page shell. Hosts
+needing a custom shell call `GenerateAsync` directly. The existing base SDK carries the target and
+task, which build and invoke the consumer's server executable; no additional package is introduced.
+The docs-site consumer in `assimalign/viu-docs` is a separate follow-up.
+
+## Remaining non-goals
 
 The low-level render entry points do not own request scopes. The host adaptor owns only the
 factory-returned scope for one invocation; it never owns the output or prescribes an HTTP response.

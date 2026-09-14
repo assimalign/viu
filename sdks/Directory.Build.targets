@@ -1,5 +1,6 @@
 <Project>
     <Import Project="..\Directory.Build.targets" />
+    <Import Project="Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Sdk.StaticPrerender.targets" />
     <PropertyGroup>
         <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectSdkTaskFiles;CollectShippedVersionProps</TargetsForTfmSpecificContentInPackage>
         <TargetsForTfmSpecificContentInPackage Condition="'$(ViuSdkBrowserPackage)' == 'true'">$(TargetsForTfmSpecificContentInPackage);CollectSdkWatchFiles;CollectSdkRunHostFiles</TargetsForTfmSpecificContentInPackage>

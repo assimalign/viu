@@ -1,0 +1,76 @@
+<Project>
+    <!-- [V01.01.07.05], [SSG-6], [PKG-4]: this same host-neutral file is packed in the base SDK and
+         imported by sdks/Directory.Build.targets for in-repository dogfooding. Physical document
+         writes belong to the explicitly designated server application, never a source generator. -->
+    <PropertyGroup>
+        <ViuStaticPrerender Condition="'$(ViuStaticPrerender)' == ''">false</ViuStaticPrerender>
+        <ViuStaticPrerenderBase Condition="'$(ViuStaticPrerenderBase)' == ''">/</ViuStaticPrerenderBase>
+        <ViuStaticPrerenderTaskAssembly Condition="'$(ViuStaticPrerenderTaskAssembly)' == '' and '$(ViuBundleCssTaskAssembly)' != ''">$(ViuBundleCssTaskAssembly)</ViuStaticPrerenderTaskAssembly>
+        <ViuStaticPrerenderTaskAssembly Condition="'$(ViuStaticPrerenderTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.dll</ViuStaticPrerenderTaskAssembly>
+    </PropertyGroup>
+
+    <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuRunStaticPrerender"
+               AssemblyFile="$(ViuStaticPrerenderTaskAssembly)"
+               Condition="'$(ViuStaticPrerender)' == 'true'" />
+
+    <Target Name="ViuStaticPrerender"
+            AfterTargets="Publish"
+            Condition="'$(ViuStaticPrerender)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true'">
+        <Error Condition="'$(ViuStaticPrerenderProject)' == ''"
+               Text="ViuStaticPrerenderProject must name a server executable project when ViuStaticPrerender=true." />
+        <Error Condition="'$(ViuStaticPrerenderRoutes)' == '' and '$(ViuStaticPrerenderRoutesFile)' == ''"
+               Text="Set ViuStaticPrerenderRoutes or ViuStaticPrerenderRoutesFile to the routes to prerender." />
+        <Error Condition="'$(PublishDir)' == '' and '$(ViuStaticPrerenderOutput)' == ''"
+               Text="ViuStaticPrerender requires PublishDir or an explicit ViuStaticPrerenderOutput." />
+        <PropertyGroup>
+            <_ViuStaticPrerenderProject>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(ViuStaticPrerenderProject)'))</_ViuStaticPrerenderProject>
+            <_ViuStaticPrerenderPublishDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(PublishDir)'))</_ViuStaticPrerenderPublishDirectory>
+            <!-- Browser publishes its static site beneath wwwroot; a host-neutral publisher can
+                 place index.html directly in PublishDir. Resolve only after Publish completed. -->
+            <ViuStaticPrerenderHostPage Condition="'$(ViuStaticPrerenderHostPage)' == '' and Exists('$(_ViuStaticPrerenderPublishDirectory)wwwroot/index.html')">$(_ViuStaticPrerenderPublishDirectory)wwwroot/index.html</ViuStaticPrerenderHostPage>
+            <ViuStaticPrerenderHostPage Condition="'$(ViuStaticPrerenderHostPage)' == ''">$(_ViuStaticPrerenderPublishDirectory)index.html</ViuStaticPrerenderHostPage>
+            <_ViuStaticPrerenderHostPage>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(ViuStaticPrerenderHostPage)'))</_ViuStaticPrerenderHostPage>
+            <ViuStaticPrerenderOutput Condition="'$(ViuStaticPrerenderOutput)' == ''">$([System.IO.Path]::GetDirectoryName('$(_ViuStaticPrerenderHostPage)'))</ViuStaticPrerenderOutput>
+            <_ViuStaticPrerenderOutput>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(ViuStaticPrerenderOutput)'))</_ViuStaticPrerenderOutput>
+            <_ViuStaticPrerenderRoutesFile Condition="'$(ViuStaticPrerenderRoutesFile)' != ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(ViuStaticPrerenderRoutesFile)'))</_ViuStaticPrerenderRoutesFile>
+            <_ViuStaticPrerenderRemoveProperties>TargetFramework;TargetFrameworks;RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishTrimmed;PublishAot;PublishSingleFile;PublishDir;PublishUrl;OutputPath;OutDir;BaseOutputPath;BaseIntermediateOutputPath;IntermediateOutputPath;MSBuildProjectExtensionsPath;WebPublishMethod;DeployOnBuild;PublishProfile;RunAOTCompilation;WasmBuildNative;WasmEnableThreads;WasmEnableSIMD;NoBuild;NoRestore</_ViuStaticPrerenderRemoveProperties>
+            <_ViuStaticPrerenderBuildProperties>Configuration=$(Configuration);ViuStaticPrerender=false</_ViuStaticPrerenderBuildProperties>
+        </PropertyGroup>
+        <Error Condition="!Exists('$(_ViuStaticPrerenderProject)')"
+               Text="ViuStaticPrerenderProject does not exist: $(_ViuStaticPrerenderProject)" />
+        <Error Condition="!Exists('$(_ViuStaticPrerenderHostPage)')"
+               Text="The published static-prerender host page does not exist: $(_ViuStaticPrerenderHostPage)" />
+        <Error Condition="'$(_ViuStaticPrerenderRoutesFile)' != '' and !Exists('$(_ViuStaticPrerenderRoutesFile)')"
+               Text="ViuStaticPrerenderRoutesFile does not exist: $(_ViuStaticPrerenderRoutesFile)" />
+        <Error Condition="!Exists('$(ViuStaticPrerenderTaskAssembly)')"
+               Text="The static-prerender task assembly does not exist: $(ViuStaticPrerenderTaskAssembly). Build the base SDK task project first for in-repository use." />
+        <!-- Separate restore and build evaluations so generated NuGet imports are observed.
+             Suppress recursive prerender and remove Browser/publish globals from the server host. -->
+        <MSBuild Projects="$(_ViuStaticPrerenderProject)"
+                 Targets="Restore"
+                 Properties="$(_ViuStaticPrerenderBuildProperties);MSBuildIsRestoring=true"
+                 RemoveProperties="$(_ViuStaticPrerenderRemoveProperties)"
+                 BuildInParallel="false" />
+        <MSBuild Projects="$(_ViuStaticPrerenderProject)"
+                 Targets="Build;GetTargetPath"
+                 Properties="$(_ViuStaticPrerenderBuildProperties)"
+                 RemoveProperties="$(_ViuStaticPrerenderRemoveProperties)"
+                 BuildInParallel="false">
+            <Output TaskParameter="TargetOutputs" ItemName="_ViuStaticPrerenderApplication" />
+        </MSBuild>
+        <RemoveDuplicates Inputs="@(_ViuStaticPrerenderApplication)">
+            <Output TaskParameter="Filtered" ItemName="_ViuStaticPrerenderAssembly" />
+        </RemoveDuplicates>
+        <Error Condition="'@(_ViuStaticPrerenderAssembly->Count())' != '1'"
+               Text="ViuStaticPrerenderProject must produce one executable assembly; found @(_ViuStaticPrerenderAssembly->Count()). Use a single-target server project." />
+        <Message Text="Static prerender: $(_ViuStaticPrerenderProject) to $(_ViuStaticPrerenderOutput)" Importance="High" />
+        <ViuRunStaticPrerender ApplicationAssemblyPath="@(_ViuStaticPrerenderAssembly)"
+                              OutputDirectory="$(_ViuStaticPrerenderOutput)"
+                              HostPagePath="$(_ViuStaticPrerenderHostPage)"
+                              ProjectDirectory="$([System.IO.Path]::GetDirectoryName('$(_ViuStaticPrerenderProject)'))"
+                              Routes="$(ViuStaticPrerenderRoutes)"
+                              RoutesFilePath="$(_ViuStaticPrerenderRoutesFile)"
+                              BasePath="$(ViuStaticPrerenderBase)"
+                              DotNetHostPath="$(DOTNET_HOST_PATH)" />
+    </Target>
+</Project>

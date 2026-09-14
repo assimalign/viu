@@ -1885,7 +1885,8 @@ event. Later interactions use the ordinary mounted listeners.
 ### 11.4 The hosting boundary
 
 `[SSR-8]` **No `Assimalign.Viu.*` library may reference a web framework.** Hosting is a downstream
-adapter over a host-agnostic contract. ServerRenderer references Components and Core, and
+adapter over a host-agnostic contract. ServerRenderer references Components, Core, State, and
+the host-neutral Router for static prerendering [SSG-1], and
 has no DOM, Browser, WebView2, or JavaScript-interop dependency.
 
 `[SSR-9]` A server host SHOULD create **one server-render application per request** when services or
@@ -1938,6 +1939,84 @@ splice each payload verbatim at host-defined markers. Prefix, render, output, or
 skips the suffix; suffix failure is an ordinary output failure. This minimal seam cannot splice into
 an already streamed prefix or head. Such earlier emission points require a host buffer or a render
 prepass and remain outside this contract.
+
+### 11.5 Static prerendering
+
+`[SSG-1]` **Request lifecycle** ([V01.01.07.05], #68). `StaticSiteGenerator` consumes an explicit
+route list, root factory, request-scope factory, memory-history factory, document shell, and output.
+Routes execute sequentially. For each route the generator enters a fresh logical execution flow,
+creates a fresh memory history, seeds its full base-stripped location, and requests a fresh
+`ServerRenderApplication` and `SsrContext`. A routed request factory MUST compose its Router over
+`StaticSiteRouteContext.History` and expose that Router through application services. The generator
+awaits `Router.ReadyAsync` before rendering, so parameters, lazy route components, and guards use
+ordinary routing [RTR-3] through [RTR-8]. A navigation failure fails that route; redirects render the
+confirmed destination at the originally requested output path. An unmatched route follows the
+application's ordinary router policy; the generator does not invent a not-found page. A scope with
+no Router may render a route-independent root. `RenderDocumentAsync` performs the actual document
+render [SSR-11] through [SSR-14]. The scope owns its Router and services and is disposed on every
+outcome; the generator disposes the borrowed-by-Router history afterward. Factories clean up any
+resources they allocate before failing to return ownership. Applications and contexts cannot be
+reused [SSR-9]; a generator instance does not support overlapping runs.
+
+`[SSG-2]` **Storage paths.** Routes MUST start with exactly one `/` and are base-stripped references
+under [RTR-12]. `/` maps to `index.html`; `/guide/intro` and `/guide/intro/` map to
+`guide/intro/index.html`. The first query or fragment delimiter ends the storage path; the original
+full location still reaches routing. Each segment is percent-decoded once. Empty interior segments,
+dot and parent segments, encoded separators, malformed percent escapes, control characters,
+portable filesystem-invalid characters, reserved device names, and trailing dots/spaces are rejected.
+Case-insensitive document-path collisions, including query/fragment variants, fail rather than
+overwrite a preceding route. The deployment base configures history/link generation only; it is
+never prepended to document paths. `IStaticSiteOutput` accepts a complete document and a validated
+relative path and reports the emitted storage location. `FileSystemStaticSiteOutput` writes UTF-8
+without a byte-order mark beneath its root, rejects reparse-point ancestors, and replaces a file
+only after a temporary sibling is complete. It removes stale `.gz` and `.br` siblings for the
+replaced page so content negotiation cannot serve the pre-render host page. The destination tree
+must not be modified concurrently.
+
+`[SSG-3]` **Published host-page shell.** `HostPageDocumentShell` takes the published `index.html`
+text and a mount selector, default `#app`. Its selector grammar is
+`#[A-Za-z_][A-Za-z0-9_-]*`; it is not a general CSS selector engine. The shell preserves source text
+through the mount element's opening tag, replaces its original children with the render, and
+preserves the suffix beginning at its matching closing tag. The source scanner handles quoted
+attributes, comments, raw-text elements, and inert template contents; it requires correctly nested
+explicit mount markup and does not implement browser HTML error recovery. Missing, duplicate,
+void, self-closing, raw-text, or template mount targets fail. Published bootstrap scripts,
+`OverrideHtmlAssetPlaceholders` output, import maps, and fingerprinted asset references remain
+unchanged. The host page MUST already use deployment-correct asset references (for example an
+absolute `<base href="/docs/">`) for nested documents. `--base` does not rewrite the page. This
+shell rejects nonempty teleport output rather than dropping it; an application needing teleport
+destinations supplies its own `IServerRenderDocumentShell` through the generator [HYD-6], [SSR-14].
+
+`[SSG-4]` **Hydration payload.** Static documents retain the ordinary server hydration markers
+[SSR-MARKERS-1] through [SSR-MARKERS-3]. The renderer captures the request's payload-capable state
+registry after traversal and appends exactly its ordinary `SsrStateIsland`, including the empty
+payload when such a registry is present [SSR-7], [STA-9]. The generator neither serializes stores
+independently nor adds a duplicate island. Applications without a state registry need no island.
+The Browser application must opt into hydration; its state restoration consumes the island before
+the mount snapshot [HYD-8]. Generating documents does not change client startup policy.
+
+`[SSG-5]` **Failure and reporting.** Generation buffers one complete document and publishes it only
+after render and request/history teardown succeed. Mapping, factory, navigation, rendering, shell,
+teardown, and storage errors stop at the first failing route and throw
+`StaticSiteGenerationException` retaining that route and the original cause. Previously emitted
+files remain. Every successful write yields one `StaticSiteFile` and invokes the optional report
+callback in input order. A failing report callback is also a generation failure, but its file has
+already been written. Cancellation propagates through all phases and scope disposal as
+`OperationCanceledException`; it is not converted to an ordinary route failure. Generation does not
+crawl links, run requests in parallel, delete old routes, or perform a whole-site transaction.
+
+`[SSG-6]` **Build-time entry point.** `StaticSiteGeneratorHost.RunAsync` invokes application-supplied
+configuration directly, with no reflection, assembly scanning, or web-framework dependency. It
+accepts an optional leading `prerender`, required `--output` and `--host-page`, repeatable `--route`
+and `--routes` (UTF-8 files, one route per nonblank line), optional `--base` and `--mount`, and
+defaults an absent route list to `/`. Unknown, missing, or repeated singleton options fail. It
+prints each emitted route/location and returns zero on success or a nonzero exit code after failure
+or cancellation. The base SDK's opt-in `ViuStaticPrerender=true` target builds the designated
+`ViuStaticPrerenderProject`, invokes its built executable after publish, and forwards explicit
+routes, the published host page, deployment base, and output directory. It defaults to the web
+publish root (`wwwroot` when present), fails the build on a nonzero result, and uses the same target
+file for packaged and in-repo SDK use. The application server project provides its registrations;
+the SDK does not activate components itself [EXE-4], [PKG-4].
 
 *Authority: `libraries/ServerRenderer/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Runtime/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;
@@ -2394,7 +2473,8 @@ ownership is ambiguous. The check repeats for document changes, diagnostics, com
 `[PKG-1]` Viu has two compositional consumer SDKs, both resolved by NuGet's built-in MSBuild SDK
 resolver with no installer or administrative rights. `<Project Sdk="Assimalign.Viu.Sdk">` chains
 `Microsoft.NET.Sdk` and is the host-neutral component-library surface: no WebAssembly workload,
-browser assets, `wwwroot` bundling, or publish hooks.
+browser assets, or `wwwroot` bundling. It also carries the explicitly enabled, host-neutral static
+prerender publish entry point [SSG-6]; browser asset and publish-budget hooks remain Browser-owned.
 `<Project Sdk="Assimalign.Viu.Sdk.Browser">` imports that base, declares an exact-version package
 dependency on it, chains `Microsoft.NET.Sdk.WebAssembly`, and adds the browser application payload.
 This is a direct package split with no compatibility shim.
@@ -2419,7 +2499,8 @@ shared `AdditionalFiles` graph; the Browser SDK inherits it rather than duplicat
 `[PKG-4]` MSBuild tasks perform the physical writes a generator legally cannot [EXE-10]. The base
 SDK extracts `.viu.css` when a component library is packed and carries it with generated
 `buildTransitive` registration, but does not itself register browser static assets or write to
-`wwwroot`. The Browser SDK consumes that transitive registration as an additional browser static web
+`wwwroot`. The optional static prerender task invokes an application's explicitly configured server
+executable to write complete published documents [SSG-6]. The Browser SDK consumes that transitive registration as an additional browser static web
 asset and owns application bundling: `ViuBundleCss` writes the app's component stylesheet, and a
 link-injection task splices referenced library component stylesheets in ordinal route order before
 the application component stylesheet.
@@ -2518,7 +2599,7 @@ correct-looking values.
 | Per-component-type static fields | Deliberately dropped: per-mount caching already removes repeat render and host work; a process-lifetime field would save only a managed allocation per mount while adding hot-reload lifetime and generator/runtime field-ABI complexity [SFC-OPT-1] |
 | Generalized handler caching | Deliberately dropped: syntax alone cannot prove a member-expression delegate has a stable receiver or infer every delegate arity; caching it could freeze mutable receiver state. Authors can supply an explicitly stable delegate when identity matters |
 | Slot/`v-for` destructuring | Deliberately unsupported: C# lambda parameters cannot represent generalized object/array destructuring without choosing new missing-member, null, and conversion semantics. A single valid C# identifier is accepted; other aliases report a located actionable template diagnostic and emit no invalid C# |
-| Server rendering | Compiler-informed server code generation, byte-oriented writer integration, static site generation, and directive-specific server properties are deferred |
+| Server rendering | Static prerendering ships for explicit routes [SSG-1] through [SSG-6]; automatic route discovery, whole-site transactions, byte-oriented writer integration, and directive-specific server properties remain deferred |
 | Scoped CSS | **Removed 2026-09-14 by owner decision [V01.01.06.17] (#367).** `.viu` reports an error; `.vue` warns and compiles ordinary global CSS [VUE-2]. Use ordinary component styles or CSS Modules; [STY-1] is non-normative history. |
 | `v-bind()` in CSS | Compile-time extraction and rewriting remain; generated reactive application is deferred for ordinary component styles [STY-6]–[STY-8]. |
 | Utility-CSS add-on | **Standalone and non-normative for Viu core.** The engine is independently published from `libraries/Utilities/`, remains outside every Viu SDK/framework surface, and has consumer MSBuild integration tracked by #346 [STY-9]. |

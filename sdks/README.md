@@ -87,6 +87,7 @@ work in Visual Studio, Rider, and the dotnet CLI with no installer and no admini
 | Generated-asset watch inputs and hot reload | The Browser SDK owns the project-scoped worker and the versioned `@(ViuGeneratedAsset)` seam. Component CSS registers directly; compatible independent build packages can register without consuming SDK-private names ([V01.01.12.30.04], #355) |
 | `viu-dom.js` interop bridge | The Browser SDK packs the asset and copies it to `wwwroot/_content/Assimalign.Viu.Browser/` at build |
 | Runtime inspection | An application explicitly references `Assimalign.Viu.DevTools` and sets `ViuEnableDevTools=true`; the base SDK fixes Core's linker feature switch and the package conditionally flows its postMessage asset |
+| Static prerendering | The base SDK's opt-in `ViuStaticPrerender` target invokes an explicitly designated server project after publish; the host-neutral ServerRenderer helper emits complete hydratable documents from the published host page ([static-prerender guide](Assimalign.Viu.Sdk/docs/STATIC-PRERENDER.md)) |
 | Publish budgets | Browser-only publish hooks measure trimmed/AOT payload; base component libraries do not load them |
 
 The two framework references resolve through three framework packages:
@@ -151,6 +152,13 @@ segment. Leaving it unset is the client-only path: generated sources contain no 
 method, delegate, or registration. A Browser project may set it to produce a deterministic dual-target
 assembly while retaining the ordinary Browser profile. Specified by `[SSR-TARGET-1]` through
 `[SSR-TARGET-3]`.
+
+For static hosting, set `ViuStaticPrerender=true`, designate a server executable through
+`ViuStaticPrerenderProject`, and supply `ViuStaticPrerenderRoutes` or
+`ViuStaticPrerenderRoutesFile`. Publish then builds that host and invokes its explicit prerender
+entry point against the published `index.html`, preserving fingerprinted assets. See
+[Static prerendering](Assimalign.Viu.Sdk/docs/STATIC-PRERENDER.md) for the complete property and
+application-composition contract.
 
 Opt out / pin independently:
 

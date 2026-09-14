@@ -71,8 +71,15 @@ internal sealed class EndToEndHarness
             StaticWebServer.Start(_options.BrowserRootDirectory!);
         await using StaticWebServer hydrationServer =
             StaticWebServer.Start(_options.HydrationRootDirectory!);
+        await using StaticWebServer? prerenderServer = _options.PrerenderRootDirectory is null
+            ? null
+            : StaticWebServer.Start(_options.PrerenderRootDirectory);
         Console.WriteLine($"Browser fixture: {browserServer.Address}");
         Console.WriteLine($"Hydration fixture: {hydrationServer.Address}");
+        if (prerenderServer is not null)
+        {
+            Console.WriteLine($"Prerender fixture: {prerenderServer.Address}");
+        }
 
         using IPlaywright playwright = await Playwright.CreateAsync();
         foreach (BrowserEngine browserEngine in _options.BrowserEngines)
@@ -81,7 +88,8 @@ internal sealed class EndToEndHarness
                 playwright,
                 browserEngine,
                 browserServer.Address,
-                hydrationServer.Address);
+                hydrationServer.Address,
+                prerenderServer?.Address);
         }
     }
 
@@ -1762,7 +1770,8 @@ internal sealed class EndToEndHarness
         IPlaywright playwright,
         BrowserEngine browserEngine,
         Uri browserAddress,
-        Uri hydrationAddress)
+        Uri hydrationAddress,
+        Uri? prerenderAddress)
     {
         IBrowserType browserType = browserEngine switch
         {
@@ -1797,6 +1806,20 @@ internal sealed class EndToEndHarness
             browserEngine,
             "server-adaptor-hydration-visible",
             page => RunHydrationScenarioAsync(page, hydrationAddress));
+
+        if (prerenderAddress is not null)
+        {
+            await RunScenarioAsync(
+                browser,
+                browserEngine,
+                "static-prerender-root-hydration",
+                page => RunPrerenderScenarioAsync(page, prerenderAddress, "/", "Static home"));
+            await RunScenarioAsync(
+                browser,
+                browserEngine,
+                "static-prerender-nested-hydration",
+                page => RunPrerenderScenarioAsync(page, prerenderAddress, "/guide/intro", "Guide: intro"));
+        }
 
         if (_options.MeasureStartup && browserEngine == BrowserEngine.Chromium)
         {
@@ -2260,6 +2283,34 @@ internal sealed class EndToEndHarness
         await RequireTextAsync(page, "lazy-action", "Lazy ready: 0");
         await lazyAction.ClickAsync();
         await RequireTextAsync(page, "lazy-action", "Lazy ready: 1");
+    }
+
+    // [V01.01.07.05], #68, [HYD-4], [HYD-8]: published routed documents adopt their nodes;
+    // the only permitted mount-container mutation consumes the inert hydration state island.
+    private static async Task RunPrerenderScenarioAsync(
+        IPage page,
+        Uri prerenderAddress,
+        string route,
+        string expectedHeading)
+    {
+        await NavigateAsync(page, new Uri(prerenderAddress, route).AbsoluteUri);
+        await WaitUntilAsync(
+            () => page.EvaluateAsync<bool>("() => globalThis.__viuPrerenderHydrated === true"),
+            "the prerendered application to complete hydration");
+        await RequireTextAsync(page, "prerender-heading", expectedHeading);
+        await RequireTextAsync(page, "prerender-state", $"server:{route}");
+        await RequireTextAsync(page, "prerender-action", "Activated: 0");
+        bool headingWasAdopted = await page.EvaluateAsync<bool>(
+            "() => globalThis.__viuPrerenderHeading === document.querySelector('[data-testid=prerender-heading]')");
+        Require(headingWasAdopted, "Static prerender hydration replaced the original heading.");
+        bool stateWasConsumed = await page.EvaluateAsync<bool>(
+            "() => globalThis.__viuPrerenderState?.version === 1 && !document.querySelector('script[data-viu-state]')");
+        Require(stateWasConsumed, "The generated versioned state island was not consumed before hydration.");
+        string[] mutations = await page.EvaluateAsync<string[]>("() => globalThis.__viuFinishPrerenderProbe()");
+        Require(mutations.Length == 0,
+            $"Static prerender hydration mutated the rendered DOM: {string.Join(", ", mutations)}.");
+        await page.Locator("[data-testid='prerender-action']").ClickAsync();
+        await RequireTextAsync(page, "prerender-action", "Activated: 1");
     }
 
     private async Task MeasureStartupAsync(IBrowser browser, Uri browserAddress)

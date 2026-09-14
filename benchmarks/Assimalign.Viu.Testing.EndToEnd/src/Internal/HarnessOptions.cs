@@ -15,6 +15,8 @@ internal sealed class HarnessOptions
 
     internal string? HydrationRootDirectory { get; init; }
 
+    internal string? PrerenderRootDirectory { get; init; }
+
     internal string? HotReloadProjectPath { get; init; }
 
     internal string? HotReloadViuVersion { get; init; }
@@ -39,6 +41,7 @@ internal sealed class HarnessOptions
         ArgumentNullException.ThrowIfNull(arguments);
         string? browserRootDirectory = null;
         string? hydrationRootDirectory = null;
+        string? prerenderRootDirectory = null;
         string? hotReloadProjectPath = null;
         string? hotReloadViuVersion = null;
         string? artifactDirectory = null;
@@ -59,6 +62,9 @@ internal sealed class HarnessOptions
                     break;
                 case "--hydration-root":
                     hydrationRootDirectory = ReadValue(arguments, ref index, argument);
+                    break;
+                case "--prerender-root":
+                    prerenderRootDirectory = ReadValue(arguments, ref index, argument);
                     break;
                 case "--hot-reload-project":
                     hotReloadProjectPath = ReadValue(arguments, ref index, argument);
@@ -121,11 +127,17 @@ internal sealed class HarnessOptions
                 throw new DirectoryNotFoundException(
                     $"The hydration fixture publish root does not exist: {hydrationRootDirectory}");
             }
+
+            if (prerenderRootDirectory is not null && !Directory.Exists(prerenderRootDirectory))
+            {
+                throw new DirectoryNotFoundException(
+                    $"The prerender fixture publish root does not exist: {prerenderRootDirectory}");
+            }
         }
         else
         {
             ArgumentException.ThrowIfNullOrEmpty(hotReloadViuVersion);
-            if (browserRootDirectory is not null || hydrationRootDirectory is not null)
+            if (browserRootDirectory is not null || hydrationRootDirectory is not null || prerenderRootDirectory is not null)
             {
                 throw new ArgumentException(
                     "--hot-reload-project cannot be combined with published fixture roots.");
@@ -186,6 +198,9 @@ internal sealed class HarnessOptions
             HydrationRootDirectory = hydrationRootDirectory is null
                 ? null
                 : Path.GetFullPath(hydrationRootDirectory),
+            PrerenderRootDirectory = prerenderRootDirectory is null
+                ? null
+                : Path.GetFullPath(prerenderRootDirectory),
             HotReloadProjectPath = hotReloadProjectPath is null
                 ? null
                 : Path.GetFullPath(hotReloadProjectPath),

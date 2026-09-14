@@ -1,0 +1,23 @@
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- The fixture's explicit readiness probe uses the source-generated JavaScript interop stub. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
+    <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
+    <ViuStaticPrerender>true</ViuStaticPrerender>
+    <ViuStaticPrerenderProject>../EndToEndPrerenderHost/EndToEndPrerenderHost.csproj</ViuStaticPrerenderProject>
+    <ViuStaticPrerenderRoutesFile>routes.txt</ViuStaticPrerenderRoutesFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
+    <!-- External packaged-consumer fixture, as required by [V01.01.07.05], #68. -->
+    <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Browser.Router" Version="$(ViuConsumerVersion)" />
+    <Compile Include="../EndToEndPrerenderShared/*.cs" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
