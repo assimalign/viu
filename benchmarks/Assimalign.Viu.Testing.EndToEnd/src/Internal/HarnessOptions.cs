@@ -17,6 +17,7 @@ internal sealed class HarnessOptions
 
     internal string? PrerenderRootDirectory { get; init; }
     internal string? DevToolsRootDirectory { get; init; }
+    internal string? CustomElementsRootDirectory { get; init; }
 
     internal string? HotReloadProjectPath { get; init; }
 
@@ -44,6 +45,7 @@ internal sealed class HarnessOptions
         string? hydrationRootDirectory = null;
         string? prerenderRootDirectory = null;
         string? devToolsRootDirectory = null;
+        string? customElementsRootDirectory = null;
         string? hotReloadProjectPath = null;
         string? hotReloadViuVersion = null;
         string? artifactDirectory = null;
@@ -70,6 +72,9 @@ internal sealed class HarnessOptions
                     break;
                 case "--devtools-root":
                     devToolsRootDirectory = ReadValue(arguments, ref index, argument);
+                    break;
+                case "--custom-elements-root":
+                    customElementsRootDirectory = ReadValue(arguments, ref index, argument);
                     break;
                 case "--hot-reload-project":
                     hotReloadProjectPath = ReadValue(arguments, ref index, argument);
@@ -111,6 +116,12 @@ internal sealed class HarnessOptions
         }
 
         ArgumentException.ThrowIfNullOrEmpty(artifactDirectory);
+        if (customElementsRootDirectory is not null && !Directory.Exists(customElementsRootDirectory))
+        {
+            throw new DirectoryNotFoundException(
+                $"The custom-element fixture publish root does not exist: {customElementsRootDirectory}");
+        }
+
         if (devToolsRootDirectory is not null)
         {
             if (hotReloadProjectPath is not null || hotReloadViuVersion is not null
@@ -156,7 +167,10 @@ internal sealed class HarnessOptions
         else
         {
             ArgumentException.ThrowIfNullOrEmpty(hotReloadViuVersion);
-            if (browserRootDirectory is not null || hydrationRootDirectory is not null || prerenderRootDirectory is not null)
+            if (browserRootDirectory is not null
+                || hydrationRootDirectory is not null
+                || prerenderRootDirectory is not null
+                || customElementsRootDirectory is not null)
             {
                 throw new ArgumentException(
                     "--hot-reload-project cannot be combined with published fixture roots.");
@@ -229,6 +243,9 @@ internal sealed class HarnessOptions
             DevToolsRootDirectory = devToolsRootDirectory is null
                 ? null
                 : Path.GetFullPath(devToolsRootDirectory),
+            CustomElementsRootDirectory = customElementsRootDirectory is null
+                ? null
+                : Path.GetFullPath(customElementsRootDirectory),
             HotReloadProjectPath = hotReloadProjectPath is null
                 ? null
                 : Path.GetFullPath(hotReloadProjectPath),

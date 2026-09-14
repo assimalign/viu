@@ -1,0 +1,47 @@
+<template>
+    <section class="custom-element-surface">
+        <p data-testid="count">{{ Count }}</p>
+        <p data-testid="enabled">{{ Enabled }}</p>
+        <p data-testid="step-size">{{ StepSize }}</p>
+        <p data-testid="label-text">{{ LabelText }}</p>
+        <button type="button" data-testid="emit-change" @click="EmitChange">Emit change</button>
+        <div data-testid="default-slot"><slot>Default fallback</slot></div>
+        <div data-testid="named-slot"><slot name="label">Named fallback</slot></div>
+    </section>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+
+    [Parameter]
+    public int Count { get; set; } = 1;
+
+    [Parameter]
+    public bool Enabled { get; set; } = true;
+
+    [Parameter]
+    public double StepSize { get; set; } = 1;
+
+    [Parameter]
+    public string LabelText { get; set; } = "initial";
+
+    [Event]
+    public partial void Changed(double count, bool enabled, string labelText);
+
+    partial void OnSetup()
+    {
+        Context!.Lifecycle.OnMounted(Program.RecordMount);
+        Context.Lifecycle.OnUnmounted(Program.RecordUnmount);
+        Context.Lifecycle.OnUpdated(Program.RecordUpdate);
+    }
+
+    private void EmitChange() => Changed(Count + StepSize, Enabled, LabelText);
+}
+
+<style>
+.custom-element-surface {
+    color: rgb(25, 80, 120);
+    border: 2px solid currentColor;
+    padding: 12px;
+}
+</style>

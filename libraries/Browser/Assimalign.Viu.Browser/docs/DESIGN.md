@@ -92,6 +92,78 @@ application initialization; hosts resolving persisted stores earlier must first 
 serialization, JSON member filtering, restoration, and pre-flush write coalescing; Browser owns
 only access to the selected storage area. Cross-tab synchronization is outside this contract.
 
+## Custom elements
+
+`BrowserCustomElements` is an explicit, disposable embedding owner with one renderer host and a
+borrowed component factory and service provider. It holds Browser's exclusive host activation lease,
+so every definition shares the active host and another Browser application or renderer waits for
+owner disposal. It defines autonomous elements through one
+parameterized `HTMLElement` factory in `viu-dom.js` ([V01.01.04.08](https://github.com/assimalign/viu/issues/46),
+`[CEL-1]`, `[CEL-2]`). The external compatibility targets are the
+[WHATWG HTML custom element lifecycle](https://html.spec.whatwg.org/multipage/custom-elements.html)
+and [WHATWG DOM shadow trees, slots, and events](https://dom.spec.whatwg.org/). Viu owns parameter
+conversion, mount scheduling, and resource ownership.
+
+The browser reports connection, disconnection, attribute changes, and adoption into a shared queue.
+The queue waits for the managed dispatcher, then forwards complete batches; managed code resolves
+inputs and schedules rendering through Core. This permits ordinary HTML to contain elements before
+WASM initialization and avoids a renderer per callback or per tag. An application-wide event observer
+dispatches root-component emissions from their host elements, preserving the exact emitted name and
+ordered argument list, including emissions during setup (`[CEL-2]`, `[CEL-5]`). Embedding intentionally
+uses the public lower-level mount lifetime; application middleware does not wrap each element.
+
+Registration reads `ComponentRegistration.Contract.Parameters`, including the declared CLR type
+tokens generated at build time. That existing public seam makes a new component metadata registry,
+runtime property inspection, and per-component JavaScript generation unnecessary. Kebab-case
+attribute aliases are computed once and passed to `observedAttributes`. Canonical JavaScript
+properties accept typed inputs without parsing strings. Names already present on `HTMLElement` or
+reserved for custom-element lifecycle callbacks are rejected before an accessor could shadow the
+native bridge surface. After each managed input batch, every resolved parameter refreshes the
+synchronous property-getter cache, including values supplied by attributes and component defaults.
+The separate input-source map canonicalizes only retained property inputs, so publishing an attribute
+or default does not make it persist as a property input across a fresh mount. Numeric normalization
+handles JavaScript's single number representation explicitly; unsupported managed values are never
+serialized by reflection. Event payloads preserve primitives and opaque JavaScript object identity, substituting
+null with a warning for unsupported CLR objects (`[CEL-3]` through `[CEL-5]`, `[EXE-4]`).
+
+Shadow styles reuse the Browser SDK's bundled application and referenced-component `.viu.css`
+links. Constructed stylesheets are shared once per owner document and adopted into each root;
+cloned stylesheet links provide the loading-time and failure fallback (`[CEL-6]`, `[PKG-4]`).
+Styles containing imports or relative resource URLs retain their clones so the browser resolves
+dependencies against the stylesheet URL. A shared observer refreshes roots when the document's
+stylesheet links change, including the Browser SDK's CSS hot-reload URL updates, and disconnects
+when the last custom-element root leaves. Links marked `data-viu-stylesheet` permit explicit
+inclusion when an application has customized its bundle URL.
+
+This deliberately chooses the
+application bundle as the stylesheet boundary: it keeps ordinary component CSS, CSS Modules, and
+packaged component libraries on the same build path. Runtime extraction of one component's CSS
+would require an additional generated dependency manifest and could omit selectors shared by its
+children. A separate per-component style registry would duplicate the bundler's authority. Copying
+CSS text into every root would repeat parsing and retain one copy per element. Relying only on
+document links would leave shadow content unstyled. Removed scoped CSS is not an alternative
+isolation mechanism (`[STY-1]`); the shadow root supplies the boundary.
+
+In shadow mode, invocation slot delegates render native default and named `<slot>` nodes. A direct
+text node or direct element with an absent or empty `slot` attribute supplies the default slot;
+nonempty `slot` attributes on direct elements supply named slots. When no direct slottable targets
+an outlet, Browser omits that invocation slot so the component's authored fallback content renders.
+One per-instance observer coalesces direct-child and `slot` attribute changes and updates the
+immutable slot set through the scheduler. The DOM
+owns assignment; light-DOM children remain with the consumer, so Browser never clones or reparents
+them into its managed subtree. This avoids inventing a second child-ownership model or translating
+consumer HTML into virtual nodes. Slot arguments cannot establish reactive bindings on consumer
+DOM. Light-DOM rendering supplies no projection, because native slot distribution requires a shadow
+tree (`[CEL-7]`, `[CMP-18]`, `[CMP-19]`).
+
+Disconnection unmounts through Core and releases bridge registrations, renderer handles, and both
+sides of listener storage. Reconnection starts a fresh component lifetime; preserving a detached
+instance was rejected because it would retain component effects and services with no mounted host.
+Disposing the owner releases all remaining mounts and its renderer activation while leaving the
+borrowed composition dependencies with their owner. The platform retains native definitions for the
+document lifetime; disposal cannot unregister a tag. Registry diagnostics check the resource
+boundary independently from visible DOM removal (`[CEL-8]`, `[EXE-14]`, `[CMP-9]`, `[CMP-10]`).
+
 ## AOT and WASM constraints
 
 All JavaScript entry points are statically declared `JSImport` or `JSExport` boundaries, and payloads

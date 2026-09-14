@@ -53,3 +53,45 @@ Browser also implements Core's deferred-hydration trigger seam. It maps idle req
 to `matchMedia`, and interactions to marker-range capture listeners. Every registration is
 cancelable; the first captured interaction is replayed asynchronously only after activation and the
 scheduled host commit (`[HYD-LAZY-3]` through `[HYD-LAZY-5]`).
+
+`BrowserCustomElements` embeds Viu components in ordinary HTML as autonomous custom elements
+([V01.01.04.08](https://github.com/assimalign/viu/issues/46), `[CEL-1]` through `[CEL-8]`). Initialize
+the shared bridge, give the owner the application's explicit component factory and optional services,
+then register each component reference with a lowercase hyphenated tag:
+
+```csharp
+await BrowserRuntime.InitializeAsync();
+var customElements = new BrowserCustomElements(componentFactory, services);
+customElements.Define(ComponentReference.ForType(typeof(Counter)), "viu-counter");
+```
+
+Retain the owner for the embedding lifetime and dispose it during host shutdown. All definitions use
+one exclusively active renderer host; dispose the owner before activating another Browser application
+or renderer. The factory and services remain the external composition root's responsibility.
+The host page still boots the packaged WASM application with `index.html` and `main.js`; it can
+declare `<viu-counter count="3">` before initialization completes. No component-specific JavaScript
+is generated.
+
+Generated `ComponentParameter` metadata supplies observed attributes and canonical JavaScript
+properties. `initialCount` maps to `initial-count` by default; set
+`CustomElementOptions.AttributeNameMapper` to supply a different mapping, or return an empty name to
+disable a parameter's attribute. Definition rejects a canonical parameter name that collides with
+a native `HTMLElement` member or custom-element lifecycle callback. Boolean attributes use
+presence/absence and the literal `false`; numeric attributes parse with invariant culture and retain
+the previous value on invalid input; removing a numeric or string attribute restores the component's
+declared default; strings pass through verbatim. Properties accept typed values:
+`element.count = 4` is a numeric input, while `element.count = "4"` is not. A batch of changes schedules
+one component update. Emitted events become bubbling, composed `CustomEvent` objects whose `detail`
+is the ordered argument array. Unsupported managed argument values become null with a warning;
+there is no reflection-based object serialization (`[CEL-3]` through `[CEL-5]`).
+
+Shadow roots are enabled by default. They adopt the host page's bundled `.viu.css` stylesheets,
+sharing constructed sheets per document with cloned `<link>` elements as the fallback. Component
+slots supply native `<slot>` elements while consumer-owned direct text or element children target
+them; removing the final slottable restores the component's authored fallback content. The slot set
+updates when direct light-DOM children are added or removed or their `slot` attributes change. Set
+`UseShadowRoot = false` to render in the host element's light DOM using document styles; native slot
+projection is unavailable in that mode. Disconnect unmounts and releases handles and listeners;
+reconnect creates a fresh component instance (`[CEL-6]` through `[CEL-8]`). The packaged consumer at
+`scripts/fixtures/EndToEndCustomElementApp` demonstrates attributes, properties, styles, slots and
+fallbacks, events, and registry cleanup.

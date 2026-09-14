@@ -1,4 +1,14 @@
 #nullable enable
+Assimalign.Viu.Browser.BrowserCustomElements
+Assimalign.Viu.Browser.BrowserCustomElements.BrowserCustomElements(Assimalign.Viu.Components.IComponentFactory! componentFactory, System.IServiceProvider? services = null) -> void
+Assimalign.Viu.Browser.BrowserCustomElements.Define(Assimalign.Viu.Components.ComponentReference! component, string! tagName, Assimalign.Viu.Browser.CustomElementOptions? options = null) -> void
+Assimalign.Viu.Browser.BrowserCustomElements.Dispose() -> void
+Assimalign.Viu.Browser.CustomElementOptions
+Assimalign.Viu.Browser.CustomElementOptions.CustomElementOptions() -> void
+Assimalign.Viu.Browser.CustomElementOptions.AttributeNameMapper.get -> System.Func<string!, string!>?
+Assimalign.Viu.Browser.CustomElementOptions.AttributeNameMapper.set -> void
+Assimalign.Viu.Browser.CustomElementOptions.UseShadowRoot.get -> bool
+Assimalign.Viu.Browser.CustomElementOptions.UseShadowRoot.set -> void
 Assimalign.Viu.Browser.BrowserStateStorage
 Assimalign.Viu.Browser.BrowserStateStorage.BrowserStateStorage(Assimalign.Viu.State.StateStorageKind kind = Assimalign.Viu.State.StateStorageKind.Local) -> void
 Assimalign.Viu.Browser.BrowserStateStorage.Kind.get -> Assimalign.Viu.State.StateStorageKind

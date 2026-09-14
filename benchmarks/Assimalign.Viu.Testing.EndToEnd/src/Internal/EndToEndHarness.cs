@@ -78,6 +78,9 @@ internal sealed partial class EndToEndHarness
         await using StaticWebServer? prerenderServer = _options.PrerenderRootDirectory is null
             ? null
             : StaticWebServer.Start(_options.PrerenderRootDirectory);
+        await using StaticWebServer? customElementsServer = _options.CustomElementsRootDirectory is null
+            ? null
+            : StaticWebServer.Start(_options.CustomElementsRootDirectory);
         Console.WriteLine($"Browser fixture: {browserServer.Address}");
         Console.WriteLine($"Hydration fixture: {hydrationServer.Address}");
         if (prerenderServer is not null)
@@ -93,7 +96,8 @@ internal sealed partial class EndToEndHarness
                 browserEngine,
                 browserServer.Address,
                 hydrationServer.Address,
-                prerenderServer?.Address);
+                prerenderServer?.Address,
+                customElementsServer?.Address);
         }
     }
 
@@ -1775,7 +1779,8 @@ internal sealed partial class EndToEndHarness
         BrowserEngine browserEngine,
         Uri browserAddress,
         Uri hydrationAddress,
-        Uri? prerenderAddress)
+        Uri? prerenderAddress,
+        Uri? customElementsAddress)
     {
         IBrowserType browserType = browserEngine switch
         {
@@ -1823,6 +1828,20 @@ internal sealed partial class EndToEndHarness
                 browserEngine,
                 "static-prerender-nested-hydration",
                 page => RunPrerenderScenarioAsync(page, prerenderAddress, "/guide/intro", "Guide: intro"));
+        }
+
+        if (customElementsAddress is not null && browserEngine == BrowserEngine.Chromium)
+        {
+            await RunScenarioAsync(
+                browser,
+                browserEngine,
+                "custom-elements-attributes-properties-slots-events-styles-cleanup",
+                page => CustomElementScenarios.RunAsync(page, customElementsAddress));
+            await RunScenarioAsync(
+                browser,
+                browserEngine,
+                "custom-elements-stylesheet-link-fallback",
+                page => CustomElementScenarios.RunStylesheetFallbackAsync(page, customElementsAddress));
         }
 
         if (_options.MeasureStartup && browserEngine == BrowserEngine.Chromium)

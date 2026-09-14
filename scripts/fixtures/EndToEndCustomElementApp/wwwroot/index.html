@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Viu custom element packaged consumer</title>
+  <link rel="preload" id="webassembly" />
+  <script type="importmap"></script>
+  <script type="module" src="main#[.{fingerprint}].js"></script>
+</head>
+<body>
+  <h1>Vanilla HTML custom element consumer</h1>
+  <div id="elements">
+    <viu-counter id="counter" count="3" enabled step-size="1.5" label-text="from HTML"><span id="default-child">Light DOM default child</span><strong id="named-child" slot="label">Light DOM named child</strong></viu-counter>
+    <viu-light-counter id="light-counter" count="2" enabled label-text="light DOM"></viu-light-counter>
+  </div>
+  <button type="button" id="change-attributes">Change attributes</button>
+  <button type="button" id="change-properties">Change properties</button>
+  <button type="button" id="disconnect">Disconnect elements</button>
+  <button type="button" id="reconnect">Reconnect elements</button>
+  <p id="status" data-testid="custom-element-status">booting</p>
+  <p id="attribute-result" data-testid="attribute-result"></p>
+  <p id="property-result" data-testid="property-result"></p>
+  <p id="event-result" data-testid="event-result"></p>
+  <p id="lifecycle-result" data-testid="lifecycle-result"></p>
+  <iframe id="adoption-document" title="Custom element adoption target" srcdoc="<!doctype html><html><head></head><body></body></html>"></iframe>
+</body>
+</html>

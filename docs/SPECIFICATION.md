@@ -987,6 +987,133 @@ expected counts and a delta fails CI there
 
 ---
 
+### 6.9 Browser custom elements
+
+The element lifecycle and platform objects in this section conform to the
+[WHATWG HTML custom element model](https://html.spec.whatwg.org/multipage/custom-elements.html)
+and the [WHATWG DOM standard](https://dom.spec.whatwg.org/). The conversion, ownership, and rendering
+rules below are Viu's contract, specified by [V01.01.04.08] (#46).
+
+`[CEL-1]` **Definition and metadata.** After `BrowserRuntime.InitializeAsync()` completes, a host
+MAY create `BrowserCustomElements` with its explicit `IComponentFactory` and optional
+`IServiceProvider`, then call `Define(ComponentReference, string, CustomElementOptions?)`.
+The owner borrows those dependencies [CMP-9] and owns one Browser renderer for every definition and
+mounted element it manages.
+The owner holds the Browser host's exclusive activation lease; another Browser application or
+renderer cannot activate until that owner is disposed. Definitions resolve only through
+`IComponentFactory.Resolve`; parameter names and CLR type tokens come only from the registration's
+static `ComponentContract.Parameters`
+table [EXE-4], [EXE-5], [CMP-4]. Registration MUST reject an invalid autonomous-custom-element name,
+including names without a hyphen, ASCII uppercase names, and the HTML standard's reserved names.
+Duplicate names in the document's `customElements` registry MUST fail with a clear exception.
+`CustomElementOptions.UseShadowRoot` defaults to `true`. Its optional `AttributeNameMapper` maps
+canonical parameter names to attribute names; null selects kebab-case and an empty mapped name
+disables attribute reflection for that parameter. Invalid or colliding nonempty attribute mappings
+MUST fail during definition. A parameter name that would shadow an existing `HTMLElement` member or
+one of the four lifecycle callbacks MUST also fail during definition, preserving the native element
+and bridge operations. No per-component JavaScript source is generated.
+
+`[CEL-2]` **Lifecycle and batching.** One parameterized `HTMLElement` class factory in `viu-dom.js`
+forwards connection, disconnection, observed-attribute changes, and document adoption through static
+`JSExport` entry points. The shim queues lifecycle and input changes until its managed dispatcher is
+ready, so an element already present in the host page can upgrade without an early-runtime call.
+All elements use the one initialized WASM runtime and shared renderer host. Input changes within a
+batch coalesce before the ordinary scheduler updates a mounted component; an individual attribute
+callback MUST NOT synchronously render the component. A connection canceled before readiness MUST
+NOT mount. A mounted disconnect/reconnect or adoption unmounts before allocating a fresh mount's
+handles. Renderer writes retain the command-frame commit discipline [RND-IO-1], [RND-HOST-4].
+Adoption uses the new owner document for shadow styles.
+Custom-element embedding uses the lower-level renderer lifetime, without application middleware
+[APP-6].
+
+`[CEL-3]` **Attributes.** `observedAttributes` is computed once from the declared parameter table.
+The default name mapping converts canonical camel-case names to kebab-case, for example
+`initialCount` becomes `initial-count`; JavaScript properties keep canonical names [CEL-4]. A
+declared `bool` is false when its attribute is absent or has the literal value `false`, and true for
+every other present value, including the empty string. Declared strings receive the attribute text
+verbatim. Removing a string or numeric attribute removes that explicit input, restoring the
+component's declared default under [CMP-29]. Integral types parse with invariant-culture integer syntax;
+`Half`, `float`, `double`, and `decimal` parse invariant floating-point syntax. Parsing checks the
+declared type's range and rejects nonfinite floating-point values. Nullable numeric and boolean
+declarations use the same attribute rules as their underlying type. An invalid numeric value leaves
+the last accepted parameter unchanged and reports a
+warning through Browser's diagnostics path. Other CLR types, and parameters without declared type
+metadata, are not attribute-reflectable; no runtime member discovery or serialization is attempted.
+These host-boundary conversions do not change Core's parameter resolution [CMP-12], [CMP-13].
+
+`[CEL-4]` **Properties.** Each upgraded element exposes instance accessors under its canonical
+parameter names. Definition rejects names inherited from `HTMLElement` or `Object`, as well as the
+four lifecycle callback names, before an accessor can shadow native behavior [CEL-1]. Attributes
+and properties update the same input state. Property writes accept
+typed JavaScript values, never attribute-style string parsing: assigning `"3"` to an integral
+parameter is invalid. JavaScript numbers are normalized to the declared CLR numeric representation
+only when representable; integral writes additionally require a whole number in JavaScript's safe
+integer range, from -(2^53 - 1) through 2^53 - 1. Strings and booleans require the corresponding declared type. JavaScript
+objects cross only as opaque `JSObject` values for compatible `object` or `JSObject` parameters;
+they are never reflected into CLR records or deserialized. Unsupported or incompatible writes warn
+and preserve the previous value. A property getter reads a local cache synchronously: a setter
+updates that cache immediately. After a queued input batch is processed, the managed render publishes
+the resolved value of every declared parameter into the getter cache, whether that value came from an
+attribute, a property, or the component default. An accepted attribute value is therefore observable
+through its property getter after that batch. Own properties assigned before upgrade are replayed
+ahead of initial HTML attributes. Getter publication canonicalizes a retained property input, but it
+does not turn an attribute or a component default into a property input for a later fresh mount.
+Property writes do not rewrite HTML attributes.
+
+`[CEL-5]` **Events.** Emitting from the wrapped root component dispatches a `CustomEvent` from the
+host element with the exact emitted name, `bubbles: true`, `composed: true`, and `detail` containing
+the complete ordered argument list [CMP-14], [CMP-15]. The application event-observer seam preserves
+the emitted name without modifying authored component listeners. Null, booleans, and strings pass
+through; characters become one-character strings, numeric primitives become JavaScript numbers,
+and `JSObject` arguments preserve their JavaScript identity. An unsupported managed value becomes
+null in its original argument position and emits a diagnostic warning. No reflection-based
+serialization, implicit object traversal, or per-component event shim is permitted [EXE-4].
+
+`[CEL-6]` **Styles.** Shadow roots consume the same application and referenced-component bundled
+stylesheets the Browser SDK places in the host page [PKG-4]. The shim discovers Viu `.viu.css`
+stylesheet links, or links marked `data-viu-stylesheet`, and shares constructed stylesheets once per
+owner document and stylesheet URL/media/disabled state through `adoptedStyleSheets`. Cloned links
+provide styles while construction is pending and remain when construction or adoption is unavailable.
+Styles containing imports or relative resource URLs keep native link loading to preserve resolution
+against the stylesheet URL. A shared observer refreshes roots when the host document's stylesheet
+links change, including stylesheet URL updates from hot reload. It stops when its last root leaves.
+Viu does not extract CSS per component at runtime or restore removed scoped CSS
+[STY-1]. CSS Modules retain their generated class names [STY-2] through [STY-5]. With
+`UseShadowRoot = false`, the element renders into its light DOM and relies on the document's
+stylesheets.
+
+`[CEL-7]` **Slots.** In shadow mode the component's supplied default and named slot functions render
+native `<slot>` and `<slot name="...">` elements. The bridge supplies the default slot while a direct
+text node or a direct element with an absent or empty `slot` attribute targets it. Named slots are
+discovered from nonempty `slot` attributes on direct light-DOM element children. When no direct
+slottable child targets an outlet, the invocation omits that slot so the component's authored
+fallback content renders. A per-instance observer coalesces direct-child additions, removals, and
+`slot` attribute changes into the same batched input path, updating the immutable slot set through
+the ordinary scheduler. Native assignment remains live between those updates. The platform owns
+assignment of the host's light-DOM children; those children remain consumer-owned DOM nodes. Slot
+arguments do not become bindings on consumer DOM. In light-DOM mode the bridge does not supply native slot projection;
+authors requiring projection MUST use shadow mode. The bridge uses the ordinary immutable
+`ComponentInvocation` slot seam [CMP-18], [CMP-19], without adding a Browser dependency to Core or
+Components [RND-HOST-3].
+
+`[CEL-8]` **Cleanup.** The next lifecycle-batch microtask after disconnection unmounts the component
+through Core, stops its reactive scope,
+and disposes its authored instance under [CMP-10], [CMP-22]. It MUST release all element-owned
+renderer handles, managed listener delegates, JavaScript listener maps, and bridge registrations
+[EXE-14]. A later connection creates a fresh component instance. Disposing `BrowserCustomElements`
+unmounts its remaining elements and releases its renderer ownership; it never disposes the borrowed
+factory or services [CMP-9]. Native custom-element definitions cannot be unregistered and remain in
+the document registry, without retaining active mounted component instances. Registry diagnostics
+after disconnect MUST return to their pre-mount counts. The owner and its elements are confined to
+the browser event loop and are not thread-safe [EXE-1], [EXE-2].
+
+*Authority: `libraries/Browser/Assimalign.Viu.Browser/src/CustomElements/`;
+`libraries/Browser/Assimalign.Viu.Browser/src/wwwroot/viu-dom.js`;
+`libraries/Browser/Assimalign.Viu.Browser/docs/DESIGN.md`;
+`scripts/fixtures/EndToEndCustomElementApp/`; [V01.01.04.08] (#46).*
+
+---
+
 ## 7. Built-in components
 
 Each built-in is specified with its **current limits** inline.

@@ -534,6 +534,7 @@ elseif ($PackagedVuePublish) {
 else {
     @(
         'EndToEndBrowserApp',
+        'EndToEndCustomElementApp',
         'EndToEndHydrationApp',
         'EndToEndHydrationShared',
         'EndToEndServerMarkup',
@@ -604,6 +605,11 @@ $globalPackagesPath = [System.IO.Path]::GetFullPath($globalPackagesPath)
 if (-not [System.IO.Directory]::Exists($globalPackagesPath)) {
     throw "The resolved NuGet global-packages directory does not exist: $globalPackagesPath"
 }
+$dotnetExecutablePath = (Get-Command dotnet -ErrorAction Stop).Source
+$dotnetLibraryPacksPath = Join-Path `
+    ([System.IO.Path]::GetDirectoryName(
+        [System.IO.Path]::GetFullPath($dotnetExecutablePath))) `
+    'library-packs'
 $isolatedGlobalPackagesPath = Join-Path $temporaryRootPath '.nuget/packages'
 Assert-NoReparsePoint -Path $isolatedGlobalPackagesPath
 $null = New-Item -ItemType Directory -Path $isolatedGlobalPackagesPath
@@ -678,7 +684,8 @@ if ($SkipPackRestore) {
         @(
             (Join-Path $fixtureStageDirectory 'EndToEndBrowserApp/EndToEndBrowserApp.csproj'),
             (Join-Path $fixtureStageDirectory 'EndToEndHydrationApp/EndToEndHydrationApp.csproj'),
-            (Join-Path $fixtureStageDirectory 'EndToEndPrerenderApp/EndToEndPrerenderApp.csproj'))
+            (Join-Path $fixtureStageDirectory 'EndToEndPrerenderApp/EndToEndPrerenderApp.csproj'),
+            (Join-Path $fixtureStageDirectory 'EndToEndCustomElementApp/EndToEndCustomElementApp.csproj'))
     }
     foreach ($stagedBrowserProject in $stagedBrowserProjects) {
         $projectContent = [System.IO.File]::ReadAllText($stagedBrowserProject)
@@ -702,6 +709,25 @@ $escapedGlobalPackagesPath =
     [System.Security.SecurityElement]::Escape($globalPackagesPath)
 $escapedIsolatedGlobalPackagesPath =
     [System.Security.SecurityElement]::Escape($isolatedGlobalPackagesPath)
+$installedPackageSources = ''
+$installedPackageSourceMappings = ''
+if ([System.IO.Directory]::Exists($dotnetLibraryPacksPath)) {
+    # Servicing releases can install workload packs beside dotnet before the same version is
+    # extracted into the user cache. Keep the restricted lane local while allowing that canonical
+    # installed source to satisfy the WebAssembly workload graph.
+    $escapedDotnetLibraryPacksPath =
+        [System.Security.SecurityElement]::Escape($dotnetLibraryPacksPath)
+    $installedPackageSources = @"
+    <add key="dotnet-library-packs" value="$escapedDotnetLibraryPacksPath" />
+"@
+    $installedPackageSourceMappings = @"
+    <packageSource key="dotnet-library-packs">
+      <package pattern="Microsoft.*" />
+      <package pattern="System.*" />
+      <package pattern="runtime.*" />
+    </packageSource>
+"@
+}
 $onlinePackageSources = ''
 $onlinePackageSourceMappings = ''
 if (-not $SkipPackRestore) {
@@ -731,6 +757,7 @@ $nugetConfiguration = @"
     <clear />
     <add key="viu-local" value="$escapedPackageDirectory" />
     <add key="restored-cache" value="$escapedGlobalPackagesPath" />
+$installedPackageSources
 $onlinePackageSources
   </packageSources>
   <packageSourceMapping>
@@ -743,6 +770,7 @@ $onlinePackageSources
       <package pattern="runtime.*" />
       <package pattern="NETStandard.Library" />
     </packageSource>
+$installedPackageSourceMappings
 $onlinePackageSourceMappings
   </packageSourceMapping>
   <config>
@@ -1006,6 +1034,54 @@ if (-not $HotReload) {
     }
 
     if (-not $DevTools) {
+    # [V01.01.04.08]: a vanilla HTML consumer uses the same packaged Browser SDK/runtime.
+    $customElementsProject = Join-Path `
+        $fixtureStageDirectory `
+        'EndToEndCustomElementApp/EndToEndCustomElementApp.csproj'
+    Invoke-DotNet `
+        -Description 'Restoring the packaged EndToEndCustomElementApp fixture' `
+        -Arguments (@('restore', $customElementsProject) + $fixtureRestoreArguments + $browserRestoreProperties)
+    $customElementsPublishDirectory = Join-Path $temporaryRootPath 'publish/EndToEndCustomElementApp'
+    Invoke-DotNet `
+        -Description 'Publishing EndToEndCustomElementApp (trimmed)' `
+        -Arguments (@(
+            'publish',
+            $customElementsProject,
+            '--configuration',
+            $Configuration,
+            '--no-restore',
+            '-warnaserror',
+            '--output',
+            $customElementsPublishDirectory,
+            '-p:PublishTrimmed=true',
+            '-p:TrimMode=full') + $browserRestoreProperties)
+    $customElementsWebRoot = Join-Path $customElementsPublishDirectory 'wwwroot'
+    $customElementsStylesheet = Join-Path `
+        $customElementsWebRoot `
+        'EndToEndCustomElementApp.viu.css'
+    foreach ($requiredCustomElementsOutput in @(
+            (Join-Path $customElementsWebRoot 'index.html'),
+            $customElementsStylesheet,
+            (Join-Path $customElementsWebRoot '_content/Assimalign.Viu.Browser/viu-dom.js'))) {
+        if (-not [System.IO.File]::Exists($requiredCustomElementsOutput)) {
+            throw "The custom-element publish is missing $requiredCustomElementsOutput."
+        }
+    }
+    if ((Get-Item -LiteralPath $customElementsStylesheet).Length -eq 0) {
+        throw "The custom-element stylesheet is empty: $customElementsStylesheet"
+    }
+    $customElementsHostPage = Get-Content `
+        -Raw `
+        -LiteralPath (Join-Path $customElementsWebRoot 'index.html')
+    $customElementsStylesheetPattern =
+        'href\s*=\s*["'']EndToEndCustomElementApp\.viu\.css["'']'
+    if ([System.Text.RegularExpressions.Regex]::Matches(
+            $customElementsHostPage,
+            $customElementsStylesheetPattern,
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase).Count -ne 1) {
+        throw 'The custom-element host page must link its bundled stylesheet exactly once.'
+    }
+
     Invoke-DotNet `
         -Description 'Restoring the packaged ServerRenderAdaptor markup generator' `
          -Arguments (@(
@@ -1227,6 +1303,8 @@ if (-not $HotReload) {
         $harnessArguments.Add($hydrationWebRoot)
         $harnessArguments.Add('--prerender-root')
         $harnessArguments.Add($prerenderWebRoot)
+        $harnessArguments.Add('--custom-elements-root')
+        $harnessArguments.Add($customElementsWebRoot)
     }
     foreach ($argument in @(
             '--artifacts',
