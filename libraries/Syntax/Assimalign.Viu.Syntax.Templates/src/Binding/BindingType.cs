@@ -27,7 +27,10 @@ public enum BindingType
     /// </summary>
     PropertyAliased,
 
-    /// <summary>A <c>let</c> binding declared in <c>&lt;script setup&gt;</c>.</summary>
+    /// <summary>
+    /// A mutable non-reference field or property. Reads and writes access the member directly,
+    /// preserving its declared C# type rather than inserting a reactive unwrap. Specified by <c>[SFC-6]</c>.
+    /// </summary>
     SetupLet,
 
     /// <summary>

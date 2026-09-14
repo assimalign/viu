@@ -11,8 +11,9 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// The source generator writes it into the consumer assembly at build time, and the language service
 /// adds it to the editor compilation, which has no generator run to produce it. Were the editor
 /// without it, every emitted <c>RenderGlue</c> call would bind to an error type and take the surrounding
-/// expression down with it: a <c>v-for</c> source is unwrapped through this glue, so its alias — and
-/// every member of that alias — would have no type the editor could name.
+/// expression down with it: a maybe-reference expression can unwrap through this glue, including a
+/// <c>v-for</c> source, so its alias and member accesses need the same helper type in both hosts.
+/// Plain collection members retain their declared type through direct access (<c>[SFC-6]</c>).
 /// </remarks>
 public static class SingleFileComponentRenderGlue
 {

@@ -11,8 +11,9 @@ public enum BindingRewriteMode
 {
     /// <summary>
     /// The render function ([V01.01.05.05]): a static method receiving the component as <c>_ctx</c>, so every
-    /// binding reads through <c>_ctx.</c> and a maybe/let binding guards its read through <c>unref</c>. The
-    /// default and the mode the whole template pipeline uses.
+    /// binding reads through <c>_ctx.</c> and a maybe-reference binding guards its read through <c>unref</c>.
+    /// Mutable non-reference members retain their declared type through direct access (<c>[SFC-6]</c>).
+    /// The default and the mode the whole template pipeline uses.
     /// </summary>
     RenderContext,
 

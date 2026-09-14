@@ -93,8 +93,11 @@ internal static class ExpressionProcessor
             raw = context.CssModules.Substitute(raw);
         }
 
-        // Fast path: a lone identifier needs no rewrite walk.
-        if (!asParams && CompilerText.IsSimpleIdentifier(raw))
+        // Fast path: a lone identifier needs no rewrite walk. Keywords such as true, false, and
+        // null must reach the Roslyn expression parser instead of becoming component members
+        // ([SFC-6], [V01.01.05.04.02]).
+        if (!asParams && CompilerText.IsSimpleIdentifier(raw)
+            && SyntaxFacts.GetKeywordKind(raw) == SyntaxKind.None)
         {
             if (context.IsLocalIdentifier(raw) || GlobalAllowList.IsAllowed(raw))
             {
@@ -225,14 +228,9 @@ internal static class ExpressionProcessor
                 ? "_ctx." + raw + ".Value"
                 : context.HelperString(HelperNames.Unref) + "(_ctx." + raw + ")",
 
-            // A let binding may or may not hold a reference: reads guard through unref. Writes assign the
-            // member directly — a write that had to decide at runtime whether to assign the member or its
-            // .Value is not expressible as a C# expression without a runtime helper. The choice is
-            // deliberate and recorded in docs/DESIGN.md; a helper-backed guarded write is deferred to the
-            // codegen work ([V01.01.05.05]).
-            BindingType.SetupLet => isWriteTarget
-                ? "_ctx." + raw
-                : context.HelperString(HelperNames.Unref) + "(_ctx." + raw + ")",
+            // Mutable non-reference fields/properties retain their declared C# type on reads and
+            // writes. An object-valued unwrap would erase a v-for source's element type ([SFC-6], #366).
+            BindingType.SetupLet => "_ctx." + raw,
 
             // Non-reference setup state and literal constants are instance members reached through the
             // context parameter; never unwrapped.

@@ -104,6 +104,26 @@ public sealed class SingleFileComponentProjectionConformanceTests
         "    <section><span>static</span></section>\n" +
         "</template>\n";
 
+    // [SFC-6], [SFC-CG-2], #366, and #364: both hosts preserve collection member types and
+    // boolean literals while producing the same qualified render code and expression mappings.
+    private const string CollectionAndLiteralSource = """
+        <template>
+            <div>
+                <span v-for="section in Sections" :hidden="true">{{ section.Length }}</span>
+                <span v-for="section in FixedSections" :hidden="false">{{ section.Length }}</span>
+                <span v-for="section in FieldSections">{{ section.Length }}</span>
+                <span v-for="section in GetSections()">{{ section.Length }}</span>
+            </div>
+        </template>
+        @script {
+            using System.Collections.Generic;
+            private IReadOnlyList<string> Sections { get; set; } = new[] { "title" };
+            private IReadOnlyList<string> FixedSections { get; } = new[] { "title" };
+            private IReadOnlyList<string> FieldSections = new[] { "title" };
+            private IReadOnlyList<string> GetSections() => Sections;
+        }
+        """;
+
     /// <summary>The fixture rows: leaf file name, source text, and the build configuration.</summary>
     public static TheoryData<string, string, string?> Fixtures => new()
     {
@@ -114,6 +134,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
         { "AppStyles.viu", StyleOnlySource, null },
         { "Bare.viu", ScriptOnlySource, null },
         { "Static.viu", StaticTemplateSource, null },
+        { "Bindings.viu", CollectionAndLiteralSource, null },
         // One Debug row so the hot-reload metadata emitter ([V01.01.06.05]) sits inside the
         // conformance boundary, not just the Release shape.
         { "Counter.viu", CanonicalHybridSource, "Debug" },

@@ -1134,10 +1134,25 @@ normative and is the contract between the compiler, code generation, and the rea
 | allowed global | `name` | `name` |
 | `SetupReference` | `_ctx.name.Value` | `_ctx.name.Value` |
 | `SetupMaybeReference` | `unref(_ctx.name)` | `_ctx.name.Value` |
+| `SetupLet` (mutable non-reference field/property) | `_ctx.name` | `_ctx.name` |
 | `SetupConstant` / `SetupReactiveConstant` / `LiteralConstant` | `_ctx.name` | `_ctx.name` |
 | `Property` / `PropertyAliased` / `Data` / `Options` | `_ctx.name` (alias resolved) | same |
 | CSS-module accessor | `Style.member` / `<Accessor>.member` | n/a (read-only) |
 | unresolved | `_ctx.name` | `_ctx.name` |
+
+`v-for` evaluates its source once and retains the declared C# type through the generated `foreach`.
+Arrays, `IEnumerable<T>`, `IReadOnlyList<T>`, and other types accepted by C# `foreach` are valid sources;
+the element alias keeps the enumerated element type regardless of whether the source is a field,
+a get-only property, a settable property, or a method call. Mutability alone MUST NOT insert an
+object-valued unwrap. A known reactive-reference field/property (`Reference<T>`,
+`IReactiveReference<T>`, or another supported reference contract) reads `.Value` before enumeration,
+so `T` must itself be enumerable. A `ReactiveList<T>` is enumerated directly. A non-enumerable source
+is rejected by the consumer C# compiler; an `object` declaration does not acquire an element type
+from a runtime value [V01.01.05.04.03] (#366).
+
+Literal expressions, including `true`, `false`, and `null`, retain their C# value and are never
+qualified as component members. This applies to component arguments and native element attributes
+as well as other template expression positions [V01.01.05.04.02] (#364).
 
 `[SFC-7]` **Spelling substitutions.** Template spellings that are not legal C# identifiers are
 rewritten before the Roslyn parse: `$event`→`__event`, `$slots`→`__slots`, `$style`→`_style`. Each

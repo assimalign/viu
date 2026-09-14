@@ -47,11 +47,23 @@ single closure over the component), and the table below is the compiler-owned co
 | allowed global (`GlobalAllowList`) | `name` | `name` |
 | `SetupReference` | `_ctx.name.Value` | `_ctx.name.Value` |
 | `SetupMaybeReference` | `unref(_ctx.name)` | `_ctx.name.Value` (a write to a maybe-reference binding is only legal when it does hold a reference) |
-| `SetupLet` | `unref(_ctx.name)` | `_ctx.name` — deciding at runtime whether to assign the member or its `.Value` is not expressible as a C# expression without a helper; the helper-backed guarded write is deferred to [V01.01.05.05] |
+| `SetupLet` (mutable non-reference field/property) | `_ctx.name` | `_ctx.name` |
 | `SetupConstant` / `SetupReactiveConstant` / `LiteralConstant` | `_ctx.name` | `_ctx.name` |
 | `Property` / `PropertyAliased` / `Data` / `Options` | `_ctx.name` (alias resolved for `PropertyAliased`) | same |
 | CSS module accessor (`$style`, named module) | `Style.member` / `<Accessor>.member` (bare accessor class) | n/a (read-only) |
 | unresolved | `_ctx.name` | `_ctx.name` |
+
+Mutable non-reference members retain their declared C# type on reads ([SFC-6],
+[V01.01.05.04.03], #366). In particular, a `v-for` over `IReadOnlyList<T>` keeps a `T` alias for
+fields, get-only properties, settable properties, and method results alike. The frame and server
+writers materialize the source once and emit `foreach (var ...)`; neither writer guesses the
+element type. Only a known reactive-reference field/property inserts `.Value`; a `ReactiveList<T>`
+is already enumerable and needs no unwrap. Routing a plain collection through the object-valued
+unwrap fallback would erase the type before either writer reaches the loop.
+
+Literal expressions, including boolean and null literals, go through the C# expression parser
+without identifier qualification ([SFC-6], [V01.01.05.04.02], #364). Component arguments and native
+attributes share this expression-binding path.
 
 Three decisions in that table are load-bearing:
 
@@ -119,8 +131,8 @@ node is returned; the transform never throws.
 base-class surface a template legitimately reaches (`Math`, `Convert`, `String`, `DateTime`,
 `Enumerable`, the numeric types, the `System` namespace root, …). Membership is a deliberate contract,
 not a convenience: a name on the list can never be shadowed by a component member, so adding one is a
-breaking change for any component that already declares that member. C# literal keywords (`true`, `false`,
-`null`, `this`) never reach the check because Roslyn tokenizes them as keywords, not identifiers.
+breaking change for any component that already declares that member. C# keywords (`true`, `false`,
+`null`, `default`, `this`) bypass the identifier fast path and follow Roslyn expression parsing.
 
 ### Known simplifications and deferrals (non-goals for [V01.01.05.04])
 

@@ -17,6 +17,27 @@ public class ExpressionBindingTests
 {
     // ---- interpolation identifier rewriting ----
 
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    [InlineData("null")]
+    [InlineData("default")]
+    [InlineData("42")]
+    [InlineData("\"value\"")]
+    public void ProcessExpression_LiteralUnderStrictMetadata_PreservesValueWithoutIdentifierDiagnostics(
+        string literal)
+    {
+        // [SFC-6], [V01.01.05.04.02]: literals are expressions, never component member names.
+        var metadata = new BindingMetadata(
+            new Dictionary<string, BindingType>(),
+            reportsUnresolvedIdentifiers: true);
+
+        var result = TransformPrefixed("<div :value='" + literal + "'></div>", metadata, out var errors);
+
+        errors.ShouldBeEmpty();
+        Flatten(PropertyValue(result, "value")).ShouldBe(literal);
+    }
+
     [Fact]
     public void ProcessExpression_ComponentDataMember_PrefixesWithContext()
     {
@@ -538,13 +559,20 @@ public class ExpressionBindingTests
             .ShouldBe("_ctx.maybe.Value = 1");
     }
 
-    [Fact]
-    public void ProcessExpression_SetupLetRead_GuardsWithUnref()
+    [Theory]
+    [InlineData("letBinding")]
+    [InlineData("letBinding.Title")]
+    public void ProcessExpression_SetupLetRead_PreservesDeclaredMemberAccess(string expression)
     {
-        // A let binding reads through unref; the write stays bare (documented decision,
-        // docs/DESIGN.md).
-        SingleInterpolation("{{ letBinding }}", Bindings(("letBinding", BindingType.SetupLet)))
-            .ShouldBe("_unref(_ctx.letBinding)");
+        // [SFC-6], [V01.01.05.04.03]: mutability never inserts a type-erasing unwrap.
+        var result = TransformPrefixed(
+            "<div :value=\"" + expression + "\"></div>",
+            Bindings(("letBinding", BindingType.SetupLet)),
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        Flatten(PropertyValue(result, "value")).ShouldBe("_ctx." + expression);
+        result.UsesHelper("unref").ShouldBeFalse();
     }
 
     [Fact]

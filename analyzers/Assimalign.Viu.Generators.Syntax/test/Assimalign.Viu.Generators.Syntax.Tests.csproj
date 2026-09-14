@@ -23,5 +23,6 @@
          compiled against, so — like Reactivity.Generators.Tests — this is a private project reference. -->
     <ViuPrivateProjectReference Include="Assimalign.Viu.Generators.Syntax" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />
+    <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
   </ItemGroup>
 </Project>
