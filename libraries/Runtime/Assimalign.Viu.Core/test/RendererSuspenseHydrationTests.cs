@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -59,7 +60,7 @@ public sealed class RendererSuspenseHydrationTests
         host.Operations.ShouldNotContain(operation => operation.StartsWith("remove:", StringComparison.Ordinal));
 
         message.Value = "updated";
-        schedulerHost.RunScheduledFlushes();
+        schedulerHost.RunUntilIdle();
 
         host.Root.Children[1].ShouldBeSameAs(serverElement);
         serverElement.Children.Single().ShouldBeSameAs(serverText);
@@ -73,7 +74,7 @@ public sealed class RendererSuspenseHydrationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Hydrate_NewDependency_ShowsFallbackAndPreservesFollowingSibling(bool snapshot)
+    public void Hydrate_NewDependency_ShowsFallbackAndPreservesFollowingSibling(bool snapshot)
     {
         using RendererParityHost schedulerHost = new();
         HydrationWalkerFakeHost host = new();
@@ -101,7 +102,7 @@ public sealed class RendererSuspenseHydrationTests
         serverContent.Parent.ShouldBeNull();
 
         load.SetResult(AsynchronousComponentTarget.From<HydratedTarget>());
-        await FlushUntilAsync(schedulerHost, () => events.Contains("resolve"));
+        schedulerHost.RunUntilIdle();
 
         VisibleText(host.Root).ShouldBe("resolvedtail");
         serverRoot.Children[^1].ShouldBeSameAs(retainedSibling);
@@ -110,9 +111,11 @@ public sealed class RendererSuspenseHydrationTests
     }
 
     [Fact]
-    public async Task Hydrate_LazyActivationInsideHiddenContent_JoinsOwningBoundaryAndAdoptsStoredMarkup()
+    public void Hydrate_LazyActivationInsideHiddenContent_JoinsOwningBoundaryAndAdoptsStoredMarkup()
     {
         using RendererParityHost schedulerHost = new();
+        int testThreadIdentifier = Environment.CurrentManagedThreadId;
+        SynchronizationContext? testContext = SynchronizationContext.Current;
         HydrationWalkerFakeHost host = new();
         HydrationWalkerHostNode serverLazy = host.CreateServerElement("strong", host.CreateServerText("resolved"));
         HydrationWalkerHostNode serverRoot = host.CreateServerElement(
@@ -157,22 +160,97 @@ public sealed class RendererSuspenseHydrationTests
         lazyLoadCount.ShouldBe(0);
 
         activate.ShouldNotBeNull()();
-        schedulerHost.RunScheduledFlushes();
+        schedulerHost.RunUntilIdle();
         lazyLoadCount.ShouldBe(1);
         gateLoad.SetResult(AsynchronousComponentTarget.From<HydratedTarget>());
-        await FlushUntilAsync(schedulerHost, () => serverRoot.Children[0].Kind == HydrationNodeKind.Element);
+        schedulerHost.RunUntilIdle();
+        serverRoot.Children[0].Kind.ShouldBe(HydrationNodeKind.Element);
 
         // [BLT-12], [BLT-19], [HYD-LAZY-3]: late activation restores its stored boundary context.
         VisibleText(host.Root).ShouldBe("waiting");
         events.ShouldBe(["pending", "fallback"]);
         lazyLoad.SetResult(AsynchronousComponentTarget.From<HydratedTarget>());
-        await FlushUntilAsync(schedulerHost, () => events.Contains("resolve") && registration.CompletionCount == 1);
+        schedulerHost.RunUntilIdle();
+        registration.CompletionCount.ShouldBe(1);
+        // [V01.01.03.20], [BLT-13]: readiness resumes on the host before its drain returns.
+        registration.CompletionThreadIdentifier.ShouldBe(testThreadIdentifier);
+        registration.CompletionContext.ShouldBeSameAs(testContext);
 
         VisibleText(host.Root).ShouldBe("resolvedresolved");
         serverLazy.Parent.ShouldBeSameAs(serverRoot);
         host.Operations.ShouldNotContain($"remove:{serverLazy.Identifier}");
         events.ShouldBe(["pending", "fallback", "resolve"]);
         renderer.Render(null, host.Root);
+    }
+
+    [Fact]
+    public void Hydrate_PendingLazyActivationUnmounted_DropsReadinessBeforeLateLoadCompletion()
+    {
+        using RendererParityHost schedulerHost = new();
+        int testThreadIdentifier = Environment.CurrentManagedThreadId;
+        SynchronizationContext? testContext = SynchronizationContext.Current;
+        HydrationWalkerFakeHost host = new();
+        host.AppendServerChild(
+            host.Root,
+            host.CreateServerComment(HydrationMarkers.GetLazyHydrationStartData(HydrationStrategyKind.Idle)));
+        host.AppendServerChild(host.Root, host.CreateServerElement("strong", host.CreateServerText("resolved")));
+        host.AppendServerChild(host.Root, host.CreateServerComment(HydrationMarkers.LazyHydrationEndData));
+        TaskCompletionSource<AsynchronousComponentTarget> load = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int loadCount = 0;
+        int targetActivationCount = 0;
+        AsynchronousComponentDefinition definition = AsynchronousComponents.Define<LazyHydrationWrapper>(_ =>
+        {
+            loadCount++;
+            return load.Task;
+        });
+        ComponentFactory components = new();
+        components.Register(definition.Registration);
+        components.Register(new ComponentRegistration(
+            ComponentReference.ForType(typeof(HydratedTarget)),
+            new ComponentContract(),
+            _ =>
+            {
+                targetActivationCount++;
+                return new HydratedTarget();
+            }));
+        SuspenseNode root = Boundary(
+            definition.CreateComponent(new ComponentInvocation(hydrationStrategy: HydrationStrategy.OnIdle())),
+            []);
+        Action? activate = null;
+        HydrationTriggerRegistration registration = new();
+        Renderer<HydrationWalkerHostNode> renderer = CreateRenderer(
+            host,
+            snapshot: true,
+            request =>
+            {
+                activate = request.Trigger;
+                return registration;
+            });
+        renderer.Hydrate(root, host.Root, Application(root, components, []));
+
+        activate.ShouldNotBeNull()();
+        schedulerHost.RunUntilIdle();
+        loadCount.ShouldBe(1);
+        targetActivationCount.ShouldBe(0);
+        registration.CompletionCount.ShouldBe(0);
+
+        renderer.Render(null, host.Root);
+        int operationCountAfterUnmount = host.Operations.Count;
+        registration.DisposalCount.ShouldBe(1);
+        registration.DisposalThreadIdentifier.ShouldBe(testThreadIdentifier);
+        registration.DisposalContext.ShouldBeSameAs(testContext);
+
+        // [V01.01.03.20], [BLT-13], [HYD-LAZY-3]: teardown invalidates pending readiness
+        // on the same flow, so completing an abandoned load cannot revive hydration.
+        load.SetResult(AsynchronousComponentTarget.From<HydratedTarget>());
+        schedulerHost.RunUntilIdle();
+
+        targetActivationCount.ShouldBe(0);
+        registration.CompletionCount.ShouldBe(0);
+        registration.DisposalCount.ShouldBe(1);
+        host.Operations.Count.ShouldBe(operationCountAfterUnmount);
+        host.Root.Children.ShouldBeEmpty();
+        Scheduler.IsFlushPending.ShouldBeFalse();
     }
 
     [Fact]
@@ -251,7 +329,7 @@ public sealed class RendererSuspenseHydrationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Hydrate_PendingAdoptedSibling_ReleasesEffectsOnlyWhenContentReveals(bool abandon)
+    public void Hydrate_PendingAdoptedSibling_ReleasesEffectsOnlyWhenContentReveals(bool abandon)
     {
         using RendererParityHost schedulerHost = new();
         HydrationWalkerFakeHost host = new();
@@ -292,7 +370,7 @@ public sealed class RendererSuspenseHydrationTests
         Renderer<HydrationWalkerHostNode> renderer = CreateRenderer(host, snapshot: true);
         renderer.Hydrate(root, host.Root, Application(root, components, []));
         state.Value = 1;
-        schedulerHost.RunScheduledFlushes();
+        schedulerHost.RunUntilIdle();
 
         // [BLT-12], [BLT-18]: adopted siblings share hidden-branch effect ownership.
         mountedCount.ShouldBe(0);
@@ -305,10 +383,9 @@ public sealed class RendererSuspenseHydrationTests
         }
 
         load.SetResult(AsynchronousComponentTarget.From<HydratedTarget>());
+        schedulerHost.RunUntilIdle();
         if (abandon)
         {
-            await Task.Yield();
-            schedulerHost.RunScheduledFlushes();
             mountedCount.ShouldBe(0);
             postCount.ShouldBe(0);
             references.ShouldBeEmpty();
@@ -316,7 +393,7 @@ public sealed class RendererSuspenseHydrationTests
         }
         else
         {
-            await FlushUntilAsync(schedulerHost, () => events.Contains("resolve"));
+            events.ShouldBe(["pending", "fallback", "resolve"]);
             mountedCount.ShouldBe(1);
             postCount.ShouldBe(1);
             references.ShouldHaveSingleItem();
@@ -359,22 +436,6 @@ public sealed class RendererSuspenseHydrationTests
 
     private static ApplicationContext Application(VirtualNode root, ComponentFactory components, List<string> warnings) =>
         new(new ApplicationOptions { RootComponent = root, Components = components, WarnHandler = warnings.Add });
-
-    private static async Task FlushUntilAsync(RendererParityHost host, Func<bool> completed)
-    {
-        for (int attempt = 0; attempt < 5000; attempt++)
-        {
-            host.RunScheduledFlushes();
-            if (completed())
-            {
-                return;
-            }
-
-            await Task.Delay(1);
-        }
-
-        throw new InvalidOperationException("The hydrated Suspense boundary did not resolve.");
-    }
 
     private static string VisibleText(HydrationWalkerHostNode node) =>
         node.Kind == HydrationNodeKind.Text ? node.Data : string.Concat(node.Children.Select(VisibleText));
@@ -450,10 +511,28 @@ public sealed class RendererSuspenseHydrationTests
     {
         internal int CompletionCount { get; private set; }
 
-        public void Complete() => CompletionCount++;
+        internal int CompletionThreadIdentifier { get; private set; }
+
+        internal SynchronizationContext? CompletionContext { get; private set; }
+
+        internal int DisposalCount { get; private set; }
+
+        internal int DisposalThreadIdentifier { get; private set; }
+
+        internal SynchronizationContext? DisposalContext { get; private set; }
+
+        public void Complete()
+        {
+            CompletionCount++;
+            CompletionThreadIdentifier = Environment.CurrentManagedThreadId;
+            CompletionContext = SynchronizationContext.Current;
+        }
 
         public void Dispose()
         {
+            DisposalCount++;
+            DisposalThreadIdentifier = Environment.CurrentManagedThreadId;
+            DisposalContext = SynchronizationContext.Current;
         }
     }
 

@@ -543,7 +543,7 @@ public sealed class RendererParityTests
             renderer.GetMountedComponentViews(host.Container).ShouldHaveSingleItem();
 
         ComponentHotReload.ApplyUpdates([typeof(RendererHotReloadTemplateMarker)]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         MountedComponentView<RendererParityNode> replacement =
             renderer.GetMountedComponentViews(host.Container).ShouldHaveSingleItem();

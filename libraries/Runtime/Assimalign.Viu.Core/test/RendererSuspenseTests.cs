@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -18,7 +17,7 @@ namespace Assimalign.Viu.Core.Tests;
 public sealed class RendererSuspenseTests
 {
     [Fact]
-    public async Task Suspense_MultipleDependencies_RevealsOnlyAfterEveryLoadSettles()
+    public void Suspense_MultipleDependencies_RevealsOnlyAfterEveryLoadSettles()
     {
         // [BLT-13] Every dependency must settle before the hidden branch is revealed.
         using var host = new RendererParityHost();
@@ -42,24 +41,22 @@ public sealed class RendererSuspenseTests
 
         VisibleText(host.Container).ShouldBe("waiting");
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         firstLoad.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("waiting");
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         secondLoad.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("firstsecond");
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Suspense_NestedBoundary_ResolvesInnerBeforeOuter()
+    public void Suspense_NestedBoundary_ResolvesInnerBeforeOuter()
     {
         using var host = new RendererParityHost();
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
@@ -80,10 +77,9 @@ public sealed class RendererSuspenseTests
 
         VisibleText(host.Container).ShouldBe("outer-fallback");
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("inner-resolved");
         events.FindAll(value => value.EndsWith("resolve", StringComparison.Ordinal))
@@ -92,7 +88,7 @@ public sealed class RendererSuspenseTests
     }
 
     [Fact]
-    public async Task Suspense_UpdateWhilePending_RefreshesFallbackAndHiddenContentBeforeReveal()
+    public void Suspense_UpdateWhilePending_RefreshesFallbackAndHiddenContentBeforeReveal()
     {
         // [BLT-19] Matching pending content is patched in its storage container.
         using var host = new RendererParityHost();
@@ -117,17 +113,16 @@ public sealed class RendererSuspenseTests
 
         VisibleText(host.Container).ShouldBe("loading-second");
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("second");
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Suspense_RejectedDependency_RoutesOnceAndKeepsFallbackVisible()
+    public void Suspense_RejectedDependency_RoutesOnceAndKeepsFallbackVisible()
     {
         using var host = new RendererParityHost();
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
@@ -156,10 +151,9 @@ public sealed class RendererSuspenseTests
         renderer.Render(root, host.Container, application);
         VisibleText(host.Container).ShouldBe("waiting");
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetException(new InvalidOperationException("load failed"));
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         handled.ShouldHaveSingleItem()
             .ShouldBeOfType<InvalidOperationException>()
@@ -173,7 +167,7 @@ public sealed class RendererSuspenseTests
     [InlineData(null)]
     [InlineData(-1)]
     [InlineData(0)]
-    public async Task Suspense_FirstPendingMountWithoutPositiveTimeout_ShowsFallback(int? timeout)
+    public void Suspense_FirstPendingMountWithoutPositiveTimeout_ShowsFallback(int? timeout)
     {
         // [BLT-16] An initial mount has no previous content to retain.
         using var host = new RendererParityHost();
@@ -188,18 +182,18 @@ public sealed class RendererSuspenseTests
 
         VisibleText(host.Container).ShouldBe("waiting");
         events.ShouldBe(["pending", "fallback"]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("ready");
         events.ShouldBe(["pending", "fallback", "resolve"]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         events.Count.ShouldBe(3);
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Suspense_FirstPendingMountWithPositiveTimeout_ShowsFallbackOnlyAtDeadline()
+    public void Suspense_FirstPendingMountWithPositiveTimeout_ShowsFallbackOnlyAtDeadline()
     {
         // [BLT-16] An explicit positive timeout also applies without a previous content branch.
         using var host = new RendererParityHost();
@@ -212,21 +206,21 @@ public sealed class RendererSuspenseTests
             100, Listeners(events));
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         renderer.Render(root, host.Container, CreateApplication(root, CreateFactory(definition)));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe(string.Empty);
         events.ShouldBe(["pending"]);
         clock.Advance(TimeSpan.FromMilliseconds(99));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe(string.Empty);
         clock.Advance(TimeSpan.FromMilliseconds(1));
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("waiting");
         events.ShouldBe(["pending", "fallback"]);
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("ready");
         events.ShouldBe(["pending", "fallback", "resolve"]);
         renderer.Render(null, host.Container);
@@ -235,7 +229,7 @@ public sealed class RendererSuspenseTests
     [Theory]
     [InlineData(null)]
     [InlineData(-1)]
-    public async Task Suspense_AbsentOrNegativeTimeout_RetainsPreviousContent(int? timeout)
+    public void Suspense_AbsentOrNegativeTimeout_RetainsPreviousContent(int? timeout)
     {
         // [BLT-16], [BLT-17] A pending replacement preserves the visible branch indefinitely.
         using var host = new RendererParityHost();
@@ -253,20 +247,20 @@ public sealed class RendererSuspenseTests
         renderer.Render(Suspense(Request(definition, "next"), new TextNode("waiting"),
             timeout, Listeners(events)), host.Container);
         clock.Advance(TimeSpan.FromDays(1));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("previous");
         events.ShouldBe(["resolve", "pending"]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("next");
         events.ShouldBe(["resolve", "pending", "resolve"]);
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Suspense_ZeroTimeout_ShowsFallbackAtPendingThenRevealsContent()
+    public void Suspense_ZeroTimeout_ShowsFallbackAtPendingThenRevealsContent()
     {
         // [BLT-16], [BLT-17] A zero timeout emits pending then fallback in the same render.
         using var host = new RendererParityHost();
@@ -288,9 +282,9 @@ public sealed class RendererSuspenseTests
 
         VisibleText(host.Container).ShouldBe("waiting");
         events.ShouldBe(["pending:previous", "fallback:waiting"]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("next");
         events.ShouldBe(["pending:previous", "fallback:waiting", "resolve:next"]);
         renderer.Render(null, host.Container);
@@ -314,7 +308,7 @@ public sealed class RendererSuspenseTests
     }
 
     [Fact]
-    public async Task Suspense_PositiveTimeout_UsesSchedulerClockAndShowsFallbackOnlyAtDeadline()
+    public void Suspense_PositiveTimeout_UsesSchedulerClockAndShowsFallbackOnlyAtDeadline()
     {
         // [BLT-16] Advancing the scheduler clock controls the deadline without wall-clock sleeps.
         using var host = new RendererParityHost();
@@ -328,27 +322,27 @@ public sealed class RendererSuspenseTests
         renderer.Render(initial, host.Container, CreateApplication(initial, CreateFactory(definition)));
         renderer.Render(Suspense(Request(definition, "next"), new TextNode("waiting"),
             100, Listeners(events)), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         clock.Advance(TimeSpan.FromMilliseconds(99));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("previous");
         events.ShouldBe(["pending"]);
         clock.Advance(TimeSpan.FromMilliseconds(1));
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("waiting");
         events.ShouldBe(["pending", "fallback"]);
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("next");
         events.ShouldBe(["pending", "fallback", "resolve"]);
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Suspense_ResolveBeforeDeadline_CancelsFallbackTimer()
+    public void Suspense_ResolveBeforeDeadline_CancelsFallbackTimer()
     {
         // [BLT-16] Completion invalidates a pending timer; it cannot later replace resolved content.
         using var host = new RendererParityHost();
@@ -362,14 +356,14 @@ public sealed class RendererSuspenseTests
         renderer.Render(initial, host.Container, CreateApplication(initial, CreateFactory(definition)));
         renderer.Render(Suspense(Request(definition, "next"), new TextNode("waiting"),
             100, Listeners(events)), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         clock.Advance(TimeSpan.FromMilliseconds(99));
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         clock.Advance(TimeSpan.FromMilliseconds(100));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("next");
         events.ShouldBe(["pending", "resolve"]);
@@ -377,7 +371,7 @@ public sealed class RendererSuspenseTests
     }
 
     [Fact]
-    public async Task Suspense_DependencyArrivesWhilePending_JoinsCurrentSetWithoutAnotherPendingEvent()
+    public void Suspense_DependencyArrivesWhilePending_JoinsCurrentSetWithoutAnotherPendingEvent()
     {
         // [BLT-19] A patched pending branch adds dependencies to its current generation.
         using var host = new RendererParityHost();
@@ -394,21 +388,21 @@ public sealed class RendererSuspenseTests
         renderer.Render(Suspense(new FragmentNode([Request(first, "first"), Request(second, "second")]),
             new TextNode("waiting"), listeners: Listeners(events)), host.Container);
         events.ShouldBe(["pending", "fallback"]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         firstLoad.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("waiting");
         events.Count.ShouldBe(2);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         secondLoad.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("firstsecond");
         events.ShouldBe(["pending", "fallback", "resolve"]);
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Suspense_ReactiveUpdateWhilePending_PatchesStoredContent()
+    public void Suspense_ReactiveUpdateWhilePending_PatchesStoredContent()
     {
         // [BLT-19] Component render jobs continue in storage while visible fallback is unchanged.
         using var host = new RendererParityHost();
@@ -429,12 +423,12 @@ public sealed class RendererSuspenseTests
         renderer.Render(root, host.Container, CreateApplication(root, components));
 
         message.Value = "after";
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renders.ShouldBe(2);
         VisibleText(host.Container).ShouldBe("waiting");
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("aftertarget");
         renders.ShouldBe(2);
@@ -442,7 +436,7 @@ public sealed class RendererSuspenseTests
     }
 
     [Fact]
-    public async Task Suspense_ReplacedPendingBranch_DiscardsOldDependencyAndKeepsPreviousContent()
+    public void Suspense_ReplacedPendingBranch_DiscardsOldDependencyAndKeepsPreviousContent()
     {
         // [BLT-19] A replacement abandons the old generation without altering the active branch.
         using var host = new RendererParityHost();
@@ -465,13 +459,13 @@ public sealed class RendererSuspenseTests
         VisibleText(host.Container).ShouldBe("previous");
         events.ShouldBe(["pending", "pending"]);
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         secondLoad.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("kept");
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         firstLoad.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         // The independent observer proves the abandoned shared load actually finished.
         VisibleText(host.Container).ShouldBe("keptobserver");
         events.ShouldBe(["pending", "pending", "resolve"]);
@@ -479,7 +473,7 @@ public sealed class RendererSuspenseTests
     }
 
     [Fact]
-    public async Task Suspense_NonSuspensibleComponent_RendersItsOwnLoadingBranch()
+    public void Suspense_NonSuspensibleComponent_RendersItsOwnLoadingBranch()
     {
         // [BLT-20] Opting out never starts a boundary dependency set.
         using var host = new RendererParityHost();
@@ -500,9 +494,9 @@ public sealed class RendererSuspenseTests
         renderer.Render(root, host.Container, CreateApplication(root, CreateFactory(definition)));
         VisibleText(host.Container).ShouldBe("self-loading");
         events.ShouldBe(["resolve"]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetResult(AsynchronousComponentTarget.From<SuspenseTargetComponent>());
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         VisibleText(host.Container).ShouldBe("ready");
         events.ShouldBe(["resolve"]);
         renderer.Render(null, host.Container);
@@ -511,7 +505,7 @@ public sealed class RendererSuspenseTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Suspense_DependencyError_TraversesCaptureChainAndHonorsStop(bool stopAtParent)
+    public void Suspense_DependencyError_TraversesCaptureChainAndHonorsStop(bool stopAtParent)
     {
         // [BLT-21], [CMP-23] Capture starts at the nearest ancestor; false stops propagation.
         using var host = new RendererParityHost();
@@ -552,9 +546,9 @@ public sealed class RendererSuspenseTests
             });
         renderer.Render(root, host.Container, application);
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetException(new InvalidOperationException("failure"));
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
 
         captured.ShouldBe(stopAtParent
             ? ["parent:suspense dependency:failure"]
@@ -566,7 +560,7 @@ public sealed class RendererSuspenseTests
     }
 
     [Fact]
-    public async Task Suspense_DependencyErrorBeforeTimeout_KeepsPreviousContentAndCancelsFallback()
+    public void Suspense_DependencyErrorBeforeTimeout_KeepsPreviousContentAndCancelsFallback()
     {
         // [BLT-21] A failed generation freezes visible content, including after its old deadline.
         using var host = new RendererParityHost();
@@ -583,11 +577,11 @@ public sealed class RendererSuspenseTests
         renderer.Render(Suspense(Request(definition, "next"), new TextNode("waiting"),
             100, Listeners(events)), host.Container);
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         load.SetException(new InvalidOperationException("failure"));
-        await DrainDependencyAsync(host);
+        host.RunUntilIdle();
         clock.Advance(TimeSpan.FromMilliseconds(100));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         errors.ShouldBe(1);
         VisibleText(host.Container).ShouldBe("previous");
@@ -597,12 +591,6 @@ public sealed class RendererSuspenseTests
 
     private static TaskCompletionSource<AsynchronousComponentTarget> NewLoad() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    private static async Task DrainDependencyAsync(RendererParityHost host)
-    {
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
-    }
 
     private static Dictionary<string, ComponentEventListener> Listeners(
         List<string> events,
@@ -684,22 +672,6 @@ public sealed class RendererSuspenseTests
         return new ApplicationContext(options);
     }
 
-    private static async Task WaitForPendingSchedulerFlushAsync()
-    {
-        for (int attempt = 0; attempt < 5000; attempt++)
-        {
-            if (Scheduler.IsFlushPending)
-            {
-                return;
-            }
-
-            await Task.Delay(1);
-        }
-
-        throw new InvalidOperationException(
-            "The Suspense dependency did not schedule renderer work.");
-    }
-
     private static string VisibleText(RendererParityNode node)
     {
         if (node.Kind == RendererParityNodeKind.Text)
@@ -735,86 +707,5 @@ public sealed class RendererSuspenseTests
                     out object? message)
                         ? (string?)message ?? "resolved"
                         : "resolved");
-    }
-
-    private sealed class ManualTimeProvider : TimeProvider
-    {
-        private readonly List<ManualTimer> _timers = [];
-        private long _ticks;
-
-        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
-
-        public override long GetTimestamp() => _ticks;
-
-        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddTicks(_ticks);
-
-        public override ITimer CreateTimer(
-            TimerCallback callback,
-            object? state,
-            TimeSpan dueTime,
-            TimeSpan period)
-        {
-            var timer = new ManualTimer(this, callback, state);
-            _timers.Add(timer);
-            timer.Change(dueTime, period);
-            return timer;
-        }
-
-        internal void Advance(TimeSpan duration)
-        {
-            _ticks += duration.Ticks;
-            foreach (ManualTimer timer in _timers.ToArray())
-            {
-                timer.FireIfDue();
-            }
-        }
-
-        private sealed class ManualTimer : ITimer
-        {
-            private readonly ManualTimeProvider _clock;
-            private readonly TimerCallback _callback;
-            private readonly object? _state;
-            private long _due = long.MaxValue;
-            private long _period;
-            private bool _disposed;
-
-            internal ManualTimer(ManualTimeProvider clock, TimerCallback callback, object? state)
-            {
-                _clock = clock;
-                _callback = callback;
-                _state = state;
-            }
-
-            public bool Change(TimeSpan dueTime, TimeSpan period)
-            {
-                if (_disposed)
-                {
-                    return false;
-                }
-
-                _due = dueTime == Timeout.InfiniteTimeSpan ? long.MaxValue : _clock._ticks + dueTime.Ticks;
-                _period = period.Ticks;
-                return true;
-            }
-
-            internal void FireIfDue()
-            {
-                if (_disposed || _clock._ticks < _due)
-                {
-                    return;
-                }
-
-                _due = _period > 0 ? _clock._ticks + _period : long.MaxValue;
-                _callback(_state);
-            }
-
-            public void Dispose() => _disposed = true;
-
-            public ValueTask DisposeAsync()
-            {
-                Dispose();
-                return ValueTask.CompletedTask;
-            }
-        }
     }
 }

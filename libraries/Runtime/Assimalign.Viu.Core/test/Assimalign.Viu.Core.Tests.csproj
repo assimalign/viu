@@ -14,5 +14,6 @@
     <ViuProjectReference Include="Assimalign.Viu.Core" />
     <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
     <ViuProjectReference Include="Assimalign.Viu.State" />
+    <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>
 </Project>

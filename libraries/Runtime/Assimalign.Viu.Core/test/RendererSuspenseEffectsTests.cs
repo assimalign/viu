@@ -14,7 +14,7 @@ namespace Assimalign.Viu.Core.Tests;
 public sealed class RendererSuspenseEffectsTests
 {
     [Fact]
-    public async Task Suspense_HiddenBranch_DefersMountedReferencesAndScheduledPostWatchUntilReveal()
+    public void Suspense_HiddenBranch_DefersMountedReferencesAndScheduledPostWatchUntilReveal()
     {
         // [BLT-13]: hidden host state is not published through mounted callbacks or references.
         using var host = new RendererParityHost();
@@ -62,7 +62,7 @@ public sealed class RendererSuspenseEffectsTests
         renderer.Render(root, host.Container, Application(root, components));
         state.Value = 1;
         state.Value = 2;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         mountedRuns.ShouldBe(0);
         updatedRuns.ShouldBe(0);
@@ -70,7 +70,7 @@ public sealed class RendererSuspenseEffectsTests
         references.ShouldBeEmpty();
 
         load.SetResult(AsynchronousComponentTarget.From<Target>());
-        await FlushDependencyAsync(host);
+        host.RunUntilIdle();
 
         mountedRuns.ShouldBe(1);
         updatedRuns.ShouldBe(1);
@@ -78,7 +78,7 @@ public sealed class RendererSuspenseEffectsTests
         references.ShouldHaveSingleItem().ShouldBeOfType<RendererParityNode>()
             .DescendantText.ShouldBe("2");
         state.Value = 3;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         mountedRuns.ShouldBe(1);
         updatedRuns.ShouldBe(2);
         postRuns.ShouldBe(2);
@@ -122,7 +122,7 @@ public sealed class RendererSuspenseEffectsTests
         renderer.Render(root, host.Container, Application(root, Factory(asynchronous, probe)));
         state.Value = 1;
         renderer.Render(null, host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         mountedRuns.ShouldBe(0);
         postRuns.ShouldBe(0);
@@ -130,7 +130,7 @@ public sealed class RendererSuspenseEffectsTests
     }
 
     [Fact]
-    public async Task Suspense_HiddenRootReferenceReplaced_AssignsOnlyLatestReference()
+    public void Suspense_HiddenRootReferenceReplaced_AssignsOnlyLatestReference()
     {
         // [BLT-13]: references belong to the revealed occurrence, including structural slot roots.
         using var host = new RendererParityHost();
@@ -151,7 +151,7 @@ public sealed class RendererSuspenseEffectsTests
         oldReferenceRuns.ShouldBe(0);
         nextReferenceRuns.ShouldBe(0);
         load.SetResult(AsynchronousComponentTarget.From<Target>());
-        await FlushDependencyAsync(host);
+        host.RunUntilIdle();
 
         oldReferenceRuns.ShouldBe(0);
         nextReferenceRuns.ShouldBe(1);
@@ -185,7 +185,7 @@ public sealed class RendererSuspenseEffectsTests
         renderer.Render(root, host.Container, Application(root, Factory(asynchronous, probe)));
         mountedRuns.ShouldBe(0);
         includeDependency.Value = false;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         mountedRuns.ShouldBe(1);
         load.Task.IsCompleted.ShouldBeFalse();
@@ -193,7 +193,7 @@ public sealed class RendererSuspenseEffectsTests
     }
 
     [Fact]
-    public async Task Suspense_SharedLoaderOneWrapperRemoved_WaitsForRemainingOccurrence()
+    public void Suspense_SharedLoaderOneWrapperRemoved_WaitsForRemainingOccurrence()
     {
         // [BLT-13]: each mounted occurrence owns one lease even when its loader task is shared.
         using var host = new RendererParityHost();
@@ -217,17 +217,17 @@ public sealed class RendererSuspenseEffectsTests
 
         renderer.Render(root, host.Container, Application(root, Factory(asynchronous, probe)));
         includeFirst.Value = false;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         mountedRuns.ShouldBe(0);
         load.SetResult(AsynchronousComponentTarget.From<Target>());
-        await FlushDependencyAsync(host);
+        host.RunUntilIdle();
 
         mountedRuns.ShouldBe(1);
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Suspense_LateAsynchronousDescendant_MountedCallbacksRemainChildFirst()
+    public void Suspense_LateAsynchronousDescendant_MountedCallbacksRemainChildFirst()
     {
         // [BLT-13], [SCH-4]: deferral retains child-before-parent mounted ordering.
         using var host = new RendererParityHost();
@@ -259,7 +259,7 @@ public sealed class RendererSuspenseEffectsTests
         renderer.Render(root, host.Container, Application(root, components));
         callbacks.ShouldBeEmpty();
         load.SetResult(new AsynchronousComponentTarget(child.Reference));
-        await FlushDependencyAsync(host);
+        host.RunUntilIdle();
 
         callbacks.ShouldBe(["child", "parent"]);
         renderer.Render(null, host.Container);
@@ -293,7 +293,7 @@ public sealed class RendererSuspenseEffectsTests
         renderer.Render(initial, host.Container, Application(initial, Factory(asynchronous, previous)));
         renderer.Render(Boundary(asynchronous.CreateComponent()), host.Container);
         state.Value = 1;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         updatedRuns.ShouldBe(1);
         postRuns.ShouldBe(1);
@@ -302,7 +302,7 @@ public sealed class RendererSuspenseEffectsTests
     }
 
     [Fact]
-    public async Task Suspense_ResolvedMatchingRootAddsAsynchronousChild_LoadsIndependentlyWithoutPendingAgain()
+    public void Suspense_ResolvedMatchingRootAddsAsynchronousChild_LoadsIndependentlyWithoutPendingAgain()
     {
         // [BLT-19]: resolved root identity preserves its live tree; only replacement roots open a generation.
         using var host = new RendererParityHost();
@@ -334,13 +334,13 @@ public sealed class RendererSuspenseEffectsTests
 
         renderer.Render(initial, host.Container, Application(initial, Factory(asynchronous)));
         renderer.Render(CreateBoundary(asynchronous.CreateComponent()), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         events.ShouldBe(["resolve"]);
         host.Container.Children.Find(node => node.Kind == RendererParityNodeKind.Element)!
             .DescendantText.ShouldBe("independent-loading");
         load.SetResult(AsynchronousComponentTarget.From<Target>());
-        await FlushDependencyAsync(host);
+        host.RunUntilIdle();
 
         events.ShouldBe(["resolve"]);
         host.Container.Children.Find(node => node.Kind == RendererParityNodeKind.Element)!
@@ -349,7 +349,7 @@ public sealed class RendererSuspenseEffectsTests
     }
 
     [Fact]
-    public async Task Suspense_FallbackResolveAndDeferredMounted_ObserveCommittedHostChanges()
+    public void Suspense_FallbackResolveAndDeferredMounted_ObserveCommittedHostChanges()
     {
         // [BLT-17], [BLT-18], [SCH-10]: visibility events and released lifecycle observe a host commit.
         using var host = new RendererParityHost();
@@ -396,13 +396,13 @@ public sealed class RendererSuspenseEffectsTests
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
 
         renderer.Render(root, host.Container, Application(root, Factory(asynchronous, probe)));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         fallbackRuns.ShouldBe(1);
         resolveRuns.ShouldBe(0);
         mountedRuns.ShouldBe(0);
         beforeReveal = host.CommitCount;
         load.SetResult(AsynchronousComponentTarget.From<Target>());
-        await FlushDependencyAsync(host);
+        host.RunUntilIdle();
 
         fallbackRuns.ShouldBe(1);
         resolveRuns.ShouldBe(1);
@@ -456,7 +456,7 @@ public sealed class RendererSuspenseEffectsTests
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
 
         renderer.Render(root, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         events.ShouldBe(["pending", "fallback", "error"]);
         errors.ShouldHaveSingleItem().ShouldBeSameAs(failure);
@@ -493,22 +493,6 @@ public sealed class RendererSuspenseEffectsTests
 
     private static ApplicationContext Application(VirtualNode root, ComponentFactory components) =>
         new(new ApplicationOptions { RootComponent = root, Components = components });
-
-    private static async Task FlushDependencyAsync(RendererParityHost host)
-    {
-        for (int attempt = 0; attempt < 5000; attempt++)
-        {
-            if (Scheduler.IsFlushPending)
-            {
-                host.RunScheduledFlushes();
-                return;
-            }
-
-            await Task.Delay(1);
-        }
-
-        throw new InvalidOperationException("The dependency did not queue a renderer flush.");
-    }
 
     private sealed class Wrapper : IComponent
     {

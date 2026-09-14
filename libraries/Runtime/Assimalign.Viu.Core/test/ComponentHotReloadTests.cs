@@ -74,7 +74,7 @@ public sealed class ComponentHotReloadTests
         source.Label = "after";
 
         ComponentHotReload.ApplyUpdates([typeof(ProbeTemplateMarker)]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         source.Instances.Count.ShouldBe(2);
         HotReloadProbeComponent next = source.Instances[1];
@@ -119,7 +119,7 @@ public sealed class ComponentHotReloadTests
                 Name = "hot-reload update application probe",
             });
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         instancesObservedBeforeRemount.ShouldBe(1);
         commitsObservedBeforeRemount.ShouldBe(0);
@@ -142,7 +142,7 @@ public sealed class ComponentHotReloadTests
         source.Label = "must-not-render";
 
         ComponentHotReload.ApplyUpdates([typeof(ProbeStyleMarker)]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         source.Instances.ShouldHaveSingleItem();
         instance.RenderCount.ShouldBe(1);
@@ -170,7 +170,7 @@ public sealed class ComponentHotReloadTests
             typeof(ProbeTemplateMarker),
             typeof(ProbeScriptMarker),
         ]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         source.Instances.Count.ShouldBe(2);
         previous.IsDisposed.ShouldBeTrue();
@@ -193,14 +193,14 @@ public sealed class ComponentHotReloadTests
         source.Label = "all";
 
         ComponentHotReload.ApplyUpdates([typeof(UnrelatedMarker)]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         source.Instances.ShouldHaveSingleItem();
         initial.RenderCount.ShouldBe(1);
         host.Container.DescendantText.ShouldBe("before:0");
 
         ComponentHotReload.ApplyUpdates(updatedTypes: null);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         source.Instances.Count.ShouldBe(2);
         initial.IsDisposed.ShouldBeTrue();
@@ -222,7 +222,7 @@ public sealed class ComponentHotReloadTests
         renderer.Render(null, host.Container);
 
         ComponentHotReload.ApplyUpdates([typeof(ProbeTemplateMarker)]);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         source.Instances.ShouldHaveSingleItem();
         instance.RenderCount.ShouldBe(1);

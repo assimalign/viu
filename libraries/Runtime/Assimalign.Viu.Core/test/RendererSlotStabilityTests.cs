@@ -141,7 +141,7 @@ public sealed class RendererSlotStabilityTests
             });
 
         renderer.Render(request, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         directiveCreatedCount.ShouldBe(1);
         lifecycleMountedCount.ShouldBe(1);
@@ -167,11 +167,11 @@ public sealed class RendererSlotStabilityTests
         ApplicationContext application = CreateApplication(initial, registration);
 
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(
             CreateSlotRequest(reference, slotStability, nextText, nextRenderPlan),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         return new SlotScenario(
             counter,
@@ -205,14 +205,14 @@ public sealed class RendererSlotStabilityTests
             parentRegistration);
 
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(
             CreateForwardingOwnerRequest(
                 parentReference,
                 parentSlotStability,
                 "after"),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         return new SlotScenario(
             counter,

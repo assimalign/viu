@@ -87,7 +87,7 @@ public sealed class RendererBuiltInParityTests
                     targetWasEmptyDuringRender = target.Children.Count == 0;
                 }));
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         targetWasEmptyDuringRender.ShouldBeTrue();
         targetWasNotResolvedDuringRender.ShouldBeTrue();
@@ -123,7 +123,7 @@ public sealed class RendererBuiltInParityTests
                     targetWasNotResolvedDuringRender = host.TeleportResolveCount == 0;
                 }));
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         contentWasLogicalDuringRender.ShouldBeTrue();
         targetHadNoContentDuringRender.ShouldBeTrue();
@@ -153,7 +153,7 @@ public sealed class RendererBuiltInParityTests
 
         renderer.Render(initial, host.Container, application);
         RendererParityNode target = host.CreateTeleportTarget("#too-late");
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         host.TeleportResolveCount.ShouldBe(1);
         target.Children.ShouldBeEmpty();
@@ -188,7 +188,7 @@ public sealed class RendererBuiltInParityTests
                     targetWasEmptyDuringRender = target.Children.Count == 0;
                 }));
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         targetWasEmptyDuringRender.ShouldBeTrue();
         TextChildren(target).ShouldHaveSingleItem().Text.ShouldBe("latest");
@@ -215,7 +215,7 @@ public sealed class RendererBuiltInParityTests
                     renderer.Render(null, host.Container);
                 }));
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         target.Children.ShouldBeEmpty();
         host.TeleportResolveCount.ShouldBe(0);
@@ -331,7 +331,7 @@ public sealed class RendererBuiltInParityTests
                     PatchFlags.NeedPatch,
                     dynamicChildren: [initialDynamic])),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode[] initialElements = ElementChildren(target);
         RendererParityNode staticHost = initialElements[0];
         RendererParityNode dynamicHost = initialElements[1];
@@ -355,7 +355,7 @@ public sealed class RendererBuiltInParityTests
                     PatchFlags.NeedPatch,
                     dynamicChildren: [nextDynamic])),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         RendererParityNode[] updatedElements = ElementChildren(target);
         updatedElements[0].ShouldBeSameAs(staticHost);
@@ -497,7 +497,7 @@ public sealed class RendererBuiltInParityTests
                 ("b", "#mixed", "B", true)),
             host.Container);
 
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         TextChildren(target).Select(node => node.Text).ShouldBe(["X", "A", "B"]);
     }
 
@@ -519,10 +519,10 @@ public sealed class RendererBuiltInParityTests
             ]);
         ApplicationContext application = CreateApplication(initial, components);
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         renderer.Render(null, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         target.Children.ShouldBeEmpty();
         events.Count(value => value == "Teleported:unmounted").ShouldBe(1);
@@ -598,7 +598,7 @@ public sealed class RendererBuiltInParityTests
         ApplicationContext application = CreateApplication(initial, components);
 
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         MountedComponentView<RendererParityNode> firstAlpha = FindView(
             renderer,
             host,
@@ -608,7 +608,7 @@ public sealed class RendererBuiltInParityTests
             KeepAlive("Beta", ("maximum", 1)),
             host.Container,
             application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         firstAlpha.IsMounted.ShouldBeFalse();
         events.Count(value => value == "Alpha:deactivated").ShouldBe(1);
@@ -620,7 +620,7 @@ public sealed class RendererBuiltInParityTests
             KeepAlive("Alpha", ("maximum", 1)),
             host.Container,
             application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         instances.Count(instance => instance.Name == "Alpha").ShouldBe(2);
         FindView(renderer, host, "Alpha").Instance.ShouldNotBeSameAs(firstAlpha.Instance);
@@ -640,7 +640,7 @@ public sealed class RendererBuiltInParityTests
         KeepAliveNode initial = KeepAliveWithComponentKey("Alpha", "shared");
         ApplicationContext application = CreateApplication(initial, components);
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         MountedComponentView<RendererParityNode> alpha = FindView(
             renderer,
             host,
@@ -650,7 +650,7 @@ public sealed class RendererBuiltInParityTests
             KeepAliveWithComponentKey("Beta", "shared"),
             host.Container,
             application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         alpha.IsMounted.ShouldBeFalse();
         events.Count(value => value == "Alpha:deactivated").ShouldBe(1);
@@ -660,7 +660,7 @@ public sealed class RendererBuiltInParityTests
             .ShouldBe(["Beta"]);
 
         renderer.Render(null, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         events.Count(value => value == "Alpha:unmounted").ShouldBe(1);
     }
 
@@ -682,17 +682,17 @@ public sealed class RendererBuiltInParityTests
         ApplicationContext application = CreateApplication(initial, components);
 
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(
             KeepAlive("Beta", ("include", include)),
             host.Container,
             application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(
             KeepAlive("Alpha", ("include", include)),
             host.Container,
             application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         instances.Count(instance => instance.Name == "Alpha").ShouldBe(1);
         instances.Count(instance => instance.Name == "Beta").ShouldBe(1);
@@ -713,19 +713,19 @@ public sealed class RendererBuiltInParityTests
         KeepAliveNode initial = KeepAlive("Alpha");
         ApplicationContext application = CreateApplication(initial, components);
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(KeepAlive("Beta"), host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         renderer.Render(
             KeepAlive("Beta", ("include", "Beta")),
             host.Container,
             application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         events.Count(value => value == "Alpha:unmounted").ShouldBe(1);
         renderer.Render(KeepAlive("Alpha"), host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         instances.Count(instance => instance.Name == "Alpha").ShouldBe(2);
     }
 
@@ -758,7 +758,7 @@ public sealed class RendererBuiltInParityTests
         ApplicationContext application = CreateApplication(initial, components);
 
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         events.Where(IsInnerOrOuterLifecycle).ShouldBe(
         [
@@ -768,7 +768,7 @@ public sealed class RendererBuiltInParityTests
 
         events.Clear();
         renderer.Render(KeepAlive("Alternative"), host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         events.Where(IsInnerOrOuterLifecycle).ShouldBe(
         [
@@ -778,7 +778,7 @@ public sealed class RendererBuiltInParityTests
 
         events.Clear();
         renderer.Render(KeepAlive("Outer"), host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         events.Where(IsInnerOrOuterLifecycle).ShouldBe(
         [
@@ -799,11 +799,11 @@ public sealed class RendererBuiltInParityTests
         KeepAliveNode initial = KeepAlive("Alpha");
         ApplicationContext application = CreateApplication(initial, components);
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         events.Clear();
 
         renderer.Render(null, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         events.ShouldBe(
         [
@@ -814,7 +814,7 @@ public sealed class RendererBuiltInParityTests
     }
 
     [Fact]
-    public async Task Suspense_PendingAsynchronousContent_ShowsFallbackThenRevealsContent()
+    public void Suspense_PendingAsynchronousContent_ShowsFallbackThenRevealsContent()
     {
         using var host = new RendererParityHost();
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
@@ -847,8 +847,7 @@ public sealed class RendererBuiltInParityTests
         fallback.Text.ShouldBe("waiting");
 
         load.SetResult(new AsynchronousComponentTarget(targetReference));
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         fallback.Parent.ShouldBeNull();
         TextChildren(host.Container).ShouldHaveSingleItem().Text.ShouldBe("resolved");
@@ -1088,22 +1087,6 @@ public sealed class RendererBuiltInParityTests
                 RootComponent = root,
                 Components = components,
             });
-    }
-
-    private static async Task WaitForPendingSchedulerFlushAsync()
-    {
-        for (int attempt = 0; attempt < 1000; attempt++)
-        {
-            if (Scheduler.IsFlushPending)
-            {
-                return;
-            }
-
-            await Task.Delay(1);
-        }
-
-        throw new InvalidOperationException(
-            "The asynchronous component did not schedule renderer work.");
     }
 
     private sealed class KeepAliveProbeComponent : IComponent

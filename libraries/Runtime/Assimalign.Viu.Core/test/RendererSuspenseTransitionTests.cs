@@ -15,7 +15,7 @@ namespace Assimalign.Viu.Core.Tests;
 public sealed class RendererSuspenseTransitionTests
 {
     [Fact]
-    public async Task Resolve_FallbackHasAsynchronousLeave_KeepsFallbackUntilLeaveCompletes()
+    public void Resolve_FallbackHasAsynchronousLeave_KeepsFallbackUntilLeaveCompletes()
     {
         using RendererParityHost host = new();
         TaskCompletionSource<AsynchronousComponentTarget> load = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -40,7 +40,7 @@ public sealed class RendererSuspenseTransitionTests
         RendererParityNode fallbackElement = host.Container.Children.Single(node => node.Kind == RendererParityNodeKind.Element);
 
         load.SetResult(AsynchronousComponentTarget.From<TransitionTarget>());
-        await FlushUntilAsync(host, () => completeLeave is not null);
+        host.RunUntilIdle();
 
         // [BLT-13]: reveal and resolve are held behind the outgoing fallback's leave callback.
         VisibleText(host.Container).ShouldBe("waiting");
@@ -48,20 +48,20 @@ public sealed class RendererSuspenseTransitionTests
         events.ShouldBe(["pending", "fallback", "before-leave", "leave"]);
 
         completeLeave.ShouldNotBeNull()();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("resolved");
         fallbackElement.Parent.ShouldBeNull();
         // [BLT-13]: leave completion reveals content before the transition's after-leave notification.
         events.ShouldBe(["pending", "fallback", "before-leave", "leave", "resolve", "after-leave"]);
         completeLeave();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         events.Count(value => value == "resolve").ShouldBe(1);
         renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public async Task Mount_ContentHasAppearTransition_DefersEnterHooksUntilReveal()
+    public void Mount_ContentHasAppearTransition_DefersEnterHooksUntilReveal()
     {
         using RendererParityHost host = new();
         TaskCompletionSource<AsynchronousComponentTarget> load = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -94,7 +94,7 @@ public sealed class RendererSuspenseTransitionTests
         transitionCalls.ShouldBeEmpty();
         VisibleText(host.Container).ShouldBe("waiting");
         load.SetResult(AsynchronousComponentTarget.From<TransitionTarget>());
-        await FlushUntilAsync(host, () => events.Contains("resolve"));
+        host.RunUntilIdle();
 
         VisibleText(host.Container).ShouldBe("resolved");
         transitionCalls.ShouldBe(["before-appear", "appear", "after-appear"]);
@@ -130,22 +130,6 @@ public sealed class RendererSuspenseTransitionTests
             new ComponentContract(),
             _ => new TransitionTarget()));
         return new(new ApplicationOptions { RootComponent = root, Components = components });
-    }
-
-    private static async Task FlushUntilAsync(RendererParityHost host, Func<bool> completed)
-    {
-        for (int attempt = 0; attempt < 5000; attempt++)
-        {
-            host.RunScheduledFlushes();
-            if (completed())
-            {
-                return;
-            }
-
-            await Task.Delay(1);
-        }
-
-        throw new InvalidOperationException("The Suspense transition did not reach the expected phase.");
     }
 
     private static string VisibleText(RendererParityNode node) =>

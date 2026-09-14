@@ -19,6 +19,8 @@ public static partial class Scheduler
         return new SchedulerTimeProviderRegistration(State, timeProvider);
     }
 
+    internal static TimeProvider CurrentTimeProvider => State.TimeProvider;
+
     internal static IDisposable ScheduleDelay(int milliseconds, Action callback) =>
         new SchedulerDelay(State.TimeProvider, milliseconds, callback);
 }

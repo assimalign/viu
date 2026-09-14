@@ -25,7 +25,7 @@ public sealed class TransitionRendererTests
                 () => Element("div", "content"),
                 recorder.Build()),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         recorder.Calls.ShouldBeEmpty();
         Elements(host.Container).ShouldHaveSingleItem().Description.ShouldBe("div");
@@ -61,7 +61,7 @@ public sealed class TransitionRendererTests
         renderer.Render(
             Transition(() => Element("div", "content"), properties),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode outgoing = Elements(host.Container).ShouldHaveSingleItem();
 
         renderer.Render(
@@ -100,7 +100,7 @@ public sealed class TransitionRendererTests
         renderer.Render(
             Transition(() => Element("div", "first"), properties),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         renderer.Render(
             Transition(() => Element("span", "second"), properties),
@@ -132,7 +132,7 @@ public sealed class TransitionRendererTests
         renderer.Render(
             Transition(() => Element("div", "first"), properties),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         renderer.Render(
             Transition(() => Element("span", "second"), properties),
@@ -166,7 +166,7 @@ public sealed class TransitionRendererTests
         renderer.Render(
             Transition(() => Element("div", "first"), properties),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         renderer.Render(
             Transition(() => Element("span", "second"), properties),
@@ -194,7 +194,7 @@ public sealed class TransitionRendererTests
                 static () => Group(("a", "a"), ("b", "b")),
                 properties),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode firstA = Elements(host.Container)[0];
         RendererParityNode firstB = Elements(host.Container)[1];
 
@@ -222,7 +222,7 @@ public sealed class TransitionRendererTests
             key: "item");
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         renderer.Render(new FragmentNode([item]), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode element = Elements(host.Container).ShouldHaveSingleItem();
 
         renderer.Render(new FragmentNode([]), host.Container);
@@ -247,7 +247,7 @@ public sealed class TransitionRendererTests
             key: "item");
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         renderer.Render(new FragmentNode([item]), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode element = Elements(host.Container).ShouldHaveSingleItem();
         renderer.Render(new FragmentNode([]), host.Container);
 
@@ -273,7 +273,7 @@ public sealed class TransitionRendererTests
         renderer.Render(
             Transition(() => Element("div", "first"), properties),
             host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(
             Transition(() => Element("span", "second"), properties),
             host.Container);
@@ -316,13 +316,13 @@ public sealed class TransitionRendererTests
                 _ => component));
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         renderer.Render(root, host.Container, Application(root, components: components));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode outgoing = Elements(host.Container).ShouldHaveSingleItem();
         show.Value = false;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         show.Value = true;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         recorder.Calls.ShouldBe(
         [
@@ -353,7 +353,7 @@ public sealed class TransitionRendererTests
                 _ => component));
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         renderer.Render(root, host.Container, Application(root, components: components));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         renderer.Render(new CommentNode("removed"), host.Container);
 
@@ -382,7 +382,7 @@ public sealed class TransitionRendererTests
             initial,
             host.Container,
             Application(initial, directive: directive));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode element = Elements(host.Container).ShouldHaveSingleItem();
 
         created.ShouldNotBeNull().BeforeEnter(element);
@@ -487,7 +487,7 @@ public sealed class TransitionRendererTests
             initial,
             host.Container,
             Application(initial, components: components));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         renderer.Render(
             Transition(() => SnapshotGroup(reference, "updated"), properties),
@@ -524,7 +524,7 @@ public sealed class TransitionRendererTests
                 directive: directive,
                 errorHandler: (exception, _, information) =>
                     failures.Add((exception, information))));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode element = Elements(host.Container).ShouldHaveSingleItem();
         int removals = 0;
 
@@ -573,10 +573,10 @@ public sealed class TransitionRendererTests
                 _ => component));
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         renderer.Render(root, host.Container, Application(root, components: components));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         showSecond.Value = true;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         component.EnterCount.ShouldBe(1);
         component.AfterEnterCount.ShouldBe(0);
@@ -606,10 +606,10 @@ public sealed class TransitionRendererTests
                 _ => component));
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         renderer.Render(root, host.Container, Application(root, components: components));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         replace.Value = true;
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         recorder.Calls.ShouldBe(
         [
@@ -645,7 +645,7 @@ public sealed class TransitionRendererTests
             nested,
             host.Container,
             Application(nested, directive: directive));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         outer.Calls.ShouldBeEmpty();
         inner.Calls.ShouldBeEmpty();
@@ -675,7 +675,7 @@ public sealed class TransitionRendererTests
             transition,
             host.Container,
             Application(transition, directive: directive));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         RendererParityNode element = Elements(host.Container).ShouldHaveSingleItem();
         int removals = 0;
 
@@ -801,7 +801,7 @@ public sealed class TransitionRendererTests
             Application(
                 initial,
                 errorHandler: (exception, _, _) => failures.Add(exception)));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         Action replace = () => renderer.Render(
             Transition(
@@ -841,7 +841,7 @@ public sealed class TransitionRendererTests
             Application(
                 initial,
                 errorHandler: (exception, _, _) => failures.Add(exception)));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         var expected = new NotSupportedException("host removal failed");
         host.RemovalFailure = expected;
 
@@ -883,7 +883,7 @@ public sealed class TransitionRendererTests
             Application(
                 initial,
                 errorHandler: (exception, _, _) => failures.Add(exception)));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         Action replace = () => renderer.Render(
             Transition(
@@ -919,7 +919,7 @@ public sealed class TransitionRendererTests
                 initial,
                 errorHandler: (exception, _, information) =>
                     failures.Add((exception, information))));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         Should.NotThrow(
             () => renderer.Render(

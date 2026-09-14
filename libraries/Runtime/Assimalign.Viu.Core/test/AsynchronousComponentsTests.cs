@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -9,6 +8,7 @@ using Xunit;
 using Assimalign.Viu;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Core.Tests;
 
@@ -62,11 +62,15 @@ public sealed class AsynchronousComponentsTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
             AsynchronousComponents.Define<WrapperIdentityComponent>(
-                _ =>
+                new AsynchronousComponentOptions
                 {
-                    loadRuns++;
-                    loaderStarted.TrySetResult();
-                    return loaderCompletion.Task;
+                    Loader = _ =>
+                    {
+                        loadRuns++;
+                        loaderStarted.TrySetResult();
+                        return loaderCompletion.Task;
+                    },
+                    Delay = 0,
                 });
         ComponentFactory components = new();
         components.Register(definition.Registration);
@@ -76,12 +80,19 @@ public sealed class AsynchronousComponentsTests
             arguments: new Dictionary<string, object?> { ["value"] = 42 });
         ComponentNode requestNode = definition.CreateComponent(invocation);
 
-        Task<IComponentRenderScope> firstRender = host.RenderAsync(
-            new ComponentRenderRequest(requestNode)).AsTask();
-        Task<IComponentRenderScope> secondRender = host.RenderAsync(
-            new ComponentRenderRequest(requestNode)).AsTask();
-        await loaderStarted.Task;
-        loaderCompletion.SetResult(AsynchronousComponentTarget.From<TargetComponent>());
+        Task<IComponentRenderScope> firstRender;
+        Task<IComponentRenderScope> secondRender;
+        using (TestSynchronizationContext synchronizationContext = TestSynchronizationContext.Install())
+        using (TestSchedulerPump pump = TestSchedulerPump.Install(synchronizationContext))
+        {
+            // [V01.01.03.20]: shared wrapper state settles on one execution flow before
+            // awaiting the server host's independent render leases.
+            firstRender = host.RenderAsync(new ComponentRenderRequest(requestNode)).AsTask();
+            secondRender = host.RenderAsync(new ComponentRenderRequest(requestNode)).AsTask();
+            loaderStarted.Task.IsCompletedSuccessfully.ShouldBeTrue();
+            loaderCompletion.SetResult(AsynchronousComponentTarget.From<TargetComponent>());
+            pump.RunUntilIdle();
+        }
 
         await using IComponentRenderScope firstScope = await firstRender;
         await using IComponentRenderScope secondScope = await secondRender;
@@ -141,9 +152,11 @@ public sealed class AsynchronousComponentsTests
     }
 
     [Fact]
-    public async Task Renderer_LoadingDelayAndResolution_AdvanceThroughDistinctPresentations()
+    public void Renderer_LoadingDelayAndResolution_AdvanceThroughDistinctPresentations()
     {
         using var host = new RendererParityHost();
+        var clock = new ManualTimeProvider();
+        using IDisposable clockRegistration = Scheduler.UseTimeProvider(clock);
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
@@ -164,26 +177,30 @@ public sealed class AsynchronousComponentsTests
         renderer.Render(request, host.Container, application);
 
         host.Container.DescendantText.ShouldBe(string.Empty);
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        clock.Advance(TimeSpan.FromMilliseconds(19));
+        host.RunUntilIdle();
+        host.Container.DescendantText.ShouldBe(string.Empty);
+
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        host.RunUntilIdle();
         host.Container.DescendantText.ShouldBe("loading");
 
         load.SetResult(AsynchronousComponentTarget.From<ParameterTargetComponent>());
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         host.Container.DescendantText.ShouldBe("resolved");
         renderer.Render(null, host.Container);
+        host.RunUntilIdle();
     }
 
     [Fact]
-    public async Task Renderer_TimeoutWithErrorPresentation_RoutesAncestorAndApplicationExactlyOnce()
+    public void Renderer_TimeoutWithErrorPresentation_RoutesAncestorAndApplicationExactlyOnce()
     {
         using var host = new RendererParityHost();
+        var clock = new ManualTimeProvider();
+        using IDisposable clockRegistration = Scheduler.UseTimeProvider(clock);
         List<string> captured = [];
         List<string> handled = [];
-        TaskCompletionSource routed = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
@@ -211,17 +228,26 @@ public sealed class AsynchronousComponentsTests
                 ErrorHandler = (error, _, information) =>
                 {
                     handled.Add($"{information}:{error.Message}");
-                    routed.TrySetResult();
                 },
             });
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
 
         renderer.Render(root, host.Container, application);
-        await routed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
-        await Task.Delay(40);
-        host.RunScheduledFlushes();
+        clock.Advance(TimeSpan.FromMilliseconds(19));
+        host.RunUntilIdle();
+        host.Container.DescendantText.ShouldBe(string.Empty);
+        captured.ShouldBeEmpty();
+        handled.ShouldBeEmpty();
+
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        host.RunUntilIdle();
+        host.Container.DescendantText.ShouldBe(
+            "Asynchronous component timed out after 20ms.");
+        captured.Count.ShouldBe(1);
+        handled.Count.ShouldBe(1);
+
+        clock.Advance(TimeSpan.FromMilliseconds(40));
+        host.RunUntilIdle();
 
         host.Container.DescendantText.ShouldBe(
             "Asynchronous component timed out after 20ms.");
@@ -234,15 +260,16 @@ public sealed class AsynchronousComponentsTests
             "asynchronous component loader:Asynchronous component timed out after 20ms.",
         ]);
         renderer.Render(null, host.Container);
+        host.RunUntilIdle();
     }
 
     [Fact]
-    public async Task Renderer_TimeoutThenLoaderFailure_RoutesOnlyTheFirstFailure()
+    public void Renderer_TimeoutThenLoaderFailure_RoutesOnlyTheFirstFailure()
     {
         using var host = new RendererParityHost();
+        var clock = new ManualTimeProvider();
+        using IDisposable clockRegistration = Scheduler.UseTimeProvider(clock);
         List<string> handled = [];
-        TaskCompletionSource firstFailure = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
@@ -263,23 +290,32 @@ public sealed class AsynchronousComponentsTests
                 ErrorHandler = (error, _, _) =>
                 {
                     handled.Add(error.Message);
-                    firstFailure.TrySetResult();
                 },
             });
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
 
         renderer.Render(request, host.Container, application);
-        await firstFailure.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await WaitForPendingSchedulerFlushAsync();
-        host.RunScheduledFlushes();
+        clock.Advance(TimeSpan.FromMilliseconds(19));
+        host.RunUntilIdle();
+        handled.ShouldBeEmpty();
+        host.Container.DescendantText.ShouldBe(string.Empty);
+
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        host.RunUntilIdle();
+        handled.ShouldBe(["Asynchronous component timed out after 20ms."]);
+        host.Container.DescendantText.ShouldBe(
+            "Asynchronous component timed out after 20ms.");
+
         load.SetException(new InvalidOperationException("late loader failure"));
-        await Task.Delay(50);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
+        clock.Advance(TimeSpan.FromMilliseconds(50));
+        host.RunUntilIdle();
 
         handled.ShouldBe(["Asynchronous component timed out after 20ms."]);
         host.Container.DescendantText.ShouldBe(
             "Asynchronous component timed out after 20ms.");
         renderer.Render(null, host.Container);
+        host.RunUntilIdle();
     }
 
     [Fact]
@@ -306,10 +342,13 @@ public sealed class AsynchronousComponentsTests
                 ErrorHandler = (_, _, _) => handledErrors++,
             });
 
-        host.CreateRenderer().Render(request, host.Container, application);
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(request, host.Container, application);
 
         host.Container.DescendantText.ShouldBe("failed");
         handledErrors.ShouldBe(1);
+        renderer.Render(null, host.Container);
+        host.RunUntilIdle();
     }
 
     [Fact]
@@ -319,8 +358,12 @@ public sealed class AsynchronousComponentsTests
         List<Exception> handled = [];
         AsynchronousComponentDefinition definition =
             AsynchronousComponents.Define<WrapperIdentityComponent>(
-                _ => Task.FromException<AsynchronousComponentTarget>(
-                    new InvalidOperationException("unhandled-load")));
+                new AsynchronousComponentOptions
+                {
+                    Loader = _ => Task.FromException<AsynchronousComponentTarget>(
+                        new InvalidOperationException("unhandled-load")),
+                    Delay = 0,
+                });
         ComponentNode request = definition.CreateComponent();
         ComponentFactory components = CreateAsynchronousFactory(definition);
         ApplicationContext application = CreateApplication(
@@ -331,12 +374,15 @@ public sealed class AsynchronousComponentsTests
                 ErrorHandler = (error, _, _) => handled.Add(error),
             });
 
-        host.CreateRenderer().Render(request, host.Container, application);
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(request, host.Container, application);
 
         handled.ShouldHaveSingleItem()
             .ShouldBeOfType<InvalidOperationException>()
             .Message.ShouldBe("unhandled-load");
         host.Container.DescendantText.ShouldBe(string.Empty);
+        renderer.Render(null, host.Container);
+        host.RunUntilIdle();
     }
 
     [Fact]
@@ -369,7 +415,8 @@ public sealed class AsynchronousComponentsTests
                 arguments: new Dictionary<string, object?> { ["message"] = "retried" }));
         ComponentFactory components = CreateAsynchronousFactory(definition);
 
-        host.CreateRenderer().Render(
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(
             request,
             host.Container,
             CreateApplication(request, components));
@@ -377,6 +424,8 @@ public sealed class AsynchronousComponentsTests
         host.Container.DescendantText.ShouldBe("retried");
         loaderRuns.ShouldBe(3);
         attempts.ShouldBe([1, 2]);
+        renderer.Render(null, host.Container);
+        host.RunUntilIdle();
     }
 
     [Fact]
@@ -396,17 +445,21 @@ public sealed class AsynchronousComponentsTests
                     },
                     ErrorComponent = error => new TextNode(error.Message),
                     OnError = (_, _, fail, _) => fail(),
+                    Delay = 0,
                 });
         ComponentNode request = definition.CreateComponent();
         ComponentFactory components = CreateAsynchronousFactory(definition);
 
-        host.CreateRenderer().Render(
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(
             request,
             host.Container,
             CreateApplication(request, components));
 
         host.Container.DescendantText.ShouldBe("not-retriable");
         loaderRuns.ShouldBe(1);
+        renderer.Render(null, host.Container);
+        host.RunUntilIdle();
     }
 
     [Fact]
@@ -417,15 +470,23 @@ public sealed class AsynchronousComponentsTests
         int cancellations = 0;
         AsynchronousComponentDefinition definition =
             AsynchronousComponents.Define<WrapperIdentityComponent>(
-                async cancellationToken =>
+                new AsynchronousComponentOptions
                 {
-                    Interlocked.Increment(ref loaderRuns);
-                    // The load state's token source owns this registration until the task settles.
-                    // Disposing it from the canceled continuation can race Cancel's callback walk.
-                    _ = cancellationToken.Register(
-                        () => Interlocked.Increment(ref cancellations));
-                    await Task.Delay(Timeout.Infinite, cancellationToken);
-                    return AsynchronousComponentTarget.From<ParameterTargetComponent>();
+                    Loader = cancellationToken =>
+                    {
+                        loaderRuns++;
+                        TaskCompletionSource<AsynchronousComponentTarget> completion = new(
+                            TaskCreationOptions.RunContinuationsAsynchronously);
+                        // The load state's token source owns this registration until the task settles.
+                        _ = cancellationToken.Register(
+                            () =>
+                            {
+                                cancellations++;
+                                completion.TrySetCanceled(cancellationToken);
+                            });
+                        return completion.Task;
+                    },
+                    Delay = 0,
                 });
         FragmentNode both = new(
         [
@@ -443,18 +504,20 @@ public sealed class AsynchronousComponentsTests
         renderer.Render(both, host.Container, application);
         renderer.Render(one, host.Container);
 
-        Volatile.Read(ref loaderRuns).ShouldBe(1);
-        Volatile.Read(ref cancellations).ShouldBe(0);
+        loaderRuns.ShouldBe(1);
+        cancellations.ShouldBe(0);
 
         renderer.Render(null, host.Container);
+        host.RunUntilIdle();
 
-        Volatile.Read(ref cancellations).ShouldBe(1);
+        cancellations.ShouldBe(1);
 
         renderer.Render(one, host.Container, application);
 
-        Volatile.Read(ref loaderRuns).ShouldBe(2);
+        loaderRuns.ShouldBe(2);
         renderer.Render(null, host.Container);
-        Volatile.Read(ref cancellations).ShouldBe(2);
+        host.RunUntilIdle();
+        cancellations.ShouldBe(2);
     }
 
     private static ComponentFactory CreateAsynchronousFactory(
@@ -480,22 +543,6 @@ public sealed class AsynchronousComponentsTests
         options.RootComponent = root;
         options.Components = components;
         return new ApplicationContext(options);
-    }
-
-    private static async Task WaitForPendingSchedulerFlushAsync()
-    {
-        for (int attempt = 0; attempt < 5000; attempt++)
-        {
-            if (Scheduler.IsFlushPending)
-            {
-                return;
-            }
-
-            await Task.Delay(1);
-        }
-
-        throw new InvalidOperationException(
-            "The asynchronous component did not schedule renderer work.");
     }
 
     private sealed class TargetComponent : IComponent

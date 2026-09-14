@@ -56,7 +56,7 @@ public sealed class RendererBlockTeardownTests
                 Components = components,
             });
         renderer.Render(root, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         Renderer<RendererParityNode>.UnmountVisitCount = 0;
 
         renderer.Render(null, host.Container);

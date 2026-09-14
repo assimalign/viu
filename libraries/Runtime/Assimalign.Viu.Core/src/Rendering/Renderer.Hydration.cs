@@ -570,7 +570,8 @@ public sealed partial class Renderer<TNode>
         MountedLazyHydration<TNode> mounted,
         SchedulerJob activationJob)
     {
-        await readiness.ConfigureAwait(false);
+        // [V01.01.03.20], [BLT-13]: readiness and teardown share the mounting host's flow.
+        await readiness;
         if (!mounted.IsUnmounted && !activationJob.IsDisposed)
         {
             Scheduler.QueuePostFlushCallback(activationJob);

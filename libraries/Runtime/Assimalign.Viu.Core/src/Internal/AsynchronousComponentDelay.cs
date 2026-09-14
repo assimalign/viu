@@ -9,7 +9,7 @@ internal static class AsynchronousComponentDelay
     internal static IDisposable Schedule(int milliseconds, Action callback)
     {
         DelayTimer timer = new();
-        timer.Start(milliseconds, callback);
+        timer.Start(milliseconds, callback, Scheduler.CurrentTimeProvider);
         return timer;
     }
 
@@ -17,19 +17,26 @@ internal static class AsynchronousComponentDelay
     {
         private readonly CancellationTokenSource _cancellation = new();
 
-        internal void Start(int milliseconds, Action callback)
+        internal void Start(
+            int milliseconds,
+            Action callback,
+            TimeProvider timeProvider)
         {
-            _ = RunAsync(milliseconds, callback, _cancellation.Token);
+            _ = RunAsync(milliseconds, callback, timeProvider, _cancellation.Token);
         }
 
         private static async Task RunAsync(
             int milliseconds,
             Action callback,
+            TimeProvider timeProvider,
             CancellationToken cancellationToken)
         {
             try
             {
-                await Task.Delay(milliseconds, cancellationToken);
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(milliseconds),
+                    timeProvider,
+                    cancellationToken);
             }
             catch (OperationCanceledException)
             {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Components;
+using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Core.Tests;
 
@@ -61,8 +62,8 @@ internal sealed class RendererParityNode
 
 internal sealed class RendererParityHost : IDisposable
 {
-    private readonly Queue<Action> _scheduledFlushes = [];
-    private readonly IDisposable _schedulerRegistration;
+    private readonly TestSynchronizationContext _synchronizationContext;
+    private readonly TestSchedulerPump _schedulerPump;
     private readonly Dictionary<string, RendererParityNode> _teleportTargets =
         new(StringComparer.Ordinal);
     private bool _isDisposed;
@@ -70,7 +71,9 @@ internal sealed class RendererParityHost : IDisposable
     internal RendererParityHost()
     {
         Scheduler.Reset();
-        _schedulerRegistration = Scheduler.UseFlushDispatcher(_scheduledFlushes.Enqueue);
+        // [V01.01.03.20], [BLT-13]: loaders and flushes share the host's single execution flow.
+        _synchronizationContext = TestSynchronizationContext.Install();
+        _schedulerPump = TestSchedulerPump.Install(_synchronizationContext);
         Container = new RendererParityNode(
             RendererParityNodeKind.Container,
             "root container");
@@ -135,17 +138,7 @@ internal sealed class RendererParityHost : IDisposable
         TeleportResolveCount = 0;
     }
 
-    internal int RunScheduledFlushes()
-    {
-        int count = 0;
-        while (_scheduledFlushes.Count > 0)
-        {
-            _scheduledFlushes.Dequeue()();
-            count++;
-        }
-
-        return count;
-    }
+    internal int RunUntilIdle() => _schedulerPump.RunUntilIdle();
 
     public void Dispose()
     {
@@ -155,9 +148,18 @@ internal sealed class RendererParityHost : IDisposable
         }
 
         Scheduler.Reset();
-        _scheduledFlushes.Clear();
-        _schedulerRegistration.Dispose();
-        _isDisposed = true;
+        try
+        {
+            // Consume canceled loads and stale flush callbacks after renderer teardown.
+            RunUntilIdle();
+        }
+        finally
+        {
+            Scheduler.Reset();
+            _schedulerPump.Dispose();
+            _isDisposed = true;
+            _synchronizationContext.Dispose();
+        }
     }
 
     private void Insert(

@@ -22,11 +22,11 @@ public sealed class DirectiveRendererTests
         ApplicationContext application = CreateApplication(initial, directive);
 
         renderer.Render(initial, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(DirectedElement(2), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(null, host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         phases.ShouldBe(
         [
@@ -48,12 +48,12 @@ public sealed class DirectiveRendererTests
         List<string> phases = [];
 
         renderer.Render(LifecycleElement("first", phases), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         host.ResetOperationCounts();
         renderer.Render(LifecycleElement("second", phases), host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
         renderer.Render(null, host.Container);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         phases.ShouldBe(
         [
@@ -90,7 +90,7 @@ public sealed class DirectiveRendererTests
             });
 
         renderer.Render(root, host.Container, application);
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         observed.ShouldNotBeNull().Message.ShouldBe("directive failed");
         diagnosticInformation.ShouldBe("Mounted directive lifecycle hook");
@@ -127,7 +127,7 @@ public sealed class DirectiveRendererTests
             ]);
 
         renderer.Render(root, host.Container, CreateApplication(root, directive));
-        host.RunScheduledFlushes();
+        host.RunUntilIdle();
 
         descendants.ShouldNotBeNull().Count.ShouldBe(2);
         descendants[0].Value.Name.LocalName.ShouldBe("option");
