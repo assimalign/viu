@@ -26,6 +26,48 @@ public sealed class BrowserRouterScrollTests : IDisposable
     }
 
     [Fact]
+    public async Task PushAsync_FragmentDestination_ExplicitBehaviorBuildsSelectorFromLocation()
+    {
+        // [RTR-9], [RTR-12]: a fragment reaches host policy as raw text; scrolling stays explicit.
+        RecordingBrowserHistoryInterop interop = new([]);
+        using BrowserRouterHistoryImplementation history = CreateHistory(interop);
+        using global::Assimalign.Viu.Router.Router router = new(history, [new RouteRecord("/current")]);
+        (await router.ReadyAsync()).ShouldBeNull();
+        RouteLocation? receivedDestination = null;
+        RouteLocation? receivedOrigin = null;
+        router.ScrollBehavior = (to, from, _) =>
+        {
+            receivedDestination = to;
+            receivedOrigin = from;
+            return Task.FromResult<ScrollTarget?>(new ScrollTarget("#" + to.Fragment));
+        };
+
+        (await router.PushAsync("/current?mode=full#details")).ShouldBeNull();
+
+        receivedDestination.ShouldNotBeNull().Path.ShouldBe("/current");
+        receivedDestination.RawQuery.ShouldBe("mode=full");
+        receivedDestination.Fragment.ShouldBe("details");
+        receivedOrigin.ShouldNotBeNull().Fragment.ShouldBeEmpty();
+        interop.ScrollCount.ShouldBe(1);
+        interop.LastScrollTarget.ShouldNotBeNull().Selector.ShouldBe("#details");
+    }
+
+    [Fact]
+    public async Task PushAsync_FragmentWithoutBehavior_DoesNotScrollImplicitly()
+    {
+        // [RTR-12]: changing a fragment confirms the location, but supplies no implicit target.
+        RecordingBrowserHistoryInterop interop = new([]);
+        using BrowserRouterHistoryImplementation history = CreateHistory(interop);
+        using global::Assimalign.Viu.Router.Router router = new(history, [new RouteRecord("/current")]);
+        (await router.ReadyAsync()).ShouldBeNull();
+
+        (await router.PushAsync("/current#details")).ShouldBeNull();
+
+        router.CurrentRoute.Value.Fragment.ShouldBe("details");
+        interop.ScrollCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task ApplyAsync_PendingRenderFlush_ThenSelectorTargetUsesOneScrollCall()
     {
         List<string> order = [];

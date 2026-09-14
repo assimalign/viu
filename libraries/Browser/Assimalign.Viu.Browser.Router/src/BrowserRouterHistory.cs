@@ -35,7 +35,10 @@ public static class BrowserRouterHistory
     public static Task InitializeAsync(CancellationToken cancellationToken = default)
         => initialization ??= InitializeCoreAsync(cancellationToken);
 
-    /// <summary>Creates a deferred clean-URL HTML History API integration.</summary>
+    /// <summary>
+    /// Creates a deferred clean-URL HTML History API integration. Location and state links preserve
+    /// the complete path, raw query, and fragment, including empty delimiters. Specified by <c>[RTR-12]</c>.
+    /// </summary>
     /// <param name="basePath">
     /// The base path, or <see langword="null"/> to use the document base element and then root.
     /// </param>
@@ -49,7 +52,11 @@ public static class BrowserRouterHistory
             static () => new JavaScriptBrowserHistoryInterop());
     }
 
-    /// <summary>Creates a deferred hash-based HTML History API integration.</summary>
+    /// <summary>
+    /// Creates a deferred hash-based HTML History API integration. The location following the hash
+    /// base includes its own query and fragment: <c>#/guide#section</c> resolves path <c>/guide</c>
+    /// with fragment <c>section</c>. Specified by <c>[RTR-12]</c>.
+    /// </summary>
     /// <param name="basePath">
     /// The hash base, or <see langword="null"/> to derive it from the current document URL.
     /// </param>

@@ -1,4 +1,35 @@
 #nullable enable
+Assimalign.Viu.Router.RouteQuery
+Assimalign.Viu.Router.RouteQuery.RouteQuery() -> void
+Assimalign.Viu.Router.RouteQuery.Count.get -> int
+Assimalign.Viu.Router.RouteQuery.Names.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Assimalign.Viu.Router.RouteQuery.RawText.get -> string!
+Assimalign.Viu.Router.RouteQuery.Equals(Assimalign.Viu.Router.RouteQuery other) -> bool
+Assimalign.Viu.Router.RouteQuery.GetString(string! name) -> string!
+Assimalign.Viu.Router.RouteQuery.GetStrings(string! name) -> System.Collections.Generic.IReadOnlyList<string!>!
+Assimalign.Viu.Router.RouteQuery.TryGetString(string! name, out string! value) -> bool
+Assimalign.Viu.Router.RouteQuery.With(string! name, string! value) -> Assimalign.Viu.Router.RouteQuery
+Assimalign.Viu.Router.RouteQuery.WithMany(string! name, params string![]! queryValues) -> Assimalign.Viu.Router.RouteQuery
+static Assimalign.Viu.Router.RouteQuery.Empty.get -> Assimalign.Viu.Router.RouteQuery
+static Assimalign.Viu.Router.RouteQuery.Parse(string! rawQuery) -> Assimalign.Viu.Router.RouteQuery
+static Assimalign.Viu.Router.RouteQuery.operator ==(Assimalign.Viu.Router.RouteQuery left, Assimalign.Viu.Router.RouteQuery right) -> bool
+static Assimalign.Viu.Router.RouteQuery.operator !=(Assimalign.Viu.Router.RouteQuery left, Assimalign.Viu.Router.RouteQuery right) -> bool
+override Assimalign.Viu.Router.RouteQuery.Equals(object? value) -> bool
+override Assimalign.Viu.Router.RouteQuery.GetHashCode() -> int
+*REMOVED*Assimalign.Viu.Router.IRouteMatcher.ResolveNamed(string! name, Assimalign.Viu.Router.RouteParameters! parameters) -> Assimalign.Viu.Router.RouteLocation!
+*REMOVED*Assimalign.Viu.Router.RouteMatcher.ResolveNamed(string! name, Assimalign.Viu.Router.RouteParameters! parameters) -> Assimalign.Viu.Router.RouteLocation!
+*REMOVED*Assimalign.Viu.Router.Router.ResolveNamed(string! name, Assimalign.Viu.Router.RouteParameters! parameters) -> Assimalign.Viu.Router.RouteLocation!
+Assimalign.Viu.Router.IRouteMatcher.ResolveNamed(string! name, Assimalign.Viu.Router.RouteParameters! parameters, Assimalign.Viu.Router.RouteQuery? query = null, string? fragment = null) -> Assimalign.Viu.Router.RouteLocation!
+Assimalign.Viu.Router.RouteLocation.Fragment.get -> string!
+Assimalign.Viu.Router.RouteLocation.FullPath.get -> string!
+Assimalign.Viu.Router.RouteLocation.HasFragment.get -> bool
+Assimalign.Viu.Router.RouteLocation.HasQuery.get -> bool
+Assimalign.Viu.Router.RouteLocation.Query.get -> Assimalign.Viu.Router.RouteQuery
+Assimalign.Viu.Router.RouteLocation.RawQuery.get -> string!
+Assimalign.Viu.Router.RouteMatcher.ResolveNamed(string! name, Assimalign.Viu.Router.RouteParameters! parameters, Assimalign.Viu.Router.RouteQuery? query = null, string? fragment = null) -> Assimalign.Viu.Router.RouteLocation!
+Assimalign.Viu.Router.Router.ResolveNamed(string! name, Assimalign.Viu.Router.RouteParameters! parameters, Assimalign.Viu.Router.RouteQuery? query = null, string? fragment = null) -> Assimalign.Viu.Router.RouteLocation!
+Assimalign.Viu.Router.Router.PushAsync(Assimalign.Viu.Router.RouteLocation! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+Assimalign.Viu.Router.Router.ReplaceAsync(Assimalign.Viu.Router.RouteLocation! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
 *REMOVED*Assimalign.Viu.Router.IRouteEnterGuard.BeforeRouteEnter(Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationGuardResult!>!
 *REMOVED*Assimalign.Viu.Router.IRouterHistory.Destroy() -> void
 *REMOVED*Assimalign.Viu.Router.IRouterHistory.Go(int delta, bool triggerListeners = true) -> void

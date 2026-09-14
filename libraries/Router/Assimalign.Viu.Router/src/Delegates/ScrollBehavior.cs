@@ -15,7 +15,11 @@ namespace Assimalign.Viu.Router;
 /// A task producing the scroll target, or <see langword="null"/> to preserve the current offset.
 /// The task may delay settlement until application-specific asynchronous rendering is ready.
 /// </returns>
-/// <remarks>Specified by <c>[V01.01.08.05]</c>.</remarks>
+/// <remarks>
+/// The destination carries its raw fragment. For a simple CSS identifier, an application may return
+/// <c>new ScrollTarget("#" + to.Fragment)</c> when it is non-empty; other text needs application-chosen
+/// decoding and CSS escaping. No fragment scroll is implicit. Specified by <c>[RTR-9]</c> and <c>[RTR-12]</c>.
+/// </remarks>
 public delegate Task<ScrollTarget?> ScrollBehavior(
     RouteLocation to,
     RouteLocation from,

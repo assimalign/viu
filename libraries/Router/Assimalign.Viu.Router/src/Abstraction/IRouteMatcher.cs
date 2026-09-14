@@ -20,9 +20,10 @@ public interface IRouteMatcher
 
     /// <summary>
     /// Resolves a path to a location: the highest-ranked matching route wins. A path that matches
-    /// nothing yields a location with an empty matched chain (it does not throw).
+    /// nothing yields a location with an empty matched chain (it does not throw). The query and
+    /// fragment are split once and retained; matching uses only the path. Specified by <c>[RTR-12]</c>.
     /// </summary>
-    /// <param name="path">The path to resolve (path portion only — no query or fragment).</param>
+    /// <param name="path">The base-stripped location, including any query and fragment.</param>
     RouteLocation Resolve(string path);
 
     /// <summary>Resolves a named route with no parameters.</summary>
@@ -33,15 +34,19 @@ public interface IRouteMatcher
     RouteLocation ResolveNamed(string name);
 
     /// <summary>
-    /// Resolves a named route, interpolating <paramref name="parameters"/> into the full path.
+    /// Resolves a named route, interpolating <paramref name="parameters"/> into the path and
+    /// retaining the optional suffix without reparsing. Specified by <c>[RTR-12]</c>.
     /// </summary>
     /// <param name="name">The route name.</param>
-    /// <param name="parameters">The parameter values to interpolate.</param>
+    /// <param name="parameters">The serialized path values to interpolate; literal query/fragment delimiters must be percent-encoded.</param>
+    /// <param name="query">The query, or null to omit its delimiter; an explicit empty query retains <c>?</c>.</param>
+    /// <param name="fragment">Raw fragment text without its leading <c>#</c>, or null to omit it; empty retains <c>#</c>. Percent escapes are not decoded.</param>
+    /// <exception cref="System.ArgumentException">The interpolated path contains a literal <c>?</c> or <c>#</c>.</exception>
     /// <exception cref="RouteMatcherException">
     /// No route with that name exists, a required parameter is missing, or an array was supplied for
     /// a non-repeatable parameter.
     /// </exception>
-    RouteLocation ResolveNamed(string name, RouteParameters parameters);
+    RouteLocation ResolveNamed(string name, RouteParameters parameters, RouteQuery? query = null, string? fragment = null);
 
     /// <summary>Whether a route with the given name exists in the table.</summary>
     /// <param name="name">The route name.</param>

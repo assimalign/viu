@@ -57,6 +57,31 @@ null. Browser.Router clears any deferred initial request before processing that 
 so a pre-mount redirect cannot replay the initial route's target after the redirected view mounts
 (`[RTR-9]`, `[RTR-10]`).
 
+## Complete browser locations
+
+Browser.Router composes browser URL components and strips the configured history base; Router owns
+the path/query/fragment model and matches only its path. Query parsing, decoded accessors, location
+equality, duplicate classification, and link-class rules therefore stay host-free (`[RTR-12]`,
+[V01.01.08.09](https://github.com/assimalign/viu/issues/365)). For web history, the route suffix is
+the document query and fragment. For hash history, the complete route is inside the outer fragment,
+so `#/guide?mode=full#reactivity` retains its inner query and fragment; the document query outside
+that hash base is unrelated to the route.
+
+The JavaScript edge reads the serialized suffix from `location.href` because the browser's
+`location.search` and `location.hash` getters erase present-but-empty delimiters. The first `?`
+before the first `#` starts the query, and a `?` after `#` is fragment text. The
+[WHATWG URL Standard](https://url.spec.whatwg.org/#url-parsing) is the external URL format for that
+separation. It does not define Viu's navigation semantics. The existing fourteen-string snapshot
+and primitive pop-state dispatch stay the same shape: only the raw search and hash strings gain
+preserved empty delimiters. `RouterHistoryState.Back`, `Current`, and `Forward` carry complete
+serialized locations; no parsed query collections cross interop (`[RTR-3]`).
+
+Fragment scrolling remains host policy. `ScrollBehavior` receives the complete destination and can
+return `new ScrollTarget("#" + to.Fragment)` for a fragment suitable as CSS identifier text, or
+derive another target after its own decoding/escaping policy. Browser.Router performs that selector
+lookup and one scroll write after rendering. A null callback or null target causes no scroll;
+query-only and fragment-only navigation does not introduce an implicit effect (`[RTR-9]`).
+
 ## Non-goals
 
 Browser.Router does not own matching, guard order, router registration, DOM rendering, application

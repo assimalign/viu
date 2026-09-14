@@ -14,10 +14,42 @@ snapshots. Static segments outrank dynamic segments, optional and repeated param
 declared semantics, and matcher failures use the package's typed error surface (`[RTR-1]`,
 `[RTR-2]`).
 
+Locations model path, query, and fragment separately (`[RTR-12]`, [#365](https://github.com/assimalign/viu/issues/365)).
+For `/guide/quick-start?tag=one&tag=two#reactivity`, `Path` is `/guide/quick-start`,
+`RawQuery` is `tag=one&tag=two`, `Query.GetStrings("tag")` returns `one`, `two`, and `Fragment`
+is `reactivity`. Only the path participates in record matching; page patterns need no suffix parameter.
+`FullPath` preserves the complete spelling. `HasQuery` and `HasFragment` also retain empty delimiters.
+
+`RouteQuery` is an immutable readonly value. Its ordinal accessors return decoded strings: UTF-8
+percent escapes decode and `+` means space. Malformed escapes stay literal and malformed UTF-8
+uses replacement characters. `Count` counts distinct names; `Names` follows first appearance.
+Single-value reads return the first occurrence, and repeated-value reads retain empty values.
+Query equality compares ordered decoded pairs. Location equality additionally compares the raw
+suffix, so different escape spellings and absent versus empty delimiters remain different locations.
+
+Build a named destination using decoded query values and a raw fragment:
+
+```csharp
+RouteLocation destination = router.ResolveNamed(
+    "guide", RouteParameters.Empty,
+    query: RouteQuery.Empty.WithMany("tag", "one", "two").With("search", "a+b c"),
+    fragment: "reactivity");
+await router.PushAsync(destination);
+string href = router.CreateHref(destination);
+```
+
+Builders serialize UTF-8 form text (space as `+`, literal plus as `%2B`); unedited parsed queries
+keep their original raw text. Null query/fragment omits the part; an explicitly empty query or
+fragment keeps `?` or `#`. Fragment text remains encoded and has no leading `#`.
+
 `Router` coordinates matching, history, guards, and the shallow-reactive `CurrentRoute`. Guards
 return an allow, abort, or redirect result; they never receive a continuation. A navigation that is
 aborted, superseded, or duplicated returns a typed `NavigationFailure`, while unexpected faults flow
 to the configured error handler (`[RTR-5]`, `[RTR-6]`).
+
+Query-only and fragment-only changes run the guard pipeline and after-hooks. The matched records
+are reused, so update guards run and per-record enter guards do not. Only an equal full location
+(including suffix spelling) is duplicated (`[RTR-12]`).
 
 Lazy factories run in the resolve step after record `BeforeEnter` guards and before explicit
 component-associated enter guards. Navigation confirmation waits for the factory. Success is cached
@@ -36,6 +68,11 @@ coordinates. `ScrollBehavior` receives the confirmed destination, previous route
 position for back/forward. It returns absolute coordinates, a selector plus offset, or null; its
 task may delay. Host-free histories intentionally no-op because only a host can apply the result
 (`[RTR-9]`).
+
+History location and adjacency state strings preserve `FullPath`; no query collection is marshalled
+into state. Scroll behavior sees `to.Fragment`. For simple heading identifiers a host can explicitly
+return `new ScrollTarget("#" + to.Fragment)` when the fragment is non-empty. Other text requires
+host-chosen decoding and CSS escaping. Router never adds implicit fragment scrolling (`[RTR-12]`).
 
 For applications migrating from the earlier Router-owned browser edge, reference
 `Assimalign.Viu.Browser.Router` and replace `RouterHistory.CreateWeb(...)` or
@@ -60,6 +97,10 @@ a different record remounts even when both records use the same component.
 `RouterLinkClickEvent`. Modified, non-primary, already-prevented, and `target="_blank"` clicks are
 left to the host. Browser-specific event translation belongs to `Assimalign.Viu.Browser.Router`
 (`[RTR-4]`, `[RTR-7]`).
+
+Active links compare ordinal paths (equal or a segment-boundary ancestor), matched-chain membership,
+and included parameters, ignoring the suffix. Exact-active also requires the same leaf, equal
+parameters, and ordinal `FullPath` equality; even `/page`, `/page?`, and `/page#` differ (`[RTR-12]`).
 
 ## Boundaries
 

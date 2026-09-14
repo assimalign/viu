@@ -12,7 +12,7 @@ namespace Assimalign.Viu.Router;
 /// <see cref="CurrentRoute"/> — a shallow reference over the resolved location, so a navigation is
 /// one trigger rather than one per changed field — resolves targets and hrefs through the matcher
 /// and history, and drives navigations through the asynchronous, guarded, cancellable pipeline with
-/// <see cref="PushAsync"/>/<see cref="ReplaceAsync"/>.
+/// <see cref="PushAsync(string, CancellationToken)"/>/<see cref="ReplaceAsync(string, CancellationToken)"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -33,13 +33,13 @@ namespace Assimalign.Viu.Router;
 /// pipeline with <c>from</c> = that sentinel, so a global <see cref="BeforeEach"/> redirect fires for
 /// a direct page load, and its confirm step replaces (never pushes) the current history entry — a
 /// push would leave a bogus back target pointing at the URL the user actually opened. The
-/// same-location dedup is skipped whenever <c>from</c> has an empty matched chain, so the sentinel
+/// same-location dedup is skipped only when <c>from</c> is the start sentinel, so the sentinel
 /// never short-circuits the initial pass while in-session duplicates still do.
 /// </para>
 /// <para>
 /// <b>Three deliberate API shapes</b> (see <c>docs/DESIGN.md</c>): a guard returns a
 /// <see cref="NavigationGuardResult"/> rather than invoking a continuation, so it decides exactly
-/// once (<c>[RTR-5]</c>); <see cref="PushAsync"/> completes with a <see cref="NavigationFailure"/> for
+/// once (<c>[RTR-5]</c>); <see cref="PushAsync(string, CancellationToken)"/> completes with a <see cref="NavigationFailure"/> for
 /// abort/cancel/duplicate and faults only on a genuinely unexpected guard exception (routed to
 /// <see cref="OnError"/>), keeping routine outcomes out of exception control flow; and a redirect
 /// loop throws <see cref="NavigationRedirectException"/> in every configuration, not only in
@@ -139,8 +139,8 @@ public sealed class Router : IDisposable
     /// </remarks>
     public ScrollBehavior? ScrollBehavior { get; set; }
 
-    /// <summary>Resolves a path to a location through the matcher.</summary>
-    /// <param name="location">The base-stripped location to resolve (path portion).</param>
+    /// <summary>Resolves a location by matching only its path and retaining its query and fragment. Specified by <c>[RTR-12]</c>.</summary>
+    /// <param name="location">The base-stripped path with any query and fragment.</param>
     /// <returns>The resolved location; an unmatched path yields an empty matched chain.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="location"/> is null.</exception>
     public RouteLocation Resolve(string location)
@@ -149,17 +149,20 @@ public sealed class Router : IDisposable
         return _matcher.Resolve(location);
     }
 
-    /// <summary>Resolves a named route with interpolated parameters.</summary>
+    /// <summary>Resolves a named route with interpolated parameters and an optional query and fragment. Specified by <c>[RTR-12]</c>.</summary>
     /// <param name="name">The route name.</param>
-    /// <param name="parameters">The parameter values to interpolate.</param>
+    /// <param name="parameters">The serialized path values to interpolate; literal query/fragment delimiters must be percent-encoded.</param>
+    /// <param name="query">The query, or null to omit its delimiter; an explicit empty query retains <c>?</c>.</param>
+    /// <param name="fragment">Raw fragment text without its leading <c>#</c>, or null to omit it; empty retains <c>#</c>. Percent escapes are not decoded.</param>
     /// <returns>The resolved location.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="parameters"/> is null.</exception>
+    /// <exception cref="ArgumentException">The interpolated path contains a literal <c>?</c> or <c>#</c>.</exception>
     /// <exception cref="RouteMatcherException">The name is unknown or a required parameter is missing.</exception>
-    public RouteLocation ResolveNamed(string name, RouteParameters parameters)
+    public RouteLocation ResolveNamed(string name, RouteParameters parameters, RouteQuery? query = null, string? fragment = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(parameters);
-        return _matcher.ResolveNamed(name, parameters);
+        return _matcher.ResolveNamed(name, parameters, query, fragment);
     }
 
     /// <summary>
@@ -174,14 +177,14 @@ public sealed class Router : IDisposable
         return _history.CreateHref(location);
     }
 
-    /// <summary>Builds the anchor <c>href</c> for a resolved location's path.</summary>
+    /// <summary>Builds the anchor <c>href</c> from the full resolved location, preserving query and fragment spelling and empty delimiters. Specified by <c>[RTR-12]</c>.</summary>
     /// <param name="location">The resolved location.</param>
     /// <returns>The href, base included.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="location"/> is null.</exception>
     public string CreateHref(RouteLocation location)
     {
         ArgumentNullException.ThrowIfNull(location);
-        return _history.CreateHref(location.Path);
+        return _history.CreateHref(location.FullPath);
     }
 
     /// <summary>
@@ -215,7 +218,7 @@ public sealed class Router : IDisposable
     /// <summary>
     /// Registers a handler for unexpected exceptions thrown by guards, lazy component factories,
     /// or scroll behavior during navigation. A
-    /// <see cref="NavigationFailure"/> is returned from <see cref="PushAsync"/> rather than routed here.
+    /// <see cref="NavigationFailure"/> is returned from <see cref="PushAsync(string, CancellationToken)"/> rather than routed here.
     /// </summary>
     /// <param name="handler">The error handler to register.</param>
     /// <returns>A delegate that unregisters <paramref name="handler"/> when invoked.</returns>
@@ -241,7 +244,7 @@ public sealed class Router : IDisposable
     /// <summary>
     /// Navigates to <paramref name="location"/> through the guard pipeline, replacing the current
     /// history entry and updating <see cref="CurrentRoute"/> on success. Resolves with the same
-    /// navigation result as <see cref="PushAsync"/>.
+    /// navigation result as <see cref="PushAsync(string, CancellationToken)"/>.
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
     /// <param name="cancellationToken">Cancels this navigation without cancelling a later navigation.</param>
@@ -251,6 +254,30 @@ public sealed class Router : IDisposable
         string location,
         CancellationToken cancellationToken = default) =>
         Navigate(location, replace: true, cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// Navigates to an already resolved location without parsing again, pushing its full path on
+    /// success. Uses the same guard, cancellation, and failure rules as string navigation. Specified by <c>[RTR-12]</c>.
+    /// </summary>
+    /// <param name="location">The immutable destination resolved by this router's matcher.</param>
+    /// <param name="cancellationToken">Cancels this navigation without cancelling a later navigation.</param>
+    /// <returns>Null on success, or the aborted, cancelled, or duplicated failure.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="location"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="location"/> is the unresolved start sentinel.</exception>
+    public Task<NavigationFailure?> PushAsync(RouteLocation location, CancellationToken cancellationToken = default)
+        => Navigate(location, replace: false, cancellationToken);
+
+    /// <summary>
+    /// Navigates to an already resolved location without parsing again, replacing the current
+    /// entry with its full path on success. Uses the ordinary guard pipeline. Specified by <c>[RTR-12]</c>.
+    /// </summary>
+    /// <param name="location">The immutable destination resolved by this router's matcher.</param>
+    /// <param name="cancellationToken">Cancels this navigation without cancelling a later navigation.</param>
+    /// <returns>Null on success, or the aborted, cancelled, or duplicated failure.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="location"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="location"/> is the unresolved start sentinel.</exception>
+    public Task<NavigationFailure?> ReplaceAsync(RouteLocation location, CancellationToken cancellationToken = default)
+        => Navigate(location, replace: true, cancellationToken);
 
     /// <summary>
     /// Runs the initial navigation and resolves when it settles. The first call
@@ -410,7 +437,21 @@ public sealed class Router : IDisposable
     {
         ArgumentNullException.ThrowIfNull(location);
         ThrowIfDisposed();
-        var to = _matcher.Resolve(location);
+        return await Navigate(_matcher.Resolve(location), replace, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<NavigationFailure?> Navigate(
+        RouteLocation location,
+        bool replace,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        ThrowIfDisposed();
+        if (ReferenceEquals(location, RouteLocation.Start))
+        {
+            throw new ArgumentException("The start sentinel is not a resolved navigation destination.", nameof(location));
+        }
+        RouteLocation to = location;
         try
         {
             return await PushWithRedirect(
@@ -464,10 +505,9 @@ public sealed class Router : IDisposable
         var from = _currentRoute.Value;
         NavigationFailure? failure;
         Task scrollTask = Task.CompletedTask;
-        // Dedup only when `from` already has a matched chain:
-        // the START sentinel has an empty chain, so the initial navigation is never deduplicated and
-        // always runs the full pipeline, while in-session same-location navigations still short-circuit.
-        if (from.Matched.Count > 0 && IsSameLocation(from, to))
+        // Only the START sentinel bypasses duplication; confirmed unmatched locations also have
+        // full-location identity and must not run the pipeline twice for an identical URL [RTR-12].
+        if (!ReferenceEquals(from, RouteLocation.Start) && IsSameLocation(from, to))
         {
             // Duplicated: skip the pipeline entirely but still notify afterEach, so a hook that
             // the navigation state stays in sync even for a no-op navigation.
@@ -737,11 +777,11 @@ public sealed class Router : IDisposable
         {
             if (replace)
             {
-                _history.Replace(to.Path);
+                _history.Replace(to.FullPath);
             }
             else
             {
-                _history.Push(to.Path);
+                _history.Push(to.FullPath);
             }
         }
         _currentRoute.Value = to;

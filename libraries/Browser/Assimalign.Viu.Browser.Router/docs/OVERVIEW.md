@@ -21,6 +21,35 @@ module holds native scroll restoration at `manual` while any history subscriptio
 restores the page's prior policy after the last one disposes. An asynchronous `ScrollBehavior` may
 delay longer (`[RTR-9]`, `[RTR-10]`).
 
+Web history passes the complete path, query, and fragment to Router, which matches only
+`RouteLocation.Path`. For example, `/guide/quick-start?mode=full#reactivity` resolves the exact
+`/guide/quick-start` record, exposes `RawQuery` as `mode=full`, and exposes `Fragment` as `reactivity`.
+`Query` provides decoded, ordinal name/value access while `FullPath` and hrefs preserve the raw
+suffix. Push, replace, back, and forward retain the complete location in the existing string state
+links. Empty `?` and `#` delimiters are preserved too (`[RTR-3]`, `[RTR-12]`,
+[V01.01.08.09](https://github.com/assimalign/viu/issues/365)).
+
+Hash history treats the text after its hash base as that same complete location:
+`#/guide?mode=full#reactivity` resolves path `/guide`, query `mode=full`, and fragment `reactivity`.
+The document query before `#/` remains part of the host URL, not the route query.
+
+A host can opt into fragment scrolling through the unchanged `ScrollBehavior` callback:
+
+```csharp
+router.ScrollBehavior = (to, from, savedPosition) => Task.FromResult<ScrollTarget?>(
+    savedPosition is { } position
+        ? new ScrollTarget(position)
+        : to.Fragment.Length > 0
+            ? new ScrollTarget("#" + to.Fragment)
+            : null);
+```
+
+This example assumes fragments are valid CSS identifier text. Fragments remain raw and are not
+percent-decoded; hosts choosing arbitrary element identifiers must decode and escape their selector
+as appropriate. Browser.Router applies the returned selector after rendering; it adds no implicit
+fragment scrolling. A fragment-only navigation still runs Router's guards and after-hooks and
+updates the location; its unchanged matched chain does not re-enter records (`[RTR-9]`, `[RTR-12]`).
+
 `RouterLinkDomBridge` converts `BrowserEvent` metadata into the host-neutral
 `RouterLinkClickEvent`. If RouterLink prevents default navigation, the bridge propagates that result
 to the live browser event. Browser retains DOM event decoding; Router retains navigation policy.

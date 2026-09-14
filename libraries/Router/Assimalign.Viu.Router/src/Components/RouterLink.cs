@@ -19,7 +19,9 @@ namespace Assimalign.Viu.Router;
 /// <see cref="ComponentContext.Services"/>. The <c>to</c> input is a string path and the component
 /// always emits an anchor; location-object targets and slot-only rendering are non-goals. Not
 /// thread-safe; Viu drives it on the host event loop. Specified by <c>[RTR-4]</c>, <c>[RTR-7]</c>,
-/// and <c>[CMP-33]</c>.
+/// and <c>[CMP-33]</c>. Active links include matched ancestor paths with equal parameters,
+/// ignoring query and fragment. Exact-active additionally requires ordinal full-location equality,
+/// including raw suffix spelling and empty delimiters. Specified by <c>[RTR-12]</c>.
 /// </remarks>
 public sealed class RouterLink : IComponent
 {
@@ -169,10 +171,16 @@ public sealed class RouterLink : IComponent
             return (false, false);
         }
 
-        bool isActive = IncludesParameters(current.Parameters, target.Parameters);
+        bool samePath = string.Equals(current.Path, target.Path, StringComparison.Ordinal);
+        bool ancestorPath = current.Path.StartsWith(
+            target.Path.EndsWith('/') ? target.Path : target.Path + "/",
+            StringComparison.Ordinal);
+        bool isActive = (samePath || ancestorPath)
+            && IncludesParameters(current.Parameters, target.Parameters);
         bool isExactActive = isActive
             && index == current.Matched.Count - 1
-            && current.Parameters.Equals(target.Parameters);
+            && current.Parameters.Equals(target.Parameters)
+            && string.Equals(current.FullPath, target.FullPath, StringComparison.Ordinal);
         return (isActive, isExactActive);
     }
 

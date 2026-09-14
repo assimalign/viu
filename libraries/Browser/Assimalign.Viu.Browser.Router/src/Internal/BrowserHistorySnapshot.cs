@@ -12,10 +12,12 @@ namespace Assimalign.Viu.Browser.Router;
 /// The components are carried raw: base stripping happens on the .NET side
 /// (<see cref="BrowserHistoryPathNormalization.CreateCurrentLocation"/>) rather than JS-side, so the whole
 /// base policy stays unit-testable without a browser and the JS edge remains a dumb reader.
+/// Search and hash preserve present-but-empty delimiters from the serialized browser URL;
+/// <c>location.search</c> and <c>location.hash</c> alone would erase them. Specified by <c>[RTR-12]</c>.
 /// </remarks>
 /// <param name="Pathname">The raw <c>location.pathname</c>.</param>
-/// <param name="Search">The raw <c>location.search</c> (with any leading <c>?</c>).</param>
-/// <param name="Hash">The raw <c>location.hash</c> (with any leading <c>#</c>).</param>
+/// <param name="Search">The raw query including <c>?</c>, or empty when the delimiter is absent.</param>
+/// <param name="Hash">The raw fragment including <c>#</c>, or empty when the delimiter is absent.</param>
 /// <param name="Host">The raw <c>location.host</c> (empty for a <c>file://</c> URL) — used for hash-base defaulting.</param>
 /// <param name="HistoryLength">The current <c>window.history.length</c>, used to seed the initial position.</param>
 /// <param name="State">

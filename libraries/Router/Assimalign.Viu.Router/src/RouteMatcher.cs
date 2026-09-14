@@ -69,14 +69,16 @@ public sealed class RouteMatcher : IRouteMatcher
     public RouteLocation Resolve(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
+        RouteLocationParts parts = RouteLocationParts.Parse(path);
         foreach (var candidate in matchers)
         {
-            if (candidate.Parser.TryParse(path, out var parameters))
+            if (candidate.Parser.TryParse(parts.Path, out var parameters))
             {
-                return BuildLocation(candidate, path, parameters);
+                return BuildLocation(candidate, parts, parameters);
             }
         }
-        return new RouteLocation(path, name: null, RouteParameters.Empty, Array.Empty<RouteRecord>(), EmptyMeta);
+        return new RouteLocation(parts.Path, name: null, RouteParameters.Empty, Array.Empty<RouteRecord>(), EmptyMeta,
+            parts.Query, parts.Fragment, parts.HasQuery, parts.HasFragment);
     }
 
     /// <inheritdoc/>
@@ -84,7 +86,7 @@ public sealed class RouteMatcher : IRouteMatcher
         => ResolveNamed(name, RouteParameters.Empty);
 
     /// <inheritdoc/>
-    public RouteLocation ResolveNamed(string name, RouteParameters parameters)
+    public RouteLocation ResolveNamed(string name, RouteParameters parameters, RouteQuery? query = null, string? fragment = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(parameters);
@@ -97,10 +99,17 @@ public sealed class RouteMatcher : IRouteMatcher
 
         // stringify enforces required/repeatable parameters and throws a descriptive error.
         var path = matcher.Parser.Stringify(parameters);
+        if (path.AsSpan().IndexOfAny('?', '#') >= 0)
+        {
+            throw new ArgumentException(
+                "Named route paths must percent-encode literal '?' and '#' as '%3F' and '%23'; supply query and fragment separately.",
+                nameof(parameters));
+        }
         var resolvedParameters = ProjectParameters(matcher, parameters);
         var matched = BuildMatchedChain(matcher);
         var meta = BuildMeta(matched);
-        return new RouteLocation(path, matcher.Record.Name, resolvedParameters, matched, meta);
+        return new RouteLocation(path, matcher.Record.Name, resolvedParameters, matched, meta,
+            query.GetValueOrDefault(), fragment ?? string.Empty, query.HasValue, fragment is not null);
     }
 
     /// <inheritdoc/>
@@ -219,11 +228,12 @@ public sealed class RouteMatcher : IRouteMatcher
     private static bool IsMatchable(RouteRecordMatcher matcher)
         => matcher is not null;
 
-    private static RouteLocation BuildLocation(RouteRecordMatcher matcher, string path, RouteParameters parameters)
+    private static RouteLocation BuildLocation(RouteRecordMatcher matcher, RouteLocationParts parts, RouteParameters parameters)
     {
         var matched = BuildMatchedChain(matcher);
         var meta = BuildMeta(matched);
-        return new RouteLocation(path, matcher.Record.Name, parameters, matched, meta);
+        return new RouteLocation(parts.Path, matcher.Record.Name, parameters, matched, meta,
+            parts.Query, parts.Fragment, parts.HasQuery, parts.HasFragment);
     }
 
     private static IReadOnlyList<RouteRecord> BuildMatchedChain(RouteRecordMatcher matcher)

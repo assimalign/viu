@@ -16,6 +16,8 @@ namespace Assimalign.Viu.Router;
 /// position to the leaving entry's yields the signed navigation distance
 /// (<see cref="NavigationInformation.Delta"/>) that drives back/forward detection. Record value
 /// equality lets a navigation pipeline compare and snapshot state cheaply.
+/// Every adjacency location retains the full base-stripped path, raw query, and fragment (including
+/// empty delimiters). The decoded query is never nested in the interop payload. Specified by <c>[RTR-12]</c>.
 /// </para>
 /// </remarks>
 /// <param name="Back">The location of the previous entry, or <see langword="null"/> at the start of history.</param>

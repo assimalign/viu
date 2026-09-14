@@ -1796,16 +1796,20 @@ prepass and remain outside this contract.
 > forwarding, and explicit `RouterView` depth continue to use the contracts below.
 
 `[RTR-1]` The router **core is host-free**. `RouteMatcher` / `IRouteMatcher`, `RouteRecord`,
-`RouteLocation`, `RouteParameters`, `PathMatchingOptions`, and the ranked path parser run in a plain
+`RouteLocation`, `RouteParameters`, `RouteQuery`, `PathMatchingOptions`, and the ranked path parser run in a plain
 .NET test host using no other Viu library.
 
-`[RTR-2]` `RouteLocation` and `RouteParameters` have **value equality** with matching null-safe
-`==` and `!=` operators, so a navigation layer can compare and snapshot cheaply.
+`[RTR-2]` `RouteLocation`, `RouteParameters`, and `RouteQuery` have **value equality** and matching
+hash codes and `==` / `!=` operators (null-safe for the reference types), so a navigation layer can
+compare and snapshot cheaply. Location equality includes the ordinal full path (raw query, fragment,
+and delimiter presence), name, parameters, and matched record identities; metadata is excluded.
+`RouteQuery` is a readonly value with ordered decoded-pair equality as defined by [RTR-12].
 `Router.CurrentRoute` exposes the covariant get-only reactive-reference contract; only Router can
 replace the current location.
 `RouteParameters` accessors are **boxing-free and reflection-free**
 (`GetString`/`TryGetString`, `GetInteger`/`TryGetInteger`, `GetStrings`), with immutable
-`With`/`WithMany` builders.
+`With`/`WithMany` builders. `RouteQuery` supplies boxing-free, reflection-free ordinal
+`GetString`/`TryGetString` and `GetStrings` accessors and immutable `With`/`WithMany` builders.
 
 `[RTR-3]` Three histories ship across the host boundary: `RouterHistory.CreateMemory` is pure and
 requires no initialization; `BrowserRouterHistory.CreateWeb` and `CreateWebHash` own the HTML
@@ -1819,6 +1823,9 @@ primitives-only** payload. Every history is an idempotent, terminal `IDisposable
 all other members throw `ObjectDisposedException`. A Router borrows its history; the owner disposes
 the Router first and then the history, making environment-listener ownership explicit.
 `RouterHistoryNavigationOptions` is a flags value whose `SuppressListeners` bit controls `Go`;
+Location strings and the state's `Back`, `Current`, and `Forward` fields retain the complete
+base-stripped path, raw query, and fragment, including explicitly empty delimiters [RTR-12].
+Decoded query collections never enter the flat interop state payload.
 `RouterHistoryEntryOptions` is a readonly value carrying the non-bitwise scroll input to `Push` and
 `Replace`. `RouterHistoryState.Replaced` remains an observed output fact, never an operation switch.
 
@@ -1847,6 +1854,11 @@ a navigation superseded by a later request. One cancellation token spans an enti
 A superseded pop navigation reports `Cancelled` to its after-navigation hooks but cannot compensate
 history after a newer navigation owns the pipeline. A guard-redirect chain that exceeds the safety
 cap throws `NavigationRedirectException`.
+Duplicate classification uses location value equality, including the raw suffix and delimiter
+presence [RTR-12], including confirmed unmatched locations; only the start sentinel bypasses this
+classification. A query-only or fragment-only change runs the ordinary pipeline. Records already
+in the matched chain are reused: their update guards run, while their leave, `BeforeEnter`, and
+component-associated enter guards do not run again.
 
 `[RTR-7]` **Boundary.** `Assimalign.Viu.Router` references Components and Reactivity but **not Core
 and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Browser.Router` owns the
@@ -1875,6 +1887,9 @@ behavior is null, so a newer confirmation invalidates deferred work for an older
 scroll work remains deferred until the host calls `Router.CompleteInitialScrollAsync` after mount;
 that signal is idempotent. An aborted, redirected, duplicated, or cancelled navigation performs no
 scroll effect. Specified by [V01.01.08.05].
+The destination exposes its raw fragment [RTR-12]. A host may explicitly return
+`new ScrollTarget("#" + to.Fragment)` for a non-empty fragment suitable as a CSS identifier.
+Decoding or CSS escaping other fragment text is the host's policy. There is no implicit fragment scroll.
 
 `[RTR-10]` The browser history edge batches both coordinates when recording a leaving entry during
 push and pop transitions, keyed by the monotonic history-position counter. Browser.Router resolves
@@ -1892,6 +1907,53 @@ exposes only an undocumented internal JavaScript loader. Viu depends on neither.
 offers a public linker-analyzable loader, `RouteComponentFactory` resolves an in-application
 `Task<ComponentNode>` source; it MUST NOT activate a type from a string or call an internal runtime
 hook.
+
+`[RTR-12]` **Path, query, and fragment** ([V01.01.08.09], #365). Location strings are base-stripped
+path references. The first `#` starts the fragment; the first `?` before that `#` starts the query.
+A `?` or another `#` inside the fragment is fragment text. Percent-encoded delimiters do not split
+the location. The external format reference for separation is the
+[WHATWG URL Standard](https://url.spec.whatwg.org/#url-parsing); it supplies no Viu navigation policy.
+Resolution scans the suffix once and matches only `RouteLocation.Path`. Paths and fragments remain
+encoded; `Fragment` omits its first `#` and is empty when absent. `RawQuery` omits `?` and preserves
+the original query spelling. `HasQuery` and `HasFragment` distinguish absent from explicitly empty
+parts. `FullPath` caches the path with its raw suffix, so `/a`, `/a?`, and `/a#` remain distinct.
+`RouteLocation.Start` has no query or fragment and both presence flags are false.
+
+`RouteQuery.Parse` takes raw query text without `?`; a literal `#` is rejected because it would
+start a fragment (use `%23`). Split on `&`, ignore empty segments, and split each pair on its first
+`=`; a missing `=` supplies an empty value. Empty names and repeated keys are retained. Decode
+names and values as UTF-8 percent-encoded bytes with `+` interpreted as space. Malformed percent
+escapes remain literal; malformed UTF-8 uses U+FFFD replacement. Names compare ordinally, `Count`
+counts distinct names, `Names` follows first appearance, `GetString`/`TryGetString` returns the
+first value, and `GetStrings` retains every value in occurrence order, including empty values.
+Missing-name reads return false/empty from `TryGetString`/`GetStrings`; `GetString` throws.
+
+The default query equals `RouteQuery.Empty`. Query equality compares the complete ordered decoded
+pair sequence, ignoring raw escape spelling but retaining cross-name and repeated-value ordering.
+All returned collections are immutable and reads perform no decoding or boxing. Builders take
+decoded strings, normalize lone UTF-16 surrogates to U+FFFD, and replace a name's values at its
+first occurrence (or append a new name); `WithMany` with no values removes that name. An edited
+query serializes all pairs canonically: UTF-8, uppercase percent escapes, space as `+`, and only
+ASCII letters/digits and `*`, `-`, `.`, `_` unescaped. Thus literal `+`, `&`, `=`, `?`, and `#`
+cannot be mistaken for separators. Parsing a builder's serialization reproduces its decoded values.
+Unedited queries retain raw spelling, including empty segments and omitted `=`.
+
+`ResolveNamed(name, parameters, query, fragment)` accepts a nullable query and raw fragment without
+`#`: null omits that part; an explicitly empty value retains its delimiter. `Resolve`, named
+resolution, resolved-location `PushAsync`/`ReplaceAsync`, `CurrentRoute`, histories, and `CreateHref`
+retain the full suffix; resolved-location navigation does not parse again and rejects the unresolved
+`RouteLocation.Start` sentinel as a destination. Hash history's location
+is the text after the hash base, so `#/guide?x=1#section` resolves path `/guide`, query `x=1`, and
+fragment `section`.
+Named path parameters retain their existing serialized-path representation. An interpolated path
+containing literal `?` or `#` is rejected; callers use `%3F` and `%23` for literal path data and
+pass query/fragment through the explicit arguments. Named resolution does not silently re-encode
+path parameters.
+
+`RouterLink` is active when its matched leaf occurs in the current matched chain, its parameters
+are included, and its path is ordinally equal to the current path or a segment-boundary ancestor.
+Active ignores query and fragment. Exact-active additionally requires the same matched leaf and
+parameters and ordinal `FullPath` equality, including raw query spelling and empty delimiters.
 
 *Authority: `libraries/Router/Assimalign.Viu.Router/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Browser/Assimalign.Viu.Browser.Router/docs/{OVERVIEW,DESIGN}.md`.*

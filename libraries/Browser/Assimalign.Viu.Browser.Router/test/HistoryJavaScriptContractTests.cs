@@ -13,6 +13,35 @@ namespace Assimalign.Viu.Browser.Router.Tests;
 public sealed class HistoryJavaScriptContractTests
 {
     [Fact]
+    public void SnapshotAndPopState_SerializedSuffix_PreservesEmptyQueryAndFragmentDelimiters()
+    {
+        // [RTR-12]: Location.search/hash erase bare delimiters, so the edge must read href.
+        // External URL format: https://url.spec.whatwg.org/#url-parsing.
+        string source = ReadHistoryModule();
+
+        source.ShouldContain("const href = window.location.href");
+        source.ShouldContain("const fragmentPosition = href.indexOf('#')");
+        source.ShouldContain("const queryPosition = href.indexOf('?')");
+        source.ShouldContain("queryPosition >= 0 && (fragmentPosition < 0 || queryPosition < fragmentPosition)");
+        source.ShouldContain("href.slice(queryPosition, fragmentPosition < 0 ? href.length : fragmentPosition)");
+        source.ShouldContain("hash: fragmentPosition >= 0 ? href.slice(fragmentPosition) : ''");
+        source.ShouldNotContain("window.location.search,");
+        source.ShouldNotContain("window.location.hash,");
+
+        int snapshot = source.IndexOf("readSnapshot: () =>", StringComparison.Ordinal);
+        int snapshotRead = source.IndexOf("const suffix = readLocationSuffix()", snapshot, StringComparison.Ordinal);
+        int snapshotReturn = source.IndexOf("return [", snapshot, StringComparison.Ordinal);
+        snapshotRead.ShouldBeGreaterThan(snapshot);
+        snapshotRead.ShouldBeLessThan(snapshotReturn);
+
+        int handler = source.IndexOf("const handler = (event) =>", StringComparison.Ordinal);
+        int popRead = source.IndexOf("const suffix = readLocationSuffix()", handler, StringComparison.Ordinal);
+        int dispatch = source.IndexOf("dispatchPopState(", handler, StringComparison.Ordinal);
+        popRead.ShouldBeGreaterThan(handler);
+        popRead.ShouldBeLessThan(dispatch);
+    }
+
+    [Fact]
     public void ScrollHandling_UsesManualRestorationUntilLastSubscriptionDisposes()
     {
         string source = ReadHistoryModule();

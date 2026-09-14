@@ -11,8 +11,9 @@ namespace Assimalign.Viu.Router;
 /// <c>[RTR-10]</c>.
 /// </summary>
 /// <remarks>
-/// Locations are the base-stripped path portion the matcher ([V01.01.08.01]) resolves — a leading
-/// <c>/</c> path plus any query and fragment. The configured <see cref="Base"/> is prepended when
+/// Locations retain the full base-stripped path plus raw query and fragment, including empty
+/// delimiters; the matcher separates these parts once per resolution. Specified by <c>[RTR-12]</c>.
+/// The configured <see cref="Base"/> is prepended when
 /// writing to the environment and stripped when reading back, so consumers never see it. Not
 /// thread-safe: the router targets the single-threaded JS event loop.
 /// <para>

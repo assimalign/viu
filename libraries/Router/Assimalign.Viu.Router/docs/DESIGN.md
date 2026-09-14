@@ -37,6 +37,42 @@ distinguishes intentional variants within one record.
 Non-component nodes pass through unchanged. This permits redirect placeholders, static content, or
 other host-neutral tree descriptions without manufacturing a component wrapper.
 
+## Location and suffix identity
+
+`[RTR-12]` ([V01.01.08.09], [#365](https://github.com/assimalign/viu/issues/365)) separates location
+format from path matching. An internal span scan finds the first fragment delimiter and the first
+query delimiter before it; the matcher receives only the path. The
+[WHATWG URL Standard](https://url.spec.whatwg.org/#url-parsing) is the external format reference for
+this split. There is no absolute-URL resolver, `Uri` parser, reflection, or host dependency here.
+
+`RouteLocation` holds a decoded immutable `RouteQuery`, its original raw text, a raw fragment, and
+delimiter-presence flags. A cached `FullPath` feeds hrefs, history entries, and location equality.
+It preserves empty delimiters, escape spelling, and query ordering without re-encoding on every
+render or history write. Named resolution takes nullable query/fragment inputs to distinguish
+omission from an explicit empty part. Resolved-location navigation can enter the pipeline directly.
+Path parameters remain serialized path text; an interpolated literal `?` or `#` is rejected rather
+than creating an ambiguous location. Literal path data uses `%3F` or `%23`, and suffixes use the
+explicit query/fragment arguments. This keeps the existing path parameter encoding contract intact.
+
+Query storage keeps the ordered decoded pairs and cached read-only name/value views. Lookups are
+ordinal and do not box or decode on access. Parsing uses UTF-8 form decoding (`+` is space), keeps
+malformed percent escapes literal, replaces malformed UTF-8, accepts empty names/values, and skips
+empty `&` segments. Query value equality compares the ordered decoded pairs; location equality
+compares their raw representation as part of `FullPath`, then the existing name, parameters, and
+matched-record identities. This deliberately avoids treating differently spelled URLs as duplicates.
+
+Builders replace all values at a name's first occurrence and canonicalize the complete query using
+UTF-8 form encoding with uppercase escapes; empty `WithMany` removes a name. Defensive copies and
+read-only views prevent a caller from changing a published query. Lone UTF-16 surrogates normalize
+to U+FFFD so serializing and parsing builder values is symmetric. Paths and fragments are raw text;
+their percent-decoding and selector escaping are not query policy.
+
+Suffix-only transitions retain matched-record identity and run global/update guards without leave
+or enter guards. RouterLink active state ignores the suffix but requires a matching ancestor path,
+record chain, and included parameters; exact-active also requires identical raw `FullPath`. Scroll
+behavior receives the destination fragment but owns the decision to return a selector target.
+No navigation path adds implicit scrolling or nests decoded query values in history state.
+
 ## Component integration
 
 `RouterView` and `RouterLink` expose static reflection-free `ComponentRegistration` values and

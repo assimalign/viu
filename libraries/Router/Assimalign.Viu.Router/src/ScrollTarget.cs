@@ -8,7 +8,9 @@ namespace Assimalign.Viu.Router;
 /// </summary>
 /// <remarks>
 /// Selectors are resolved only by a browser integration after the post-render flush. The host-free
-/// router carries this value without inspecting a document. Specified by <c>[V01.01.08.05]</c>.
+/// router carries this value without inspecting a document. A behavior may explicitly use a
+/// destination's fragment as a selector; there is no implicit fragment scrolling. Specified by
+/// <c>[RTR-9]</c> and <c>[RTR-12]</c>.
 /// </remarks>
 public sealed class ScrollTarget
 {
