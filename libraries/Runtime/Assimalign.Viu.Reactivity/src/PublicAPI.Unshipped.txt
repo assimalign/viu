@@ -16,6 +16,9 @@
 *REMOVED*static Assimalign.Viu.Reactivity.Reactive.IsReadonly(object? value) -> bool
 *REMOVED*static Assimalign.Viu.Reactivity.Reactive.StartBatch() -> void
 *REMOVED*static Assimalign.Viu.Reactivity.Reactive.ToRaw<T>(T value) -> T
+Assimalign.Viu.Reactivity.IReactiveObject.GetMemberValues() -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Assimalign.Viu.Reactivity.IReactiveObject.TrySetMemberValue(string! propertyName, object? value) -> bool
+Assimalign.Viu.Reactivity.IReactiveReference.IsComputed.get -> bool
 Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<T>
 Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<T>.Value.get -> T
 Assimalign.Viu.Reactivity.ReactiveAttribute.ReadOnly.get -> bool

@@ -1,0 +1,86 @@
+<template>
+    <section class="viu-devtools-pane" aria-label="Custom inspectors" :data-revision="Revision">
+        <h2>Custom inspectors</h2>
+        <p v-if="HasNoInspectors" class="viu-devtools-muted">No custom inspectors registered.</p>
+        <div class="viu-devtools-controls">
+            <button v-for="inspector in Inspectors" :key="inspector.Identifier" type="button"
+                data-testid="devtools-inspector-select" :data-inspector-identifier="inspector.Identifier"
+                :aria-pressed="BooleanAttribute(IsSelected(inspector.Identifier))" @click="() => Select(inspector.Identifier)">{{ inspector.DisplayName }}</button>
+        </div>
+        <p v-if="HasTreeError" role="status">{{ TreeError }}</p>
+        <ol class="viu-devtools-tree" data-testid="devtools-inspector-tree">
+            <li v-for="row in TreeRows" :key="row.Node.Identifier" :style="row.Indentation">
+                <button type="button" data-testid="devtools-inspector-node" :data-node-identifier="row.Node.Identifier"
+                    @click="() => SelectNode(row.Node.Identifier)">{{ row.Node.Label }}</button>
+            </li>
+        </ol>
+        <p v-if="HasStateError" role="status">{{ StateError }}</p>
+        <ol class="viu-devtools-values" data-testid="devtools-inspector-state">
+            <li v-for="row in StateRows" :key="row.Key" :style="row.Indentation" class="viu-devtools-value">
+                <strong>{{ row.Name }}</strong> <code>{{ row.Display }}</code>
+            </li>
+        </ol>
+    </section>
+</template>
+
+@script {
+    using System.Collections.Generic;
+
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.DevTools;
+    using Assimalign.Viu.Reactivity;
+
+    /// <summary>Gets or sets the caller-owned session supplying generic inspector messages. Single-threaded; specified by [DVT-7] and [DVT-14].</summary>
+    [Parameter(IsRequired = true)]
+    public DevToolsClientSession Session { get; set; } = null!;
+
+    private readonly Reference<int> RevisionReference = Reactive.Reference(0);
+    private string? SelectedInspector;
+    private int PreviousConnectionGeneration;
+    private int PreviousStoreRevision;
+    private int Revision => RevisionReference.Value;
+    private bool HasNoInspectors => Session.Inspectors.Count == 0;
+    private bool HasTreeError => Session.InspectorTree?.Error is not null;
+    private bool HasStateError => Session.InspectorState?.Error is not null;
+    private string TreeError => Session.InspectorTree?.Error ?? string.Empty;
+    private string StateError => Session.InspectorState?.Error ?? string.Empty;
+    private IReadOnlyList<InspectorRegistrationPayload> Inspectors => new List<InspectorRegistrationPayload>(Session.Inspectors.Values);
+    private IReadOnlyList<DevToolsPaneRows.InspectorRow> TreeRows => DevToolsPaneRows.InspectorTree(Session.InspectorTree);
+    private IReadOnlyList<DevToolsPaneRows.ValueRow> StateRows => DevToolsPaneRows.InspectorState(Session.InspectorState);
+
+    partial void OnSetup()
+    {
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        PreviousStoreRevision = Session.InspectorRevision;
+        Session.Changed += Refresh;
+        Context!.Lifecycle.OnBeforeUnmount(() => Session.Changed -= Refresh);
+    }
+
+    private void Refresh()
+    {
+        if (PreviousStoreRevision == Session.InspectorRevision && PreviousConnectionGeneration == Session.ConnectionGeneration)
+            return;
+        PreviousStoreRevision = Session.InspectorRevision;
+        if (!Session.IsConnected || PreviousConnectionGeneration != Session.ConnectionGeneration
+            || (SelectedInspector is not null && !Session.Inspectors.ContainsKey(SelectedInspector)))
+            SelectedInspector = null;
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        RevisionReference.Value++;
+    }
+
+    private bool IsSelected(string identifier) => SelectedInspector == identifier;
+    private string BooleanAttribute(bool value) => DevToolsPaneRows.BooleanAttribute(value);
+
+    private void Select(string identifier)
+    {
+        SelectedInspector = identifier;
+        Session.SelectInspector(identifier);
+        RevisionReference.Value++;
+    }
+
+    private void SelectNode(string identifier)
+    {
+        if (SelectedInspector is { } inspector)
+            Session.SelectInspectorNode(inspector, identifier);
+    }
+}

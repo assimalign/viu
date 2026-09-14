@@ -308,7 +308,7 @@ public static class SingleFileComponentSourceEmitter
 
         builder.Append('\n');
         AppendIndent(builder, indent);
-        builder.Append("/// <summary>Runs developer-authored synchronous setup after <see cref=\"Context\"/> is assigned.</summary>\n");
+        builder.Append("/// <summary>Runs developer-authored synchronous setup after <c>Context</c> is assigned.</summary>\n");
         AppendIndent(builder, indent);
         builder.Append("partial void OnSetup();\n");
 

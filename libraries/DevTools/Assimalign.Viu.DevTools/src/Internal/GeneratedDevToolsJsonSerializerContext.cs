@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Assimalign.Viu.DevTools;
 
+/// <summary>Provides generated JSON metadata shared by the runtime and client without reflection fallback. Specified by <c>[DVT-2]</c> and <c>[DVT-14]</c>.</summary>
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
@@ -34,4 +35,6 @@ namespace Assimalign.Viu.DevTools;
 [JsonSerializable(typeof(TimelineLayerPayload))]
 [JsonSerializable(typeof(TimelineEventPayload))]
 [JsonSerializable(typeof(TimelineDroppedPayload))]
-internal sealed partial class DevToolsJsonSerializerContext : JsonSerializerContext;
+[JsonSerializable(typeof(StateEditRequestPayload))]
+[JsonSerializable(typeof(StateEditResponsePayload))]
+internal sealed partial class GeneratedDevToolsJsonSerializerContext : JsonSerializerContext;

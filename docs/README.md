@@ -40,3 +40,10 @@ nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
 
 Per-project documentation is indexed from the repository map in the root
 [`README.md`](../README.md).
+
+The inspection client is an ecosystem integration under `extensions/DevTools/`; its
+[overview](../extensions/DevTools/Assimalign.Viu.DevTools.Client/docs/OVERVIEW.md) and
+[design](../extensions/DevTools/Assimalign.Viu.DevTools.Client/docs/DESIGN.md) live beside the client.
+Its packaged Browser host and sample are in `scripts/fixtures/EndToEndDevToolsApp`, because SDK
+consumers build through the isolated Packaging lane, while the component library and its tests
+build with the main solution.

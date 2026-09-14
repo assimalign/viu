@@ -1,9 +1,173 @@
 #nullable enable
+Assimalign.Viu.DevTools.ComponentChangePayload
+Assimalign.Viu.DevTools.ComponentChangePayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentChangePayload!
+Assimalign.Viu.DevTools.ComponentChangePayload.ComponentChangePayload(int Identifier, int? ParentIdentifier, int Index, string! Name, string? Key) -> void
+Assimalign.Viu.DevTools.ComponentChangePayload.Deconstruct(out int Identifier, out int? ParentIdentifier, out int Index, out string! Name, out string? Key) -> void
+Assimalign.Viu.DevTools.ComponentChangePayload.Equals(Assimalign.Viu.DevTools.ComponentChangePayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentChangePayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentChangePayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentChangePayload.Index.get -> int
+Assimalign.Viu.DevTools.ComponentChangePayload.Index.init -> void
+Assimalign.Viu.DevTools.ComponentChangePayload.Key.get -> string?
+Assimalign.Viu.DevTools.ComponentChangePayload.Key.init -> void
+Assimalign.Viu.DevTools.ComponentChangePayload.Name.get -> string!
+Assimalign.Viu.DevTools.ComponentChangePayload.Name.init -> void
+Assimalign.Viu.DevTools.ComponentChangePayload.ParentIdentifier.get -> int?
+Assimalign.Viu.DevTools.ComponentChangePayload.ParentIdentifier.init -> void
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentEventMetadataPayload!
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.ComponentEventMetadataPayload(string! Name, bool HasValidator) -> void
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.Deconstruct(out string! Name, out bool HasValidator) -> void
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.Equals(Assimalign.Viu.DevTools.ComponentEventMetadataPayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.HasValidator.get -> bool
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.HasValidator.init -> void
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.Name.get -> string!
+Assimalign.Viu.DevTools.ComponentEventMetadataPayload.Name.init -> void
+Assimalign.Viu.DevTools.ComponentEventPayload
+Assimalign.Viu.DevTools.ComponentEventPayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentEventPayload!
+Assimalign.Viu.DevTools.ComponentEventPayload.Arguments.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsValuePayload!>!
+Assimalign.Viu.DevTools.ComponentEventPayload.Arguments.init -> void
+Assimalign.Viu.DevTools.ComponentEventPayload.ComponentEventPayload(int Identifier, string! Name, System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsValuePayload!>! Arguments) -> void
+Assimalign.Viu.DevTools.ComponentEventPayload.Deconstruct(out int Identifier, out string! Name, out System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsValuePayload!>! Arguments) -> void
+Assimalign.Viu.DevTools.ComponentEventPayload.Equals(Assimalign.Viu.DevTools.ComponentEventPayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentEventPayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentEventPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentEventPayload.Name.get -> string!
+Assimalign.Viu.DevTools.ComponentEventPayload.Name.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentExpansionRequestPayload!
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.ComponentExpansionRequestPayload(int Identifier, string! Section, System.Collections.Generic.List<string!>! Path, int Depth) -> void
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Deconstruct(out int Identifier, out string! Section, out System.Collections.Generic.List<string!>! Path, out int Depth) -> void
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Depth.get -> int
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Depth.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Equals(Assimalign.Viu.DevTools.ComponentExpansionRequestPayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Path.get -> System.Collections.Generic.List<string!>!
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Path.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Section.get -> string!
+Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Section.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentExpansionResponsePayload!
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.ComponentExpansionResponsePayload(int Identifier, string! Section, System.Collections.Generic.List<string!>! Path, Assimalign.Viu.DevTools.DevToolsValuePayload? Value, string? Error) -> void
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Deconstruct(out int Identifier, out string! Section, out System.Collections.Generic.List<string!>! Path, out Assimalign.Viu.DevTools.DevToolsValuePayload? Value, out string? Error) -> void
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Equals(Assimalign.Viu.DevTools.ComponentExpansionResponsePayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Error.get -> string?
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Error.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Path.get -> System.Collections.Generic.List<string!>!
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Path.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Section.get -> string!
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Section.init -> void
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Value.get -> Assimalign.Viu.DevTools.DevToolsValuePayload?
+Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Value.init -> void
+Assimalign.Viu.DevTools.ComponentIdentifierPayload
+Assimalign.Viu.DevTools.ComponentIdentifierPayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentIdentifierPayload!
+Assimalign.Viu.DevTools.ComponentIdentifierPayload.ComponentIdentifierPayload(int Identifier) -> void
+Assimalign.Viu.DevTools.ComponentIdentifierPayload.Deconstruct(out int Identifier) -> void
+Assimalign.Viu.DevTools.ComponentIdentifierPayload.Equals(Assimalign.Viu.DevTools.ComponentIdentifierPayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentIdentifierPayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentIdentifierPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentReorderPayload
+Assimalign.Viu.DevTools.ComponentReorderPayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentReorderPayload!
+Assimalign.Viu.DevTools.ComponentReorderPayload.ComponentReorderPayload(int Identifier, int Index) -> void
+Assimalign.Viu.DevTools.ComponentReorderPayload.Deconstruct(out int Identifier, out int Index) -> void
+Assimalign.Viu.DevTools.ComponentReorderPayload.Equals(Assimalign.Viu.DevTools.ComponentReorderPayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentReorderPayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentReorderPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentReorderPayload.Index.get -> int
+Assimalign.Viu.DevTools.ComponentReorderPayload.Index.init -> void
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload!
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.ComponentSnapshotRequestPayload(int Identifier, int Depth) -> void
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.Deconstruct(out int Identifier, out int Depth) -> void
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.Depth.get -> int
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.Depth.init -> void
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.Equals(Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload!
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.ComponentSnapshotResponsePayload(int Identifier, System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! Parameters, System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! State, System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentEventMetadataPayload!>! Events, string? Error) -> void
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Deconstruct(out int Identifier, out System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! Parameters, out System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! State, out System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentEventMetadataPayload!>! Events, out string? Error) -> void
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Equals(Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Error.get -> string?
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Error.init -> void
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Events.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentEventMetadataPayload!>!
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Events.init -> void
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Parameters.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>!
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Parameters.init -> void
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.State.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>!
+Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.State.init -> void
+Assimalign.Viu.DevTools.ComponentTreeNodePayload
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentTreeNodePayload!
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Children.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentTreeNodePayload!>!
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Children.init -> void
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.ComponentTreeNodePayload(int Identifier, string! Name, string? Key, System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentTreeNodePayload!>! Children) -> void
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Deconstruct(out int Identifier, out string! Name, out string? Key, out System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentTreeNodePayload!>! Children) -> void
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Equals(Assimalign.Viu.DevTools.ComponentTreeNodePayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Identifier.get -> int
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Identifier.init -> void
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Key.get -> string?
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Key.init -> void
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Name.get -> string!
+Assimalign.Viu.DevTools.ComponentTreeNodePayload.Name.init -> void
+Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload
+Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.<Clone>$() -> Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload!
+Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.ComponentTreeSnapshotPayload(System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentTreeNodePayload!>! Roots) -> void
+Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.Deconstruct(out System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentTreeNodePayload!>! Roots) -> void
+Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.Equals(Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload? other) -> bool
+Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.Roots.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.ComponentTreeNodePayload!>!
+Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.Roots.init -> void
 Assimalign.Viu.DevTools.DevToolsInspectorNode
 Assimalign.Viu.DevTools.DevToolsInspectorNode.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.DevToolsInspectorNode!>!
 Assimalign.Viu.DevTools.DevToolsInspectorNode.DevToolsInspectorNode(string! identifier, string! label, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.DevToolsInspectorNode!>? children = null) -> void
 Assimalign.Viu.DevTools.DevToolsInspectorNode.Identifier.get -> string!
 Assimalign.Viu.DevTools.DevToolsInspectorNode.Label.get -> string!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentChangePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentChangePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentEventMetadataPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentEventMetadataPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentEventPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentEventPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentExpansionRequestPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentExpansionRequestPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentExpansionResponsePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentExpansionResponsePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentIdentifierPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentIdentifierPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentReorderPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentReorderPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentSnapshotRequestPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentSnapshotResponsePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentTreeNodePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentTreeNodePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ComponentTreeSnapshotPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.DevToolsNamedValuePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.DevToolsValuePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.DevToolsValuePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.EmptyPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.EmptyPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.HandshakeRequestPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.HandshakeRequestPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.HandshakeResponsePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.HandshakeResponsePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.InspectorIdentifierPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.InspectorIdentifierPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.InspectorNodePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.InspectorNodePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.InspectorRegistrationPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.InspectorRegistrationPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.InspectorStateRequestPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.InspectorStateRequestPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.InspectorStateResponsePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.InspectorStateResponsePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.InspectorTreeRequestPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.InspectorTreeRequestPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.InspectorTreeResponsePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.InspectorTreeResponsePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ProtocolBatch.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ProtocolBatch!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.ProtocolEnvelope.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.ProtocolEnvelope!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.StateEditRequestPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.StateEditRequestPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.StateEditResponsePayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.StateEditResponsePayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.TelemetryDroppedPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.TelemetryDroppedPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.TimelineDroppedPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.TimelineDroppedPayload!>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.TimelineEventPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.TimelineEventPayload>!
+Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.TimelineLayerPayload.get -> System.Text.Json.Serialization.Metadata.JsonTypeInfo<Assimalign.Viu.DevTools.TimelineLayerPayload!>!
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.<Clone>$() -> Assimalign.Viu.DevTools.DevToolsNamedValuePayload!
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.Deconstruct(out string! Name, out Assimalign.Viu.DevTools.DevToolsValuePayload! Value) -> void
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.DevToolsNamedValuePayload(string! Name, Assimalign.Viu.DevTools.DevToolsValuePayload! Value) -> void
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.Equals(Assimalign.Viu.DevTools.DevToolsNamedValuePayload? other) -> bool
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.Name.get -> string!
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.Name.init -> void
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.Value.get -> Assimalign.Viu.DevTools.DevToolsValuePayload!
+Assimalign.Viu.DevTools.DevToolsNamedValuePayload.Value.init -> void
 Assimalign.Viu.DevTools.DevToolsProtocol
 Assimalign.Viu.DevTools.DevToolsSession
 Assimalign.Viu.DevTools.DevToolsSession.DevToolsSession(Assimalign.Viu.DevTools.IDevToolsTransport! transport, Assimalign.Viu.DevTools.DevToolsSessionOptions? options = null) -> void
@@ -30,6 +194,45 @@ Assimalign.Viu.DevTools.DevToolsTimelineLayer.Color.get -> string?
 Assimalign.Viu.DevTools.DevToolsTimelineLayer.DevToolsTimelineLayer(string! identifier, string! displayName, string? color = null) -> void
 Assimalign.Viu.DevTools.DevToolsTimelineLayer.DisplayName.get -> string!
 Assimalign.Viu.DevTools.DevToolsTimelineLayer.Identifier.get -> string!
+Assimalign.Viu.DevTools.DevToolsValuePayload
+Assimalign.Viu.DevTools.DevToolsValuePayload.<Clone>$() -> Assimalign.Viu.DevTools.DevToolsValuePayload!
+Assimalign.Viu.DevTools.DevToolsValuePayload.Children.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>!
+Assimalign.Viu.DevTools.DevToolsValuePayload.Children.init -> void
+Assimalign.Viu.DevTools.DevToolsValuePayload.Deconstruct(out string! Kind, out string! TypeName, out string? DisplayValue, out bool Expandable, out System.Collections.Generic.List<string!>! Path, out System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! Children) -> void
+Assimalign.Viu.DevTools.DevToolsValuePayload.DevToolsValuePayload(string! Kind, string! TypeName, string? DisplayValue, bool Expandable, System.Collections.Generic.List<string!>! Path, System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! Children) -> void
+Assimalign.Viu.DevTools.DevToolsValuePayload.DisplayValue.get -> string?
+Assimalign.Viu.DevTools.DevToolsValuePayload.DisplayValue.init -> void
+Assimalign.Viu.DevTools.DevToolsValuePayload.Equals(Assimalign.Viu.DevTools.DevToolsValuePayload? other) -> bool
+Assimalign.Viu.DevTools.DevToolsValuePayload.Expandable.get -> bool
+Assimalign.Viu.DevTools.DevToolsValuePayload.Expandable.init -> void
+Assimalign.Viu.DevTools.DevToolsValuePayload.Kind.get -> string!
+Assimalign.Viu.DevTools.DevToolsValuePayload.Kind.init -> void
+Assimalign.Viu.DevTools.DevToolsValuePayload.Path.get -> System.Collections.Generic.List<string!>!
+Assimalign.Viu.DevTools.DevToolsValuePayload.Path.init -> void
+Assimalign.Viu.DevTools.DevToolsValuePayload.TypeName.get -> string!
+Assimalign.Viu.DevTools.DevToolsValuePayload.TypeName.init -> void
+Assimalign.Viu.DevTools.EmptyPayload
+Assimalign.Viu.DevTools.EmptyPayload.<Clone>$() -> Assimalign.Viu.DevTools.EmptyPayload!
+Assimalign.Viu.DevTools.EmptyPayload.EmptyPayload() -> void
+Assimalign.Viu.DevTools.EmptyPayload.Equals(Assimalign.Viu.DevTools.EmptyPayload? other) -> bool
+Assimalign.Viu.DevTools.HandshakeRequestPayload
+Assimalign.Viu.DevTools.HandshakeRequestPayload.<Clone>$() -> Assimalign.Viu.DevTools.HandshakeRequestPayload!
+Assimalign.Viu.DevTools.HandshakeRequestPayload.Deconstruct(out System.Collections.Generic.List<int>! SupportedVersions) -> void
+Assimalign.Viu.DevTools.HandshakeRequestPayload.Equals(Assimalign.Viu.DevTools.HandshakeRequestPayload? other) -> bool
+Assimalign.Viu.DevTools.HandshakeRequestPayload.HandshakeRequestPayload(System.Collections.Generic.List<int>! SupportedVersions) -> void
+Assimalign.Viu.DevTools.HandshakeRequestPayload.SupportedVersions.get -> System.Collections.Generic.List<int>!
+Assimalign.Viu.DevTools.HandshakeRequestPayload.SupportedVersions.init -> void
+Assimalign.Viu.DevTools.HandshakeResponsePayload
+Assimalign.Viu.DevTools.HandshakeResponsePayload.<Clone>$() -> Assimalign.Viu.DevTools.HandshakeResponsePayload!
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Accepted.get -> bool
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Accepted.init -> void
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Deconstruct(out bool Accepted, out int? Version, out string? Reason) -> void
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Equals(Assimalign.Viu.DevTools.HandshakeResponsePayload? other) -> bool
+Assimalign.Viu.DevTools.HandshakeResponsePayload.HandshakeResponsePayload(bool Accepted, int? Version, string? Reason) -> void
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Reason.get -> string?
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Reason.init -> void
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Version.get -> int?
+Assimalign.Viu.DevTools.HandshakeResponsePayload.Version.init -> void
 Assimalign.Viu.DevTools.IDevToolsInspector
 Assimalign.Viu.DevTools.IDevToolsInspector.DisplayName.get -> string!
 Assimalign.Viu.DevTools.IDevToolsInspector.GetStateAsync(string! nodeIdentifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyDictionary<string!, object?>!>
@@ -38,10 +241,186 @@ Assimalign.Viu.DevTools.IDevToolsInspector.Identifier.get -> string!
 Assimalign.Viu.DevTools.IDevToolsTransport
 Assimalign.Viu.DevTools.IDevToolsTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Assimalign.Viu.DevTools.IDevToolsTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.InspectorIdentifierPayload
+Assimalign.Viu.DevTools.InspectorIdentifierPayload.<Clone>$() -> Assimalign.Viu.DevTools.InspectorIdentifierPayload!
+Assimalign.Viu.DevTools.InspectorIdentifierPayload.Deconstruct(out string! Identifier) -> void
+Assimalign.Viu.DevTools.InspectorIdentifierPayload.Equals(Assimalign.Viu.DevTools.InspectorIdentifierPayload? other) -> bool
+Assimalign.Viu.DevTools.InspectorIdentifierPayload.Identifier.get -> string!
+Assimalign.Viu.DevTools.InspectorIdentifierPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.InspectorIdentifierPayload.InspectorIdentifierPayload(string! Identifier) -> void
+Assimalign.Viu.DevTools.InspectorNodePayload
+Assimalign.Viu.DevTools.InspectorNodePayload.<Clone>$() -> Assimalign.Viu.DevTools.InspectorNodePayload!
+Assimalign.Viu.DevTools.InspectorNodePayload.Children.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.InspectorNodePayload!>!
+Assimalign.Viu.DevTools.InspectorNodePayload.Children.init -> void
+Assimalign.Viu.DevTools.InspectorNodePayload.Deconstruct(out string! Identifier, out string! Label, out System.Collections.Generic.List<Assimalign.Viu.DevTools.InspectorNodePayload!>! Children) -> void
+Assimalign.Viu.DevTools.InspectorNodePayload.Equals(Assimalign.Viu.DevTools.InspectorNodePayload? other) -> bool
+Assimalign.Viu.DevTools.InspectorNodePayload.Identifier.get -> string!
+Assimalign.Viu.DevTools.InspectorNodePayload.Identifier.init -> void
+Assimalign.Viu.DevTools.InspectorNodePayload.InspectorNodePayload(string! Identifier, string! Label, System.Collections.Generic.List<Assimalign.Viu.DevTools.InspectorNodePayload!>! Children) -> void
+Assimalign.Viu.DevTools.InspectorNodePayload.Label.get -> string!
+Assimalign.Viu.DevTools.InspectorNodePayload.Label.init -> void
+Assimalign.Viu.DevTools.InspectorRegistrationPayload
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.<Clone>$() -> Assimalign.Viu.DevTools.InspectorRegistrationPayload!
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.Deconstruct(out string! Identifier, out string! DisplayName) -> void
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.DisplayName.get -> string!
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.DisplayName.init -> void
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.Equals(Assimalign.Viu.DevTools.InspectorRegistrationPayload? other) -> bool
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.Identifier.get -> string!
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.InspectorRegistrationPayload.InspectorRegistrationPayload(string! Identifier, string! DisplayName) -> void
+Assimalign.Viu.DevTools.InspectorStateRequestPayload
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.<Clone>$() -> Assimalign.Viu.DevTools.InspectorStateRequestPayload!
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.Deconstruct(out string! InspectorIdentifier, out string! NodeIdentifier, out int Depth) -> void
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.Depth.get -> int
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.Depth.init -> void
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.Equals(Assimalign.Viu.DevTools.InspectorStateRequestPayload? other) -> bool
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.InspectorIdentifier.get -> string!
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.InspectorIdentifier.init -> void
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.InspectorStateRequestPayload(string! InspectorIdentifier, string! NodeIdentifier, int Depth) -> void
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.NodeIdentifier.get -> string!
+Assimalign.Viu.DevTools.InspectorStateRequestPayload.NodeIdentifier.init -> void
+Assimalign.Viu.DevTools.InspectorStateResponsePayload
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.<Clone>$() -> Assimalign.Viu.DevTools.InspectorStateResponsePayload!
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.Deconstruct(out string! InspectorIdentifier, out string! NodeIdentifier, out System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! State, out string? Error) -> void
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.Equals(Assimalign.Viu.DevTools.InspectorStateResponsePayload? other) -> bool
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.Error.get -> string?
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.Error.init -> void
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.InspectorIdentifier.get -> string!
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.InspectorIdentifier.init -> void
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.InspectorStateResponsePayload(string! InspectorIdentifier, string! NodeIdentifier, System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>! State, string? Error) -> void
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.NodeIdentifier.get -> string!
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.NodeIdentifier.init -> void
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.State.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.DevToolsNamedValuePayload!>!
+Assimalign.Viu.DevTools.InspectorStateResponsePayload.State.init -> void
+Assimalign.Viu.DevTools.InspectorTreeRequestPayload
+Assimalign.Viu.DevTools.InspectorTreeRequestPayload.<Clone>$() -> Assimalign.Viu.DevTools.InspectorTreeRequestPayload!
+Assimalign.Viu.DevTools.InspectorTreeRequestPayload.Deconstruct(out string! InspectorIdentifier) -> void
+Assimalign.Viu.DevTools.InspectorTreeRequestPayload.Equals(Assimalign.Viu.DevTools.InspectorTreeRequestPayload? other) -> bool
+Assimalign.Viu.DevTools.InspectorTreeRequestPayload.InspectorIdentifier.get -> string!
+Assimalign.Viu.DevTools.InspectorTreeRequestPayload.InspectorIdentifier.init -> void
+Assimalign.Viu.DevTools.InspectorTreeRequestPayload.InspectorTreeRequestPayload(string! InspectorIdentifier) -> void
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.<Clone>$() -> Assimalign.Viu.DevTools.InspectorTreeResponsePayload!
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.Deconstruct(out string! InspectorIdentifier, out System.Collections.Generic.List<Assimalign.Viu.DevTools.InspectorNodePayload!>! Roots, out string? Error) -> void
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.Equals(Assimalign.Viu.DevTools.InspectorTreeResponsePayload? other) -> bool
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.Error.get -> string?
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.Error.init -> void
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.InspectorIdentifier.get -> string!
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.InspectorIdentifier.init -> void
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.InspectorTreeResponsePayload(string! InspectorIdentifier, System.Collections.Generic.List<Assimalign.Viu.DevTools.InspectorNodePayload!>! Roots, string? Error) -> void
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.Roots.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.InspectorNodePayload!>!
+Assimalign.Viu.DevTools.InspectorTreeResponsePayload.Roots.init -> void
 Assimalign.Viu.DevTools.PostMessageDevToolsTransport
 Assimalign.Viu.DevTools.PostMessageDevToolsTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Assimalign.Viu.DevTools.PostMessageDevToolsTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Assimalign.Viu.DevTools.PostMessageDevToolsTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.ProtocolBatch
+Assimalign.Viu.DevTools.ProtocolBatch.<Clone>$() -> Assimalign.Viu.DevTools.ProtocolBatch!
+Assimalign.Viu.DevTools.ProtocolBatch.Deconstruct(out string! Protocol, out System.Collections.Generic.List<Assimalign.Viu.DevTools.ProtocolEnvelope!>! Messages) -> void
+Assimalign.Viu.DevTools.ProtocolBatch.Equals(Assimalign.Viu.DevTools.ProtocolBatch? other) -> bool
+Assimalign.Viu.DevTools.ProtocolBatch.Messages.get -> System.Collections.Generic.List<Assimalign.Viu.DevTools.ProtocolEnvelope!>!
+Assimalign.Viu.DevTools.ProtocolBatch.Messages.init -> void
+Assimalign.Viu.DevTools.ProtocolBatch.Protocol.get -> string!
+Assimalign.Viu.DevTools.ProtocolBatch.Protocol.init -> void
+Assimalign.Viu.DevTools.ProtocolBatch.ProtocolBatch(string! Protocol, System.Collections.Generic.List<Assimalign.Viu.DevTools.ProtocolEnvelope!>! Messages) -> void
+Assimalign.Viu.DevTools.ProtocolCodec
+Assimalign.Viu.DevTools.ProtocolEnvelope
+Assimalign.Viu.DevTools.ProtocolEnvelope.<Clone>$() -> Assimalign.Viu.DevTools.ProtocolEnvelope!
+Assimalign.Viu.DevTools.ProtocolEnvelope.Deconstruct(out int Version, out string! Type, out System.Text.Json.JsonElement Payload) -> void
+Assimalign.Viu.DevTools.ProtocolEnvelope.Equals(Assimalign.Viu.DevTools.ProtocolEnvelope? other) -> bool
+Assimalign.Viu.DevTools.ProtocolEnvelope.Payload.get -> System.Text.Json.JsonElement
+Assimalign.Viu.DevTools.ProtocolEnvelope.Payload.init -> void
+Assimalign.Viu.DevTools.ProtocolEnvelope.ProtocolEnvelope(int Version, string! Type, System.Text.Json.JsonElement Payload) -> void
+Assimalign.Viu.DevTools.ProtocolEnvelope.Type.get -> string!
+Assimalign.Viu.DevTools.ProtocolEnvelope.Type.init -> void
+Assimalign.Viu.DevTools.ProtocolEnvelope.Version.get -> int
+Assimalign.Viu.DevTools.ProtocolEnvelope.Version.init -> void
+Assimalign.Viu.DevTools.StateEditRequestPayload
+Assimalign.Viu.DevTools.StateEditRequestPayload.<Clone>$() -> Assimalign.Viu.DevTools.StateEditRequestPayload!
+Assimalign.Viu.DevTools.StateEditRequestPayload.Deconstruct(out int Identifier, out string! Section, out System.Collections.Generic.List<string!>! Path, out System.Text.Json.JsonElement Value) -> void
+Assimalign.Viu.DevTools.StateEditRequestPayload.Equals(Assimalign.Viu.DevTools.StateEditRequestPayload? other) -> bool
+Assimalign.Viu.DevTools.StateEditRequestPayload.Identifier.get -> int
+Assimalign.Viu.DevTools.StateEditRequestPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.StateEditRequestPayload.Path.get -> System.Collections.Generic.List<string!>!
+Assimalign.Viu.DevTools.StateEditRequestPayload.Path.init -> void
+Assimalign.Viu.DevTools.StateEditRequestPayload.Section.get -> string!
+Assimalign.Viu.DevTools.StateEditRequestPayload.Section.init -> void
+Assimalign.Viu.DevTools.StateEditRequestPayload.StateEditRequestPayload(int Identifier, string! Section, System.Collections.Generic.List<string!>! Path, System.Text.Json.JsonElement Value) -> void
+Assimalign.Viu.DevTools.StateEditRequestPayload.Value.get -> System.Text.Json.JsonElement
+Assimalign.Viu.DevTools.StateEditRequestPayload.Value.init -> void
+Assimalign.Viu.DevTools.StateEditResponsePayload
+Assimalign.Viu.DevTools.StateEditResponsePayload.<Clone>$() -> Assimalign.Viu.DevTools.StateEditResponsePayload!
+Assimalign.Viu.DevTools.StateEditResponsePayload.Accepted.get -> bool
+Assimalign.Viu.DevTools.StateEditResponsePayload.Accepted.init -> void
+Assimalign.Viu.DevTools.StateEditResponsePayload.Deconstruct(out int Identifier, out System.Collections.Generic.List<string!>! Path, out bool Accepted, out string? Reason) -> void
+Assimalign.Viu.DevTools.StateEditResponsePayload.Equals(Assimalign.Viu.DevTools.StateEditResponsePayload? other) -> bool
+Assimalign.Viu.DevTools.StateEditResponsePayload.Identifier.get -> int
+Assimalign.Viu.DevTools.StateEditResponsePayload.Identifier.init -> void
+Assimalign.Viu.DevTools.StateEditResponsePayload.Path.get -> System.Collections.Generic.List<string!>!
+Assimalign.Viu.DevTools.StateEditResponsePayload.Path.init -> void
+Assimalign.Viu.DevTools.StateEditResponsePayload.Reason.get -> string?
+Assimalign.Viu.DevTools.StateEditResponsePayload.Reason.init -> void
+Assimalign.Viu.DevTools.StateEditResponsePayload.StateEditResponsePayload(int Identifier, System.Collections.Generic.List<string!>! Path, bool Accepted, string? Reason) -> void
+Assimalign.Viu.DevTools.TelemetryDroppedPayload
+Assimalign.Viu.DevTools.TelemetryDroppedPayload.<Clone>$() -> Assimalign.Viu.DevTools.TelemetryDroppedPayload!
+Assimalign.Viu.DevTools.TelemetryDroppedPayload.Count.get -> int
+Assimalign.Viu.DevTools.TelemetryDroppedPayload.Count.init -> void
+Assimalign.Viu.DevTools.TelemetryDroppedPayload.Deconstruct(out int Count) -> void
+Assimalign.Viu.DevTools.TelemetryDroppedPayload.Equals(Assimalign.Viu.DevTools.TelemetryDroppedPayload? other) -> bool
+Assimalign.Viu.DevTools.TelemetryDroppedPayload.TelemetryDroppedPayload(int Count) -> void
+Assimalign.Viu.DevTools.TimelineDroppedPayload
+Assimalign.Viu.DevTools.TimelineDroppedPayload.<Clone>$() -> Assimalign.Viu.DevTools.TimelineDroppedPayload!
+Assimalign.Viu.DevTools.TimelineDroppedPayload.Count.get -> long
+Assimalign.Viu.DevTools.TimelineDroppedPayload.Count.init -> void
+Assimalign.Viu.DevTools.TimelineDroppedPayload.Deconstruct(out long Count) -> void
+Assimalign.Viu.DevTools.TimelineDroppedPayload.Equals(Assimalign.Viu.DevTools.TimelineDroppedPayload? other) -> bool
+Assimalign.Viu.DevTools.TimelineDroppedPayload.TimelineDroppedPayload(long Count) -> void
+Assimalign.Viu.DevTools.TimelineEventPayload
+Assimalign.Viu.DevTools.TimelineEventPayload.ComponentIdentifier.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.ComponentIdentifier.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.CorrelationIdentifier.get -> long
+Assimalign.Viu.DevTools.TimelineEventPayload.CorrelationIdentifier.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.Deconstruct(out long Sequence, out long Timestamp, out long CorrelationIdentifier, out string! LayerIdentifier, out string! Kind, out string! Label, out int? DependencyIdentifier, out int? EffectIdentifier, out int? OwnerIdentifier, out int? ComponentIdentifier, out int? Version, out int? PreFlushCount, out int? RenderCount, out int? PostFlushCount, out bool? Succeeded) -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.DependencyIdentifier.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.DependencyIdentifier.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.EffectIdentifier.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.EffectIdentifier.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.Equals(Assimalign.Viu.DevTools.TimelineEventPayload other) -> bool
+Assimalign.Viu.DevTools.TimelineEventPayload.Kind.get -> string!
+Assimalign.Viu.DevTools.TimelineEventPayload.Kind.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.Label.get -> string!
+Assimalign.Viu.DevTools.TimelineEventPayload.Label.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.LayerIdentifier.get -> string!
+Assimalign.Viu.DevTools.TimelineEventPayload.LayerIdentifier.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.OwnerIdentifier.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.OwnerIdentifier.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.PostFlushCount.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.PostFlushCount.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.PreFlushCount.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.PreFlushCount.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.RenderCount.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.RenderCount.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.Sequence.get -> long
+Assimalign.Viu.DevTools.TimelineEventPayload.Sequence.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.Succeeded.get -> bool?
+Assimalign.Viu.DevTools.TimelineEventPayload.Succeeded.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.TimelineEventPayload() -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.TimelineEventPayload(long Sequence, long Timestamp, long CorrelationIdentifier, string! LayerIdentifier, string! Kind, string! Label, int? DependencyIdentifier = null, int? EffectIdentifier = null, int? OwnerIdentifier = null, int? ComponentIdentifier = null, int? Version = null, int? PreFlushCount = null, int? RenderCount = null, int? PostFlushCount = null, bool? Succeeded = null) -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.Timestamp.get -> long
+Assimalign.Viu.DevTools.TimelineEventPayload.Timestamp.init -> void
+Assimalign.Viu.DevTools.TimelineEventPayload.Version.get -> int?
+Assimalign.Viu.DevTools.TimelineEventPayload.Version.init -> void
+Assimalign.Viu.DevTools.TimelineLayerPayload
+Assimalign.Viu.DevTools.TimelineLayerPayload.<Clone>$() -> Assimalign.Viu.DevTools.TimelineLayerPayload!
+Assimalign.Viu.DevTools.TimelineLayerPayload.Color.get -> string?
+Assimalign.Viu.DevTools.TimelineLayerPayload.Color.init -> void
+Assimalign.Viu.DevTools.TimelineLayerPayload.Deconstruct(out string! Identifier, out string! DisplayName, out string? Color) -> void
+Assimalign.Viu.DevTools.TimelineLayerPayload.DisplayName.get -> string!
+Assimalign.Viu.DevTools.TimelineLayerPayload.DisplayName.init -> void
+Assimalign.Viu.DevTools.TimelineLayerPayload.Equals(Assimalign.Viu.DevTools.TimelineLayerPayload? other) -> bool
+Assimalign.Viu.DevTools.TimelineLayerPayload.Identifier.get -> string!
+Assimalign.Viu.DevTools.TimelineLayerPayload.Identifier.init -> void
+Assimalign.Viu.DevTools.TimelineLayerPayload.TimelineLayerPayload(string! Identifier, string! DisplayName, string? Color) -> void
 Assimalign.Viu.DevTools.WebSocketDevToolsTransport
 Assimalign.Viu.DevTools.WebSocketDevToolsTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Assimalign.Viu.DevTools.WebSocketDevToolsTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
@@ -49,5 +428,164 @@ Assimalign.Viu.DevTools.WebSocketDevToolsTransport.StartAsync(System.Func<string
 Assimalign.Viu.DevTools.WebSocketDevToolsTransport.WebSocketDevToolsTransport(System.Net.WebSockets.WebSocket! webSocket, bool ownsWebSocket = false, int maximumInboundMessageBytes = 1048576) -> void
 const Assimalign.Viu.DevTools.DevToolsProtocol.CurrentVersion = 1 -> int
 const Assimalign.Viu.DevTools.DevToolsProtocol.Name = "assimalign.viu.devtools" -> string!
+override Assimalign.Viu.DevTools.ComponentChangePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentChangePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentChangePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentEventMetadataPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentEventMetadataPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentEventMetadataPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentEventPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentEventPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentEventPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentIdentifierPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentIdentifierPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentIdentifierPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentReorderPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentReorderPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentReorderPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentTreeNodePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentTreeNodePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentTreeNodePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.DevToolsNamedValuePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.DevToolsNamedValuePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.DevToolsNamedValuePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.DevToolsValuePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.DevToolsValuePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.DevToolsValuePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.EmptyPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.EmptyPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.EmptyPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.HandshakeRequestPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.HandshakeRequestPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.HandshakeRequestPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.HandshakeResponsePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.HandshakeResponsePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.HandshakeResponsePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.InspectorIdentifierPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.InspectorIdentifierPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.InspectorIdentifierPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.InspectorNodePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.InspectorNodePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.InspectorNodePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.InspectorRegistrationPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.InspectorRegistrationPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.InspectorRegistrationPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.InspectorStateRequestPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.InspectorStateRequestPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.InspectorStateRequestPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.InspectorStateResponsePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.InspectorStateResponsePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.InspectorStateResponsePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.InspectorTreeRequestPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.InspectorTreeRequestPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.InspectorTreeRequestPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.InspectorTreeResponsePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.InspectorTreeResponsePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.InspectorTreeResponsePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.ProtocolBatch.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ProtocolBatch.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ProtocolBatch.ToString() -> string!
+override Assimalign.Viu.DevTools.ProtocolEnvelope.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.ProtocolEnvelope.GetHashCode() -> int
+override Assimalign.Viu.DevTools.ProtocolEnvelope.ToString() -> string!
+override Assimalign.Viu.DevTools.StateEditRequestPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.StateEditRequestPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.StateEditRequestPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.StateEditResponsePayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.StateEditResponsePayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.StateEditResponsePayload.ToString() -> string!
+override Assimalign.Viu.DevTools.TelemetryDroppedPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.TelemetryDroppedPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.TelemetryDroppedPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.TimelineDroppedPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.TimelineDroppedPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.TimelineDroppedPayload.ToString() -> string!
+override Assimalign.Viu.DevTools.TimelineEventPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.TimelineLayerPayload.Equals(object? obj) -> bool
+override Assimalign.Viu.DevTools.TimelineLayerPayload.GetHashCode() -> int
+override Assimalign.Viu.DevTools.TimelineLayerPayload.ToString() -> string!
+static Assimalign.Viu.DevTools.ComponentChangePayload.operator !=(Assimalign.Viu.DevTools.ComponentChangePayload? left, Assimalign.Viu.DevTools.ComponentChangePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentChangePayload.operator ==(Assimalign.Viu.DevTools.ComponentChangePayload? left, Assimalign.Viu.DevTools.ComponentChangePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentEventMetadataPayload.operator !=(Assimalign.Viu.DevTools.ComponentEventMetadataPayload? left, Assimalign.Viu.DevTools.ComponentEventMetadataPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentEventMetadataPayload.operator ==(Assimalign.Viu.DevTools.ComponentEventMetadataPayload? left, Assimalign.Viu.DevTools.ComponentEventMetadataPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentEventPayload.operator !=(Assimalign.Viu.DevTools.ComponentEventPayload? left, Assimalign.Viu.DevTools.ComponentEventPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentEventPayload.operator ==(Assimalign.Viu.DevTools.ComponentEventPayload? left, Assimalign.Viu.DevTools.ComponentEventPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.operator !=(Assimalign.Viu.DevTools.ComponentExpansionRequestPayload? left, Assimalign.Viu.DevTools.ComponentExpansionRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentExpansionRequestPayload.operator ==(Assimalign.Viu.DevTools.ComponentExpansionRequestPayload? left, Assimalign.Viu.DevTools.ComponentExpansionRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.operator !=(Assimalign.Viu.DevTools.ComponentExpansionResponsePayload? left, Assimalign.Viu.DevTools.ComponentExpansionResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentExpansionResponsePayload.operator ==(Assimalign.Viu.DevTools.ComponentExpansionResponsePayload? left, Assimalign.Viu.DevTools.ComponentExpansionResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentIdentifierPayload.operator !=(Assimalign.Viu.DevTools.ComponentIdentifierPayload? left, Assimalign.Viu.DevTools.ComponentIdentifierPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentIdentifierPayload.operator ==(Assimalign.Viu.DevTools.ComponentIdentifierPayload? left, Assimalign.Viu.DevTools.ComponentIdentifierPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentReorderPayload.operator !=(Assimalign.Viu.DevTools.ComponentReorderPayload? left, Assimalign.Viu.DevTools.ComponentReorderPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentReorderPayload.operator ==(Assimalign.Viu.DevTools.ComponentReorderPayload? left, Assimalign.Viu.DevTools.ComponentReorderPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.operator !=(Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload? left, Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload.operator ==(Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload? left, Assimalign.Viu.DevTools.ComponentSnapshotRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.operator !=(Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload? left, Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload.operator ==(Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload? left, Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentTreeNodePayload.operator !=(Assimalign.Viu.DevTools.ComponentTreeNodePayload? left, Assimalign.Viu.DevTools.ComponentTreeNodePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentTreeNodePayload.operator ==(Assimalign.Viu.DevTools.ComponentTreeNodePayload? left, Assimalign.Viu.DevTools.ComponentTreeNodePayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.operator !=(Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload? left, Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload? right) -> bool
+static Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload.operator ==(Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload? left, Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload? right) -> bool
+static Assimalign.Viu.DevTools.DevToolsJsonSerializerContext.Default.get -> Assimalign.Viu.DevTools.DevToolsJsonSerializerContext!
+static Assimalign.Viu.DevTools.DevToolsNamedValuePayload.operator !=(Assimalign.Viu.DevTools.DevToolsNamedValuePayload? left, Assimalign.Viu.DevTools.DevToolsNamedValuePayload? right) -> bool
+static Assimalign.Viu.DevTools.DevToolsNamedValuePayload.operator ==(Assimalign.Viu.DevTools.DevToolsNamedValuePayload? left, Assimalign.Viu.DevTools.DevToolsNamedValuePayload? right) -> bool
+static Assimalign.Viu.DevTools.DevToolsValuePayload.operator !=(Assimalign.Viu.DevTools.DevToolsValuePayload? left, Assimalign.Viu.DevTools.DevToolsValuePayload? right) -> bool
+static Assimalign.Viu.DevTools.DevToolsValuePayload.operator ==(Assimalign.Viu.DevTools.DevToolsValuePayload? left, Assimalign.Viu.DevTools.DevToolsValuePayload? right) -> bool
+static Assimalign.Viu.DevTools.EmptyPayload.operator !=(Assimalign.Viu.DevTools.EmptyPayload? left, Assimalign.Viu.DevTools.EmptyPayload? right) -> bool
+static Assimalign.Viu.DevTools.EmptyPayload.operator ==(Assimalign.Viu.DevTools.EmptyPayload? left, Assimalign.Viu.DevTools.EmptyPayload? right) -> bool
+static Assimalign.Viu.DevTools.HandshakeRequestPayload.operator !=(Assimalign.Viu.DevTools.HandshakeRequestPayload? left, Assimalign.Viu.DevTools.HandshakeRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.HandshakeRequestPayload.operator ==(Assimalign.Viu.DevTools.HandshakeRequestPayload? left, Assimalign.Viu.DevTools.HandshakeRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.HandshakeResponsePayload.operator !=(Assimalign.Viu.DevTools.HandshakeResponsePayload? left, Assimalign.Viu.DevTools.HandshakeResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.HandshakeResponsePayload.operator ==(Assimalign.Viu.DevTools.HandshakeResponsePayload? left, Assimalign.Viu.DevTools.HandshakeResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorIdentifierPayload.operator !=(Assimalign.Viu.DevTools.InspectorIdentifierPayload? left, Assimalign.Viu.DevTools.InspectorIdentifierPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorIdentifierPayload.operator ==(Assimalign.Viu.DevTools.InspectorIdentifierPayload? left, Assimalign.Viu.DevTools.InspectorIdentifierPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorNodePayload.operator !=(Assimalign.Viu.DevTools.InspectorNodePayload? left, Assimalign.Viu.DevTools.InspectorNodePayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorNodePayload.operator ==(Assimalign.Viu.DevTools.InspectorNodePayload? left, Assimalign.Viu.DevTools.InspectorNodePayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorRegistrationPayload.operator !=(Assimalign.Viu.DevTools.InspectorRegistrationPayload? left, Assimalign.Viu.DevTools.InspectorRegistrationPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorRegistrationPayload.operator ==(Assimalign.Viu.DevTools.InspectorRegistrationPayload? left, Assimalign.Viu.DevTools.InspectorRegistrationPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorStateRequestPayload.operator !=(Assimalign.Viu.DevTools.InspectorStateRequestPayload? left, Assimalign.Viu.DevTools.InspectorStateRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorStateRequestPayload.operator ==(Assimalign.Viu.DevTools.InspectorStateRequestPayload? left, Assimalign.Viu.DevTools.InspectorStateRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorStateResponsePayload.operator !=(Assimalign.Viu.DevTools.InspectorStateResponsePayload? left, Assimalign.Viu.DevTools.InspectorStateResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorStateResponsePayload.operator ==(Assimalign.Viu.DevTools.InspectorStateResponsePayload? left, Assimalign.Viu.DevTools.InspectorStateResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorTreeRequestPayload.operator !=(Assimalign.Viu.DevTools.InspectorTreeRequestPayload? left, Assimalign.Viu.DevTools.InspectorTreeRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorTreeRequestPayload.operator ==(Assimalign.Viu.DevTools.InspectorTreeRequestPayload? left, Assimalign.Viu.DevTools.InspectorTreeRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorTreeResponsePayload.operator !=(Assimalign.Viu.DevTools.InspectorTreeResponsePayload? left, Assimalign.Viu.DevTools.InspectorTreeResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.InspectorTreeResponsePayload.operator ==(Assimalign.Viu.DevTools.InspectorTreeResponsePayload? left, Assimalign.Viu.DevTools.InspectorTreeResponsePayload? right) -> bool
 static Assimalign.Viu.DevTools.PostMessageDevToolsTransport.CreateAsync(string! targetOrigin, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.DevTools.PostMessageDevToolsTransport!>
+static Assimalign.Viu.DevTools.ProtocolBatch.operator !=(Assimalign.Viu.DevTools.ProtocolBatch? left, Assimalign.Viu.DevTools.ProtocolBatch? right) -> bool
+static Assimalign.Viu.DevTools.ProtocolBatch.operator ==(Assimalign.Viu.DevTools.ProtocolBatch? left, Assimalign.Viu.DevTools.ProtocolBatch? right) -> bool
+static Assimalign.Viu.DevTools.ProtocolCodec.CreateEnvelope<TPayload>(string! type, TPayload payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TPayload>! typeInformation) -> Assimalign.Viu.DevTools.ProtocolEnvelope!
+static Assimalign.Viu.DevTools.ProtocolCodec.DeserializeBatch(string! message) -> Assimalign.Viu.DevTools.ProtocolBatch?
+static Assimalign.Viu.DevTools.ProtocolCodec.SerializeBatch(System.Collections.Generic.List<Assimalign.Viu.DevTools.ProtocolEnvelope!>! messages) -> string!
+static Assimalign.Viu.DevTools.ProtocolEnvelope.operator !=(Assimalign.Viu.DevTools.ProtocolEnvelope? left, Assimalign.Viu.DevTools.ProtocolEnvelope? right) -> bool
+static Assimalign.Viu.DevTools.ProtocolEnvelope.operator ==(Assimalign.Viu.DevTools.ProtocolEnvelope? left, Assimalign.Viu.DevTools.ProtocolEnvelope? right) -> bool
+static Assimalign.Viu.DevTools.StateEditRequestPayload.operator !=(Assimalign.Viu.DevTools.StateEditRequestPayload? left, Assimalign.Viu.DevTools.StateEditRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.StateEditRequestPayload.operator ==(Assimalign.Viu.DevTools.StateEditRequestPayload? left, Assimalign.Viu.DevTools.StateEditRequestPayload? right) -> bool
+static Assimalign.Viu.DevTools.StateEditResponsePayload.operator !=(Assimalign.Viu.DevTools.StateEditResponsePayload? left, Assimalign.Viu.DevTools.StateEditResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.StateEditResponsePayload.operator ==(Assimalign.Viu.DevTools.StateEditResponsePayload? left, Assimalign.Viu.DevTools.StateEditResponsePayload? right) -> bool
+static Assimalign.Viu.DevTools.TelemetryDroppedPayload.operator !=(Assimalign.Viu.DevTools.TelemetryDroppedPayload? left, Assimalign.Viu.DevTools.TelemetryDroppedPayload? right) -> bool
+static Assimalign.Viu.DevTools.TelemetryDroppedPayload.operator ==(Assimalign.Viu.DevTools.TelemetryDroppedPayload? left, Assimalign.Viu.DevTools.TelemetryDroppedPayload? right) -> bool
+static Assimalign.Viu.DevTools.TimelineDroppedPayload.operator !=(Assimalign.Viu.DevTools.TimelineDroppedPayload? left, Assimalign.Viu.DevTools.TimelineDroppedPayload? right) -> bool
+static Assimalign.Viu.DevTools.TimelineDroppedPayload.operator ==(Assimalign.Viu.DevTools.TimelineDroppedPayload? left, Assimalign.Viu.DevTools.TimelineDroppedPayload? right) -> bool
+static Assimalign.Viu.DevTools.TimelineEventPayload.operator !=(Assimalign.Viu.DevTools.TimelineEventPayload left, Assimalign.Viu.DevTools.TimelineEventPayload right) -> bool
+static Assimalign.Viu.DevTools.TimelineEventPayload.operator ==(Assimalign.Viu.DevTools.TimelineEventPayload left, Assimalign.Viu.DevTools.TimelineEventPayload right) -> bool
+static Assimalign.Viu.DevTools.TimelineLayerPayload.operator !=(Assimalign.Viu.DevTools.TimelineLayerPayload? left, Assimalign.Viu.DevTools.TimelineLayerPayload? right) -> bool
+static Assimalign.Viu.DevTools.TimelineLayerPayload.operator ==(Assimalign.Viu.DevTools.TimelineLayerPayload? left, Assimalign.Viu.DevTools.TimelineLayerPayload? right) -> bool
 static Assimalign.Viu.DevTools.WebSocketDevToolsTransport.ConnectAsync(System.Uri! endpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.DevTools.WebSocketDevToolsTransport!>
+~override Assimalign.Viu.DevTools.TimelineEventPayload.Equals(object obj) -> bool
+~override Assimalign.Viu.DevTools.TimelineEventPayload.ToString() -> string

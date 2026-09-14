@@ -1,0 +1,70 @@
+#nullable enable
+Assimalign.Viu.DevTools.Client.DevToolsClientSession
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Changed -> System.Action?
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.ConnectionGeneration.get -> int
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.DevToolsClientSession(Assimalign.Viu.DevTools.Client.IDevToolsClientTransport! transport, Assimalign.Viu.DevTools.Client.IDevToolsClientScheduler? scheduler = null, int messagesPerFrame = 128, int timelineCapacity = 2048) -> void
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.EditState(string! section, System.Collections.Generic.IReadOnlyList<string!>! path, string! jsonValue) -> void
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Error.get -> string?
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Expand(string! section, System.Collections.Generic.IReadOnlyList<string!>! path) -> void
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Expansions.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.ComponentExpansionResponsePayload!>!
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Inspectors.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.DevTools.InspectorRegistrationPayload!>!
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.InspectorState.get -> Assimalign.Viu.DevTools.InspectorStateResponsePayload?
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.InspectorTree.get -> Assimalign.Viu.DevTools.InspectorTreeResponsePayload?
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.IsConnected.get -> bool
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.LastEdit.get -> Assimalign.Viu.DevTools.StateEditResponsePayload?
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.PendingMessageCount.get -> int
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Reconnect() -> void
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.SelectComponent(int identifier) -> void
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.SelectedComponentIdentifier.get -> int?
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.SelectInspector(string! identifier) -> void
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.SelectInspectorNode(string! inspectorIdentifier, string! nodeIdentifier) -> void
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Snapshot.get -> Assimalign.Viu.DevTools.ComponentSnapshotResponsePayload?
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.StartAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Timeline.get -> Assimalign.Viu.DevTools.Client.DevToolsTimelineStore!
+Assimalign.Viu.DevTools.Client.DevToolsClientSession.Tree.get -> Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore!
+Assimalign.Viu.DevTools.Client.DevToolsComponentNode
+Assimalign.Viu.DevTools.Client.DevToolsComponentNode.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.Client.DevToolsComponentNode!>!
+Assimalign.Viu.DevTools.Client.DevToolsComponentNode.Identifier.get -> int
+Assimalign.Viu.DevTools.Client.DevToolsComponentNode.Key.get -> string?
+Assimalign.Viu.DevTools.Client.DevToolsComponentNode.Name.get -> string!
+Assimalign.Viu.DevTools.Client.DevToolsComponentNode.ParentIdentifier.get -> int?
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.Apply(Assimalign.Viu.DevTools.ComponentChangePayload! change) -> void
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.Clear() -> void
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.DevToolsComponentTreeStore() -> void
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.Nodes.get -> System.Collections.Generic.IReadOnlyDictionary<int, Assimalign.Viu.DevTools.Client.DevToolsComponentNode!>!
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.Remove(int identifier) -> void
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.Reorder(int identifier, int index) -> void
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.Replace(Assimalign.Viu.DevTools.ComponentTreeSnapshotPayload! snapshot) -> void
+Assimalign.Viu.DevTools.Client.DevToolsComponentTreeStore.Roots.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.Client.DevToolsComponentNode!>!
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.Apply(Assimalign.Viu.DevTools.TimelineDroppedPayload! gap) -> void
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.Apply(Assimalign.Viu.DevTools.TimelineEventPayload timelineEvent) -> void
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.Clear() -> void
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.Count.get -> int
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.DevToolsTimelineStore(int capacity = 2048) -> void
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.Events.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.TimelineEventPayload>!
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.Gaps.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.TimelineDroppedPayload!>!
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.GetRelatedSequences(long sequence) -> System.Collections.Generic.IReadOnlySet<long>!
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.GetWindow(int offset, int count, string? layer = null, long? from = null, long? to = null) -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.TimelineEventPayload>!
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.Layers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.DevTools.TimelineLayerPayload!>!
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.RegisterLayer(Assimalign.Viu.DevTools.TimelineLayerPayload! layer) -> void
+Assimalign.Viu.DevTools.Client.DevToolsTimelineStore.RemoveLayer(string! identifier) -> void
+Assimalign.Viu.DevTools.Client.GeneratedViuComponents
+Assimalign.Viu.DevTools.Client.IDevToolsClientScheduler
+Assimalign.Viu.DevTools.Client.IDevToolsClientScheduler.Schedule(System.Action! callback) -> void
+Assimalign.Viu.DevTools.Client.IDevToolsClientTransport
+Assimalign.Viu.DevTools.Client.IDevToolsClientTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.IDevToolsClientTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Action! connected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport
+Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Action! connected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.WebSocketDevToolsClientTransport
+Assimalign.Viu.DevTools.Client.WebSocketDevToolsClientTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.WebSocketDevToolsClientTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.WebSocketDevToolsClientTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Action! connected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.Client.WebSocketDevToolsClientTransport.WebSocketDevToolsClientTransport(System.Uri! endpoint) -> void
+static Assimalign.Viu.DevTools.Client.GeneratedViuComponents.Register(Assimalign.Viu.Components.ComponentFactory! factory) -> void
+static Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport.CreateAsync(string! targetOrigin, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport!>

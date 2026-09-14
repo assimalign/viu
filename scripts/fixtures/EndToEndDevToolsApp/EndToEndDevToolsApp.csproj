@@ -1,0 +1,42 @@
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EndToEndDevToolsApp</RootNamespace>
+    <AssemblyName>EndToEndDevToolsApp</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <ViuEnableDevTools>true</ViuEnableDevTools>
+    <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
+    <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The entry module is fingerprinted; the interop module has a stable JSHost import URL. -->
+    <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
+    <!-- Packaged-consumer boundary, as required by [V01.01.10.03], #83. -->
+    <PackageReference Include="Assimalign.Viu.DevTools" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.DevTools.Client" Version="$(ViuConsumerVersion)" GeneratePathProperty="true" />
+  </ItemGroup>
+  <!-- This packaged fixture owns its two stable client routes, just as the DevTools package
+       materializes its runtime bridge. Registration after default asset discovery keeps JSHost's
+       fixed import URL available alongside the fingerprinted application entry module. [DVT-14]. -->
+  <Target Name="RegisterDevToolsClientFixtureAssets" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_DevToolsClientFixtureAsset Include="$(PkgAssimalign_Viu_DevTools_Client)/assets/Assimalign.Viu.DevTools.Client/viu-devtools-client.js;$(PkgAssimalign_Viu_DevTools_Client)/assets/Assimalign.Viu.DevTools.Client/viu-devtools-client.css" />
+      <_DevToolsClientFixtureSourceAsset Include="@(_DevToolsClientFixtureAsset->'$(MSBuildProjectDirectory)/wwwroot/_content/Assimalign.Viu.DevTools.Client/%(Filename)%(Extension)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_DevToolsClientFixtureAsset)" DestinationFiles="@(_DevToolsClientFixtureSourceAsset)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Remove="@(_DevToolsClientFixtureSourceAsset)" MatchOnMetadata="FullPath" MatchOnMetadataOptions="PathLike" />
+      <Content Include="@(_DevToolsClientFixtureSourceAsset)"
+               Link="wwwroot/_content/Assimalign.Viu.DevTools.Client/%(Filename)%(Extension)"
+               TargetPath="wwwroot/_content/Assimalign.Viu.DevTools.Client/%(Filename)%(Extension)"
+               CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
+               ExcludeFromSingleFile="true" Visible="false" />
+      <_DevToolsClientFixtureAsset Remove="@(_DevToolsClientFixtureAsset)" />
+      <_DevToolsClientFixtureSourceAsset Remove="@(_DevToolsClientFixtureSourceAsset)" />
+    </ItemGroup>
+  </Target>
+</Project>

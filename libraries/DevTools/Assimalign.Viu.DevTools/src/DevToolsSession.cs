@@ -535,6 +535,9 @@ public sealed partial class DevToolsSession : IAsyncDisposable, IRuntimeInspecti
             case "component.expand.request":
                 HandleComponentExpansionRequest(payload);
                 break;
+            case "state.edit.request":
+                HandleStateEditRequest(payload);
+                break;
             case "inspector.tree.request":
                 await HandleInspectorTreeRequestAsync(payload).ConfigureAwait(false);
                 break;
@@ -649,6 +652,33 @@ public sealed partial class DevToolsSession : IAsyncDisposable, IRuntimeInspecti
                 value,
                 error),
             DevToolsJsonSerializerContext.Default.ComponentExpansionResponsePayload);
+    }
+
+    private void HandleStateEditRequest(JsonElement payload)
+    {
+        StateEditRequestPayload? request = payload.Deserialize(
+            DevToolsJsonSerializerContext.Default.StateEditRequestPayload);
+        if (request is null)
+        {
+            return;
+        }
+
+        bool accepted = false;
+        string? reason = "The edit request has a missing section or invalid path.";
+        if (!string.IsNullOrEmpty(request.Section)
+            && request.Path is not null && !ContainsNullPathSegment(request.Path))
+        {
+            using (new UntrackedReactiveReadScope())
+            {
+                accepted = _components.TryEdit(
+                    request.Identifier, request.Section, request.Path, request.Value, out reason);
+            }
+        }
+
+        EnqueueControl(
+            "state.edit.response",
+            new StateEditResponsePayload(request.Identifier, request.Path ?? [], accepted, reason),
+            DevToolsJsonSerializerContext.Default.StateEditResponsePayload);
     }
 
     private async ValueTask HandleInspectorTreeRequestAsync(JsonElement payload)

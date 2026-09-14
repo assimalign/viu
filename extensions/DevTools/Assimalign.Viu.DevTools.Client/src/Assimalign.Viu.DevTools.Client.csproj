@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ViuUseSingleFileComponents>true</ViuUseSingleFileComponents>
+    <!-- A host-neutral panel has no static-web-asset SDK. The packaged host owns presentation assets. -->
+    <ViuBundleSingleFileComponentCss>false</ViuBundleSingleFileComponentCss>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuAnalyzerReference Include="Assimalign.Viu.Generators.Syntax" />
+    <ViuProjectReference Include="Assimalign.Viu.DevTools" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="wwwroot/viu-devtools-client.js" Pack="true" PackagePath="assets/Assimalign.Viu.DevTools.Client/viu-devtools-client.js" />
+    <None Update="wwwroot/viu-devtools-client.css" Pack="true" PackagePath="assets/Assimalign.Viu.DevTools.Client/viu-devtools-client.css" />
+  </ItemGroup>
+</Project>

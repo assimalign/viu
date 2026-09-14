@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 using Assimalign.Viu.Components;
 
@@ -169,6 +170,30 @@ internal sealed class ComponentInspectionRegistry
         value = encoder.EncodeValue(resolved, depth, path);
         error = null;
         return true;
+    }
+
+    internal bool TryEdit(
+        int identifier,
+        string section,
+        IReadOnlyList<string> path,
+        JsonElement value,
+        out string? reason)
+    {
+        if (!TryGetIdentity(identifier, out object? instance, out ComponentIdentity? identity))
+        {
+            reason = "The component is no longer mounted.";
+            return false;
+        }
+
+        if (!string.Equals(section, "state", StringComparison.Ordinal))
+        {
+            reason = string.Equals(section, "parameters", StringComparison.Ordinal)
+                ? "Component parameters are read-only."
+                : "The requested snapshot section is unknown.";
+            return false;
+        }
+
+        return StateValueEditor.TryEdit(GetState(instance, identity.Metadata), path, value, out reason);
     }
 
     private ComponentIdentity GetOrCreateIdentity(object instance)

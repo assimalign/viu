@@ -1,0 +1,123 @@
+<template>
+    <section class="viu-devtools-pane" aria-label="Component state" :data-revision="Revision">
+        <h2>Properties and state</h2>
+        <p v-if="HasNoSelection" class="viu-devtools-muted">Select a component to inspect its current values.</p>
+        <p v-if="HasError" role="status">{{ SnapshotError }}</p>
+        <ol class="viu-devtools-values" data-testid="devtools-snapshot">
+            <li v-for="row in Rows" :key="row.Key" class="viu-devtools-value" :style="row.Indentation"
+                data-testid="devtools-state-row" :data-path="row.Path" :data-section="row.Section">
+                <small>{{ row.Section }}</small>
+                <strong>{{ row.Name }}</strong>
+                <code>{{ row.Display }}</code>
+                <button v-if="row.Value.Expandable" type="button" data-testid="devtools-expand"
+                    :aria-label="ExpandLabel(row.Name)" @click="() => Expand(row)">Expand</button>
+                <button v-if="row.Editable" type="button" data-testid="devtools-edit-select"
+                    :aria-label="EditLabel(row.Name)" @click="() => ChooseEdit(row)">Edit</button>
+            </li>
+        </ol>
+        <div>
+            <div v-if="HasEdit" class="viu-devtools-controls">
+                <label>Value for {{ EditPath }}
+                    <input data-testid="devtools-edit-value" :value="EditText" @input="UpdateEditText" />
+                </label>
+                <button type="button" data-testid="devtools-edit-apply" @click="ApplyEdit">Apply</button>
+            </div>
+        </div>
+        <p role="status" data-testid="devtools-edit-result">{{ EditResult }}</p>
+    </section>
+</template>
+
+@script {
+    using System;
+    using System.Collections.Generic;
+    using System.Text.Json;
+
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.Reactivity;
+
+    /// <summary>Gets or sets the caller-owned session supplying lazy snapshots and edit responses. Single-threaded; specified by [DVT-13] and [DVT-14].</summary>
+    [Parameter(IsRequired = true)]
+    public DevToolsClientSession Session { get; set; } = null!;
+
+    private readonly Reference<int> RevisionReference = Reactive.Reference(0);
+    private DevToolsPaneRows.ValueRow? SelectedEdit;
+    private int? EditingComponentIdentifier;
+    private int PreviousConnectionGeneration;
+    private int PreviousStoreRevision;
+    private string EditText = string.Empty;
+    private string? LocalError;
+    private int Revision => RevisionReference.Value;
+    private IReadOnlyList<DevToolsPaneRows.ValueRow> Rows => DevToolsPaneRows.Snapshot(Session);
+    private bool HasNoSelection => Session.SelectedComponentIdentifier is null;
+    private bool HasError => Session.Snapshot?.Error is not null;
+    private string SnapshotError => Session.Snapshot?.Error ?? string.Empty;
+    private bool HasEdit => SelectedEdit is not null;
+    private string EditPath => SelectedEdit?.Path ?? string.Empty;
+    private string EditResult => LocalError ?? (Session.LastEdit is { } response
+        ? response.Accepted ? "Applied" : response.Reason ?? "The value could not be changed."
+        : string.Empty);
+
+    partial void OnSetup()
+    {
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        PreviousStoreRevision = Session.SnapshotRevision;
+        Session.Changed += Refresh;
+        Context!.Lifecycle.OnBeforeUnmount(() => Session.Changed -= Refresh);
+    }
+
+    private void Refresh()
+    {
+        if (PreviousStoreRevision == Session.SnapshotRevision && PreviousConnectionGeneration == Session.ConnectionGeneration)
+            return;
+        PreviousStoreRevision = Session.SnapshotRevision;
+        if (!Session.IsConnected || PreviousConnectionGeneration != Session.ConnectionGeneration
+            || EditingComponentIdentifier != Session.SelectedComponentIdentifier)
+        {
+            SelectedEdit = null;
+            LocalError = null;
+        }
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        RevisionReference.Value++;
+    }
+
+    private string ExpandLabel(string name) => "Expand " + name;
+    private string EditLabel(string name) => "Edit " + name;
+    private void Expand(DevToolsPaneRows.ValueRow row) => Session.Expand(row.Section, row.Value.Path);
+
+    private void ChooseEdit(DevToolsPaneRows.ValueRow row)
+    {
+        SelectedEdit = row;
+        EditingComponentIdentifier = Session.SelectedComponentIdentifier;
+        EditText = row.Value.DisplayValue ?? "null";
+        LocalError = null;
+        RevisionReference.Value++;
+    }
+
+    private void UpdateEditText(IElementEvent input)
+    {
+        EditText = input.TargetValue ?? string.Empty;
+    }
+
+    private void ApplyEdit()
+    {
+        if (SelectedEdit is not { } row)
+            return;
+        try
+        {
+            string jsonValue = row.Value.TypeName == "System.String"
+                ? "\"" + JsonEncodedText.Encode(EditText).ToString() + "\""
+                : EditText;
+            Session.EditState(row.Section, row.Value.Path, jsonValue);
+            LocalError = null;
+        }
+        catch (JsonException)
+        {
+            LocalError = "Enter a valid number, true, false, or null.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            LocalError = exception.Message;
+        }
+        RevisionReference.Value++;
+    }
+}

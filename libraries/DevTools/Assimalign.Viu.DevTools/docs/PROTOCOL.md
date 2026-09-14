@@ -3,7 +3,7 @@
 - Protocol name: `assimalign.viu.devtools`
 - Current version: `1`
 
-This document is the standalone wire contract for `[DVT-1]` through `[DVT-12]`. Viu owns the
+This document is the standalone wire contract for `[DVT-1]` through `[DVT-14]`. Viu owns the
 message semantics. The browser transport applies the WHATWG HTML web-messaging model, and the
 socket transport applies the WHATWG WebSockets message model; those standards define transport
 delivery only, not Viu's inspection data.
@@ -48,6 +48,15 @@ The runtime selects the newest mutually supported version and replies with
 
 When there is no common version, `accepted` is false, `version` is absent, and `reason` is a
 diagnostic string. Messages other than a handshake are ignored until negotiation succeeds.
+
+The client treats every accepted handshake as a new local inspection epoch: it clears component
+identities, selected snapshots, pending expansions/edits, inspector data, and timeline records,
+then requests a fresh tree. The runtime replays inspector and layer registrations. Re-handshaking
+with the same runtime does not recycle its object identifiers or elapsed clock. Reloading the
+inspected application creates a new runtime session whose identifiers and clock are unrelated.
+The postMessage adapter announces `assimalign.viu.devtools.ready` when its listener is installed;
+this advisory asks an attached client to negotiate again and carries no inspection data. Socket
+reconnection likewise requires a fresh handshake. These client rules are specified by [DVT-14].
 
 ## Component tree
 
@@ -106,10 +115,68 @@ re-reads live state and therefore never requires a strongly held snapshot graph.
 
 Value `kind` is `null`, `scalar`, `object`, `array`, `reference`, or `placeholder`. A `reference`
 has a `value` child containing the current `IReactiveReference` value, including computed values.
+Generated `IReactiveObject` members appear as lazily expanded objects using the generated
+`GetMemberValues()` access surface; their properties are never discovered by reflection.
 Unknown objects, failed getters/providers, cycles, and values beyond collection limits become a
 `placeholder` with a type name and diagnostic display value; they never fault serialization.
 Snapshot, expansion, inspector-state, and component-event reads suspend dependency collection, so
 inspection cannot add reactive dependencies to an application effect.
+
+## State edits ([V01.01.10.03], #83)
+
+Version 1 adds `state.edit.request` and `state.edit.response` [DVT-13]. Older receivers ignore
+these additive message types under [DVT-2]. A request carries:
+
+```json
+{ "identifier": 2, "section": "state", "path": ["count", "value"], "value": 12 }
+```
+
+The response is a reliable control message, independent of telemetry capacity:
+
+```json
+{ "identifier": 2, "path": ["count", "value"], "accepted": true }
+```
+
+Only `state` is writable; `parameters` is always rejected. Paths contain 1 through 64 ordinal,
+case-sensitive segments and resolve against live state on each request. A reference can be
+addressed directly (`["count"]`) or by its displayed child (`["count", "value"]`). Generated
+object members use their declared names, for example `["model", "Count"]`. Dictionary/sequence
+paths can lead to an editable reference or generated member; plain dictionary/sequence entries
+and entire objects are never replaced. No reflection or runtime JSON contract discovery occurs.
+
+The target fixes the conversion; the JSON value never selects a CLR type:
+
+| CLR target | Accepted JSON |
+| --- | --- |
+| `bool` | `true` or `false` |
+| `int` | Integral numeric token within signed 32-bit range |
+| `long` | Integral numeric token within signed 64-bit range |
+| `double` | Numeric token convertible to a finite double |
+| `decimal` | Numeric token representable as a decimal |
+| `string` | String token or null |
+
+There is no numeric conversion from strings or booleans. Fractional tokens cannot edit integers;
+out-of-range numbers and non-finite doubles are rejected. Nullable numeric members, enums, custom
+types, and arbitrary object replacement are unsupported. `IReactiveReference<T>` writes use an
+explicit typed setter. Generated members use `IReactiveObject.TrySetMemberValue`, which dispatches
+only the table's declared property types through their normal setters. An equal-value write is
+accepted but retains ordinary equality suppression. Read-only generated objects and computed
+references (including computeds with authored setters) cannot be edited.
+Computed ancestors are rejected before reading their values, regardless of their generic value
+type, through the non-evaluating `IReactiveReference.IsComputed` classification. An ordinary mutable
+object-valued reference may still be traversed to a supported generated member or scalar reference.
+
+Rejected responses include `accepted: false` and a diagnostic `reason`. Reasons distinguish an
+unmounted component, read-only parameters/target, computed target, unknown section, invalid or
+missing path, scalar type/range mismatch, unsupported target, and a failing getter/provider/setter.
+No-write rejections do not trigger reactivity. A user-defined setter may throw after a side effect;
+that response explicitly says state may have changed and promises no rollback. Reads used to
+resolve the target suspend ambient dependency collection; an accepted write uses ordinary reactive
+notification and rendering. The client requests a fresh shallow snapshot after the response.
+
+The public data-only records in `src/Protocol/`, `ProtocolCodec`, and
+`DevToolsJsonSerializerContext` are shared by runtime and client. They contain wire data only:
+clients must not access runtime internals or retain application objects [DVT-14].
 
 ## Custom inspectors and timeline layers
 
@@ -191,7 +258,8 @@ Flush counts include attempted application jobs, including a throwing job, and e
 jobs and the recorder's own drain callbacks. A post-flush callback that queues more application
 work stays in the same correlation chain. Diagnostics-only drains do not emit flush pairs. The
 completed hook schedules an asynchronous drain without queuing another scheduler flush solely for
-its own observation. The inspection UI remains #83 and is outside this wire contract.
+its own observation. The inspection application lives in `extensions/DevTools/` and consumes these
+messages through the same public protocol contracts.
 
 ## Serialization and transport invariants
 
@@ -199,7 +267,7 @@ its own observation. The inspection UI remains #83 and is outside this wire cont
   `JsonSerializerContext`; runtime contract discovery is forbidden.
 - Renderer telemetry is bounded and oldest-first when capacity is exhausted. A
   `telemetry.dropped` marker reports each drain's loss count without consuming telemetry capacity.
-- Handshake responses, requested snapshot and inspector responses, and registration changes use a
+- Handshake responses, state-edit responses, requested snapshot and inspector responses, and registration changes use a
   separate reliable queue; telemetry pressure cannot evict them.
 - A monotonic session sequence stable-merges all queues, and the loss marker takes the first
   evicted envelope's position so retained observations cannot cross a later control response.

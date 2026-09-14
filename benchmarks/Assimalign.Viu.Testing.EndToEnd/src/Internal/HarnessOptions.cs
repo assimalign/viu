@@ -16,6 +16,7 @@ internal sealed class HarnessOptions
     internal string? HydrationRootDirectory { get; init; }
 
     internal string? PrerenderRootDirectory { get; init; }
+    internal string? DevToolsRootDirectory { get; init; }
 
     internal string? HotReloadProjectPath { get; init; }
 
@@ -42,6 +43,7 @@ internal sealed class HarnessOptions
         string? browserRootDirectory = null;
         string? hydrationRootDirectory = null;
         string? prerenderRootDirectory = null;
+        string? devToolsRootDirectory = null;
         string? hotReloadProjectPath = null;
         string? hotReloadViuVersion = null;
         string? artifactDirectory = null;
@@ -65,6 +67,9 @@ internal sealed class HarnessOptions
                     break;
                 case "--prerender-root":
                     prerenderRootDirectory = ReadValue(arguments, ref index, argument);
+                    break;
+                case "--devtools-root":
+                    devToolsRootDirectory = ReadValue(arguments, ref index, argument);
                     break;
                 case "--hot-reload-project":
                     hotReloadProjectPath = ReadValue(arguments, ref index, argument);
@@ -106,7 +111,21 @@ internal sealed class HarnessOptions
         }
 
         ArgumentException.ThrowIfNullOrEmpty(artifactDirectory);
-        if (hotReloadProjectPath is null)
+        if (devToolsRootDirectory is not null)
+        {
+            if (hotReloadProjectPath is not null || hotReloadViuVersion is not null
+                || browserRootDirectory is not null || hydrationRootDirectory is not null
+                || measureStartup)
+            {
+                throw new ArgumentException("--devtools-root selects an independent published-fixture lane.");
+            }
+            if (!Directory.Exists(devToolsRootDirectory))
+            {
+                throw new DirectoryNotFoundException(
+                    $"The DevTools fixture publish root does not exist: {devToolsRootDirectory}");
+            }
+        }
+        else if (hotReloadProjectPath is null)
         {
             if (hotReloadViuVersion is not null)
             {
@@ -156,6 +175,12 @@ internal sealed class HarnessOptions
             browserEngines.Add(BrowserEngine.Chromium);
         }
 
+        if (devToolsRootDirectory is not null
+            && (browserEngines.Count != 1 || browserEngines[0] != BrowserEngine.Chromium))
+        {
+            throw new ArgumentException("The DevTools lane requires exactly the Chromium browser engine.");
+        }
+
         if (measureStartup)
         {
             ArgumentException.ThrowIfNullOrEmpty(startupResultsPath);
@@ -201,6 +226,9 @@ internal sealed class HarnessOptions
             PrerenderRootDirectory = prerenderRootDirectory is null
                 ? null
                 : Path.GetFullPath(prerenderRootDirectory),
+            DevToolsRootDirectory = devToolsRootDirectory is null
+                ? null
+                : Path.GetFullPath(devToolsRootDirectory),
             HotReloadProjectPath = hotReloadProjectPath is null
                 ? null
                 : Path.GetFullPath(hotReloadProjectPath),

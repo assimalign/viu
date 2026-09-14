@@ -20,7 +20,7 @@ namespace Assimalign.Viu.Reactivity;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The computed value type.</typeparam>
-public sealed class Computed<T> : ReactiveValue<T>
+public sealed class Computed<T> : ReactiveValue<T>, IReactiveReference
 {
     private readonly Func<T> _getter;
     private readonly Action<T>? _setter;
@@ -54,6 +54,8 @@ public sealed class Computed<T> : ReactiveValue<T>
     /// Whether this computed has a setter, making <see cref="Value"/> assignable.
     /// </summary>
     public bool IsWritable => _setter is not null;
+
+    bool IReactiveReference.IsComputed => true;
 
     /// <summary>
     /// A getter-only computed is read-only; a writable computed is not. Surfaced through

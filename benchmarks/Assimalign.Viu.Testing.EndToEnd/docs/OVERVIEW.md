@@ -33,6 +33,14 @@ click proves the adopted button is interactive. The shared explicit component re
 the server creates a new application, router, and state registry for each route. Specified by
 [V01.01.07.05], #68.
 
+The opt-in `-DevTools` mode packs the ecosystem inspection-client library and publishes
+`scripts/fixtures/EndToEndDevToolsApp`. Its Chromium scenario uses an iframe with an independent
+WebAssembly runtime for the Viu panel and exchanges only postMessage protocol frames with the
+inspected application. It checks incremental mounts and unmounts, lazy snapshot expansion,
+state edits visible in the inspected DOM, correlated timeline highlighting, generic custom
+inspector rendering, and a fresh handshake after document reload ([DVT-13], [DVT-14]). Combine
+`-DevTools -PublishOnly -PublishDirectory _out/devtools-publish` to retain only the trimmed host.
+
 Startup mode performs one or more warm-up loads followed by at least ten fresh-context
 boot-to-interactive measurements in Chromium. A sample stops only after the increment click is
 acknowledged by the reactive count, proving event dispatch and update readiness. Its JSON result is

@@ -32,8 +32,10 @@ hot reload. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367).
   currently independently published. The independently published UtilityCss add-on lives at
   `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}`. It remains outside every Viu SDK and
   framework surface; consumer MSBuild integration arrives separately through #346.
-- `extensions/` — ecosystem integration points: `VisualStudio/`, `VisualStudioCode/`, and `dotnet/`;
+- `extensions/` — ecosystem integration points: `VisualStudio/`, `VisualStudioCode/`, `DevTools/`, and `dotnet/`;
   templates live at `extensions/dotnet/Assimalign.Viu.Templates`.
+  `DevTools/Assimalign.Viu.DevTools.Client/{src,test,docs}` contains the protocol-only Viu inspection
+  panel; its packaged Browser host is `scripts/fixtures/EndToEndDevToolsApp` (the Packaging lane).
 - `benchmarks/Assimalign.Viu.Testing.EndToEnd/` — real-browser end-to-end harness. It is a test
   harness, not a benchmark; the folder name is historical.
 - `sdks/<SdkId>/Tasks/{src,test}` — SDK task projects.

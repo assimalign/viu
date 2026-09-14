@@ -59,6 +59,7 @@ internal static class ReactiveSourceEmitter
         var bodyIndent = indent + 1;
         EmitProperties(builder, model, bodyIndent);
         EmitDependencyLookup(builder, model, bodyIndent);
+        EmitMemberInspection(builder, model, bodyIndent);
         EmitTraversal(builder, model, bodyIndent);
         EmitReadOnlyMarker(builder, model, bodyIndent);
         EmitReferences(builder, model, bodyIndent);
@@ -167,6 +168,65 @@ internal static class ReactiveSourceEmitter
         builder.Append("default:\n");
         AppendIndent(builder, indent + 3);
         builder.Append("return null;\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("}\n");
+        AppendIndent(builder, indent);
+        builder.Append("}\n\n");
+    }
+
+    private static void EmitMemberInspection(StringBuilder builder, in ReactiveClassModel model, int indent)
+    {
+        // [DVT-13]: cold, explicitly generated access; writes reuse normal reactive setters.
+        AppendIndent(builder, indent);
+        builder.Append("global::System.Collections.Generic.IReadOnlyDictionary<string, object?> ")
+            .Append(ReactiveObjectType).Append(".GetMemberValues() =>\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("new global::System.Collections.Generic.Dictionary<string, object?>\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("{\n");
+        foreach (var property in model.Properties)
+        {
+            AppendIndent(builder, indent + 2);
+            builder.Append("[\"").Append(property.Name).Append("\"] = this.")
+                .Append(property.Name).Append(",\n");
+        }
+        AppendIndent(builder, indent + 1);
+        builder.Append("};\n\n");
+        AppendIndent(builder, indent);
+        builder.Append("bool ").Append(ReactiveObjectType)
+            .Append(".TrySetMemberValue(string propertyName, object? value)\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("switch (propertyName)\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("{\n");
+        if (!model.ReadOnly)
+        {
+            foreach (var property in model.Properties)
+            {
+                string propertyType = property.TypeFullName;
+                bool isString = propertyType == "string" || propertyType == "string?";
+                if (!isString && propertyType != "bool" && propertyType != "int"
+                    && propertyType != "long" && propertyType != "double" && propertyType != "decimal")
+                {
+                    continue;
+                }
+
+                AppendIndent(builder, indent + 2);
+                builder.Append("case \"").Append(property.Name).Append("\" when value is ")
+                    .Append(isString ? "null or string" : propertyType).Append(":\n");
+                AppendIndent(builder, indent + 3);
+                builder.Append("this.").Append(property.Name).Append(" = (")
+                    .Append(propertyType).Append(")value!;\n");
+                AppendIndent(builder, indent + 3);
+                builder.Append("return true;\n");
+            }
+        }
+        AppendIndent(builder, indent + 2);
+        builder.Append("default:\n");
+        AppendIndent(builder, indent + 3);
+        builder.Append("return false;\n");
         AppendIndent(builder, indent + 1);
         builder.Append("}\n");
         AppendIndent(builder, indent);

@@ -1,0 +1,30 @@
+.viu-devtools { color: #dce5f3; background: #101824; font: 14px/1.5 system-ui, sans-serif; padding: 18px; color-scheme: dark; }
+.viu-devtools * { box-sizing: border-box; }
+.viu-devtools-header { display: flex; align-items: center; gap: 18px; margin-bottom: 16px; }
+.viu-devtools h1 { font-size: 22px; margin: 0; }
+.viu-devtools h2 { font-size: 16px; margin: 0 0 12px; }
+.viu-devtools h3 { font-size: 14px; }
+.viu-devtools-grid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 2fr); gap: 12px; }
+.viu-devtools-pane { background: #182434; border: 1px solid #304057; border-radius: 8px; padding: 14px; min-width: 0; }
+.viu-devtools button { color: inherit; background: #26384d; border: 1px solid #455973; border-radius: 4px; padding: 5px 9px; cursor: pointer; }
+.viu-devtools button:hover { background: #344e6c; }
+.viu-devtools button:focus-visible, .viu-devtools input:focus-visible { outline: 2px solid #75c7ff; outline-offset: 2px; }
+.viu-devtools button[aria-pressed="true"] { background: #264f70; border-color: #75c7ff; }
+.viu-devtools input { color: inherit; background: #101824; border: 1px solid #455973; border-radius: 4px; padding: 6px; width: 130px; }
+.viu-devtools label { display: inline-flex; align-items: center; gap: 6px; }
+.viu-devtools ol, .viu-devtools ul { list-style: none; margin: 0; padding: 0; }
+.viu-devtools-tree { max-height: 400px; overflow: auto; }
+.viu-devtools-tree li { margin-bottom: 4px; }
+.viu-devtools-tree button { width: 100%; text-align: left; }
+.viu-devtools-muted { color: #a3b4c9; }
+.viu-devtools-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.viu-devtools-layer-options { display: contents; }
+.viu-devtools-values { max-height: 360px; overflow: auto; }
+.viu-devtools-value { display: flex; align-items: center; gap: 8px; padding-block: 5px; border-bottom: 1px solid #304057; }
+.viu-devtools-value code { overflow-wrap: anywhere; }
+.viu-devtools-value small { color: #a3b4c9; }
+.viu-devtools-timeline { max-height: 480px; overflow: auto; }
+.viu-devtools-timeline button { display: block; width: 100%; text-align: left; margin-bottom: 3px; font-family: monospace; }
+.viu-devtools-timeline button[data-related="true"] { border-color: #ffcc72; background: #45402c; }
+.viu-devtools-gap { color: #ffcc72; }
+@media (max-width: 780px) { .viu-devtools-grid { grid-template-columns: 1fr; } }

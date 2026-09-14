@@ -97,6 +97,28 @@ namespace Demo
             }
         }
 
+        global::System.Collections.Generic.IReadOnlyDictionary<string, object?> global::Assimalign.Viu.Reactivity.IReactiveObject.GetMemberValues() =>
+            new global::System.Collections.Generic.Dictionary<string, object?>
+            {
+                ["Title"] = this.Title,
+                ["Done"] = this.Done,
+            };
+
+        bool global::Assimalign.Viu.Reactivity.IReactiveObject.TrySetMemberValue(string propertyName, object? value)
+        {
+            switch (propertyName)
+            {
+                case "Title" when value is null or string:
+                    this.Title = (string)value!;
+                    return true;
+                case "Done" when value is bool:
+                    this.Done = (bool)value!;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         void global::Assimalign.Viu.Reactivity.IReactiveTraversable.Traverse(global::Assimalign.Viu.Reactivity.ReactiveTraversal traversal)
         {
             traversal.Visit(this.Title);
@@ -150,6 +172,57 @@ namespace Demo
         outcome.Diagnostics.ShouldBeEmpty();
         Normalize(GeneratorTestHarness.GeneratedSource(outcome, "TodoItem.Reactive.g.cs"))
             .ShouldBe(Normalize(expected));
+    }
+
+    [Fact]
+    public void MemberInspection_ScalarDispatch_CompilesAndUsesOrdinarySetters()
+    {
+        // [DVT-13]: the generated cold seam accepts only its declared scalar types.
+        const string source = """
+            using Assimalign.Viu.Reactivity;
+            [Reactive]
+            public partial class ScalarModel
+            {
+                public partial bool Enabled { get; set; }
+                public partial int Count { get; set; }
+                public partial long Total { get; set; }
+                public partial double Ratio { get; set; }
+                public partial decimal Price { get; set; }
+                public partial string? Label { get; set; }
+                public partial object? Opaque { get; set; }
+                public partial int? Optional { get; set; }
+            }
+            """;
+        GeneratorDriver driver = GeneratorTestHarness.CreateDriver().RunGeneratorsAndUpdateCompilation(
+            GeneratorTestHarness.CreateCompilation(source), out Compilation compilation, out _);
+        compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ShouldBeEmpty();
+        string generated = driver.GetRunResult().Results[0].GeneratedSources.Single().SourceText.ToString();
+        generated.ShouldContain("this.Count = (int)value!;");
+        generated.ShouldContain("case \"Label\" when value is null or string:");
+        generated.ShouldContain("this.Label = (string?)value!;");
+        generated.ShouldNotContain("case \"Opaque\" when");
+        generated.ShouldNotContain("case \"Optional\" when");
+        generated.ShouldContain("[\"Opaque\"] = this.Opaque,");
+    }
+
+    [Fact]
+    public void MemberInspection_ReadOnlyModel_EmitsNoWriteDispatch()
+    {
+        // [DVT-13]: the inspection write surface cannot bypass readonly generated properties.
+        const string source = """
+            using Assimalign.Viu.Reactivity;
+            [Reactive(ReadOnly = true)]
+            public partial class ReadOnlyModel
+            {
+                public partial int Count { get; set; }
+            }
+            """;
+        string generated = GeneratorTestHarness.GeneratedSource(
+            GeneratorTestHarness.Run(source), "ReadOnlyModel.Reactive.g.cs");
+        generated.ShouldContain(".TrySetMemberValue(string propertyName, object? value)");
+        generated.ShouldNotContain("case \"Count\" when");
+        generated.ShouldContain("[\"Count\"] = this.Count,");
     }
 
     [Fact]

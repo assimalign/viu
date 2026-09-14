@@ -1,0 +1,52 @@
+<template>
+    <main class="viu-devtools" data-testid="devtools-panel" :data-revision="Revision">
+        <header class="viu-devtools-header">
+            <h1>Viu DevTools</h1>
+            <span data-testid="devtools-status" role="status">{{ Status }}</span>
+            <button type="button" @click="Reconnect">Reconnect</button>
+        </header>
+        <div class="viu-devtools-grid">
+            <DevToolsTreePane :session="Session" />
+            <DevToolsSnapshotPane :session="Session" />
+            <DevToolsTimelinePane :session="Session" />
+            <DevToolsInspectorsPane :session="Session" />
+        </div>
+    </main>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.Reactivity;
+
+    /// <summary>Gets or sets the caller-owned protocol session used by every pane. Single-threaded; specified by [DVT-14].</summary>
+    [Parameter(IsRequired = true)]
+    public DevToolsClientSession Session { get; set; } = null!;
+
+    private readonly Reference<int> RevisionReference = Reactive.Reference(0);
+    private bool PreviousIsConnected;
+    private string? PreviousError;
+    private int PreviousConnectionGeneration;
+    private int Revision => RevisionReference.Value;
+    private string Status => Session.Error ?? (Session.IsConnected ? "Connected" : "Connecting");
+
+    partial void OnSetup()
+    {
+        PreviousIsConnected = Session.IsConnected;
+        PreviousError = Session.Error;
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        Session.Changed += Refresh;
+        Context!.Lifecycle.OnBeforeUnmount(() => Session.Changed -= Refresh);
+    }
+
+    private void Refresh()
+    {
+        if (PreviousIsConnected == Session.IsConnected && PreviousError == Session.Error
+            && PreviousConnectionGeneration == Session.ConnectionGeneration)
+            return;
+        PreviousIsConnected = Session.IsConnected;
+        PreviousError = Session.Error;
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        RevisionReference.Value++;
+    }
+    private void Reconnect() => Session.Reconnect();
+}

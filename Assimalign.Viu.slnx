@@ -464,4 +464,15 @@
 		<Project Path="analyzers/Assimalign.Viu.Generators.FileRouting/test/Assimalign.Viu.Generators.FileRouting.Tests.csproj" />
 		<Project Path="analyzers/Assimalign.Viu.Generators.FileRouting/test/Assimalign.Viu.Generators.FileRouting.CompiledFixtureTests/Assimalign.Viu.Generators.FileRouting.CompiledFixtureTests.csproj" />
 	</Folder>
+	<Folder Name="/viu/extensions/DevTools/" />
+	<Folder Name="/viu/extensions/DevTools/Assimalign.Viu.DevTools.Client/docs/">
+		<File Path="extensions/DevTools/Assimalign.Viu.DevTools.Client/docs/OVERVIEW.md" />
+		<File Path="extensions/DevTools/Assimalign.Viu.DevTools.Client/docs/DESIGN.md" />
+	</Folder>
+	<Folder Name="/viu/extensions/DevTools/Assimalign.Viu.DevTools.Client/src/">
+		<Project Path="extensions/DevTools/Assimalign.Viu.DevTools.Client/src/Assimalign.Viu.DevTools.Client.csproj" />
+	</Folder>
+	<Folder Name="/viu/extensions/DevTools/Assimalign.Viu.DevTools.Client/test/">
+		<Project Path="extensions/DevTools/Assimalign.Viu.DevTools.Client/test/Assimalign.Viu.DevTools.Client.Tests.csproj" />
+	</Folder>
 </Solution>

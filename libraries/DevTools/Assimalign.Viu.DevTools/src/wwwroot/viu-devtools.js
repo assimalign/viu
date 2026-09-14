@@ -28,6 +28,8 @@ export const postMessage = {
 
         subscriptions.set(subscriptionIdentifier, { listener, targetOrigin })
         window.addEventListener('message', listener)
+        // A newly loaded inspected runtime invites a fresh protocol handshake [DVT-14].
+        window.postMessage({ channel: 'assimalign.viu.devtools.ready' }, targetOrigin)
     },
 
     unsubscribe: (subscriptionIdentifier) => {

@@ -55,6 +55,10 @@
     With PublishOnly, publishes the isolated .vue-only Browser consumer and verifies its generated
     component-CSS asset. Release and AOT metadata-absence checks then inspect that .vue consumer assembly.
 
+.PARAMETER DevTools
+    Publishes the packaged inspection sample and embedded client host, then runs the Chromium
+    protocol-driven panel scenario. May be combined with PublishOnly to retain the trimmed host.
+
 .PARAMETER PublishDirectory
     Exact retained output for PublishOnly. It must be a child of this repository's _out directory.
 
@@ -91,6 +95,7 @@ param(
     [int] $StartupMeasuredRuns = 10,
     [switch] $PublishOnly,
     [switch] $PackagedVuePublish,
+    [switch] $DevTools,
     [string] $PublishDirectory,
     [switch] $Aot,
     [switch] $SkipPack,
@@ -309,6 +314,13 @@ if ($PackagedVuePublish -and -not $PublishOnly) {
     throw '-PackagedVuePublish requires -PublishOnly.'
 }
 
+if ($DevTools -and ($HotReload -or $PackagedVuePublish -or $MeasureStartup)) {
+    throw '-DevTools cannot be combined with -HotReload, -PackagedVuePublish, or -MeasureStartup.'
+}
+if ($DevTools -and ($BrowserEngine.Count -ne 1 -or $BrowserEngine[0] -ne 'Chromium')) {
+    throw '-DevTools requires exactly -BrowserEngine Chromium.'
+}
+
 if ($PackagedVuePublish -and $HotReload) {
     throw '-PackagedVuePublish cannot be combined with -HotReload.'
 }
@@ -439,6 +451,21 @@ if (-not $SkipPack) {
     }
 }
 
+if ($DevTools -and -not $SkipPack) {
+    # Ecosystem clients are intentionally outside the framework/library package inventory. #83.
+    $clientPackArguments = @(
+        'pack',
+        (Join-Path $repositoryRootPath 'extensions/DevTools/Assimalign.Viu.DevTools.Client/src/Assimalign.Viu.DevTools.Client.csproj'),
+        '--configuration', $Configuration,
+        '--output', $packageDirectoryPath,
+        '-p:AllowMissingPrunePackageData=true',
+        '-warnaserror')
+    if ($SkipPackRestore) {
+        $clientPackArguments += '--no-restore'
+    }
+    Invoke-DotNet -Description 'Packing the DevTools inspection client' -Arguments $clientPackArguments
+}
+
 $requiredPackages = @(
     "Assimalign.Viu.Sdk.$viuVersion.nupkg",
     "Assimalign.Viu.Sdk.Browser.$viuVersion.nupkg",
@@ -447,6 +474,11 @@ $requiredPackages = @(
     "Assimalign.Viu.App.Browser.Runtime.browser-wasm.$viuVersion.nupkg")
 if ($HotReload) {
     $requiredPackages += "Assimalign.Viu.UtilityCss.Build.$viuVersion.nupkg"
+}
+elseif ($DevTools) {
+    $requiredPackages += @(
+        "Assimalign.Viu.DevTools.$viuVersion.nupkg",
+        "Assimalign.Viu.DevTools.Client.$viuVersion.nupkg")
 }
 elseif (-not $PackagedVuePublish) {
     $requiredPackages += @(
@@ -492,6 +524,9 @@ $fixtureStageDirectory = Join-Path $temporaryRootPath 'fixtures'
 $null = New-Item -ItemType Directory -Path $fixtureStageDirectory
 $fixtureNames = if ($HotReload) {
     @('EndToEndHotReloadApp')
+}
+elseif ($DevTools) {
+    @('EndToEndDevToolsApp')
 }
 elseif ($PackagedVuePublish) {
     @('PackagedVueBrowserConsumer')
@@ -633,6 +668,9 @@ if ($SkipPackRestore) {
     $stagedBrowserProjects = if ($HotReload) {
         @((Join-Path $fixtureStageDirectory 'EndToEndHotReloadApp/EndToEndHotReloadApp.csproj'))
     }
+    elseif ($DevTools) {
+        @((Join-Path $fixtureStageDirectory 'EndToEndDevToolsApp/EndToEndDevToolsApp.csproj'))
+    }
     elseif ($PackagedVuePublish) {
         @((Join-Path $fixtureStageDirectory 'PackagedVueBrowserConsumer/PackagedVueBrowserConsumer.csproj'))
     }
@@ -733,6 +771,9 @@ else {
 $browserProjectRelativePath = if ($HotReload) {
     'EndToEndHotReloadApp/EndToEndHotReloadApp.csproj'
 }
+elseif ($DevTools) {
+    'EndToEndDevToolsApp/EndToEndDevToolsApp.csproj'
+}
 elseif ($PackagedVuePublish) {
     'PackagedVueBrowserConsumer/PackagedVueBrowserConsumer.csproj'
 }
@@ -816,6 +857,19 @@ if (-not $HotReload) {
     }
     if (@(Get-ChildItem -LiteralPath $browserWebRoot -Filter 'main*.js' -File).Count -eq 0) {
         throw 'The Browser publish did not contain the fingerprinted application boot module.'
+    }
+
+    if ($DevTools) {
+        foreach ($assetPath in @(
+                '_content/Assimalign.Viu.DevTools/viu-devtools.js',
+                '_content/Assimalign.Viu.DevTools.Client/viu-devtools-client.js',
+                '_content/Assimalign.Viu.DevTools.Client/viu-devtools-client.css')) {
+            $publishedAsset = Join-Path $browserWebRoot $assetPath
+            if (-not [System.IO.File]::Exists($publishedAsset) -or
+                (Get-Item -LiteralPath $publishedAsset).Length -eq 0) {
+                throw "The DevTools host publish is missing a non-empty packaged asset: $publishedAsset"
+            }
+        }
     }
 
     if ($PackagedVuePublish) {
@@ -951,6 +1005,7 @@ if (-not $HotReload) {
         return
     }
 
+    if (-not $DevTools) {
     Invoke-DotNet `
         -Description 'Restoring the packaged ServerRenderAdaptor markup generator' `
          -Arguments (@(
@@ -1042,6 +1097,7 @@ if (-not $HotReload) {
             throw "Static prerender document '$routeDocument' retained an unresolved asset placeholder."
         }
         Write-Host "Verified static prerender document: $routeDocumentPath" -ForegroundColor Green
+    }
     }
 }
 
@@ -1159,6 +1215,10 @@ if (-not $HotReload) {
         $harnessArguments.Add($browserProject)
         $harnessArguments.Add('--hot-reload-viu-version')
         $harnessArguments.Add($viuVersion)
+    }
+    elseif ($DevTools) {
+        $harnessArguments.Add('--devtools-root')
+        $harnessArguments.Add($browserWebRoot)
     }
     else {
         $harnessArguments.Add('--browser-root')

@@ -64,7 +64,7 @@ contradict [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
 
 Developer tooling follows `tooling/<Area>/<AssemblyId>/{src,test,docs}` under the `Compiler/` and
 `Editor/` areas. The `extensions/` root contains ecosystem integrations (`VisualStudio`,
-`VisualStudioCode`, and
+`VisualStudioCode`, `DevTools`, and
 `dotnet`), while the Playwright end-to-end executable lives with the performance harnesses under
 [`benchmarks/Assimalign.Viu.Testing.EndToEnd`](benchmarks/Assimalign.Viu.Testing.EndToEnd).
 
@@ -123,7 +123,7 @@ happens here instead. They never ship in the runtime assemblies.
 | `Assimalign.Viu.Sdk.Browser.Tasks` | Browser-only MSBuild tasks for host-page component-CSS link injection and CSS hot-reload worker launch. Its projects use `Tasks/{src,test}`. |
 | `Assimalign.Viu.Sdk.CssHotReload` | The Browser SDK's internal Debug `dotnet watch` worker; it regenerates component stylesheets and is never copied into the application or runtime framework. |
 
-### Editor extensions (`extensions/`)
+### Ecosystem extensions (`extensions/`)
 
 Both editor hosts are thin clients over the **same** editor-neutral language server
 (`tooling/Editor/Assimalign.Viu.LanguageServer`, a plain stdio LSP executable with no editor
@@ -136,6 +136,7 @@ settings.
 | [`extensions/VisualStudio`](extensions/VisualStudio) | Visual Studio 2022 17.14+ / Visual Studio 2026 | Published to the Visual Studio Marketplace as a preview |
 | [`extensions/VisualStudioCode/packages/viu`](extensions/VisualStudioCode/packages/viu) | Visual Studio Code 1.85+ | Scaffold — compiles and packages, not published |
 | [`extensions/dotnet/Assimalign.Viu.Templates`](extensions/dotnet/Assimalign.Viu.Templates) | `dotnet new` | Packaged application and component-library templates |
+| [`extensions/DevTools/Assimalign.Viu.DevTools.Client`](extensions/DevTools/Assimalign.Viu.DevTools.Client) | Viu inspection panel | Protocol-only component tree, state editor, timeline, and generic inspectors; [design](extensions/DevTools/Assimalign.Viu.DevTools.Client/docs/DESIGN.md). Packaged Browser host: [`EndToEndDevToolsApp`](scripts/fixtures/EndToEndDevToolsApp), built through `Test-EndToEnd.ps1 -DevTools`. |
 
 The two hosts differ in exactly one build property. The Visual Studio VSIX embeds `win-x64` and
 `win-arm64` only, because it ships every payload in one package and each is roughly 18 MB; Visual

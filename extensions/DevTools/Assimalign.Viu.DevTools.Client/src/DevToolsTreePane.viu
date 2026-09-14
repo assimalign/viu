@@ -1,0 +1,53 @@
+<template>
+    <section class="viu-devtools-pane" aria-label="Component tree" :data-revision="Revision">
+        <h2>Components</h2>
+        <p v-if="IsEmpty" class="viu-devtools-muted">Waiting for mounted components.</p>
+        <ol class="viu-devtools-tree" data-testid="devtools-tree">
+            <li v-for="row in Rows" :key="row.Node.Identifier" :style="row.Indentation">
+                <button type="button" data-testid="devtools-tree-node"
+                    :data-component-identifier="row.Node.Identifier" :data-component-name="row.Node.Name"
+                    :aria-pressed="BooleanAttribute(IsSelected(row.Node.Identifier))" @click="() => Select(row.Node.Identifier)">
+                    {{ row.Node.Name }} <small>{{ row.Node.Key }}</small>
+                </button>
+            </li>
+        </ol>
+    </section>
+</template>
+
+@script {
+    using System.Collections.Generic;
+
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.Reactivity;
+
+    /// <summary>Gets or sets the caller-owned session supplying the incremental component tree. Single-threaded; specified by [DVT-14].</summary>
+    [Parameter(IsRequired = true)]
+    public DevToolsClientSession Session { get; set; } = null!;
+
+    private readonly Reference<int> RevisionReference = Reactive.Reference(0);
+    private int PreviousStoreRevision;
+    private int PreviousConnectionGeneration;
+    private int Revision => RevisionReference.Value;
+    private IReadOnlyList<DevToolsPaneRows.TreeRow> Rows => DevToolsPaneRows.Tree(Session.Tree.Roots);
+    private bool IsEmpty => Session.Tree.Roots.Count == 0;
+
+    partial void OnSetup()
+    {
+        PreviousStoreRevision = Session.TreeRevision;
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        Session.Changed += Refresh;
+        Context!.Lifecycle.OnBeforeUnmount(() => Session.Changed -= Refresh);
+    }
+
+    private void Refresh()
+    {
+        if (PreviousStoreRevision == Session.TreeRevision && PreviousConnectionGeneration == Session.ConnectionGeneration)
+            return;
+        PreviousStoreRevision = Session.TreeRevision;
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        RevisionReference.Value++;
+    }
+    private bool IsSelected(int identifier) => Session.SelectedComponentIdentifier == identifier;
+    private string BooleanAttribute(bool value) => DevToolsPaneRows.BooleanAttribute(value);
+    private void Select(int identifier) => Session.SelectComponent(identifier);
+}

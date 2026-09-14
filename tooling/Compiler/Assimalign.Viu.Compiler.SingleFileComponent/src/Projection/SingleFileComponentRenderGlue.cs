@@ -70,6 +70,22 @@ public static class SingleFileComponentRenderGlue
                     return handler;
                 }
 
+                // Portable native events retain their host-neutral delegate type across assembly
+                // boundaries. Wrapping these in object delegates would require a host-specific shim.
+                internal static global::System.Action<global::Assimalign.Viu.Components.IElementEvent> Handler(
+                    global::System.Action<global::Assimalign.Viu.Components.IElementEvent> handler)
+                {
+                    global::System.ArgumentNullException.ThrowIfNull(handler);
+                    return handler;
+                }
+
+                internal static global::System.Func<global::Assimalign.Viu.Components.IElementEvent, global::System.Threading.Tasks.Task> Handler(
+                    global::System.Func<global::Assimalign.Viu.Components.IElementEvent, global::System.Threading.Tasks.Task> handler)
+                {
+                    global::System.ArgumentNullException.ThrowIfNull(handler);
+                    return handler;
+                }
+
                 internal static global::System.Func<object?, global::System.Threading.Tasks.Task> Handler<TEvent>(
                     global::System.Func<TEvent, global::System.Threading.Tasks.Task> handler)
                 {

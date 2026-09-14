@@ -11,7 +11,7 @@ using Microsoft.Playwright;
 
 namespace Assimalign.Viu.Testing.EndToEnd;
 
-internal sealed class EndToEndHarness
+internal sealed partial class EndToEndHarness
 {
     private const string ManagedHotReloadCompletionMessage =
         "C# and Razor changes applied";
@@ -33,7 +33,11 @@ internal sealed class EndToEndHarness
     internal async Task<int> RunAsync()
     {
         Directory.CreateDirectory(_options.ArtifactDirectory);
-        if (_options.HotReloadProjectPath is not null)
+        if (_options.DevToolsRootDirectory is not null)
+        {
+            await RunDevToolsLaneAsync(_options.DevToolsRootDirectory);
+        }
+        else if (_options.HotReloadProjectPath is not null)
         {
             await RunHotReloadLaneAsync(
                 _options.HotReloadProjectPath,

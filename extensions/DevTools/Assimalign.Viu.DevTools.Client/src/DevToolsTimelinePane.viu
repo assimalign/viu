@@ -1,0 +1,176 @@
+<template>
+    <section class="viu-devtools-pane" aria-label="Timeline" :data-revision="Revision">
+        <h2>Timeline</h2>
+        <div class="viu-devtools-controls" aria-label="Timeline layers">
+            <button type="button" :aria-pressed="BooleanAttribute(AllLayersSelected)" @click="SelectAllLayers">All layers</button>
+            <span class="viu-devtools-layer-options">
+                <button v-for="layer in Layers" :key="layer.Identifier" type="button"
+                    data-testid="devtools-timeline-layer" :data-layer="layer.Identifier"
+                    :aria-pressed="BooleanAttribute(IsLayerSelected(layer.Identifier))" @click="() => SelectLayer(layer.Identifier)">{{ layer.DisplayName }}</button>
+            </span>
+        </div>
+        <div class="viu-devtools-controls">
+            <label>From (µs) <input type="number" min="0" data-testid="devtools-timeline-from" :value="FromText" @input="SetFrom" /></label>
+            <label>To (µs) <input type="number" min="0" data-testid="devtools-timeline-to" :value="ToText" @input="SetTo" /></label>
+            <button type="button" data-testid="devtools-timeline-zoom" @click="ApplyRange">Zoom</button>
+            <button type="button" @click="ResetRange">Reset range</button>
+        </div>
+        <p v-if="HasRangeError" role="status">{{ RangeError }}</p>
+        <p v-if="HasGaps" class="viu-devtools-gap" data-testid="devtools-timeline-gaps">{{ GapDescription }}</p>
+        <p class="viu-devtools-muted" data-testid="devtools-timeline-selection">{{ SelectionDescription }}</p>
+        <ol class="viu-devtools-timeline" data-testid="devtools-timeline">
+            <li v-for="entry in Window" :key="entry.Sequence">
+                <button type="button" data-testid="devtools-timeline-event"
+                    :data-sequence="entry.Sequence" :data-correlation="entry.CorrelationIdentifier"
+                    :data-kind="entry.Kind" :data-related="BooleanAttribute(IsRelated(entry.Sequence))"
+                    :aria-pressed="BooleanAttribute(IsSelected(entry.Sequence))" @click="() => SelectEvent(entry.Sequence)">
+                    {{ entry.Timestamp }} µs · {{ entry.LayerIdentifier }} · {{ entry.Kind }} · {{ entry.Label }}
+                </button>
+            </li>
+        </ol>
+        <div class="viu-devtools-controls">
+            <button type="button" data-testid="devtools-timeline-previous" :disabled="AtStart" @click="PreviousWindow">Previous 50</button>
+            <span data-testid="devtools-timeline-window">{{ WindowDescription }}</span>
+            <button type="button" data-testid="devtools-timeline-next" :disabled="AtEnd" @click="NextWindow">Next 50</button>
+        </div>
+    </section>
+</template>
+
+@script {
+    using System;
+    using System.Collections.Generic;
+    using System.Globalization;
+
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.DevTools;
+    using Assimalign.Viu.Reactivity;
+
+    /// <summary>Gets or sets the caller-owned session supplying bounded timeline records. Single-threaded; specified by [DVT-14].</summary>
+    [Parameter(IsRequired = true)]
+    public DevToolsClientSession Session { get; set; } = null!;
+
+    private const int WindowSize = 50;
+    private readonly Reference<int> RevisionReference = Reactive.Reference(0);
+    private IReadOnlyList<TimelineEventPayload> Window = Array.Empty<TimelineEventPayload>();
+    private IReadOnlySet<long> RelatedSequences = new HashSet<long>();
+    private string? SelectedLayer;
+    private long? SelectedSequence;
+    private long? RangeFrom;
+    private long? RangeTo;
+    private int WindowOffset;
+    private int PreviousConnectionGeneration;
+    private int PreviousStoreRevision;
+    private string FromText = string.Empty;
+    private string ToText = string.Empty;
+    private string? RangeError;
+    private int Revision => RevisionReference.Value;
+    private IReadOnlyList<TimelineLayerPayload> Layers => new List<TimelineLayerPayload>(Session.Timeline.Layers.Values);
+    private bool AllLayersSelected => SelectedLayer is null;
+    private bool HasRangeError => RangeError is not null;
+    private bool AtStart => WindowOffset == 0;
+    private bool AtEnd => Session.Timeline.GetWindow(WindowOffset + WindowSize, 1, SelectedLayer, RangeFrom, RangeTo).Count == 0;
+    private bool HasGaps => Session.Timeline.Gaps.Count != 0;
+    private string WindowDescription => Window.Count == 0 ? "No events in this range" : $"Rows {WindowOffset + 1}–{WindowOffset + Window.Count}";
+    private string SelectionDescription => SelectedSequence is null
+        ? "Select an event to highlight its correlated chain."
+        : $"{RelatedSequences.Count} related events in the retained window";
+    private string GapDescription
+    {
+        get
+        {
+            long count = 0;
+            foreach (TimelineDroppedPayload gap in Session.Timeline.Gaps)
+                count += gap.Count;
+            return $"{count} events dropped; correlated chains may be incomplete.";
+        }
+    }
+
+    partial void OnSetup()
+    {
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        PreviousStoreRevision = Session.TimelineRevision;
+        Session.Changed += Refresh;
+        Context!.Lifecycle.OnBeforeUnmount(() => Session.Changed -= Refresh);
+        UpdateWindow();
+    }
+
+    private void Refresh()
+    {
+        if (PreviousStoreRevision == Session.TimelineRevision && PreviousConnectionGeneration == Session.ConnectionGeneration)
+            return;
+        PreviousStoreRevision = Session.TimelineRevision;
+        if (!Session.IsConnected || PreviousConnectionGeneration != Session.ConnectionGeneration)
+        {
+            SelectedSequence = null;
+            SelectedLayer = null;
+            WindowOffset = 0;
+            RangeFrom = null;
+            RangeTo = null;
+            FromText = string.Empty;
+            ToText = string.Empty;
+            RangeError = null;
+        }
+        PreviousConnectionGeneration = Session.ConnectionGeneration;
+        UpdateWindow();
+    }
+
+    private void UpdateWindow()
+    {
+        Window = Session.Timeline.GetWindow(WindowOffset, WindowSize, SelectedLayer, RangeFrom, RangeTo);
+        if (Window.Count == 0 && WindowOffset > 0)
+        {
+            WindowOffset = 0;
+            Window = Session.Timeline.GetWindow(0, WindowSize, SelectedLayer, RangeFrom, RangeTo);
+        }
+        RelatedSequences = SelectedSequence is { } sequence
+            ? Session.Timeline.GetRelatedSequences(sequence)
+            : new HashSet<long>();
+        RevisionReference.Value++;
+    }
+
+    private bool IsLayerSelected(string identifier) => SelectedLayer == identifier;
+    private bool IsRelated(long sequence) => RelatedSequences.Contains(sequence);
+    private bool IsSelected(long sequence) => SelectedSequence == sequence;
+    private string BooleanAttribute(bool value) => DevToolsPaneRows.BooleanAttribute(value);
+    private void SelectEvent(long sequence) { SelectedSequence = sequence; UpdateWindow(); }
+    private void SelectLayer(string identifier) { SelectedLayer = identifier; WindowOffset = 0; UpdateWindow(); }
+    private void SelectAllLayers() { SelectedLayer = null; WindowOffset = 0; UpdateWindow(); }
+    private void PreviousWindow() { WindowOffset = Math.Max(0, WindowOffset - WindowSize); UpdateWindow(); }
+    private void NextWindow() { if (!AtEnd) { WindowOffset += WindowSize; UpdateWindow(); } }
+    private void SetFrom(IElementEvent input) => FromText = input.TargetValue ?? string.Empty;
+    private void SetTo(IElementEvent input) => ToText = input.TargetValue ?? string.Empty;
+
+    private void ApplyRange()
+    {
+        if (!TryReadTime(FromText, out long? from) || !TryReadTime(ToText, out long? to)
+            || (from.HasValue && to.HasValue && from.Value > to.Value))
+        {
+            RangeError = "Enter a nonnegative microsecond range with From no greater than To.";
+            RevisionReference.Value++;
+            return;
+        }
+        RangeError = null;
+        RangeFrom = from;
+        RangeTo = to;
+        WindowOffset = 0;
+        UpdateWindow();
+    }
+
+    private void ResetRange()
+    {
+        FromText = string.Empty;
+        ToText = string.Empty;
+        ApplyRange();
+    }
+
+    private static bool TryReadTime(string text, out long? value)
+    {
+        value = null;
+        if (string.IsNullOrWhiteSpace(text))
+            return true;
+        if (!long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) || parsed < 0)
+            return false;
+        value = parsed;
+        return true;
+    }
+}

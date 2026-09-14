@@ -82,6 +82,13 @@ internal sealed class SnapshotValueEncoder
                     continue;
                 }
 
+                if (value is IReactiveObject reactiveObject
+                    && reactiveObject.GetMemberValues().TryGetValue(path[index], out object? memberValue))
+                {
+                    value = memberValue;
+                    continue;
+                }
+
                 if (value is IDictionary dictionary)
                 {
                     bool found = false;
@@ -192,6 +199,14 @@ internal sealed class SnapshotValueEncoder
                     [new DevToolsNamedValuePayload(
                         "value",
                         Encode(current, depth - 1, childPath, ancestors))]);
+            }
+
+            if (value is IReactiveObject reactiveObject)
+            {
+                return depth == 0
+                    ? Deferred("object", typeName, path)
+                    : EncodeReadOnlyDictionary(
+                        reactiveObject.GetMemberValues(), depth, path, ancestors, typeName);
             }
 
             if (value is IReadOnlyDictionary<string, object?> readOnlyDictionary)

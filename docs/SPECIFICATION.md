@@ -2421,8 +2421,54 @@ boxing, formatting, or interface calls. Runtime feature configuration precedes a
 the switch is read once when the inspection types initialize, so later changes have no effect, and
 the enabled flag is not an application scheduling policy.
 
+`[DVT-13]` Version 1 additively accepts `state.edit.request` with component `identifier`,
+`section`, `path`, and a JSON `value`, and replies reliably with `state.edit.response` containing
+`identifier`, `path`, `accepted`, and an optional diagnostic `reason`. Only explicitly exposed
+state is editable. Parameters and computed values (including writable computed references) are
+rejected. A computed ancestor is rejected before evaluating its value, regardless of its generic
+type; ordinary object-valued references remain traversable. Primitive mutable
+`IReactiveReference<T>` values and generated `IReactiveObject` members
+use typed setters; no reflection, activation, or runtime serialization metadata discovery is
+permitted. The fixed coercion table accepts JSON booleans for `bool`, integral in-range JSON numbers
+for `int` and `long`, finite in-range JSON numbers for `double` and `decimal`, and JSON strings or
+null for `string`. Other types and conversions are rejected. Generated member writes dispatch
+through the ordinary generated property setter and preserve read-only guards and reactive
+notifications. Missing components, invalid sections or paths, unavailable providers, read-only
+targets, unsupported types, incompatible values, and setter failures produce rejection reasons.
+An accepted write schedules normal application reactivity; acknowledgement does not imply that a
+later asynchronous render has already completed. Reads used to resolve an edit suspend dependency
+collection. [V01.01.10.03], #83.
+
+`[DVT-14]` The inspection client is an ordinary Viu component library under
+`extensions/DevTools/`, built solely from public protocol JSON contracts and their shared
+source-generated context. It MUST NOT access runtime internals or share application object
+identities. Both browser postMessage and WebSocket transports deliver complete frames to a
+deferred client scheduler; callbacks MUST NOT synchronously send or render. The client applies at
+most its configured envelope budget per frame and notifies panes once per frame. Panes invalidate
+only for their relevant stores; timeline traffic MUST NOT traverse unchanged trees or snapshots. Component deltas
+update existing identity nodes in place, including keyed sibling moves; an authoritative snapshot
+is requested after `telemetry.dropped`. Selection requests depth zero and each explicit expansion
+loads one further level. Timeline retention and loss-notice retention are bounded; visible rows
+are windowed, layer filters and inclusive microsecond ranges select that window, and selection
+follows correlation identifiers and transitive dependency/effect/component links among retained
+events. Custom inspectors use only generic registration, tree, and state messages.
+
+Each initial transport connection, WebSocket reopen, or postMessage runtime-ready advisory begins
+a fresh handshake. Reconnect immediately discards old pending requests and client identities;
+every handshake response resets the tree, selection, expansions, inspector state, layer metadata,
+timeline, and loss notices before applying following messages. On acceptance, the client requests
+an authoritative tree. Runtime identities and the elapsed clock may survive a handshake in the
+same runtime session [DVT-10]; the client never assumes this across connections. Unsupported
+versions remain disconnected; unknown types, malformed frames, and other-protocol batches do not
+close a usable session. The client bounds frames to 1 MiB of text and queues at most 16,384
+envelopes; receive overflow requests a fresh handshake instead of silently keeping an incomplete
+tree. Browser socket reconnect retries after one second and disposal cancels retries and listeners.
+The postMessage readiness advisory is outside versioned JSON and carries no inspection state;
+receivers validate source and origin. [V01.01.10.03], #83.
+
 *Authority: `libraries/DevTools/Assimalign.Viu.DevTools/docs/PROTOCOL.md`;
-`libraries/DevTools/Assimalign.Viu.DevTools/{src,test}`.*
+`libraries/DevTools/Assimalign.Viu.DevTools/{src,test}`;
+`extensions/DevTools/Assimalign.Viu.DevTools.Client/{src,test}`.*
 
 ---
 

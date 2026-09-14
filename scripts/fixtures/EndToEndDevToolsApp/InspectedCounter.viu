@@ -1,0 +1,36 @@
+<template>
+    <main data-testid="inspected-application">
+        <h1>Viu inspected application</h1>
+        <p>Count: <output data-testid="inspected-count">{{ Count }}</output></p>
+        <button type="button" data-testid="inspected-increment" @click="Increment">Increment count</button>
+        <button type="button" data-testid="inspected-toggle-child" @click="ToggleChild">Toggle child</button>
+        <section aria-label="Mounted child">
+            <InspectedChild v-if="ShowChild" />
+        </section>
+    </main>
+</template>
+
+@script {
+    using System.Collections.Generic;
+
+    using Assimalign.Viu.Reactivity;
+
+    private readonly Reference<int> CountReference =
+        Reactive.WithDebugLabel(Reactive.Reference(0), "count");
+    private readonly Reference<bool> ShowChildReference = Reactive.Reference(false);
+
+    public int Count => CountReference.Value;
+    public bool ShowChild => ShowChildReference.Value;
+
+    partial void OnSetup()
+    {
+        Context!.Expose(new Dictionary<string, object?>
+        {
+            ["count"] = CountReference,
+            ["details"] = new Dictionary<string, object?> { ["description"] = "Lazy sample state" },
+        });
+    }
+
+    private void Increment() => CountReference.Value++;
+    private void ToggleChild() => ShowChildReference.Value = !ShowChildReference.Value;
+}

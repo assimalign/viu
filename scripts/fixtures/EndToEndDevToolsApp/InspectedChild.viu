@@ -1,0 +1,3 @@
+<template>
+    <p data-testid="inspected-child">Mounted child</p>
+</template>
