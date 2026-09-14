@@ -141,7 +141,7 @@ public sealed class StateStorePayload
     internal bool TryGetState(string key, out JsonElement state) =>
         _stores.TryGetValue(key, out state);
 
-    private static StateStorePayload Create(
+    internal static StateStorePayload Create(
         IReadOnlyDictionary<string, JsonElement> stores)
     {
         ArrayBufferWriter<byte> buffer = new();

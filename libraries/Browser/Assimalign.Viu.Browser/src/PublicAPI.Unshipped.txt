@@ -1,4 +1,10 @@
 #nullable enable
+Assimalign.Viu.Browser.BrowserStateStorage
+Assimalign.Viu.Browser.BrowserStateStorage.BrowserStateStorage(Assimalign.Viu.State.StateStorageKind kind = Assimalign.Viu.State.StateStorageKind.Local) -> void
+Assimalign.Viu.Browser.BrowserStateStorage.Kind.get -> Assimalign.Viu.State.StateStorageKind
+Assimalign.Viu.Browser.BrowserStateStorage.Remove(string! key) -> void
+Assimalign.Viu.Browser.BrowserStateStorage.TryRead(string! key, out string! value) -> bool
+Assimalign.Viu.Browser.BrowserStateStorage.Write(string! key, string! value) -> void
 Assimalign.Viu.Browser.BrowserRendererHost.BrowserRendererHost(Assimalign.Viu.Browser.BrowserCommandFrameApplier! applyCommandFrame, System.Func<int, int>? parentNode, System.Func<int, int>? nextSibling, System.Func<int, string!>? snapshotHydration, System.Func<Assimalign.Viu.HydrationTriggerRequest<int>!, Assimalign.Viu.IHydrationTriggerRegistration!>? scheduleHydrationTrigger) -> void
 *REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateEmbedded(Assimalign.Viu.Browser.BrowserRendererHost! host, Assimalign.Viu.ApplicationContext! context, bool hydrate = false, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>? initialize = null, System.Func<string!, int>? resolveContainer = null, System.Action? requestFullReload = null, string! mountTargetSelector = "#app") -> Assimalign.Viu.Browser.BrowserApplication!
 *REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateEmbedded(Assimalign.Viu.Renderer<int>! renderer, Assimalign.Viu.ApplicationContext! context, bool hydrate = false, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>? initialize = null, System.Action<int>? clearContainer = null, System.Func<string!, int>? resolveContainer = null, System.Action? requestFullReload = null, string! mountTargetSelector = "#app") -> Assimalign.Viu.Browser.BrowserApplication!

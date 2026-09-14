@@ -17,6 +17,15 @@ const namespaceUris = {
 
 const xlinkNamespaceUri = 'http://www.w3.org/1999/xlink'
 
+// [STA-11]: one complete payload operation per crossing; leave quota/security errors intact
+// for the managed persistence plugin to report. Storage semantics are defined by WHATWG:
+// https://html.spec.whatwg.org/multipage/webstorage.html
+export const stateStorage = {
+    read: (session, key) => (session ? window.sessionStorage : window.localStorage).getItem(key),
+    write: (session, key, value) => (session ? window.sessionStorage : window.localStorage).setItem(key, value),
+    remove: (session, key) => (session ? window.sessionStorage : window.localStorage).removeItem(key)
+}
+
 let nextHandle = 1
 const nodes = new Map()          // handle -> Node
 const nodeHandles = new WeakMap() // Node -> handle

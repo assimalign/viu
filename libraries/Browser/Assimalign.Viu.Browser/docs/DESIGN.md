@@ -76,6 +76,22 @@ members to `ComponentContext`. Transition nodes remain host-neutral descriptions
 class scheduling, geometry, and completion behavior through the public host seam (`[BLT-7]` through
 `[BLT-10]`, `[CMP-33]`).
 
+## State storage
+
+`BrowserStateStorage` implements State's `IStateStorage` for the local or session area selected at
+construction. The existing `viu-dom.js` module exposes three primitive operations; each read, write,
+or removal is one interop crossing over an entire payload. No storage handles or event listeners
+are retained. The adapter preserves missing-key null results and native quota/security failures
+from [WHATWG Web Storage](https://html.spec.whatwg.org/multipage/webstorage.html); the State
+persistence plugin catches failures and reports its diagnostic callback (`[STA-11]`,
+[V01.01.09.04](https://github.com/assimalign/viu/issues/79)).
+
+Storage operations require the initialized Browser bridge. Normal component setup follows
+application initialization; hosts resolving persisted stores earlier must first await
+`BrowserRuntime.InitializeAsync()`. Construction itself never accesses storage. State owns
+serialization, JSON member filtering, restoration, and pre-flush write coalescing; Browser owns
+only access to the selected storage area. Cross-tab synchronization is outside this contract.
+
 ## AOT and WASM constraints
 
 All JavaScript entry points are statically declared `JSImport` or `JSExport` boundaries, and payloads

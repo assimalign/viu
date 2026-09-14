@@ -40,6 +40,14 @@ the mount container out of Core's hydration snapshot. Stores resolved earlier up
 stores resolved during component setup receive their server state before first render
 ([HYD-8], [V01.01.09.03], [EXE-4]).
 
+`BrowserStateStorage` supplies State's persistence plugin with `localStorage` or `sessionStorage`
+through the existing browser module. Its constructor selects `StateStorageKind.Local` by default;
+create a second instance with `StateStorageKind.Session` when composing both areas. Each operation
+crosses interop once for the complete payload, and the plugin diagnoses rejected storage access or
+writes. Normal application startup initializes the bridge before component setup; resolving a
+persisted store earlier requires awaiting `BrowserRuntime.InitializeAsync()` first (`[STA-11]`,
+[V01.01.09.04](https://github.com/assimalign/viu/issues/79)).
+
 Browser also implements Core's deferred-hydration trigger seam. It maps idle requests to
 `requestIdleCallback` with a timer fallback, visibility to `IntersectionObserver`, media conditions
 to `matchMedia`, and interactions to marker-range capture listeners. Every registration is

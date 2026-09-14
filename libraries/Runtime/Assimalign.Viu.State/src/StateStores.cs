@@ -121,6 +121,45 @@ public static class StateStores
     }
 
     /// <summary>
+    /// Defines a context-aware serializable store with explicit persistence settings. Specified
+    /// by <c>[STA-11]</c>; the serializer remains constrained by <c>[EXE-4]</c>.
+    /// </summary>
+    /// <typeparam name="TStore">The store type.</typeparam>
+    /// <param name="key">The non-empty application-unique store key.</param>
+    /// <param name="setup">The explicit AOT-safe setup delegate.</param>
+    /// <param name="serializer">The explicit AOT-safe state serializer.</param>
+    /// <param name="persistence">The immutable persistence opt-in settings.</param>
+    /// <returns>Reusable registry-independent store metadata.</returns>
+    public static StateStoreDefinition<TStore> Define<TStore>(
+        string key,
+        StateStoreActivator<TStore> setup,
+        IStateStoreSerializer<TStore> serializer,
+        StateStorePersistenceDescriptor persistence)
+        where TStore : class
+        => new(key, setup, serializer, persistence);
+
+    /// <summary>
+    /// Defines a parameterless serializable store with explicit persistence settings. Specified
+    /// by <c>[STA-11]</c>; the serializer remains constrained by <c>[EXE-4]</c>.
+    /// </summary>
+    /// <typeparam name="TStore">The store type.</typeparam>
+    /// <param name="key">The non-empty application-unique store key.</param>
+    /// <param name="setup">The explicit AOT-safe setup delegate.</param>
+    /// <param name="serializer">The explicit AOT-safe state serializer.</param>
+    /// <param name="persistence">The immutable persistence opt-in settings.</param>
+    /// <returns>Reusable registry-independent store metadata.</returns>
+    public static StateStoreDefinition<TStore> Define<TStore>(
+        string key,
+        Func<TStore> setup,
+        IStateStoreSerializer<TStore> serializer,
+        StateStorePersistenceDescriptor persistence)
+        where TStore : class
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        return new StateStoreDefinition<TStore>(key, _ => setup(), serializer, persistence);
+    }
+
+    /// <summary>
     /// Creates an independent registry using Reactivity's production scope factory. Specified by
     /// <c>[STA-2]</c> and <c>[STA-3]</c>.
     /// </summary>

@@ -23,13 +23,14 @@ namespace Assimalign.Viu.State;
 /// </para>
 /// </remarks>
 /// <typeparam name="TState">A source-generated reactive state object.</typeparam>
-public abstract class StateStore<TState>
+public abstract class StateStore<TState> : IStateStoreMutationSource
     where TState : class, IReactiveObject
 {
     private readonly List<StateStoreActionCallback> _actionSubscriptions = new();
     private readonly Action<TState, TState>? _applyState;
     private readonly Func<TState>? _initialStateFactory;
     private readonly IReactiveEffectScope? _stateStoreScope;
+    private readonly StateContext? _stateContext;
     private readonly List<StateStoreSubscriptionCallback<TState>> _subscriptions = new();
     private readonly IReactiveWatchScheduler? _watchScheduler;
     private bool _hasPendingNotification;
@@ -71,6 +72,7 @@ public abstract class StateStore<TState>
         ArgumentNullException.ThrowIfNull(state);
         Key = key;
         State = state;
+        _stateContext = StateStoreSetupRuntime.Current as StateContext;
         _stateStoreScope =
             StateStoreSetupRuntime.Current?.Scope
             ?? Reactive.CurrentScope;
@@ -123,6 +125,7 @@ public abstract class StateStore<TState>
                 "The state factory returned null.");
         _initialStateFactory = stateFactory;
         _applyState = applyState;
+        _stateContext = StateStoreSetupRuntime.Current as StateContext;
         _stateStoreScope =
             StateStoreSetupRuntime.Current?.Scope
             ?? Reactive.CurrentScope;
@@ -211,6 +214,12 @@ public abstract class StateStore<TState>
             () => _subscriptions.Remove(callback));
         RegisterAutomaticRemoval(subscription, detached);
         return subscription;
+    }
+
+    StateStoreSubscription IStateStoreMutationSource.SubscribeMutation(Action callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        return Subscribe((_, _) => callback());
     }
 
     /// <summary>
@@ -450,6 +459,42 @@ public abstract class StateStore<TState>
         TState previousState,
         OnCleanup onCleanup)
     {
+        // [STA-11] Opted-in persistence finishes restoration before the first delivery, including
+        // the synchronous scheduler fallback and a scheduler explicitly flushed during setup.
+        if (_stateContext is { IsInitializing: true })
+        {
+            _hasPendingNotification = false;
+            _stateContext.DeferNotification(NotifyInitializedStateChanged);
+            return;
+        }
+
+        NotifyStateChanged();
+    }
+
+    private void NotifyInitializedStateChanged()
+    {
+        // A later creation-time mutation can queue this watcher again after an early flush.
+        // That queued job owns final delivery; sending here as well would notify twice [STA-11].
+        if (_hasPendingNotification)
+        {
+            return;
+        }
+
+        // Deferred delivery runs outside Watch's callback boundary. Preserve its tracking pause
+        // so a subscriber cannot become a dependency of an effect that first resolves this store.
+        Reactive.PauseTracking();
+        try
+        {
+            NotifyStateChanged();
+        }
+        finally
+        {
+            Reactive.ResetTracking();
+        }
+    }
+
+    private void NotifyStateChanged()
+    {
         StateStorePatchKind kind = _pendingKind;
         _pendingKind = StateStorePatchKind.Direct;
         _hasPendingNotification = false;
@@ -463,7 +508,7 @@ public abstract class StateStore<TState>
             _subscriptions.ToArray();
         foreach (StateStoreSubscriptionCallback<TState> subscriber in subscribers)
         {
-            subscriber(mutation, state);
+            subscriber(mutation, State);
         }
     }
 

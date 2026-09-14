@@ -12,6 +12,7 @@
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
     <ViuProjectReference Include="Assimalign.Viu.State" />
+    <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>
   <ItemGroup>
     <ViuAnalyzerReference Include="Assimalign.Viu.Generators.Reactivity" />

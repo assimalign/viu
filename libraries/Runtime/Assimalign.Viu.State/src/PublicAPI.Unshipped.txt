@@ -1,4 +1,63 @@
 #nullable enable
+Assimalign.Viu.State.InMemoryStateStorage
+Assimalign.Viu.State.InMemoryStateStorage.InMemoryStateStorage() -> void
+Assimalign.Viu.State.InMemoryStateStorage.Remove(string! key) -> void
+Assimalign.Viu.State.InMemoryStateStorage.TryRead(string! key, out string! value) -> bool
+Assimalign.Viu.State.InMemoryStateStorage.Write(string! key, string! value) -> void
+Assimalign.Viu.State.IStateStorage
+Assimalign.Viu.State.IStateStorage.Remove(string! key) -> void
+Assimalign.Viu.State.IStateStorage.TryRead(string! key, out string! value) -> bool
+Assimalign.Viu.State.IStateStorage.Write(string! key, string! value) -> void
+Assimalign.Viu.State.IStateStorePlugin
+Assimalign.Viu.State.IStateStorePlugin.Apply(Assimalign.Viu.State.StateStorePluginContext! context) -> void
+Assimalign.Viu.State.IStateStoreRegistry.GetExtension<TExtension>(object! store) -> TExtension
+Assimalign.Viu.State.IStateStoreRegistry.Use(Assimalign.Viu.State.IStateStorePlugin! plugin) -> Assimalign.Viu.State.IStateStoreRegistry!
+Assimalign.Viu.State.StateStorageKind
+Assimalign.Viu.State.StateStorageKind.Local = 0 -> Assimalign.Viu.State.StateStorageKind
+Assimalign.Viu.State.StateStorageKind.Session = 1 -> Assimalign.Viu.State.StateStorageKind
+Assimalign.Viu.State.StateStoreDefinition<TStore>.Persistence.get -> Assimalign.Viu.State.StateStorePersistenceDescriptor?
+Assimalign.Viu.State.StateStoreDefinition<TStore>.StateStoreDefinition(string! key, Assimalign.Viu.State.StateStoreActivator<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer, Assimalign.Viu.State.StateStorePersistenceDescriptor! persistence) -> void
+Assimalign.Viu.State.StateStorePersistenceDescriptor
+Assimalign.Viu.State.StateStorePersistenceDescriptor.ExcludePaths.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Assimalign.Viu.State.StateStorePersistenceDescriptor.IncludePaths.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Assimalign.Viu.State.StateStorePersistenceDescriptor.Key.get -> string!
+Assimalign.Viu.State.StateStorePersistenceDescriptor.StateStorePersistenceDescriptor(string! key, Assimalign.Viu.State.StateStorageKind storageKind = Assimalign.Viu.State.StateStorageKind.Local, System.Collections.Generic.IEnumerable<string!>? includePaths = null, System.Collections.Generic.IEnumerable<string!>? excludePaths = null) -> void
+Assimalign.Viu.State.StateStorePersistenceDescriptor.StorageKind.get -> Assimalign.Viu.State.StateStorageKind
+Assimalign.Viu.State.StateStorePersistenceDiagnostic
+Assimalign.Viu.State.StateStorePersistenceDiagnostic.Exception.get -> System.Exception!
+Assimalign.Viu.State.StateStorePersistenceDiagnostic.Identifier.get -> string!
+Assimalign.Viu.State.StateStorePersistenceDiagnostic.Key.get -> string!
+Assimalign.Viu.State.StateStorePersistenceDiagnostic.Operation.get -> Assimalign.Viu.State.StateStorePersistenceOperation
+Assimalign.Viu.State.StateStorePersistenceDiagnostic.StorageKind.get -> Assimalign.Viu.State.StateStorageKind
+Assimalign.Viu.State.StateStorePersistenceOperation
+Assimalign.Viu.State.StateStorePersistenceOperation.Configure = 0 -> Assimalign.Viu.State.StateStorePersistenceOperation
+Assimalign.Viu.State.StateStorePersistenceOperation.Read = 1 -> Assimalign.Viu.State.StateStorePersistenceOperation
+Assimalign.Viu.State.StateStorePersistenceOperation.Remove = 4 -> Assimalign.Viu.State.StateStorePersistenceOperation
+Assimalign.Viu.State.StateStorePersistenceOperation.Restore = 2 -> Assimalign.Viu.State.StateStorePersistenceOperation
+Assimalign.Viu.State.StateStorePersistenceOperation.Write = 3 -> Assimalign.Viu.State.StateStorePersistenceOperation
+Assimalign.Viu.State.StateStorePersistenceOptions
+Assimalign.Viu.State.StateStorePersistenceOptions.Diagnostic.get -> System.Action<Assimalign.Viu.State.StateStorePersistenceDiagnostic!>?
+Assimalign.Viu.State.StateStorePersistenceOptions.LocalStorage.get -> Assimalign.Viu.State.IStateStorage!
+Assimalign.Viu.State.StateStorePersistenceOptions.SessionStorage.get -> Assimalign.Viu.State.IStateStorage?
+Assimalign.Viu.State.StateStorePersistenceOptions.StateStorePersistenceOptions(Assimalign.Viu.State.IStateStorage! localStorage, Assimalign.Viu.State.IStateStorage? sessionStorage = null, System.Action<Assimalign.Viu.State.StateStorePersistenceDiagnostic!>? diagnostic = null) -> void
+Assimalign.Viu.State.StateStorePersistencePlugin
+Assimalign.Viu.State.StateStorePersistencePlugin.Apply(Assimalign.Viu.State.StateStorePluginContext! context) -> void
+Assimalign.Viu.State.StateStorePersistencePlugin.StateStorePersistencePlugin(Assimalign.Viu.State.StateStorePersistenceOptions! options) -> void
+Assimalign.Viu.State.StateStorePluginContext
+Assimalign.Viu.State.StateStorePluginContext.Definition.get -> object!
+Assimalign.Viu.State.StateStorePluginContext.Identifier.get -> string!
+Assimalign.Viu.State.StateStorePluginContext.Key.get -> string!
+Assimalign.Viu.State.StateStorePluginContext.Registry.get -> Assimalign.Viu.State.IStateStoreRegistry!
+Assimalign.Viu.State.StateStorePluginContext.Scope.get -> Assimalign.Viu.Reactivity.IReactiveEffectScope!
+Assimalign.Viu.State.StateStorePluginContext.Services.get -> System.IServiceProvider?
+Assimalign.Viu.State.StateStorePluginContext.SetExtension<TExtension>(TExtension extension) -> void
+Assimalign.Viu.State.StateStorePluginContext.StateContext.get -> Assimalign.Viu.State.IStateContext!
+Assimalign.Viu.State.StateStorePluginContext.Store.get -> object!
+Assimalign.Viu.State.StateStorePluginContext.TryGetStore<TStore>(out TStore? store) -> bool
+Assimalign.Viu.State.StateStoreRegistry.GetExtension<TExtension>(object! store) -> TExtension
+Assimalign.Viu.State.StateStoreRegistry.Use(Assimalign.Viu.State.IStateStorePlugin! plugin) -> Assimalign.Viu.State.IStateStoreRegistry!
+static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, Assimalign.Viu.State.StateStoreActivator<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer, Assimalign.Viu.State.StateStorePersistenceDescriptor! persistence) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!
+static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, System.Func<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer, Assimalign.Viu.State.StateStorePersistenceDescriptor! persistence) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!
 *REMOVED*Assimalign.Viu.State.StateStoreDefinition<TStore>.Dispose(Assimalign.Viu.State.IStateStoreRegistry! registry) -> bool
 Assimalign.Viu.State.IStateStorePayloadRegistry
 Assimalign.Viu.State.IStateStorePayloadRegistry.CapturePayload() -> Assimalign.Viu.State.StateStorePayload!

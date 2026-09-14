@@ -41,4 +41,28 @@ applies server state before returning the store ([V01.01.09.03], [EXE-4]).
 store-key uniqueness, then exposes normalized JSON with HTML-sensitive characters and Unicode line
 separators escaped for inert script-island transport.
 
-See [DESIGN.md](DESIGN.md) for lifetime, scheduler, and AOT boundaries.
+Plugins register through `registry.Use(IStateStorePlugin)` before resolving stores. Each registration
+runs in order for subsequently created stores, with the exact definition, store, services, and
+store scope exposed by `StateStorePluginContext`. `TryGetStore<TStore>` supports typed behavior;
+`SetExtension<TExtension>` and `registry.GetExtension<TExtension>(store)` attach and retrieve values
+by exact declared type. Disposable extensions and attached handlers end with the store scope
+([STA-10], [V01.01.09.04]).
+
+`StateStorePersistencePlugin` supports definition-local opt-in on a serializable
+`StateStore<TState>`. Compose it with `StateStorePersistenceOptions(localStorage, sessionStorage,
+diagnostic)` and pass a `StateStorePersistenceDescriptor` when defining the store. The descriptor
+selects a storage key, `StateStorageKind.Local` or `Session`, and optional include/exclude JSON
+member paths. For example, `includePaths: ["Count", "Preferences.Theme"]` selects those serialized
+members; `excludePaths: ["Preferences.Secret"]` removes that member even if its parent is included.
+Names are ordinal JSON names from the registered serializer; arrays are selected whole.
+
+Persistence restores selected values into setup defaults before creation notifications. A staged
+SSR payload is applied afterward. Writes reuse the pre-flush state subscription and contain one
+complete versioned payload per changed selection, never one per property. Invalid data is removed
+and reported through the diagnostic callback; storage failures do not crash the store. The State
+package supplies `IStateStorage` and `InMemoryStateStorage`; Browser supplies `BrowserStateStorage`
+after its normal interop initialization. Storage and diagnostic composition stay host-owned
+([STA-11], [EXE-4]).
+
+See [DESIGN.md](DESIGN.md) for lifetime, scheduler, failure recovery, and AOT boundaries, and
+the [work item](https://github.com/assimalign/viu/issues/79) for delivery scope.

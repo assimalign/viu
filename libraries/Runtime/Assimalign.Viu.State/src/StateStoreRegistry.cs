@@ -22,6 +22,9 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
 {
     private readonly Dictionary<string, StateStoreEntry> _entries =
         new(StringComparer.Ordinal);
+    private readonly Dictionary<string, object> _creatingDefinitions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, StateStoreEntry> _creatingEntries = new(StringComparer.Ordinal);
+    private readonly List<IStateStorePlugin> _plugins = new();
     private readonly IReactiveEffectScopeFactory _effectScopes;
     private readonly IReactiveEffectScope _rootScope;
     private readonly IServiceProvider? _services;
@@ -57,6 +60,40 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
     public bool IsDisposed { get; private set; }
 
     /// <inheritdoc />
+    public IStateStoreRegistry Use(IStateStorePlugin plugin)
+    {
+        ArgumentNullException.ThrowIfNull(plugin);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        _plugins.Add(plugin);
+        return this;
+    }
+
+    /// <inheritdoc />
+    public TExtension GetExtension<TExtension>(object store)
+        where TExtension : notnull
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        foreach (StateStoreEntry entry in _entries.Values)
+        {
+            if (ReferenceEquals(entry.Instance, store))
+            {
+                return entry.GetExtension<TExtension>();
+            }
+        }
+
+        foreach (StateStoreEntry entry in _creatingEntries.Values)
+        {
+            if (ReferenceEquals(entry.Instance, store))
+            {
+                return entry.GetExtension<TExtension>();
+            }
+        }
+
+        throw new InvalidOperationException("The supplied store is not owned by this registry.");
+    }
+
+    /// <inheritdoc />
     public TStore GetOrCreate<TStore>(StateStoreDefinition<TStore> definition)
         where TStore : class
     {
@@ -79,15 +116,31 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
                 $"The registry entry for state store \"{definition.Key}\" has an invalid type.");
         }
 
-        IReactiveEffectScope scope =
-            _rootScope.Run(() => _effectScopes.Create(isDetached: false));
+        if (_creatingDefinitions.TryGetValue(definition.Key, out object? creatingDefinition))
+        {
+            if (!ReferenceEquals(creatingDefinition, definition))
+            {
+                throw new DuplicateStateStoreKeyException(definition.Key);
+            }
+
+            throw new InvalidOperationException(
+                $"State store \"{definition.Key}\" cannot recursively resolve itself during creation.");
+        }
+
+        IStateStorePlugin[] plugins = _plugins.ToArray();
+        _creatingDefinitions.Add(definition.Key, definition);
+        IReactiveEffectScope? scope = null;
         StateStoreEntry? createdEntry = null;
         try
         {
+            scope = _rootScope.Run(() => _effectScopes.Create(isDetached: false));
             StateContext context = new(
                 scope,
                 _services,
-                _watchScheduler);
+                _watchScheduler)
+            {
+                IsInitializing = definition.Persistence is not null,
+            };
             IStateContext? previousContext = StateStoreSetupRuntime.Current;
             try
             {
@@ -107,6 +160,20 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
                     serializer is null
                         ? null
                         : state => serializer.Restore(store, state));
+                EnsureCreationActive(scope);
+                _creatingEntries.Add(definition.Key, createdEntry);
+                StateStorePluginContext pluginContext = new(
+                    this,
+                    createdEntry,
+                    context,
+                    definition.Identifier,
+                    definition.Persistence);
+                foreach (IStateStorePlugin plugin in plugins)
+                {
+                    scope.Run(() => plugin.Apply(pluginContext));
+                    EnsureCreationActive(scope);
+                }
+
                 if (_restorePayload is { } restorePayload
                     && restorePayload.TryGetState(
                         definition.Key,
@@ -115,6 +182,9 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
                     createdEntry.RestoreState(state);
                 }
 
+                EnsureCreationActive(scope);
+                scope.Run(context.CompleteInitialization);
+                EnsureCreationActive(scope);
                 _entries.Add(definition.Key, createdEntry);
                 return store;
             }
@@ -130,7 +200,7 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
             {
                 if (createdEntry is null)
                 {
-                    scope.Stop();
+                    scope?.Stop();
                 }
                 else
                 {
@@ -144,6 +214,20 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
 
             failure.Throw();
             throw;
+        }
+        finally
+        {
+            _creatingEntries.Remove(definition.Key);
+            _creatingDefinitions.Remove(definition.Key);
+        }
+    }
+
+    private void EnsureCreationActive(IReactiveEffectScope scope)
+    {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        if (!scope.IsActive)
+        {
+            throw new InvalidOperationException("A state store scope was stopped during creation.");
         }
     }
 
@@ -227,6 +311,7 @@ public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayload
         finally
         {
             _entries.Clear();
+            _plugins.Clear();
             if (ReferenceEquals(StateStores.ActiveRegistry, this))
             {
                 StateStores.SetActiveRegistry(null);

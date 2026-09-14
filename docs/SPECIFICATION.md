@@ -2065,8 +2065,77 @@ serializer. Restore applies immediately to an existing store or stages state unt
 request-local, ordinal strings, schema version 1 is strict, and normalized JSON is safe for the inert
 state island [SSR-7], [EXE-4].
 
+`[STA-10]` **Store plugins.** `IStateStoreRegistry.Use(IStateStorePlugin)` registers a plugin for
+future store creation. `StateStoreRegistry` snapshots registrations at the start of each creation;
+each registration runs once, in registration order, after setup and before staged SSR restoration.
+Cache hits and stores already created are not visited. Registrations made during creation affect
+subsequent creations only. Custom registries may leave the optional plugin and extension methods
+unsupported; their default interface implementations throw `NotSupportedException`.
+
+`StateStorePluginContext` exposes the exact registry, store object, reusable definition object,
+`Identifier`/`Key`, setup `IStateContext`, services, and store scope. `TryGetStore<TStore>` is a
+statically named type test. Plugins run with the store's scope and setup context active, so ordinary
+`Subscribe`/`OnAction` handlers outlive component unmount and stop with the store. A throwing
+plugin fails creation like setup [STA-2]: no materialized entry, stopped scope, disposed store,
+and the original failure preserved despite cleanup errors. Recursive resolution of a key currently
+being created is rejected; stopping its scope or disposing its registry during creation also fails
+creation.
+
+`SetExtension<TExtension>` attaches a non-null value under its exact statically selected type key;
+duplicate keys are rejected. `GetExtension<TExtension>(store)` retrieves that type from the same
+registry, including during plugin execution, and rejects missing keys, foreign stores, and stopped
+store scopes. No members are injected or discovered. Disposable extension instances are disposed
+once by reference when the store scope stops, even if registered under multiple type keys; teardown
+continues after an extension failure. Plugins and service/storage providers remain externally owned.
+
+`[STA-11]` **Optional store persistence.** A definition opts in with an immutable
+`StateStorePersistenceDescriptor`: a non-empty storage key independent of its identifier, `Local`
+or `Session` storage kind, and copied include/exclude JSON member paths. A registered
+`StateStorePersistencePlugin` uses the definition's [STA-9] serializer and the rich
+`StateStore<TState>` subscription seam. Unsupported stores or an unconfigured storage kind remain
+usable and report a configuration diagnostic. State contains no Browser or interop dependency.
+
+Persistence stores one complete [STA-9] version-1 payload containing exactly that definition's key.
+Its state must be a JSON object. Selection uses `System.Text.Json.Nodes`, never reflection: paths
+are ordinal, dot-separated JSON object member names with non-empty segments; arrays are atomic
+members, and literal dots in member names cannot be individually addressed. Empty includes select
+all members, missing paths are ignored, and exclusions win on both write and restore. Selected
+objects merge recursively into captured setup defaults; omitted members retain their defaults.
+Unknown selected members, duplicate JSON members, incompatible known JSON kinds, invalid envelopes,
+and serializer-rejected values are invalid. Nullability and array-element shapes remain the explicit
+typed serializer's contract [EXE-4].
+
+The serialized setup-default object defines recognized member names. Participating serializers
+MUST emit selected optional/default-valued members in that baseline; open-ended object key discovery
+is not provided. Hosts MUST assign distinct storage keys to definitions sharing one storage area.
+
+For opted-in definitions, state subscription notifications during creation are deferred until
+plugins and staged SSR restoration complete. This includes setup-time subscribers and the
+synchronous fallback. Explicit staged SSR state is applied last [STA-9]. Persistence subscribes
+inside the store scope and captures once per state notification: with a scheduler, several direct
+writes and a grouped `Patch` coalesce through the existing pre-flush watcher [STA-7]. It writes one
+whole payload when the selected JSON changes; unchanged selections and the plugin's persisted-state
+restoration alone cause no write. A differing staged SSR value can therefore produce a write.
+Without a scheduler, [STA-7]'s synchronous direct-write and batched-patch behavior remains.
+Stopping the store cancels pending watcher delivery and removes the persistence subscription.
+
+Corrupt or incompatible persisted payloads are discarded through `IStateStorage.Remove`, retain
+setup defaults, and report diagnostics rather than failing creation. Deserialization must validate
+before applying; a custom restore delegate that mutates before throwing is given a best-effort
+restore of the captured defaults, with recovery failures included in the diagnostic. Read, capture,
+write (including quota/security), remove, and diagnostic-callback errors are contained. A failed
+write is retried on a later mutation notification. Storage operations are synchronous whole-string
+`TryRead`/`Write`/`Remove`; `InMemoryStateStorage` is instance-local and ordinal. Hosts explicitly
+compose local/session storage and retain ownership of it.
+
+`BrowserStateStorage` implements the [WHATWG Web Storage standard](https://html.spec.whatwg.org/multipage/webstorage.html)
+over the existing initialized browser interop module, with exactly one crossing per operation.
+The selected storage area is fixed at construction. Missing keys differ from stored empty strings,
+and native quota/security failures reach the plugin's diagnostic boundary.
+
 *Authority: `libraries/Runtime/Assimalign.Viu.State/{src,docs/{OVERVIEW,DESIGN}.md}`;
-`docs/COMPONENT-MODEL-PLAN.md` §2a.*
+`libraries/Browser/Assimalign.Viu.Browser/src/Storage/BrowserStateStorage.cs`;
+`docs/COMPONENT-MODEL-PLAN.md` §2a; [V01.01.09.04] (#79).*
 
 ---
 

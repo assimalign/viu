@@ -29,7 +29,7 @@ public sealed class StateStoreDefinition<TStore>
 
     /// <summary>
     /// Creates reusable metadata for a serializable state store. The serializer is invoked only
-    /// for registry payload capture and restore and must remain reflection-free. Specified by
+    /// for registry payload capture, restore, and opted-in persistence and must remain reflection-free. Specified by
     /// <c>[STA-9]</c> and <c>[EXE-4]</c>.
     /// </summary>
     /// <param name="key">The non-empty application-unique state-store key.</param>
@@ -43,6 +43,26 @@ public sealed class StateStoreDefinition<TStore>
     {
         ArgumentNullException.ThrowIfNull(serializer);
         Serializer = serializer;
+    }
+
+    /// <summary>
+    /// Defines a serializable store with explicit persistence settings. Persistence requires a
+    /// registered <see cref="StateStorePersistencePlugin"/> and a <see cref="StateStore{TState}"/>
+    /// implementation for mutation observation. Specified by <c>[STA-10]</c> and <c>[STA-11]</c>.
+    /// </summary>
+    /// <param name="key">The non-empty application-unique store key.</param>
+    /// <param name="setup">The AOT-safe setup delegate.</param>
+    /// <param name="serializer">The explicit AOT-safe state serializer.</param>
+    /// <param name="persistence">The immutable storage and JSON selection settings.</param>
+    public StateStoreDefinition(
+        string key,
+        StateStoreActivator<TStore> setup,
+        IStateStoreSerializer<TStore> serializer,
+        StateStorePersistenceDescriptor persistence)
+        : this(key, setup, serializer)
+    {
+        ArgumentNullException.ThrowIfNull(persistence);
+        Persistence = persistence;
     }
 
     /// <summary>
@@ -70,6 +90,12 @@ public sealed class StateStoreDefinition<TStore>
     /// </summary>
     /// <remarks>Specified by <c>[STA-9]</c> and constrained by <c>[EXE-4]</c>.</remarks>
     public IStateStoreSerializer<TStore>? Serializer { get; }
+
+    /// <summary>
+    /// Gets optional persistence settings. A definition without settings is never visited by the
+    /// first-party persistence plugin. Specified by <c>[STA-11]</c>.
+    /// </summary>
+    public StateStorePersistenceDescriptor? Persistence { get; }
 
     /// <summary>
     /// Gets the registry-owned store for this definition, creating it on first use. Different

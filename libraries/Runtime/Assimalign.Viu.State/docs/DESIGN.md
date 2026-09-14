@@ -93,3 +93,68 @@ the matching value before adding or returning the entry, and disposes the new st
 if restoration fails. Browser invokes this operation after its bridge initializes but before mount;
 ServerRenderer also selects request-local setup and active-registry ambient state, so separately
 owned payload maps and reactive lifetimes cannot cross concurrent requests [EXE-1].
+
+## Plugin creation and extension ownership
+
+The registry snapshots plugin registrations before setup, then runs each plugin inside the new
+store scope before staged SSR restore and publication. No materialized entry is visible until
+creation completes. A private in-progress map prevents recursive construction and lets later
+plugins retrieve extensions attached by earlier plugins. Failures stop and dispose the candidate
+without publishing it; nested successfully created stores retain their own registry lifetimes
+([STA-10]).
+
+The plugin context retains the definition object so a plugin with a known store type can inspect
+its typed setup and serializer metadata. The registry itself exposes no ambient component owner.
+Extensions use exact static type keys, without reflection-based activation or member discovery.
+Duplicate keys throw; one disposable instance attached under several types is disposed once by
+reference. Cleanup clears extension values and continues after individual failures. Plugin objects,
+services, and storage providers remain externally owned. Optional default interface methods reject
+unsupported operations on custom registry implementations, preserving their existing store contract.
+
+## Persistence selection and failure boundary
+
+Persistence opt-in adds an immutable descriptor to an already serializable definition. The
+first-party plugin observes `StateStore<TState>` through an internal mutation subscription adapter;
+the adapter calls the same public subscription path, sharing its one deep pre-flush watcher. There
+is no additional timer or scheduler queue and no new reactive property traversal ([STA-7], [STA-11]).
+
+Only opted-in definitions defer state notifications while setup, plugins, and staged SSR restore
+run. This covers a subscriber attached by setup or by an earlier plugin even in synchronous mode.
+The deferred callback observes the final live state. The plugin remembers its initial selected JSON
+so restoring stored values alone does not write them back; changed selection is serialized once per
+notification and written as one versioned payload. An excluded-only mutation produces no write.
+Scheduler-free hosts keep synchronous direct-write delivery and grouped patch batching.
+
+The payload reuses `StateStorePayload` version 1 with exactly one matching definition key. Selection
+operates on JSON nodes. Dot-separated paths address object members; arrays are atomic, missing paths
+are ignored, empty includes select all, and exclusions take precedence. Object selections merge
+recursively into serialized setup defaults so excluded or absent members preserve defaults. Unknown
+selected names, duplicate members, and incompatible known kinds are rejected before the typed
+serializer applies anything. JSON nullability and array-element validation belong to that serializer,
+which must use source-generated metadata. No runtime schema discovery is introduced.
+
+Serialized setup defaults define recognized object member names. A participating serializer must
+emit selected optional/default-valued members rather than omit them; newly introduced keys in an
+empty dynamic dictionary are not discoverable through this contract. Each definition sharing a
+storage area needs a distinct storage key, assigned by the host, because a stored envelope identifies
+one definition and another definition's envelope is incompatible.
+
+Invalid payloads are removed and reported. Read and write failures, including Browser security and
+quota failures, report an operation-specific diagnostic and leave the application usable. A failed
+write leaves the previous selection marker unchanged, allowing retry on a later notification.
+Diagnostic callbacks are isolated from application behavior. A custom restore delegate should
+validate before applying; if it changes state and then throws, the plugin attempts recovery through
+the same serializer with captured defaults. If that delegate also rejects recovery, the diagnostic
+includes both failures; arbitrary user mutation cannot be transactionally reversed without another
+explicit state copier. This limitation does not affect corrupt JSON rejected before application.
+
+`IStateStorage` carries only whole-string operations. `InMemoryStateStorage` has independent ordinal
+maps; server hosts decide their lifetime and must not share them unsafely across concurrent requests.
+Browser implements the same interface in its own package over its already initialized module. State
+never references Browser, and there are no reflection serializer overloads or new host dependencies.
+
+Persistence does not provide migrations, cross-tab synchronization, asynchronous storage, automatic
+retry timers, encryption, or arbitrary-object mutation observation. Applications should compose one
+persistence plugin per registry. These are explicit non-goals of [V01.01.09.04]
+([issue #79](https://github.com/assimalign/viu/issues/79)); the storage adapter only implements the
+[WHATWG Web Storage](https://html.spec.whatwg.org/multipage/webstorage.html) compatibility boundary.
