@@ -19,6 +19,10 @@ internal abstract class MountedNode<TNode>
 
     internal bool IsUnmounted;
 
+    internal SuspenseBoundary? EffectBoundary;
+
+    internal MountReference? AssignedReference;
+
     internal List<MountedNode<TNode>>? BlockChildren;
 
     internal abstract TNode FirstHostNode { get; }

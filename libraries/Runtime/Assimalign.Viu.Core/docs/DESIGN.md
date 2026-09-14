@@ -87,9 +87,75 @@ nodes. Their public descriptions remain immutable and lazy; Core owns retained b
 accounting, reveal, movement, and teardown. Host-specific transition effects stay behind the public
 host contract.
 
+### Suspense generations and reveal
+
+`MountedSuspense<TNode>` owns runtime anchors, a storage container, the content candidate, and the
+currently visible branch. `SuspenseBoundary` owns one generation's dependency set, deferred effect
+buffer, failure state, and parent-boundary participation. This keeps timeout and reveal policy in
+the existing executor instead of introducing another component activation system. The public
+description remains one lazy invocation; its `timeout` argument and zero-argument `pending`,
+`fallback`, and `resolve` listeners require no compiler-specific runtime seam ([BLT-11], [BLT-13],
+[BLT-16], [BLT-17]; [V01.01.03.20], [#36](https://github.com/assimalign/viu/issues/36)).
+
+| State | Trigger / next state | Visible range | Event and effect behavior |
+| --- | --- | --- | --- |
+| Creating | Ready content → Resolved | Newly inserted content | Emit `resolve`; release post-flush work |
+| Creating | Pending dependency without positive timeout → Pending fallback | Newly mounted fallback | Emit `pending`, then `fallback`; retain hidden effects |
+| Creating | Pending dependency with positive timeout → Pending retained | Empty placeholder | Emit `pending`; start deadline |
+| Resolved | Matching content root patches → Resolved | Existing live content | No boundary event or remount; new async descendants own their loading presentation |
+| Resolved | New pending replacement → Pending retained | Previous content | Emit `pending`; start positive clock deadline if configured |
+| Pending retained | Zero timeout or positive deadline → Pending fallback | Fallback | Emit `fallback` only when it is shown |
+| Pending retained / Pending fallback | Matching patch or new dependency → Same state | Unchanged | Patch storage; extend dependency set; no second `pending` |
+| Pending retained / Pending fallback | Different content root → New generation | Previous visible branch | Dispose old dependencies, timer, and buffered effects |
+| Pending retained / Pending fallback | Last successful settlement → Leaving or Resolved | Outgoing branch, then content | Finish root transition leave before insertion; defer content enter until reveal; emit `resolve` and release effects |
+| Pending retained / Pending fallback | Fault → Failed | Branch visible at failure | Cancel timeout, route `suspense dependency`, suppress reveal and effects |
+| Failed | Explicit boundary patch → Creating | Retained visible branch | Replace failed generation even if its content root still matches |
+| Any live state | Unmount → Disposed | Removed | Cancel timer and jobs; discard hidden effects; dispose owned mounts |
+
+The absent/negative timeout contract preserves previous content indefinitely. Initial mount selects
+fallback immediately without a positive timeout; with a positive timeout it retains an empty
+placeholder until deadline or earlier reveal. New asynchronous work discovered during hydration
+always selects client fallback immediately. Positive deadlines use the scheduler's scoped `TimeProvider`;
+timer callbacks enqueue scheduler work and never mutate a mounted branch directly. Generation
+identity prevents expired timers or completed tasks from revealing a replacement generation.
+
+Root replacement uses the renderer's ordinary identity check: node type, key, and the element name
+or component reference where applicable. A matching resolved root patches its live branch and keeps
+its mounted instances. Its generation accepts no more asynchronous dependencies and does not
+re-enter pending; new asynchronous descendants use their own presentation options. This prevents
+an update to an existing component from silently cloning or remounting that component merely to
+create a hidden candidate. Different content roots create fresh generations in storage; matching
+pending roots continue patching storage and may acquire more dependencies ([BLT-19]).
+
+Mounted callbacks, template-reference publication, updated callbacks, directives, and component
+post-flush watches use the same boundary buffer. Queued jobs still honor lifetime disposal and
+ordinary scheduler deduplication. Normal post-flush ordering and host commit apply when the buffer
+is released; never-revealed components still dispose their scopes and instances without running
+mounted callbacks ([BLT-18], [SCH-4], [SCH-10]).
+The initial synchronous `Reactive.WatchEffect` execution remains setup work; only its scheduled
+post-flush reactions enter the boundary buffer.
+
+A nested boundary registers completion with its pending parent and settles that participation only
+after the inner reveal. It forwards buffered effects to the parent rather than publishing host
+references to content that is still detached. This gives inner-first `resolve` ordering while
+mounted work waits for the outer reveal. Asynchronous definitions with `Suspensible = false` bypass
+dependency participation and keep their own loading/failure presentation ([BLT-20]).
+
+Failure is terminal for one generation: ancestor error hooks and the application handler see the
+named `suspense dependency` source, but neither another successful dependency nor a stale timeout
+can change the visible branch. An explicit boundary patch replaces the failed generation even
+when the content root matches, allowing recovery to start fresh ([BLT-21]).
+
 Core owns the `HydrationMarkers` wire vocabulary and the generic hydration walk. A host supplies a
 snapshot reader; Core adopts matching nodes and remounts only the smallest mismatched range
 (`[SSR-MARKERS-1]` through `[SSR-MARKERS-3]`, `[HYD-1]` through `[HYD-7]`).
+
+Suspense hydration reuses the generic content walk and adds runtime anchors around the adopted
+range afterward. SSR emits its settled default content with no additional Suspense marker pair.
+When client setup discovers new asynchronous work, ordinary localized mismatch recovery handles
+an unresolved wrapper, the resulting client branch moves to storage, and fallback is mounted
+immediately. An empty default slot claims no server range, and the walk preserves following
+siblings under both live and snapshot readers ([BLT-12]).
 
 Deferred hydration is marker-range bookkeeping, not a second renderer. Core validates and adopts
 the range as opaque host state, registers the invocation's data-only strategy through

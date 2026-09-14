@@ -1052,13 +1052,107 @@ slot supplies content and its `fallback` slot supplies the fallback, both uneval
 time. The engine-internal executor implements pending-branch storage, fallback ownership, nested
 boundary accounting, and coordinated reveal.
 
-`[BLT-12]` **Limit — Suspense hydration is not implemented.** Hydrating a Suspense boundary throws
-`NotSupportedException` with a descriptive message, rather than attempting a partial or incorrect
-claim of server-rendered pending/fallback branches. Render the boundary on the client.
+`[BLT-12]` **Hydration.** The server serializes the default content after server prefetch; Suspense
+adds no server wire markers of its own. Hydration MUST adopt that content directly when its client
+activation registers no pending asynchronous dependency. The executor adds its own runtime anchors
+around the adopted range without consuming following siblings. An empty default slot adopts no
+server range. If client activation registers a new asynchronous dependency, the executor applies the
+ordinary localized mismatch rule [HYD-5] where necessary, moves the pending client content into
+storage, and immediately shows the client fallback, regardless of `timeout`. The completed client
+content is then revealed under [BLT-13]. This rule deliberately does not retain server markup whose
+client component has not become ready.
 
-`[BLT-13]` **Limit.** Boundary timeout and events, fallback-to-reveal transition choreography, and
-delaying mounted/post-render effects from the hidden default branch are not implemented; those
-effects run when the detached branch mounts. See [§18](#18-non-goals-and-current-limits).
+`[BLT-13]` **Pending and reveal.** A boundary owns one current content generation, a dependency set,
+and a visible branch. Content with unresolved dependencies is mounted and patched in its detached
+storage container. A dependency's target update MUST run before the executor tests the generation
+for reveal. When every dependency has settled successfully, the executor removes the outgoing
+visible branch, moves the content range into the boundary's live anchors, and releases its deferred
+effects to the scheduler's post-flush phase. An outgoing root `TransitionNode` completes its leave
+before content insertion; hidden content's enter callbacks are deferred until reveal. The leave
+completion callback removes the fallback, reveals content, and emits `resolve` before the
+transition's `OnAfterLeave` notification; deferred content enter callbacks run afterward. A
+synchronously ready initial content branch follows
+the same reveal path without entering pending. An abandoned or failed generation MUST NOT reveal.
+All boundary mutation, timer delivery, dependency settlement, and reveal run on the scheduler's
+single execution flow; asynchronous continuations resume through its synchronization context.
+
+`[BLT-16]` **Timeout.** The invocation's `timeout` argument is an `int` number of milliseconds.
+Absent, null, or negative values retain the previous visible branch indefinitely while replacement
+content is pending. Zero shows fallback as soon as the new generation becomes pending. A positive
+value shows fallback only when that generation remains pending at its deadline, measured from the
+executor's pending transition (`pending` event) on the scheduler's `TimeProvider`. `Scheduler.UseTimeProvider` scopes
+a replacement clock for a host or deterministic test. Timer expiry queues scheduler work; it MUST
+NOT mutate the mounted tree on the timer callback thread. Success, failure, replacement, and
+unmount invalidate that generation's timer. On an initial pending mount there is no previous content:
+absent, null, negative, or zero shows fallback immediately; a positive timeout leaves an empty
+placeholder until its deadline or earlier content reveal. Values of any other type are rejected.
+
+`[BLT-17]` **Events.** Invocation listeners named `pending`, `fallback`, and `resolve` receive an
+empty ordered argument list, synchronously at these executor transitions:
+
+- `pending` runs exactly once when the executor observes the first dependency of a new generation,
+  after the current synchronous mount or patch step completes. A reactive render queues this
+  transition on the scheduler after its current tree mutation. Dependencies joining that set do
+  not emit it again.
+- `fallback` runs when the fallback branch is first shown for that generation, after its host
+  insertion. Patching an already visible fallback does not emit it again.
+- `resolve` runs once when that generation's content is inserted into the visible range, before
+  its deferred post-flush effects run. A synchronously ready initial generation emits only
+  `resolve`. An ordinary patch of already resolved, matching content does not emit another event.
+
+Thus an asynchronous generation that shows fallback emits `pending`, `fallback`, `resolve`; a
+generation that settles before fallback is shown emits `pending`, `resolve`. A failed or discarded pending
+generation emits no `resolve`. Listeners belong to the current immutable invocation; templates reach
+the same surface through `:timeout`, `@pending`, `@fallback`, and `@resolve`.
+Listener failures use the named sources `suspense pending event listener`,
+`suspense fallback event listener`, and `suspense resolve event listener`, respectively, and follow
+the component/application error route [CMP-23].
+
+`[BLT-18]` **Deferred effects.** Hidden content owns a buffer for mounted lifecycle callbacks,
+non-null template-reference publication, and component-owned post-flush effects, including updated
+and directive post-render callbacks. These callbacks MUST NOT run merely because content was
+mounted into storage. The synchronous initial execution of `Reactive.WatchEffect` remains part of
+setup; its subsequently scheduled post-flush reactions are buffered. Reveal releases the buffer
+into the ordinary post-flush ordering [SCH-4],
+after the host commit [SCH-10]; each queued callback remains subject to scheduler deduplication and
+its component's lifetime. A hidden component unmounted before reveal never runs its mounted
+callback or publishes its template reference. Teardown still cancels its lifetime and disposes its
+scope and instance [CMP-10], [CMP-22]. Stopping an effect before reveal prevents its buffered job
+from running. An inner reveal inside still-hidden outer content forwards its effects to the outer
+buffer; only the outer reveal makes them eligible to run.
+
+`[BLT-19]` **Pending patches and replacement.** State-driven component updates continue to patch
+the pending branch in storage. A `SuspenseNode` patch whose content root retains its node type,
+element name or component reference where applicable, and key patches that generation in place;
+while the generation remains pending, new asynchronous dependencies join its set. A different
+content root discards the old hidden generation, its buffered effects, and its timer, then mounts
+a fresh generation without disturbing the visible branch. Settlement from the discarded generation
+has no effect on its replacement. Fallback slot patches update a currently visible fallback without
+re-emitting `fallback`. Matching resolved content patches its live branch in place and MUST NOT
+re-enter pending or remount retained components. New asynchronous descendants under that resolved
+generation do not register dependencies with it; they use their own loading and failure
+presentation. A different content root starts a fresh generation in storage, allowing previous
+content to remain visible while replacement work is pending.
+
+`[BLT-20]` **Nesting and asynchronous components.** An inner pending boundary contributes a
+dependency to a containing pending boundary. It settles that dependency only after its own reveal,
+so content and `resolve` events proceed inner-first. Deferred effects still obey the outer buffer
+[BLT-18]. An asynchronous component with `Suspensible = true` (the default) registers with its
+nearest owning boundary when that boundary's generation is pending and delegates loading
+presentation to it. A resolved generation accepts no new dependency registration [BLT-19].
+`Suspensible = false` registers
+no boundary dependency and uses the component's own loading, delay, timeout, and failure options.
+
+`[BLT-21]` **Failure.** A faulted asynchronous dependency marks its generation failed, invalidates
+its timer, and routes the original exception with source string `suspense dependency`. Routing
+starts at the asynchronous component's nearest ancestor `OnErrorCaptured` hook and continues toward
+the application error handler unless a capture hook returns `false` [CMP-23]. Each observing wrapper
+routes its dependency failure once. The failed generation retains the branch currently visible
+(previous content or fallback), suppresses `resolve`, and never releases its hidden effect buffer.
+Later successful dependency settlements cannot revive it. A subsequent explicit `SuspenseNode`
+patch replaces the failed generation even when its content root still matches, and may start a
+fresh one; unmount always tears it down. This failure
+state is deliberate, not a partially successful reveal.
 
 ### 7.5 Asynchronous and dynamic components
 
@@ -1074,7 +1168,7 @@ registration. `DynamicComponents.Resolve(...)` normalizes a selector and
 
 *Authority: `libraries/Runtime/Assimalign.Viu.Components/src/{BuiltIns,Tree}/*.cs`;
 `libraries/Runtime/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
-`libraries/Runtime/Assimalign.Viu.Core/src/Rendering/{Renderer.KeepAlive.cs,Renderer.Suspense.cs,Renderer.Hydration.cs}`;
+`libraries/Runtime/Assimalign.Viu.Core/src/Rendering/{Renderer.BuiltIns.cs,Renderer.Hydration.cs}`;
 `libraries/Browser/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions;
 `docs/COMPONENT-MODEL-PLAN.md` §§2, 9.*
 
@@ -1748,7 +1842,8 @@ textual, and `data-allow-mismatch` gates expected divergence.
 `SsrContext.Teleports[target]` into the target element **before** client hydration. That buffer
 already carries the trailing `<!--teleport anchor-->` the walker requires.
 
-`[HYD-7]` **Limit.** Suspense hydration throws [BLT-12].
+`[HYD-7]` Suspense hydrates server-rendered default content directly when client activation is
+ready. New client asynchronous dependencies select the immediate client fallback rule [BLT-12].
 
 `[HYD-8]` A hydrating Browser application with composed state initializes the bridge, consumes and
 removes the single `script[data-viu-state]` island, validates schema version 1, and restores the
@@ -2420,8 +2515,6 @@ correct-looking values.
 
 | Limit | Detail |
 | --- | --- |
-| Suspense hydration | Throws `NotSupportedException` [BLT-12] |
-| Suspense boundary behavior | Timeout and events, fallback-to-reveal choreography, and hidden-branch post-effect delay are absent [BLT-13] |
 | Per-component-type static fields | Deliberately dropped: per-mount caching already removes repeat render and host work; a process-lifetime field would save only a managed allocation per mount while adding hot-reload lifetime and generator/runtime field-ABI complexity [SFC-OPT-1] |
 | Generalized handler caching | Deliberately dropped: syntax alone cannot prove a member-expression delegate has a stable receiver or infer every delegate arity; caching it could freeze mutable receiver state. Authors can supply an explicitly stable delegate when identity matters |
 | Slot/`v-for` destructuring | Deliberately unsupported: C# lambda parameters cannot represent generalized object/array destructuring without choosing new missing-member, null, and conversion semantics. A single valid C# identifier is accepted; other aliases report a located actionable template diagnostic and emit no invalid C# |

@@ -17,7 +17,7 @@ namespace Assimalign.Viu;
 /// one graph from several threads. Specified by <c>[EXE-1]</c>, <c>[EXE-3]</c>, and <c>[SCH-1]</c>
 /// through <c>[SCH-12]</c>.
 /// </remarks>
-public static class Scheduler
+public static partial class Scheduler
 {
     private const int RecursionLimit = 100;
     private static long _nextInspectionFlushIdentifier;

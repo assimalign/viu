@@ -29,7 +29,7 @@ internal static class AsynchronousComponentDelay
         {
             try
             {
-                await Task.Delay(milliseconds, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(milliseconds, cancellationToken);
             }
             catch (OperationCanceledException)
             {

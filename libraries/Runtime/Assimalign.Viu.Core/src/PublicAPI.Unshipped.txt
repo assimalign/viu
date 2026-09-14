@@ -1,4 +1,5 @@
 #nullable enable
+static Assimalign.Viu.Scheduler.UseTimeProvider(System.TimeProvider! timeProvider) -> System.IDisposable!
 *REMOVED*Assimalign.Viu.ComponentScriptUpdateResetHandler
 *REMOVED*static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent(System.Type! componentType, Assimalign.Viu.AsynchronousComponentLoader! loader, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!
 *REMOVED*static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent(System.Type! componentType, Assimalign.Viu.AsynchronousComponentOptions! options, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!

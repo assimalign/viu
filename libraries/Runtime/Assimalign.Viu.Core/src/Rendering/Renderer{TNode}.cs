@@ -1456,7 +1456,8 @@ public sealed partial class Renderer<TNode>
         }
 
         List<DirectiveBinding> bindings = mounted.DirectiveBindings;
-        Scheduler.QueuePostFlushCallback(
+        QueuePostRenderEffect(
+            invokeAfterUnmount ? null : mounted.EffectBoundary,
             new SchedulerJob(
                 () =>
                 {
@@ -1475,6 +1476,9 @@ public sealed partial class Renderer<TNode>
                     QueueHostCommit();
                 })
             {
+                Identifier = invokeAfterUnmount
+                    ? null
+                    : DeferredLifecycleIdentifier(mounted.EffectBoundary, mounted.Owner),
                 Name = $"directive {hookKind} lifecycle",
             });
     }
@@ -1572,7 +1576,8 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        Scheduler.QueuePostFlushCallback(
+        QueuePostRenderEffect(
+            mounted?.EffectBoundary,
             new SchedulerJob(
                 () =>
                 {
@@ -1587,6 +1592,9 @@ public sealed partial class Renderer<TNode>
                     }
                 })
             {
+                Identifier = DeferredLifecycleIdentifier(
+                    mounted?.EffectBoundary,
+                    owner),
                 Name = $"virtual node {name} lifecycle",
             });
     }
@@ -2207,14 +2215,39 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        if (previous is not null)
+        if (mounted.AssignedReference is { } assignedReference)
         {
-            InvokeReference(tree, mounted.Owner, previous, null);
+            mounted.AssignedReference = null;
+            InvokeReference(tree, mounted.Owner, assignedReference, null);
         }
 
         if (next is not null)
         {
-            InvokeReference(tree, mounted.Owner, next, ReferenceValue(mounted));
+            if (IsEffectDeferred(mounted.EffectBoundary))
+            {
+                QueuePostRenderEffect(
+                    mounted.EffectBoundary,
+                    new SchedulerJob(
+                        () =>
+                        {
+                            if (!mounted.IsUnmounted
+                                && ReferenceEquals(mounted.Value.MountReference, next)
+                                && !ReferenceEquals(mounted.AssignedReference, next))
+                            {
+                                mounted.AssignedReference = next;
+                                InvokeReference(tree, mounted.Owner, next, ReferenceValue(mounted));
+                            }
+                        })
+                    {
+                        Identifier = -1,
+                        Name = "suspense mount reference",
+                    });
+            }
+            else
+            {
+                mounted.AssignedReference = next;
+                InvokeReference(tree, mounted.Owner, next, ReferenceValue(mounted));
+            }
         }
     }
 
@@ -2228,10 +2261,58 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        if (mounted.Value.MountReference is { } reference)
+        if (mounted.AssignedReference is { } reference)
         {
+            mounted.AssignedReference = null;
             InvokeReference(tree, mounted.Owner, reference, null);
         }
+    }
+
+    private static bool IsEffectDeferred(SuspenseBoundary? boundary)
+    {
+        for (; boundary is not null; boundary = boundary.Parent)
+        {
+            if (boundary.IsPending || boundary.IsFailed || boundary.IsDisposed)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void QueuePostRenderEffect(
+        SuspenseBoundary? boundary,
+        SchedulerJob job)
+    {
+        if (boundary is not null)
+        {
+            boundary.QueueEffect(job);
+        }
+        else
+        {
+            Scheduler.QueuePostFlushCallback(job);
+        }
+    }
+
+    private static int? DeferredLifecycleIdentifier(
+        SuspenseBoundary? boundary,
+        RuntimeComponentContext? owner)
+    {
+        if (!IsEffectDeferred(boundary))
+        {
+            return null;
+        }
+
+        // Late asynchronous descendants mount after their hidden ancestor was queued. Preserve
+        // child-first lifecycle delivery when both are released by the same reveal [SCH-4].
+        int depth = 0;
+        for (ComponentContext? context = owner; context is not null; context = context.Parent)
+        {
+            depth++;
+        }
+
+        return int.MaxValue - depth;
     }
 
     private static void InvokeReference(
@@ -2307,7 +2388,7 @@ public sealed partial class Renderer<TNode>
         };
     }
 
-    private static void Register(
+    private void Register(
         MountedTree<TNode> tree,
         VirtualNode value,
         MountedNode<TNode> mounted)
@@ -2319,6 +2400,7 @@ public sealed partial class Renderer<TNode>
                 "A mounted occurrence must register its own immutable description.");
         }
 
+        mounted.EffectBoundary = _activeSuspenseBoundary ?? mounted.Owner?.SuspenseBoundary;
         RefreshBlockChildren(mounted);
     }
 

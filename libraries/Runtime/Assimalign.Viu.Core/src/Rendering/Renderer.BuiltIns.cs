@@ -858,7 +858,7 @@ public sealed partial class Renderer<TNode>
         MountedNode<TNode> mounted,
         bool activate)
     {
-        Scheduler.QueuePostFlushCallback(
+        QueuePostRenderEffect(mounted.EffectBoundary,
             new SchedulerJob(
                 () => InvokeKeepAliveLifecycle(mounted, activate))
             {
@@ -977,50 +977,73 @@ public sealed partial class Renderer<TNode>
         TNode? anchor,
         RuntimeComponentContext? owner)
     {
+        _ = ReadSuspenseTimeout(value);
         TNode startAnchor = _options.CreateComment("suspense start");
         TNode endAnchor = _options.CreateComment("suspense end");
         _options.Insert(startAnchor, container, anchor);
         _options.Insert(endAnchor, container, anchor);
         TNode storage = _options.CreateElement(StorageContainerName);
-        SuspenseBoundary boundary = new();
         SuspenseBoundary? previousBoundary = _activeSuspenseBoundary;
-        _activeSuspenseBoundary = boundary;
+        SuspenseBoundary boundary = new(previousBoundary ?? owner?.SuspenseBoundary);
         MountedNode<TNode> content;
+        _activeSuspenseBoundary = boundary;
         try
         {
             VirtualNode contentValue = EvaluateSlot(value.Invocation, "default", owner)
                 ?? new CommentNode(string.Empty);
-            content = Mount(tree, contentValue, container, endAnchor, owner);
+            content = Mount(tree, contentValue, storage, default, owner);
         }
         finally
         {
             _activeSuspenseBoundary = previousBoundary;
         }
 
-        MountedNode<TNode>? fallback = null;
-        MountedNode<TNode> active = content;
-        if (boundary.PendingCount > 0)
-        {
-            Move(content, storage, default);
-            VirtualNode fallbackValue = EvaluateSlot(value.Invocation, "fallback", owner)
-                ?? new CommentNode(string.Empty);
-            fallback = Mount(tree, fallbackValue, container, endAnchor, owner);
-            active = fallback;
-        }
-
+        MountedNode<TNode> placeholder = Mount(tree, new CommentNode(string.Empty), container, endAnchor, owner);
         MountedSuspense<TNode> mounted = new(
-            value,
-            startAnchor,
-            endAnchor,
-            storage,
-            boundary,
-            content,
-            fallback,
-            active,
-            owner);
-        boundary.Resolved += () => QueueSuspenseResolve(tree, mounted, container);
-        Register(tree, value, mounted);
+            value, startAnchor, endAnchor, storage, boundary, content, null, placeholder, owner);
+        FinishSuspenseMount(tree, mounted, container);
         return mounted;
+    }
+
+    private void FinishSuspenseMount(
+        MountedTree<TNode> tree,
+        MountedSuspense<TNode> mounted,
+        TNode container,
+        bool isHydrating = false)
+    {
+        mounted.Container = container;
+        Register(tree, mounted.Value, mounted);
+        InitializeSuspense(tree, mounted);
+        if (mounted.Boundary.PendingCount > 0)
+        {
+            int? timeout = ReadSuspenseTimeout((SuspenseNode)mounted.Value);
+            BeginSuspensePending(tree, mounted, showFallback: isHydrating || timeout is null or 0);
+        }
+        else
+        {
+            ResolveSuspense(tree, mounted, container);
+        }
+    }
+
+    private void InitializeSuspense(MountedTree<TNode> tree, MountedSuspense<TNode> mounted)
+    {
+        SuspenseBoundary boundary = mounted.Boundary;
+        boundary.PendingStarted += () => Scheduler.QueueJob(new SchedulerJob(() =>
+        {
+            if (!mounted.IsUnmounted && ReferenceEquals(mounted.Boundary, boundary))
+            {
+                BeginSuspensePending(tree, mounted, showFallback: false);
+            }
+        }) { Name = "suspense pending" });
+        boundary.Resolved += () => QueueSuspenseResolve(tree, mounted, mounted.Container);
+        boundary.Failed += () =>
+        {
+            if (ReferenceEquals(mounted.Boundary, boundary))
+            {
+                mounted.TimeoutTimer?.Dispose();
+                mounted.TimeoutTimer = null;
+            }
+        };
     }
 
     private void PatchSuspense(
@@ -1029,76 +1052,152 @@ public sealed partial class Renderer<TNode>
         SuspenseNode next,
         TNode container)
     {
-        SuspenseNode previous = (SuspenseNode)mounted.Value;
+        _ = ReadSuspenseTimeout(next);
+        mounted.Container = container;
+        ReplaceValue(tree, mounted, next);
+        VirtualNode contentValue = EvaluateSlot(next.Invocation, "default", mounted.Owner)
+            ?? new CommentNode(string.Empty);
+        bool replace = mounted.Boundary.IsFailed
+            || !IsSameNodeType(mounted.ContentBranch.Value, contentValue);
+        if (replace)
+        {
+            mounted.TimeoutTimer?.Dispose();
+            mounted.TimeoutTimer = null;
+            if (mounted.ResolveJob is not null)
+            {
+                mounted.ResolveJob.IsDisposed = true;
+                mounted.ResolveJob = null;
+            }
+
+            if (!ReferenceEquals(mounted.ContentBranch, mounted.ActiveBranch))
+            {
+                mounted.Boundary.Dispose();
+                Unmount(tree, mounted.ContentBranch, removeHostNodes: true);
+            }
+            else
+            {
+                mounted.Boundary.Retire();
+            }
+
+            mounted.Boundary = new SuspenseBoundary(mounted.Boundary.Parent);
+            mounted.PendingEmitted = false;
+            mounted.IsRevealing = false;
+            InitializeSuspense(tree, mounted);
+        }
+
         SuspenseBoundary? previousBoundary = _activeSuspenseBoundary;
         _activeSuspenseBoundary = mounted.Boundary;
         try
         {
-            VirtualNode contentValue = EvaluateSlot(next.Invocation, "default", mounted.Owner)
-                ?? new CommentNode(string.Empty);
-            TNode contentContainer = ReferenceEquals(
-                mounted.ActiveBranch,
-                mounted.ContentBranch)
-                    ? container
-                    : mounted.StorageContainer;
-            TNode? contentAnchor = ReferenceEquals(
-                mounted.ActiveBranch,
-                mounted.ContentBranch)
-                    ? mounted.EndAnchor
-                    : default;
-            mounted.ContentBranch = Patch(
-                tree,
-                mounted.ContentBranch,
-                contentValue,
-                contentContainer,
-                contentAnchor,
-                mounted.Owner);
+            if (replace)
+            {
+                mounted.ContentBranch = Mount(tree, contentValue, mounted.StorageContainer, default, mounted.Owner);
+            }
+            else
+            {
+                bool visible = ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch);
+                mounted.ContentBranch = Patch(
+                    tree, mounted.ContentBranch, contentValue,
+                    visible ? container : mounted.StorageContainer,
+                    visible ? mounted.EndAnchor : default, mounted.Owner);
+                if (visible)
+                {
+                    mounted.ActiveBranch = mounted.ContentBranch;
+                }
+            }
         }
         finally
         {
             _activeSuspenseBoundary = previousBoundary;
         }
 
+        if (mounted.FallbackBranch is not null)
+        {
+            VirtualNode fallback = EvaluateSlot(next.Invocation, "fallback", mounted.Owner)
+                ?? new CommentNode(string.Empty);
+            mounted.FallbackBranch = Patch(tree, mounted.FallbackBranch, fallback, container, mounted.EndAnchor, mounted.Owner);
+            mounted.ActiveBranch = mounted.FallbackBranch;
+        }
+
         if (mounted.Boundary.PendingCount > 0)
         {
-            if (ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch))
-            {
-                Move(mounted.ContentBranch, mounted.StorageContainer, default);
-                VirtualNode fallbackValue = EvaluateSlot(
-                    next.Invocation,
-                    "fallback",
-                    mounted.Owner) ?? new CommentNode(string.Empty);
-                mounted.FallbackBranch = Mount(
-                    tree,
-                    fallbackValue,
-                    container,
-                    mounted.EndAnchor,
-                    mounted.Owner);
-                mounted.ActiveBranch = mounted.FallbackBranch;
-            }
-            else if (mounted.FallbackBranch is not null)
-            {
-                VirtualNode fallbackValue = EvaluateSlot(
-                    next.Invocation,
-                    "fallback",
-                    mounted.Owner) ?? new CommentNode(string.Empty);
-                mounted.FallbackBranch = Patch(
-                    tree,
-                    mounted.FallbackBranch,
-                    fallbackValue,
-                    container,
-                    mounted.EndAnchor,
-                    mounted.Owner);
-                mounted.ActiveBranch = mounted.FallbackBranch;
-            }
+            BeginSuspensePending(tree, mounted, showFallback: false);
         }
         else
         {
             ResolveSuspense(tree, mounted, container);
         }
+    }
 
-        _ = previous;
-        ReplaceValue(tree, mounted, next);
+    private void BeginSuspensePending(
+        MountedTree<TNode> tree,
+        MountedSuspense<TNode> mounted,
+        bool showFallback)
+    {
+        SuspenseBoundary boundary = mounted.Boundary;
+        if (!boundary.IsPending || boundary.IsFailed || boundary.IsDisposed || mounted.PendingEmitted)
+        {
+            return;
+        }
+
+        mounted.PendingEmitted = true;
+        EmitSuspenseEvent(tree, mounted, "pending");
+        int? timeout = ReadSuspenseTimeout((SuspenseNode)mounted.Value);
+        if (showFallback || timeout == 0)
+        {
+            ShowSuspenseFallback(tree, mounted);
+        }
+        else if (timeout is > 0 && mounted.FallbackBranch is null)
+        {
+            mounted.TimeoutTimer = Scheduler.ScheduleDelay(timeout.Value, () =>
+            {
+                if (!mounted.IsUnmounted && ReferenceEquals(boundary, mounted.Boundary)
+                    && boundary.IsPending && !boundary.IsFailed && boundary.PendingCount > 0)
+                {
+                    ShowSuspenseFallback(tree, mounted);
+                    QueueHostCommit();
+                }
+            });
+        }
+    }
+
+    private void ShowSuspenseFallback(MountedTree<TNode> tree, MountedSuspense<TNode> mounted)
+    {
+        if (mounted.IsUnmounted || mounted.Boundary.IsFailed || mounted.FallbackBranch is not null)
+        {
+            return;
+        }
+
+        mounted.Container = HostParentOrFallback(mounted.EndAnchor, mounted.Container);
+        if (ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch))
+        {
+            Move(mounted.ContentBranch, mounted.StorageContainer, default);
+        }
+        else
+        {
+            Unmount(tree, mounted.ActiveBranch, removeHostNodes: true);
+            mounted.ActiveBoundary?.Dispose();
+        }
+
+        mounted.ActiveBoundary = null;
+        VirtualNode fallback = EvaluateSlot(((SuspenseNode)mounted.Value).Invocation, "fallback", mounted.Owner)
+            ?? new CommentNode(string.Empty);
+        SuspenseBoundary? previousBoundary = _activeSuspenseBoundary;
+        _activeSuspenseBoundary = mounted.Boundary.Parent;
+        try
+        {
+            mounted.FallbackBranch = Mount(tree, fallback, mounted.Container, mounted.EndAnchor, mounted.Owner);
+        }
+        finally
+        {
+            _activeSuspenseBoundary = previousBoundary;
+        }
+
+        mounted.ActiveBranch = mounted.FallbackBranch;
+        // Events observe committed presentation even when a deadline changes it during a flush.
+        QueueHostCommit();
+        _options.Commit?.Invoke();
+        EmitSuspenseEvent(tree, mounted, "fallback");
     }
 
     private void QueueSuspenseResolve(
@@ -1111,18 +1210,14 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        SchedulerJob job = new(
-            () =>
-            {
-                mounted.ResolveJob = null;
-                if (!mounted.IsUnmounted)
-                {
-                    ResolveSuspense(tree, mounted, container);
-                }
-            })
+        SchedulerJob job = new(() =>
         {
-            Name = "suspense reveal",
-        };
+            mounted.ResolveJob = null;
+            if (!mounted.IsUnmounted)
+            {
+                ResolveSuspense(tree, mounted, mounted.Container);
+            }
+        }) { Name = "suspense reveal" };
         mounted.ResolveJob = job;
         Scheduler.QueuePostFlushCallback(job);
     }
@@ -1132,28 +1227,118 @@ public sealed partial class Renderer<TNode>
         MountedSuspense<TNode> mounted,
         TNode container)
     {
-        if (mounted.Boundary.PendingCount > 0
-            || ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch))
+        SuspenseBoundary boundary = mounted.Boundary;
+        if (boundary.PendingCount > 0 || !boundary.IsPending || boundary.IsFailed
+            || boundary.IsDisposed || mounted.IsRevealing)
         {
             return;
         }
 
-        if (mounted.FallbackBranch is not null)
+        mounted.TimeoutTimer?.Dispose();
+        mounted.TimeoutTimer = null;
+        mounted.IsRevealing = true;
+        void Reveal()
         {
-            Unmount(tree, mounted.FallbackBranch, removeHostNodes: true);
+            if (mounted.IsUnmounted || !ReferenceEquals(boundary, mounted.Boundary)
+                || boundary.IsFailed || boundary.IsDisposed)
+            {
+                return;
+            }
+
+            if (boundary.PendingCount > 0)
+            {
+                mounted.IsRevealing = false;
+                return;
+            }
+
+            mounted.Container = HostParentOrFallback(mounted.EndAnchor, mounted.Container);
+            if (!ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch))
+            {
+                Unmount(tree, mounted.ActiveBranch, removeHostNodes: true);
+                mounted.ActiveBoundary?.Dispose();
+                Move(mounted.ContentBranch, mounted.Container, mounted.EndAnchor);
+            }
+
+            mounted.ActiveBranch = mounted.ContentBranch;
+            mounted.ActiveBoundary = boundary;
             mounted.FallbackBranch = null;
+            mounted.IsRevealing = false;
+            mounted.PendingEmitted = false;
+            QueueHostCommit();
+            // Reveal can finish inside the post-flush phase or an asynchronous leave callback.
+            // Commit its moves before releasing references and mounted callbacks [SCH-10].
+            _options.Commit?.Invoke();
+            EmitSuspenseEvent(tree, mounted, "resolve");
+            boundary.Reveal();
         }
 
-        Move(mounted.ContentBranch, container, mounted.EndAnchor);
-        mounted.ActiveBranch = mounted.ContentBranch;
-        QueueHostCommit();
+        if (!ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch)
+            && mounted.ActiveBranch is MountedTransition<TNode> transition
+            && !transition.Controller.Properties.Persisted)
+        {
+            SettleTransitionBeforePatch(tree, transition);
+            BeginTransitionLeave(tree, transition, CurrentTransitionChild(transition), transition.Controller, _ => Reveal());
+        }
+        else
+        {
+            Reveal();
+        }
     }
 
-    private void UnmountSuspense(
-        MountedTree<TNode> tree,
-        MountedSuspense<TNode> mounted,
-        bool removeHostNodes)
+    private static int? ReadSuspenseTimeout(SuspenseNode value)
     {
+        if (!value.Invocation.Arguments.TryGetValue("timeout", out object? argument) || argument is null)
+        {
+            return null;
+        }
+
+        if (argument is not int timeout)
+        {
+            throw new ArgumentException("The Suspense timeout argument must be an integer number of milliseconds.", nameof(value));
+        }
+
+        return timeout < 0 ? null : timeout;
+    }
+
+    private static void EmitSuspenseEvent(MountedTree<TNode> tree, MountedSuspense<TNode> mounted, string name)
+    {
+        if (!((SuspenseNode)mounted.Value).Invocation.Listeners.TryGetValue(name, out ComponentEventListener? listener))
+        {
+            return;
+        }
+
+        try
+        {
+            if (mounted.Owner is { } owner)
+            {
+                owner.Run(() => listener(Array.Empty<object?>()));
+            }
+            else
+            {
+                listener(Array.Empty<object?>());
+            }
+        }
+        catch (Exception error)
+        {
+            if (mounted.Owner is { } owner)
+            {
+                owner.RouteError(error, $"suspense {name} event listener");
+            }
+            else if (tree.Application?.ErrorHandler is { } handler)
+            {
+                handler(error, null, $"suspense {name} event listener");
+            }
+            else
+            {
+                throw;
+            }
+        }
+    }
+
+    private void UnmountSuspense(MountedTree<TNode> tree, MountedSuspense<TNode> mounted, bool removeHostNodes)
+    {
+        mounted.TimeoutTimer?.Dispose();
+        mounted.TimeoutTimer = null;
         if (mounted.ResolveJob is not null)
         {
             mounted.ResolveJob.IsDisposed = true;
@@ -1162,17 +1347,13 @@ public sealed partial class Renderer<TNode>
         }
 
         mounted.Boundary.Dispose();
-        if (mounted.FallbackBranch is not null)
+        mounted.ActiveBoundary?.Dispose();
+        if (!ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch))
         {
-            Unmount(tree, mounted.FallbackBranch, removeHostNodes: false);
+            Unmount(tree, mounted.ActiveBranch, removeHostNodes: false);
         }
 
-        Unmount(
-            tree,
-            mounted.ContentBranch,
-            removeHostNodes: !ReferenceEquals(
-                mounted.ActiveBranch,
-                mounted.ContentBranch));
+        Unmount(tree, mounted.ContentBranch, removeHostNodes: !ReferenceEquals(mounted.ActiveBranch, mounted.ContentBranch));
         if (removeHostNodes)
         {
             RemoveRange(mounted.StartAnchor, mounted.EndAnchor);
@@ -1200,6 +1381,8 @@ public sealed partial class Renderer<TNode>
             childValue);
         bool shouldEnter = !properties.Persisted
             && (sharedState.IsMounted || properties.Appear);
+        SuspenseBoundary? effectBoundary = _activeSuspenseBoundary ?? owner?.SuspenseBoundary;
+        bool deferEnter = shouldEnter && effectBoundary is { IsHidden: true };
         (MountedNode<TNode> child, TransitionMountContext<TNode> mountContext) =
             MountTransitionChild(
                 tree,
@@ -1208,7 +1391,7 @@ public sealed partial class Renderer<TNode>
                 anchor,
                 owner,
                 controller,
-                shouldEnter);
+                shouldEnter && !deferEnter);
         MountedTransition<TNode> mounted = new(
             value,
             child,
@@ -1219,7 +1402,17 @@ public sealed partial class Renderer<TNode>
             State = TransitionExecutionState.Entered,
         };
         Register(tree, value, mounted);
-        if (shouldEnter)
+        if (deferEnter)
+        {
+            effectBoundary!.QueueEffect(new SchedulerJob(() =>
+            {
+                if (!mounted.IsUnmounted)
+                {
+                    BeginTransitionEnter(tree, mounted, mounted.Child, controller, mountContext);
+                }
+            }) { Name = "suspense transition enter" });
+        }
+        else if (shouldEnter)
         {
             BeginTransitionEnter(
                 tree,
@@ -1639,6 +1832,18 @@ public sealed partial class Renderer<TNode>
         TransitionMountContext<TNode> mountContext,
         Action<bool>? afterCompletion = null)
     {
+        if (mounted.EffectBoundary is { IsHidden: true } boundary)
+        {
+            boundary.QueueEffect(new SchedulerJob(() =>
+            {
+                if (!mounted.IsUnmounted)
+                {
+                    BeginTransitionEnter(tree, mounted, child, controller, mountContext, afterCompletion);
+                }
+            }) { Name = "suspense transition enter" });
+            return;
+        }
+
         if (controller.Properties.Persisted || mountContext.IsSuppressed)
         {
             mounted.State = TransitionExecutionState.Entered;
@@ -1979,7 +2184,7 @@ public sealed partial class Renderer<TNode>
         TransitionMountContext<TNode> context = new(
             controller,
             previous,
-            shouldEnter,
+            shouldEnter && !((_activeSuspenseBoundary ?? owner?.SuspenseBoundary)?.IsHidden ?? false),
             isHydrating: false);
         _activeTransitionMount = context;
         try
@@ -2029,7 +2234,7 @@ public sealed partial class Renderer<TNode>
         TransitionController controller,
         TransitionState state)
     {
-        Scheduler.QueuePostFlushCallback(
+        QueuePostRenderEffect(mounted.EffectBoundary,
             new SchedulerJob(
                 () =>
                 {

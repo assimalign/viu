@@ -24,6 +24,7 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
     private bool _hasTarget;
     private bool _isActive;
     private bool _suspenseControlled;
+    private Task? _registeredDependency;
 
     internal AsynchronousComponentWrapper(AsynchronousComponentDefinition definition)
     {
@@ -67,6 +68,10 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
             {
                 _suspenseControlled = runtime.RegisterAsynchronousDependency(
                     pendingLoad);
+                if (_suspenseControlled)
+                {
+                    _registeredDependency = pendingLoad;
+                }
             }
 
             if (_suspenseControlled)
@@ -146,7 +151,8 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
     {
         try
         {
-            AsynchronousComponentTarget target = await pendingLoad.ConfigureAwait(false);
+            // Keep renderer state and dependency settlement on the mounting scheduler context.
+            AsynchronousComponentTarget target = await pendingLoad;
             if (!_isActive)
             {
                 return;
@@ -154,9 +160,9 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
 
             _target = target;
             _hasTarget = true;
-            runtime?.SettleAsynchronousDependency(pendingLoad);
-            runtime = null;
             _loaded!.Value = true;
+            SettleDependency(runtime);
+            runtime = null;
         }
         catch (OperationCanceledException) when (!_isActive)
         {
@@ -165,16 +171,60 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         {
             if (_isActive)
             {
-                runtime?.SettleAsynchronousDependency(pendingLoad);
-                runtime = null;
-                HandleError(error);
+                // Failure must freeze the boundary before a final settlement can reveal it.
+                if (_suspenseControlled)
+                {
+                    await QueueSuspenseError(error);
+                }
+                else
+                {
+                    HandleError(error);
+                }
             }
         }
         finally
         {
-            runtime?.SettleAsynchronousDependency(pendingLoad);
+            SettleDependency(runtime);
             SignalHydrationReadiness();
         }
+    }
+
+    private Task QueueSuspenseError(Exception error)
+    {
+        // An already-faulted loader must not settle inside Setup before its executor has
+        // established the initial visible branch and pending event [BLT-17], [BLT-21].
+        TaskCompletionSource completion = new();
+        Scheduler.QueueJob(new SchedulerJob(() =>
+        {
+            try
+            {
+                if (_isActive)
+                {
+                    HandleError(error);
+                }
+
+                completion.SetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.SetException(exception);
+            }
+        })
+        {
+            Name = "suspense dependency failure",
+        });
+        return completion.Task;
+    }
+
+    private void SettleDependency(IAsynchronousComponentRuntime? runtime)
+    {
+        if (_registeredDependency is not { } dependency)
+        {
+            return;
+        }
+
+        _registeredDependency = null;
+        runtime?.SettleAsynchronousDependency(dependency);
     }
 
     private void HandleError(Exception error)
@@ -254,6 +304,7 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         }
 
         _isActive = false;
+        SettleDependency(_runtime);
         SignalHydrationReadiness();
         _delayTimer?.Dispose();
         _delayTimer = null;

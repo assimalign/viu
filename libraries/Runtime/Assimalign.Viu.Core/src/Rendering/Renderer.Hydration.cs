@@ -33,6 +33,8 @@ public sealed partial class Renderer<TNode>
     /// <remarks>
     /// Structural reads come only from the host reader; Core retains no platform vocabulary.
     /// Specified by <c>[HYD-1]</c> through <c>[HYD-5]</c>.
+    /// Suspense adopts its resolved default content; new client asynchronous dependencies show
+    /// the fallback immediately and defer content effects until reveal, as specified by <c>[BLT-12]</c>.
     /// </remarks>
     public ComponentContext? Hydrate(
         VirtualNode value,
@@ -161,8 +163,13 @@ public sealed partial class Renderer<TNode>
                 keepAlive,
                 container,
                 owner),
-            SuspenseNode => throw new NotSupportedException(
-                "Suspense hydration is not implemented; render the boundary on the client."),
+            SuspenseNode suspense => HydrateSuspense(
+                tree,
+                reader,
+                node,
+                suspense,
+                container,
+                owner),
             TransitionNode transition => HydrateTransition(
                 tree,
                 reader,
@@ -466,6 +473,23 @@ public sealed partial class Renderer<TNode>
         MountedTree<TNode> tree,
         MountedLazyHydration<TNode> mounted)
     {
+        SuspenseBoundary? previousBoundary = _activeSuspenseBoundary;
+        _activeSuspenseBoundary = mounted.EffectBoundary ?? previousBoundary;
+        mounted.Container = HostParentOrFallback(mounted.StartAnchor, mounted.Container);
+        try
+        {
+            ActivateLazyHydrationWithinBoundary(tree, mounted);
+        }
+        finally
+        {
+            _activeSuspenseBoundary = previousBoundary;
+        }
+    }
+
+    private void ActivateLazyHydrationWithinBoundary(
+        MountedTree<TNode> tree,
+        MountedLazyHydration<TNode> mounted)
+    {
         if (mounted.IsUnmounted || mounted.ActivatedComponent is not null)
         {
             return;
@@ -584,7 +608,9 @@ public sealed partial class Renderer<TNode>
             ?? throw new InvalidOperationException(
                 "Hydrating an authored component requires an application context.");
         int componentIdentifier = checked(++_nextComponentIdentifier);
-        ApplicationWatchScheduler watchScheduler = new(componentIdentifier);
+        ApplicationWatchScheduler watchScheduler = new(
+            componentIdentifier,
+            _activeSuspenseBoundary ?? owner?.SuspenseBoundary);
         ComponentRuntimeOptions runtimeOptions = new(
             application.Components,
             watchScheduler,
@@ -675,6 +701,72 @@ public sealed partial class Renderer<TNode>
             activation.Release();
             throw;
         }
+    }
+
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateSuspense(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        SuspenseNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        // [BLT-12]: server output contains only the default branch. Hydrate that range before
+        // inserting runtime anchors, so both live and snapshot readers retain their server cursor.
+        _ = ReadSuspenseTimeout(value);
+        SuspenseBoundary? previousBoundary = _activeSuspenseBoundary;
+        SuspenseBoundary boundary = new(previousBoundary ?? owner?.SuspenseBoundary);
+        MountedNode<TNode> content;
+        TNode? next;
+        _activeSuspenseBoundary = boundary;
+        try
+        {
+            VirtualNode? contentValue = EvaluateSlot(value.Invocation, "default", owner);
+            if (contentValue is null)
+            {
+                // An empty default slot serializes no markup, so the server cursor belongs to
+                // the next sibling and must not be claimed as this boundary's placeholder.
+                content = Mount(tree, new CommentNode(string.Empty), container, node, owner);
+                next = node;
+            }
+            else
+            {
+                (content, next) = HydrateNode(
+                    tree,
+                    reader,
+                    node,
+                    contentValue,
+                    container,
+                    owner);
+            }
+        }
+        catch
+        {
+            boundary.Dispose();
+            throw;
+        }
+        finally
+        {
+            _activeSuspenseBoundary = previousBoundary;
+        }
+
+        TNode startAnchor = _options.CreateComment("suspense start");
+        TNode endAnchor = _options.CreateComment("suspense end");
+        _options.Insert(startAnchor, container, content.FirstHostNode);
+        _options.Insert(endAnchor, container, HasHostNode(next) ? next : default);
+        TNode storage = _options.CreateElement(StorageContainerName);
+        MountedSuspense<TNode> mounted = new(
+            value,
+            startAnchor,
+            endAnchor,
+            storage,
+            boundary,
+            content,
+            fallbackBranch: null,
+            activeBranch: content,
+            owner);
+        FinishSuspenseMount(tree, mounted, container, isHydrating: true);
+        return (mounted, next);
     }
 
     private (MountedNode<TNode> Mounted, TNode? Next) HydrateTeleport(

@@ -23,7 +23,9 @@ public sealed partial class Renderer<TNode>
             ?? throw new InvalidOperationException(
                 "Mounting an authored component requires an application context.");
         int componentIdentifier = checked(++_nextComponentIdentifier);
-        ApplicationWatchScheduler watchScheduler = new(componentIdentifier);
+        ApplicationWatchScheduler watchScheduler = new(
+            componentIdentifier,
+            _activeSuspenseBoundary ?? owner?.SuspenseBoundary);
         ComponentRuntimeOptions runtimeOptions = new(
             application.Components,
             watchScheduler,
@@ -266,13 +268,22 @@ public sealed partial class Renderer<TNode>
             mounted.Subtree.FirstHostNode,
             fallbackContainer);
         TNode? anchor = GetNextHostNode(mounted.Subtree);
-        mounted.Subtree = Patch(
-            tree,
-            mounted.Subtree,
-            mounted.PendingTree,
-            parent,
-            anchor,
-            mounted.Context);
+        SuspenseBoundary? previousBoundary = _activeSuspenseBoundary;
+        _activeSuspenseBoundary = mounted.Context.SuspenseBoundary;
+        try
+        {
+            mounted.Subtree = Patch(
+                tree,
+                mounted.Subtree,
+                mounted.PendingTree,
+                parent,
+                anchor,
+                mounted.Context);
+        }
+        finally
+        {
+            _activeSuspenseBoundary = previousBoundary;
+        }
         mounted.PendingTree = null;
         if (RuntimeInspection.IsEnabled)
         {
@@ -286,7 +297,8 @@ public sealed partial class Renderer<TNode>
             RuntimeInspection.NotifyUpdated(in inspectionComponent);
         }
 
-        Scheduler.QueuePostFlushCallback(
+        QueuePostRenderEffect(
+            mounted.Context.SuspenseBoundary,
             new SchedulerJob(
                 () =>
                 {
@@ -296,6 +308,9 @@ public sealed partial class Renderer<TNode>
                     }
                 })
             {
+                Identifier = DeferredLifecycleIdentifier(
+                    mounted.Context.SuspenseBoundary,
+                    mounted.Context),
                 Name = "component updated lifecycle",
             });
         NormalizeTeleportTargetOrder(tree);
@@ -630,7 +645,8 @@ public sealed partial class Renderer<TNode>
 
     private static void QueueMountedLifecycle(MountedComponent<TNode> mounted)
     {
-        Scheduler.QueuePostFlushCallback(
+        QueuePostRenderEffect(
+            mounted.Context.SuspenseBoundary,
             new SchedulerJob(
                 () =>
                 {
@@ -640,6 +656,9 @@ public sealed partial class Renderer<TNode>
                     }
                 })
             {
+                Identifier = DeferredLifecycleIdentifier(
+                    mounted.Context.SuspenseBoundary,
+                    mounted.Context),
                 Name = "component mounted lifecycle",
             });
     }

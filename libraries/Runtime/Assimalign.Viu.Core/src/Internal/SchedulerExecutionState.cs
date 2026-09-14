@@ -9,6 +9,8 @@ internal sealed class SchedulerExecutionState
 {
     internal object Synchronization { get; } = new();
 
+    internal TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
     internal List<SchedulerJob> Queue { get; } = [];
 
     internal List<SchedulerJob> PendingPostFlushCallbacks { get; } = [];

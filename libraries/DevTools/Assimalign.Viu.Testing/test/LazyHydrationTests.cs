@@ -208,8 +208,7 @@ public sealed class LazyHydrationTests
         container.Children[1].ShouldBeSameAs(adopted);
 
         load.SetResult(AsynchronousComponentTarget.From<LazyTargetComponent>());
-        await WaitForPendingFlushAsync(pump);
-        pump.RunUntilIdle();
+        await WaitForHydrationCompletionAsync(pump, triggers);
 
         target.SetupCount.ShouldBe(1);
         triggers.CompletedCount.ShouldBe(1);
@@ -265,9 +264,8 @@ public sealed class LazyHydrationTests
         load.Task.IsCompleted.ShouldBeFalse();
         container.Children[1].ShouldBeSameAs(adopted);
 
+        await WaitForHydrationCompletionAsync(pump, triggers);
         Exception routedError = await routed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await WaitForPendingFlushAsync(pump);
-        pump.RunUntilIdle();
 
         routedError.ShouldBeOfType<TimeoutException>();
         TestElement errorPresentation = container.Children[1].ShouldBeOfType<TestElement>();
@@ -432,15 +430,26 @@ public sealed class LazyHydrationTests
             HydrationTriggers = triggers,
         });
 
-    private static async Task WaitForPendingFlushAsync(TestSchedulerPump pump)
+    private static async Task WaitForHydrationCompletionAsync(
+        TestSchedulerPump pump,
+        TestHydrationTriggers triggers)
     {
         Stopwatch elapsed = Stopwatch.StartNew();
-        while (pump.PendingFlushCount == 0 && elapsed.Elapsed < TimeSpan.FromSeconds(5))
+        while (triggers.CompletedCount == 0 && elapsed.Elapsed < TimeSpan.FromSeconds(5))
         {
+            // [BLT-13], [HYD-LAZY-3]: captured loader continuations must run before they can
+            // schedule hydration work; a queued renderer flush is not the completion signal.
+            pump.RunUntilIdle();
+            if (triggers.CompletedCount > 0)
+            {
+                break;
+            }
+
             await Task.Delay(1);
         }
 
-        pump.PendingFlushCount.ShouldBeGreaterThan(0);
+        pump.RunUntilIdle();
+        triggers.CompletedCount.ShouldBe(1);
     }
 
     private static ComponentNode Register(

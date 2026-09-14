@@ -1,3 +1,5 @@
+using System;
+
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu;
@@ -34,6 +36,8 @@ internal sealed class MountedSuspense<TNode> : MountedNode<TNode>
 
     internal SuspenseBoundary Boundary;
 
+    internal SuspenseBoundary? ActiveBoundary;
+
     internal MountedNode<TNode> ContentBranch;
 
     internal MountedNode<TNode>? FallbackBranch;
@@ -41,6 +45,14 @@ internal sealed class MountedSuspense<TNode> : MountedNode<TNode>
     internal MountedNode<TNode> ActiveBranch;
 
     internal SchedulerJob? ResolveJob;
+
+    internal TNode Container = default!;
+
+    internal IDisposable? TimeoutTimer;
+
+    internal bool PendingEmitted;
+
+    internal bool IsRevealing;
 
     internal override TNode FirstHostNode => StartAnchor;
 

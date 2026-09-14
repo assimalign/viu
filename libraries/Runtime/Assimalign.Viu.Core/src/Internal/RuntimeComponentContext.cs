@@ -27,6 +27,7 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     private IReadOnlyDictionary<string, ComponentEventListener> _listeners;
     private List<Task>? _taskObservers;
     private object? _exposedValue;
+    private bool _hasSuspenseDependencyRegistration;
 
     internal RuntimeComponentContext(
         IComponent instance,
@@ -300,9 +301,10 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
         Task dependency)
     {
         ArgumentNullException.ThrowIfNull(dependency);
-        if (SuspenseBoundary is not null)
+        if (SuspenseBoundary is { IsPending: true, IsDisposed: false, IsFailed: false, IsRetired: false } boundary)
         {
-            SuspenseBoundary.Register(dependency);
+            boundary.Register(dependency, this);
+            _hasSuspenseDependencyRegistration = true;
             return true;
         }
 
@@ -319,11 +321,18 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
         Exception exception,
         bool rethrowIfUnhandled)
     {
+        string diagnosticInformation = "asynchronous component loader";
+        if (_hasSuspenseDependencyRegistration && SuspenseBoundary is { } boundary)
+        {
+            boundary.Fail(exception, this);
+            diagnosticInformation = "suspense dependency";
+        }
+
         try
         {
             RouteError(
                 exception,
-                "asynchronous component loader",
+                diagnosticInformation,
                 rethrowIfUnhandled);
         }
         catch (Exception unhandled)
@@ -332,7 +341,7 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
             Scheduler.QueuePostFlushCallback(
                 new SchedulerJob(captured.Throw)
                 {
-                    Name = "asynchronous component loader",
+                    Name = diagnosticInformation,
                 });
         }
     }

@@ -147,7 +147,7 @@ public sealed class AsynchronousComponentDefinition
                 try
                 {
                     AsynchronousComponentTarget target =
-                        await _options.Loader(state.Cancellation.Token).ConfigureAwait(false);
+                        await _options.Loader(state.Cancellation.Token);
                     target.Validate();
                     if (ReferenceEquals(_pendingLoad, state))
                     {
@@ -167,7 +167,7 @@ public sealed class AsynchronousComponentDefinition
                     bool retry = await GetRetryDecisionAsync(
                         error,
                         attempts,
-                        state.Cancellation.Token).ConfigureAwait(false);
+                        state.Cancellation.Token);
                     if (!retry)
                     {
                         ExceptionDispatchInfo.Capture(error).Throw();
@@ -200,6 +200,6 @@ public sealed class AsynchronousComponentDefinition
             () => completion.TrySetResult(true),
             () => completion.TrySetResult(false),
             attempts);
-        return await completion.Task.ConfigureAwait(false);
+        return await completion.Task;
     }
 }
