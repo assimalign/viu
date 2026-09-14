@@ -1,0 +1,7 @@
+# Templates compiles linked copies of Components' PatchFlags and SlotStability. Their canonical
+# API pages come from Components; document the parser's own namespace without duplicate UIDs.
+apiRules:
+  - include:
+      uidRegex: ^Assimalign\.Viu\.Syntax\.Templates($|\.)
+  - exclude:
+      uidRegex: .*

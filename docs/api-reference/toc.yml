@@ -1,0 +1,10 @@
+- name: Overview
+  href: index.md
+- name: Getting started
+  href: docs/guide/getting-started.md
+- name: Developer examples
+  href: docs/DEVELOPER-EXAMPLES.md
+- name: Specification
+  href: docs/SPECIFICATION.md
+- name: API reference
+  href: api/toc.yml

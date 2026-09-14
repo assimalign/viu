@@ -199,7 +199,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered; the deferred compiler optimization set has explicit implemented-or-dropped outcomes, and the size/startup budget gates are live against measured `EndToEndBrowserApp` baselines | Complete diagnostic source attribution |
 | **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; hosted fingerprint selection and deterministic component-library/application CSS delivery are complete | Close built-in edge cases, generated State/source-map work, and deferred reactive `v-bind()` application for ordinary component styles |
 | **W05** | Host-neutral component-library and Browser SDK/framework segments, validated release packaging/staging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, explicit server-profile selection with reflection-free registration, installable `dotnet new` templates with an optional server host, editor hot-reload metadata, a working package-only `dotnet watch` component-CSS and component-remount path with connected-browser conformance, the ordinary real-browser end-to-end harness, live size/startup budget gates, lazy route factories with Browser scroll restoration, and the opt-in runtime-inspection protocol exist | Finish compatibility/conformance gates and Cohesion hosting integration |
-| **W06** | Semantic `@script` language-server work has begun; the former utility-composition train was parked and superseded by the 2026-08-13 removal | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
+| **W06** | The versioned API-reference generation pipeline is delivered; semantic `@script` language-server work has begun; the former utility-composition train was parked and superseded by the 2026-08-13 removal | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, and the documentation site |
 
 This snapshot includes the 2026-08-13 area-layout and utility-removal decisions and the 2026-09-14
 scoped-CSS removal. Budget-gate activation and remaining style work are grouped by delivery theme;
@@ -432,6 +432,18 @@ and component-style hot reload remain active Viu features. Scoped CSS was remove
 | `V01.01.13.04` | Generate the API reference from XML docs | W06 | P006 |
 | `V01.01.13.05` | Build the documentation site | W06 | P006 |
 | `V01.01.13.06` | Build the HackerNews-style sample application | W04 | P004 |
+
+**Delivered pipeline — [V01.01.13.04] ([#101](https://github.com/assimalign/viu/issues/101)).**
+The [docfx project](api-reference/) generates the public API reference from Release DLL/XML output,
+including the public Syntax parsers and standalone Utilities APIs. Missing XML comments, unknown
+specification clause citations, and docfx warnings fail the build. Text clause citations resolve
+through one mapping to stable anchors in the published specification; getting-started and developer
+example pages join the reference, and every page carries `ViuVersion`.
+[`scripts/Build-ApiReference.ps1`](../scripts/Build-ApiReference.ps1) uses the pinned local tool and
+writes `_out/api-reference/`; the [workflow](../.github/workflows/api-reference.yml) uploads the
+`api-reference` artifact on successful main and pull-request builds. Local setup and the task-only
+package exclusion are documented in [CONTRIBUTING.md](CONTRIBUTING.md#build-the-api-reference).
+Pages deployment remains [V01.01.13.05] ([#102](https://github.com/assimalign/viu/issues/102)).
 
 ## Operating references
 

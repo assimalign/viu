@@ -29,6 +29,7 @@ nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
 | [`PLAN.md`](PLAN.md) | The delivery narrative — wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. |
 | [`adr/`](adr/) | The append-only log of repo-wide, cross-cutting architecture decisions (see [`adr/README.md`](adr/README.md)). |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Documentation conventions: where each kind of document lives, what belongs in it, and when it must be updated. |
+| [`api-reference/`](api-reference/) | The docfx project and local build instructions for the versioned public API reference, specification, and guides; generated output lives in `_out/api-reference/`. |
 | [`guide/getting-started.md`](guide/getting-started.md) | The consumer-facing walkthrough — build, run, and publish a Viu app with the packaged `Assimalign.Viu.Sdk.Browser`. |
 | [`DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked consumption examples for the Components, Reactivity, State, Core, and Browser packages, written from the application developer's point of view. |
 | [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Standalone add-on design; non-normative for Viu core.** The former Viu integration was removed on 2026-08-13; its Tailwind CSS v4.3.3 target belongs only to the independently published add-on. |

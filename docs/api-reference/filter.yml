@@ -1,0 +1,8 @@
+# [V01.01.13.04] Accessibility filtering remains enabled; EditorBrowsable(Never) public
+# host/generator ABI members are included so every published public contract is visible.
+# Metadata inputs are selected from the package inventory, never a bin/** wildcard.
+apiRules:
+  - include:
+      uidRegex: ^Assimalign\.Viu($|\.)
+  - exclude:
+      uidRegex: .*

@@ -33,6 +33,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 | `PLAN.md` | [`docs/PLAN.md`](PLAN.md) | The delivery narrative: the wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. The GitHub [Project #15](https://github.com/orgs/assimalign/projects/15) board is the authoritative *backlog*. |
 | `DEVELOPER-EXAMPLES.md` | [`docs/DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked package-consumer examples for Components, Reactivity, State, Core, and Browser. |
 | Getting-started guide | [`docs/guide/getting-started.md`](guide/getting-started.md) | The external-consumer walkthrough from manual project creation through browser execution and publish. |
+| Generated API reference | [`docs/api-reference/`](api-reference/) | The docfx configuration and source pages; [`Build-ApiReference.ps1`](../scripts/Build-ApiReference.ps1) emits the versioned site under `_out/api-reference/`. |
 | `UTILITY-CSS-DESIGN.md` | [`docs/UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Standalone add-on design; non-normative for Viu core.** The former Viu integration and the independently published add-on's Tailwind CSS v4.3.3 target. |
 | `NET-RESHAPE-PLAN.md` | [`docs/NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The dated historical record of the completed .NET reshape and its later supersession notes. |
 | `RELEASING.md` | [`docs/RELEASING.md`](RELEASING.md) | Package and extension release channels, credentials, validation, and publication sequence. |
@@ -81,7 +82,7 @@ The rationale and the trade-offs — why the shape, not the shape itself.
   decision links its ADR under [`docs/adr/`](adr/); a library-local one is documented here.
 - **Non-goals** — what is intentionally out of scope, sequenced to the work item that will add it.
   A non-goal that is a *decision* rather than a deferral says so, and matches
-  [`SPECIFICATION.md` §17](SPECIFICATION.md#17-non-goals-and-current-limits).
+  [`SPECIFICATION.md` §18](SPECIFICATION.md#18-non-goals-and-current-limits).
 
 ## When documents must be updated
 
@@ -126,9 +127,63 @@ The rationale and the trade-offs — why the shape, not the shape itself.
 Every relative link in a Markdown doc must point at a real file, and every in-document anchor must
 resolve. An external link is reserved for a genuine standard or for a foreign format Viu consumes,
 and is **version-pinned** so it keeps meaning what it meant when it was written. Verify links before
-committing. (Automated link-checking in CI is planned under the Documentation area, [V01.01.13];
-until it lands, this is a manual check.)
+committing. The [API-reference workflow](../.github/workflows/api-reference.yml) validates the local
+links in its included pages through docfx; links outside that site's content still need manual review.
 
 A reference to Viu's own behavior is a `SPECIFICATION.md` clause id written as text — `[SCH-4]`,
 never a URL — so the API-reference generator ([V01.01.13.04]) resolves ids to anchors from one
 mapping and the docs survive the site moving.
+
+## Build the API reference
+
+The [docfx project](api-reference/) delivers
+[[V01.01.13.04] #101](https://github.com/assimalign/viu/issues/101). Install PowerShell 7 and the
+.NET SDK selected by [`global.json`](../global.json). Prepare the solution's dependencies once,
+and repeat restore whenever its dependency graph changes:
+
+```sh
+dotnet workload install wasm-tools --skip-manifest-update
+dotnet restore Assimalign.Viu.slnx -p:Configuration=Release
+pwsh scripts/Build-ApiReference.ps1
+```
+
+The script restores the exact docfx version in
+[`.config/dotnet-tools.json`](../.config/dotnet-tools.json), builds the solution in Release with
+XML documentation and missing-public-member checks, then runs `docfx metadata` and `docfx build`
+with warnings as errors. Solution dependency restore is separate: after prerequisites and the local
+tool are restored, compilation and site generation use local inputs without fetching remote themes
+or cross-reference maps. The generated site is `_out/api-reference/`; its entry page is
+`_out/api-reference/index.html`. Generated metadata and HTML belong under `_out/`, never in a commit.
+
+Metadata covers the shipping library inventory in
+[`ViuPackaging.psm1`](../scripts/modules/ViuPackaging.psm1), plus all five public Syntax parser
+assemblies. Standalone Utilities APIs are included because they are public package surfaces;
+their inclusion does not make them Viu core semantics or add them to an SDK or framework.
+`Assimalign.Viu.UtilityCss.Build` is checked for XML coverage with the other shipping packages,
+but its MSBuild tasks are excluded from API metadata. Test assemblies, analyzer internals,
+SDK tasks, and compiler/editor implementation assemblies are also excluded.
+
+Cite existing specification clauses as plain text in XML comments:
+
+```xml
+/// <remarks>Specified by <c>[RND-FLAGS-1]</c>.</remarks>
+```
+
+The preprocessing step builds one mapping from clause declarations at paragraph starts in
+[`SPECIFICATION.md`](SPECIFICATION.md), inserts stable clause anchors into the staged specification,
+and replaces matching XML-comment citations with links to those anchors. Unknown clause ids fail
+generation. Keep work-item codes such as `[V01.01.13.04]` as work-item references; they are not
+specification clauses. Never add an invented clause id or a framework counterpart to satisfy a
+documentation check.
+
+The site includes the [getting-started guide](guide/getting-started.md) and
+[developer examples](DEVELOPER-EXAMPLES.md), and docfx checks their relative links. Each page labels
+the package version evaluated from `ViuVersion` in
+[`Build.Version.props`](../build/Targets/Build.Version.props), supplied through docfx global metadata.
+CI builds on every push to `main` and relevant pull requests, fails on generation errors, and uploads
+the `api-reference` artifact. Pages deployment remains
+[[V01.01.13.05] #102](https://github.com/assimalign/viu/issues/102); the workflow header records the
+intended deployment job and its permissions.
+
+Run `pwsh scripts/tests/Test-ApiReference.ps1` for the preprocessor's offline regression checks.
+The build log and machine-readable generation summary are in `_out/api-reference-work/`.

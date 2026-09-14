@@ -35,7 +35,10 @@ internal sealed class FrameRenderCodeWriter
     private int indentLevel;
     private int generatedNameIndex;
 
-    /// <summary>The source map produced by the most recent <see cref="EmitRenderBody"/> call.</summary>
+    /// <summary>
+    /// The source map produced by the most recent <see cref="EmitRenderBody()"/> or
+    /// <see cref="EmitRenderBody(object)"/> call.
+    /// </summary>
     public IReadOnlyList<RenderSourceMapping> SourceMappings => sourceMappings;
 
     /// <summary>Initializes a writer for one transformed template.</summary>

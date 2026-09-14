@@ -1,0 +1,76 @@
+# Generate the versioned XML API reference ([V01.01.13.04], #101); this lane does not deploy.
+# Pages seam ([V01.01.13.05], #102): add a separate, main-only job that consumes the successful
+# api-reference artifact, prepares the Pages artifact, and deploys through the github-pages
+# environment with pages: write and id-token: write. Keep those permissions out of this build job.
+name: API reference
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+        paths:
+            - "libraries/**"
+            - "docs/**"
+            - "scripts/**"
+            - "tooling/**"
+            - "analyzers/**"
+            - "build/**"
+            - "frameworks/**"
+            - "sdks/**"
+            - ".config/dotnet-tools.json"
+            - "Assimalign.Viu.slnx"
+            - "Directory.Build.props"
+            - "Directory.Build.targets"
+            - "global.json"
+            - "nuget.config"
+            - ".github/workflows/api-reference.yml"
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+    build:
+        name: Generate API reference
+        runs-on: windows-latest
+        timeout-minutes: 60
+        steps:
+            - name: Checkout
+              # actions/checkout v4
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with:
+                  persist-credentials: false
+
+            # #101 requires every uses entry to carry a SHA. Keep this pin aligned with the
+            # shared setup-dotnet-wasm action; global.json remains the only SDK version source.
+            - name: Set up .NET SDK
+              # actions/setup-dotnet v4
+              uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+              with:
+                  global-json-file: global.json
+
+            - name: Install WebAssembly build prerequisites
+              shell: pwsh
+              run: dotnet workload install wasm-tools --skip-manifest-update
+
+            - name: Restore solution dependencies
+              shell: pwsh
+              run: dotnet restore Assimalign.Viu.slnx -p:Configuration=Release
+
+            - name: Build reference and validate documentation
+              shell: pwsh
+              run: |
+                  ./scripts/tests/Test-ApiReference.ps1
+                  ./scripts/Build-ApiReference.ps1
+
+            - name: Upload API reference
+              # actions/upload-artifact v4
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+              with:
+                  name: api-reference
+                  path: _out/api-reference/
+                  if-no-files-found: error

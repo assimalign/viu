@@ -302,7 +302,7 @@ root needs neither a component registration nor a provider.
 
 This is **app-level** DI. Viu deliberately has **no hierarchical component-tree dependency API** —
 no ambient provide/inject walking up the parent chain
-([`[CMP-24]`](../SPECIFICATION.md#48-no-component-tree-provideinject)). A component's dependencies are
+([`[CMP-24]`](../SPECIFICATION.md#48-explicit-component-model-seams)). A component's dependencies are
 explicit:
 
 - `ComponentContext.Bindings` carries contract-resolved parameters, slots, and fallthrough values;

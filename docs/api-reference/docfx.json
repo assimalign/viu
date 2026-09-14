@@ -1,0 +1,43 @@
+{
+  "metadata": [
+    {
+      "src": [{ "src": "../../_out/api-reference-work/assemblies", "files": ["*.dll"], "exclude": ["Assimalign.Viu.Syntax.Templates.dll"] }],
+      "references": [],
+      "dest": "../../_out/api-reference-work/metadata/libraries",
+      "filter": "filter.yml",
+      "disableDefaultFilter": true,
+      "disableGitFeatures": true,
+      "noRestore": true,
+      "namespaceLayout": "flattened",
+      "memberLayout": "samePage"
+    },
+    {
+      "src": [{ "src": "../../_out/api-reference-work/assemblies", "files": ["Assimalign.Viu.Syntax.Templates.dll"] }],
+      "references": [],
+      "dest": "../../_out/api-reference-work/metadata/templates",
+      "filter": "filter-templates.yml",
+      "disableDefaultFilter": true,
+      "disableGitFeatures": true,
+      "noRestore": true,
+      "namespaceLayout": "flattened",
+      "memberLayout": "samePage"
+    }
+  ],
+  "build": {
+    "content": [
+      { "src": "../../_out/api-reference-work/content", "files": ["**/*.md", "**/*.yml"], "dest": "." }
+    ],
+    "resource": [
+      { "src": "../../_out/api-reference-work/content", "files": ["**/*"], "exclude": ["**/*.md", "**/*.yml"], "dest": "." }
+    ],
+    "dest": "../../_out/api-reference",
+    "template": ["default", "modern"],
+    "globalMetadata": {
+      "_appTitle": "Viu API reference",
+      "_appName": "Viu",
+      "_disableContribution": true,
+      "_enableSearch": true
+    },
+    "disableGitFeatures": true
+  }
+}
