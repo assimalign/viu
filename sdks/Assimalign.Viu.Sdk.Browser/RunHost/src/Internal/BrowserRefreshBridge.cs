@@ -268,12 +268,14 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
         string? requestedSubProtocol = requestedSubProtocols.Count == 1
             ? requestedSubProtocols[0]
             : null;
+        string? requestOrigin = context.Request.Headers.Origin.FirstOrDefault();
         using CancellationTokenSource requestCancellationSource =
             CancellationTokenSource.CreateLinkedTokenSource(
                 context.RequestAborted,
                 _shutdownCancellationSource.Token);
         ClientWebSocket? upstreamSocket = await ConnectUpstreamAsync(
             requestedSubProtocol,
+            requestOrigin,
             requestCancellationSource.Token);
         if (upstreamSocket is null)
         {
@@ -338,6 +340,7 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
 
     private async Task<ClientWebSocket?> ConnectUpstreamAsync(
         string? requestedSubProtocol,
+        string? requestOrigin,
         CancellationToken cancellationToken)
     {
         foreach (Uri upstreamEndpoint in _upstreamEndpoints)
@@ -346,6 +349,11 @@ internal sealed class BrowserRefreshBridge : IAsyncDisposable
             if (requestedSubProtocol is not null)
             {
                 socket.Options.AddSubProtocol(requestedSubProtocol);
+            }
+
+            if (requestOrigin is not null)
+            {
+                socket.Options.SetRequestHeader("Origin", requestOrigin);
             }
 
             using CancellationTokenSource connectionCancellationSource =

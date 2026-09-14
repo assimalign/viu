@@ -87,6 +87,38 @@ public sealed class BrowserRefreshBridgeTests
     }
 
     [Fact]
+    public async Task Connection_BrowserOrigin_ForwardsExactOriginAndRelaysMessage()
+    {
+        using CancellationTokenSource cancellationSource = new(TestTimeout);
+        const string browserOrigin = "http://127.0.0.1:45123";
+        await using BrowserRefreshServerStub upstream =
+            await BrowserRefreshServerStub.StartAsync(
+                cancellationSource.Token,
+                requiredOrigin: browserOrigin);
+        await using BrowserRefreshBridge bridge = await BrowserRefreshBridge.StartAsync(
+            upstream.Endpoint.AbsoluteUri,
+            cancellationSource.Token);
+        using ClientWebSocket browser = new();
+        browser.Options.SetRequestHeader("Origin", browserOrigin);
+
+        await browser.ConnectAsync(
+            new Uri(bridge.Endpoint),
+            cancellationSource.Token);
+        await using BrowserRefreshServerStubConnection upstreamConnection =
+            await upstream.AcceptConnectionAsync(cancellationSource.Token);
+        await upstreamConnection.SendTextFragmentsAsync(
+            ["{\"type\":\"Probe\"}"],
+            cancellationSource.Token);
+        ReceivedWebSocketMessage browserMessage = await ReceiveMessageAsync(
+            browser,
+            cancellationSource.Token);
+
+        upstreamConnection.RequestedOrigin.ShouldBe(browserOrigin);
+        browserMessage.Text.ShouldBe("{\"type\":\"Probe\"}");
+        browserMessage.MessageType.ShouldBe(WebSocketMessageType.Text);
+    }
+
+    [Fact]
     public async Task BroadcastStaticFileUpdateAsync_TwoBrowsers_SendsExactClientMessageToBoth()
     {
         using CancellationTokenSource cancellationSource = new(TestTimeout);
@@ -420,20 +452,24 @@ public sealed class BrowserRefreshBridgeTests
             Channel.CreateUnbounded<BrowserRefreshServerStubConnection>();
         private readonly WebApplication _application;
         private readonly string _path;
+        private readonly string? _requiredOrigin;
         private long _lastConnectionIdentifier;
 
         private BrowserRefreshServerStub(
             WebApplication application,
-            string path)
+            string path,
+            string? requiredOrigin)
         {
             _application = application;
             _path = path;
+            _requiredOrigin = requiredOrigin;
         }
 
         internal Uri Endpoint { get; private set; } = null!;
 
         internal static async Task<BrowserRefreshServerStub> StartAsync(
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? requiredOrigin = null)
         {
             string path = "/upstream/" + Guid.NewGuid().ToString("N");
             WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
@@ -441,7 +477,7 @@ public sealed class BrowserRefreshBridgeTests
             builder.WebHost.ConfigureKestrel(
                 options => options.Listen(IPAddress.Loopback, 0));
             WebApplication application = builder.Build();
-            BrowserRefreshServerStub server = new(application, path);
+            BrowserRefreshServerStub server = new(application, path, requiredOrigin);
             application.UseWebSockets();
             application.Run(server.HandleRequestAsync);
             await application.StartAsync(cancellationToken);
@@ -494,6 +530,17 @@ public sealed class BrowserRefreshBridgeTests
                 return;
             }
 
+            string? requestedOrigin = context.Request.Headers.Origin.FirstOrDefault();
+            if (_requiredOrigin is not null
+                && !string.Equals(
+                    requestedOrigin,
+                    _requiredOrigin,
+                    StringComparison.Ordinal))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
             IList<string> requestedSubProtocols =
                 context.WebSockets.WebSocketRequestedProtocols;
             string? requestedSubProtocol = requestedSubProtocols.Count == 1
@@ -505,7 +552,8 @@ public sealed class BrowserRefreshBridgeTests
                 ref _lastConnectionIdentifier);
             BrowserRefreshServerStubConnection connection = new(
                 socket,
-                requestedSubProtocol);
+                requestedSubProtocol,
+                requestedOrigin);
             _connections.TryAdd(connectionIdentifier, connection);
             await _acceptedConnections.Writer.WriteAsync(
                 connection,
@@ -534,15 +582,19 @@ public sealed class BrowserRefreshBridgeTests
 
         internal BrowserRefreshServerStubConnection(
             WebSocket socket,
-            string? requestedSubProtocol)
+            string? requestedSubProtocol,
+            string? requestedOrigin)
         {
             _socket = socket;
             RequestedSubProtocol = requestedSubProtocol;
+            RequestedOrigin = requestedOrigin;
         }
 
         internal Task Completion => _completion.Task;
 
         internal string? RequestedSubProtocol { get; }
+
+        internal string? RequestedOrigin { get; }
 
         internal async Task<ReceivedWebSocketMessage> ReceiveMessageAsync(
             CancellationToken cancellationToken) =>

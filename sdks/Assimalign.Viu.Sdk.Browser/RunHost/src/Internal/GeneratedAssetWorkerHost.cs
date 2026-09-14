@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -37,6 +38,7 @@ internal sealed class GeneratedAssetWorkerHost
 
             int processIdentifier = 0;
             long processStartTicks = 0;
+            long processStartClockTicks = 0;
             foreach (string line in File.ReadAllLines(stateFilePath))
             {
                 if (line.StartsWith("worker=", StringComparison.Ordinal))
@@ -55,25 +57,79 @@ internal sealed class GeneratedAssetWorkerHost
                         CultureInfo.InvariantCulture,
                         out processStartTicks);
                 }
+                else if (line.StartsWith("worker-start-clock-ticks=", StringComparison.Ordinal))
+                {
+                    long.TryParse(
+                        line.Substring("worker-start-clock-ticks=".Length),
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out processStartClockTicks);
+                }
             }
 
-            if (processIdentifier <= 0 || processStartTicks <= 0)
+            if (processIdentifier <= 0)
             {
                 return false;
             }
 
             using Process workerProcess = Process.GetProcessById(processIdentifier);
-            return !workerProcess.HasExited
-                && workerProcess.StartTime.ToUniversalTime().Ticks == processStartTicks;
+            if (workerProcess.HasExited)
+            {
+                return false;
+            }
+
+            bool matches;
+            if (OperatingSystem.IsLinux())
+            {
+                // [V01.01.12.05.03], #370: match the watch-list task's kernel identity.
+                // Linux Process.StartTime adds a process-local wall-clock estimate, which would
+                // make RunHost replace an existing watch worker's browser-refresh topology.
+                string status = File.ReadAllText(
+                    "/proc/" + processIdentifier.ToString(CultureInfo.InvariantCulture) + "/stat");
+                matches = processStartClockTicks > 0
+                    && TryParseLinuxStartClockTicks(status, out long currentStartClockTicks)
+                    && currentStartClockTicks == processStartClockTicks;
+            }
+            else
+            {
+                matches = processStartTicks > 0
+                    && workerProcess.StartTime.ToUniversalTime().Ticks == processStartTicks;
+            }
+
+            return matches && !workerProcess.HasExited;
         }
         catch (Exception exception) when (
             exception is ArgumentException or
                 InvalidOperationException or
                 IOException or
-                UnauthorizedAccessException)
+                UnauthorizedAccessException or
+                Win32Exception or
+                NotSupportedException)
         {
             return false;
         }
+    }
+
+    internal static bool TryParseLinuxStartClockTicks(string status, out long startClockTicks)
+    {
+        startClockTicks = 0;
+        int processNameEnd = status.LastIndexOf(')');
+        if (processNameEnd < 0 || processNameEnd + 2 >= status.Length)
+        {
+            return false;
+        }
+
+        // The process name can contain spaces and closing parentheses. Fields following its
+        // final ')' start at field 3; field 22 is the stable process start-clock token.
+        string[] fields = status.Substring(processNameEnd + 2)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return fields.Length > 19
+            && long.TryParse(
+                fields[19],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out startClockTicks)
+            && startClockTicks > 0;
     }
 
     internal static IReadOnlyList<string> ReadManagedStylesheetPaths(
