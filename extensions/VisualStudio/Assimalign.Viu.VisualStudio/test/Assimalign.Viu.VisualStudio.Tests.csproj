@@ -58,6 +58,8 @@
     <Compile Include="..\src\Internal\ViuHoverRun.cs" Link="Internal\ViuHoverRun.cs" />
     <Compile Include="..\src\Internal\ViuSnippetShortcut.cs"
              Link="Internal\ViuSnippetShortcut.cs" />
+    <Compile Include="..\src\Internal\ViuSnippetCatalog.cs"
+             Link="Internal\ViuSnippetCatalog.cs" />
     <Compile Include="..\src\Internal\ViuHoverPresentation.cs"
              Link="Internal\ViuHoverPresentation.cs" />
     <Compile Include="..\src\Internal\ViuClassificationMerge.cs"
@@ -92,5 +94,11 @@
          tests exercise is the repository's authoritative one and not a test fixture. -->
     <Compile Include="$(ViuRepositoryDirectory)libraries\ServerRenderer\Assimalign.Viu.ServerRenderer\src\Internal\DomKnowledgeData.cs"
              Link="Internal\DomKnowledgeData.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Test the shipped inputs under the same relative directory the VSIX packages. -->
+    <Content Include="..\src\Snippets\**\*.snippet"
+             Link="Snippets\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

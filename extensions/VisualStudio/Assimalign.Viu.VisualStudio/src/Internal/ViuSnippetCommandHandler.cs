@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.IO;
 
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Commanding;
@@ -44,9 +45,19 @@ internal sealed class ViuSnippetCommandHandler :
 {
     private static readonly object ClientPropertyKey = new();
 
+    // The assembly sits beside the pkgdef: this is its $PackageFolder$\Snippets search path.
+    // Force the lazy value during handler initialization, once across every handler and text view.
+    private static readonly Lazy<ISet<string>> ShippedShortcuts = new(() => ViuSnippetCatalog.Read(
+        Path.Combine(
+            ViuLanguageServerConfiguration.GetExtensionDirectory(
+                typeof(ViuSnippetCommandHandler).Assembly.Location),
+            "Snippets"),
+        message => ActivityLog.TryLogWarning(nameof(ViuSnippetCatalog), message)));
+
     private readonly IVsEditorAdaptersFactoryService adapterFactory;
     private readonly IAsyncCompletionBroker completionBroker;
     private readonly IServiceProvider serviceProvider;
+    private readonly ISet<string> shortcuts;
 
     /// <summary>Initializes the handler from the editor and shell services Visual Studio supplies.</summary>
     [ImportingConstructor]
@@ -60,6 +71,7 @@ internal sealed class ViuSnippetCommandHandler :
             throw new ArgumentNullException(nameof(completionBroker));
         this.serviceProvider = serviceProvider ??
             throw new ArgumentNullException(nameof(serviceProvider));
+        this.shortcuts = ShippedShortcuts.Value;
     }
 
     /// <inheritdoc />
@@ -109,6 +121,7 @@ internal sealed class ViuSnippetCommandHandler :
             ViuSnapshotLines.Read(point.Snapshot),
             line.LineNumber,
             caretIndex,
+            this.shortcuts,
             out int start);
         return shortcut is not null &&
             client.TryExpand(shortcut, line.LineNumber, start, caretIndex);

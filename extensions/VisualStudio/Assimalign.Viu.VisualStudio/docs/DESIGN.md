@@ -853,6 +853,36 @@ the Source Code (Text) Editor everything still works; if it was the XML editor, 
 a vote. Clearing the override restores the shipped behavior. This is documented as a troubleshooting
 note in [`extensions/VisualStudio/README.md`](../../README.md); it is no longer an installation step.
 
+## Snippet shortcuts
+
+[V01.01.12.29] ([#344](https://github.com/assimalign/viu/issues/344)) expands shipped C# declaration
+snippets through Visual Studio's expansion service. `ViuSnippetCommandHandler` lets an active snippet
+session route Tab between fields and finish with Enter or Escape. Without a session, Tab expands only
+a complete shortcut word immediately before the caret in a `@script` block, and an open completion
+list keeps its Tab command. The editor-free `ViuSnippetShortcut.Find` receives the shortcut set and
+decides whether the document position qualifies; `ViuSnippetExpansionClient` performs the expansion
+and owns the view's session.
+
+The shipped `.snippet` files are the shortcut catalog. At handler initialization, a shared lazy
+catalog reads `Snippets` relative to the extension assembly's own location, matching the pkgdef's
+`$PackageFolder$\Snippets` path. `ViuSnippetCatalog` recursively enumerates `.snippet` files and uses
+`System.Xml` to read each `CodeSnippet/Header/Shortcut` in the Visual Studio code-snippet namespace.
+The set uses ordinal matching, is built once, and performs no file access during key handling.
+Missing or unreadable directories, unreadable files, malformed XML, and missing or empty shortcuts
+produce an empty catalog and an activity-log warning naming the affected directory or file. A failed
+load discards any shortcuts already read, so a partial catalog never changes which keys are captured.
+
+To add a shortcut, drop a valid `.snippet` file beneath [`src/Snippets`](../src/Snippets), with the
+shortcut in its `<Header><Shortcut>` element. Nothing else needs editing: the existing
+`Snippets\**\*.snippet` content glob packages it, the catalog reads it, and the expansion manager
+finds it through the existing `Languages\CodeExpansions\Viu\Paths` registration. The registration
+uses `ViuSnippetExpansionClient.LanguageGuid` solely for expansion lookup; it adds no `File Extensions`
+binding and preserves the file-extension ownership described above.
+
+The reader's injectable file source and the shortcut decision are covered by editor-free unit tests.
+The interactive Tab, Enter, and Escape session still requires validation in Visual Studio; those
+tests cannot exercise its expansion service.
+
 ## Packaging
 
 The shared `ViuPublishLanguageServer` target in `build/Targets/Build.LanguageServer.targets`
@@ -883,6 +913,8 @@ Assimalign.Viu.VisualStudio/
   Assimalign.Viu.VisualStudio.dll
   Assimalign.Viu.VisualStudio.pkgdef
   language-server.json
+  Snippets/
+    prop.snippet
   LanguageServer/
     win-x64/
       Assimalign.Viu.LanguageServer.exe

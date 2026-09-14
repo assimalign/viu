@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.VisualStudio;
 
 /// <summary>
-/// Decides, from document text and a caret position alone, whether a <c>Tab</c> means "expand the
-/// shortcut I just typed".
+/// Decides, from document text, a caret position, and the shipped shortcut set, whether a <c>Tab</c>
+/// means "expand the shortcut I just typed". Specified by <c>[V01.01.12.29]</c> (#344).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,14 +26,6 @@ namespace Assimalign.Viu.VisualStudio;
 /// </remarks>
 internal static class ViuSnippetShortcut
 {
-    // The shipped shortcuts, which is also the list a new .snippet file has to join. Kept ordinal:
-    // a snippet shortcut is matched exactly, as the C# editor matches its own.
-    private static readonly HashSet<string> Shortcuts =
-        new(System.StringComparer.Ordinal) { "prop" };
-
-    /// <summary>Gets the shortcuts this extension ships, in no particular order.</summary>
-    public static IEnumerable<string> All => Shortcuts;
-
     /// <summary>
     /// Returns the shortcut a <c>Tab</c> at this position should expand, or <see langword="null"/>
     /// when the key means what it always means.
@@ -41,12 +33,14 @@ internal static class ViuSnippetShortcut
     /// <param name="lines">The document's lines, without their line breaks.</param>
     /// <param name="lineNumber">Zero-based line the caret is on.</param>
     /// <param name="characterIndex">Zero-based caret offset within that line.</param>
+    /// <param name="shortcuts">The ordinal set read from the shipped snippet catalog.</param>
     /// <param name="start">The zero-based offset the shortcut begins at, when one is returned.</param>
     /// <returns>The shortcut, or <see langword="null"/>.</returns>
     public static string? Find(
         IReadOnlyList<string> lines,
         int lineNumber,
         int characterIndex,
+        ISet<string> shortcuts,
         out int start)
     {
         start = characterIndex;
@@ -81,7 +75,7 @@ internal static class ViuSnippetShortcut
         }
 
         string word = line.Substring(wordStart, characterIndex - wordStart);
-        if (!Shortcuts.Contains(word) ||
+        if (!shortcuts.Contains(word) ||
             ViuSectionScanner.ScanLineSections(lines)[lineNumber] != ViuSectionKind.Script)
         {
             return null;
