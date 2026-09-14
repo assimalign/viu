@@ -25,8 +25,11 @@
     <ViuCssHotReloadDebounceMilliseconds Condition="'$(ViuCssHotReloadDebounceMilliseconds)' == ''">100</ViuCssHotReloadDebounceMilliseconds>
     <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.dll</ViuCssHotReloadTaskAssembly>
     <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
-    <ViuCssHotReloadStateFile Condition="'$(ViuCssHotReloadStateFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'viu', 'css-hot-reload', 'worker.state'))</ViuCssHotReloadStateFile>
-    <ViuGeneratedAssetWorkerConfigurationFile Condition="'$(ViuGeneratedAssetWorkerConfigurationFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'viu', 'css-hot-reload', 'worker.state.configuration'))</ViuGeneratedAssetWorkerConfigurationFile>
+    <!-- [V01.01.12.33.01] Mirrors the packaged Common.props: obj\ is not a Unix separator, so the
+         segment is normalized before composition. -->
+    <_ViuIntermediateOutputRoot>$(BaseIntermediateOutputPath.Replace('\', '/'))</_ViuIntermediateOutputRoot>
+    <ViuCssHotReloadStateFile Condition="'$(ViuCssHotReloadStateFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(_ViuIntermediateOutputRoot)', 'viu', 'css-hot-reload', 'worker.state'))</ViuCssHotReloadStateFile>
+    <ViuGeneratedAssetWorkerConfigurationFile Condition="'$(ViuGeneratedAssetWorkerConfigurationFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(_ViuIntermediateOutputRoot)', 'viu', 'css-hot-reload', 'worker.state.configuration'))</ViuGeneratedAssetWorkerConfigurationFile>
   </PropertyGroup>
 
   <UsingTask TaskName="Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker"
