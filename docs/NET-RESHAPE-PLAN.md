@@ -44,7 +44,7 @@ incomplete unit. Update the State table in the same commit as any unit's progres
 > 3. **R4's "Boundary to preserve (Vue parity)" was not carried out, and is now the opposite of
 >    policy.** Component-tree `Provide`/`Inject` with a typed `InjectionKey<T>` does not exist in the
 >    tree. Viu deliberately has **no hierarchical component-tree dependency API**
->    ([`[CMP-24]`](SPECIFICATION.md#48-no-component-tree-provideinject)): dependencies arrive through
+>    ([`[CMP-24]`](SPECIFICATION.md#48-explicit-component-model-seams)): dependencies arrive through
 >    parameters and slots, the component context's nullable `Services`, or State definitions. The
 >    former context-owned component-factory member is gone. Reversing that needs a superseding
 >    decision, not an edit here.

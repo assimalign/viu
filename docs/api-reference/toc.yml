@@ -2,8 +2,12 @@
   href: index.md
 - name: Getting started
   href: docs/guide/getting-started.md
-- name: Developer examples
-  href: docs/DEVELOPER-EXAMPLES.md
+- name: Guides
+  items:
+{{ViuGuideItems}}
+- name: Libraries
+  items:
+{{ViuLibraryItems}}
 - name: Specification
   href: docs/SPECIFICATION.md
 - name: API reference

@@ -565,6 +565,8 @@ That folder is a static site — host it on any static web host.
 
 ## Where to go next
 
+- **The documentation home** — [overview, guides, libraries, and API reference](../api-reference/index.md)
+  share one versioned navigation tree and local search in the generated site.
 - **The repository map** in the [root `README.md`](../../README.md) — every library, generator, sample,
   and packaging project.
 - **Per-library overviews** — each library documents itself in `docs/OVERVIEW.md` (what it is) and
@@ -587,7 +589,7 @@ That folder is a static site — host it on any static web host.
 The component examples in this guide describe the shipping `[V01.01.15]` surface. Remaining
 documentation work includes:
 
-- **A template-syntax reference and the API reference site** — the Documentation area
+- **A dedicated template-syntax reference** — the Documentation area
   [V01.01.13](https://github.com/assimalign/viu/issues/97).
 
 ---

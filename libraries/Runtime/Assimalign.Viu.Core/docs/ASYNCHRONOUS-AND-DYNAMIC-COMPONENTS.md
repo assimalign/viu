@@ -3,7 +3,7 @@
 Core implements dynamic component selection and asynchronous loading without weakening the
 component-factory boundary. Neither feature performs constructor discovery, reflection,
 service lookup, or component-tree provide/inject. Specified by
-[`docs/SPECIFICATION.md` §7.5](../../../docs/SPECIFICATION.md#75-asynchronous-and-dynamic-components).
+[`docs/SPECIFICATION.md` §7.5](../../../../docs/SPECIFICATION.md#75-asynchronous-and-dynamic-components).
 
 ## Factory identity remains authoritative
 

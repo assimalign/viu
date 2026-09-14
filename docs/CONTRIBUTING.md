@@ -33,7 +33,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 | `PLAN.md` | [`docs/PLAN.md`](PLAN.md) | The delivery narrative: the wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. The GitHub [Project #15](https://github.com/orgs/assimalign/projects/15) board is the authoritative *backlog*. |
 | `DEVELOPER-EXAMPLES.md` | [`docs/DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked package-consumer examples for Components, Reactivity, State, Core, and Browser. |
 | Getting-started guide | [`docs/guide/getting-started.md`](guide/getting-started.md) | The external-consumer walkthrough from manual project creation through browser execution and publish. |
-| Generated API reference | [`docs/api-reference/`](api-reference/) | The docfx configuration and source pages; [`Build-ApiReference.ps1`](../scripts/Build-ApiReference.ps1) emits the versioned site under `_out/api-reference/`. |
+| Documentation site | [Documentation home](api-reference/index.md) · [generator notes](api-reference/README.md) | One navigation tree for the overview, getting started, guides, libraries and SDKs, specification, and API reference; [`Build-ApiReference.ps1`](../scripts/Build-ApiReference.ps1) emits the versioned site under `_out/api-reference/`. |
 | `UTILITY-CSS-DESIGN.md` | [`docs/UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | **Standalone add-on design; non-normative for Viu core.** The former Viu integration and the independently published add-on's Tailwind CSS v4.3.3 target. |
 | `NET-RESHAPE-PLAN.md` | [`docs/NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The dated historical record of the completed .NET reshape and its later supersession notes. |
 | `RELEASING.md` | [`docs/RELEASING.md`](RELEASING.md) | Package and extension release channels, credentials, validation, and publication sequence. |
@@ -124,11 +124,28 @@ The rationale and the trade-offs — why the shape, not the shape itself.
 
 ## Links must resolve
 
-Every relative link in a Markdown doc must point at a real file, and every in-document anchor must
-resolve. An external link is reserved for a genuine standard or for a foreign format Viu consumes,
-and is **version-pinned** so it keeps meaning what it meant when it was written. Verify links before
-committing. The [API-reference workflow](../.github/workflows/api-reference.yml) validates the local
-links in its included pages through docfx; links outside that site's content still need manual review.
+Every relative Markdown link must resolve to a file or repository directory, and every linked
+fragment must exist in its target document. Run the offline gate from the repository root:
+
+```sh
+pwsh scripts/Test-DocumentationLinks.ps1
+```
+
+The gate covers `docs/**/*.md`, the root `README.md`, `libraries/**/docs/*.md`, `sdks/**/*.md`,
+and `extensions/**/README.md`, excluding `bin/`, `obj/`, `node_modules/`, and `_out/`. It checks
+relative links, document anchors, and specification clause citations through the same
+[`ViuApiReference.psm1`](../scripts/modules/ViuApiReference.psm1) mapping used by the site. It stops
+at the first failure with the source file, line, and target, and reports file, link, and anchor
+counts on success. Code examples are not navigation links, but clause citations are validated
+inside examples too. WBS work-item codes and ADR numbers are separate numbering systems.
+
+External links must be absolute `https://` URLs. This check validates their shape only and never
+contacts the network; it cannot confirm an external page's availability or fragments. Link genuine
+standards and foreign formats at version-pinned references, and use repository links for work items
+and the external sample gallery. The [Documentation workflow](../.github/workflows/api-reference.yml)
+runs this gate before generating the site; docfx also validates the staged reader pages.
+Docfx `xref:` destinations are internal API identifiers, not external URLs. The Markdown gate
+checks their syntax; docfx resolves identifiers in the published pages with warnings as errors.
 
 A reference to Viu's own behavior is a `SPECIFICATION.md` clause id written as text — `[SCH-4]`,
 never a URL — so the API-reference generator ([V01.01.13.04]) resolves ids to anchors from one
@@ -136,14 +153,17 @@ mapping and the docs survive the site moving.
 
 ## Build the API reference
 
-The [docfx project](api-reference/) delivers
-[[V01.01.13.04] #101](https://github.com/assimalign/viu/issues/101). Install PowerShell 7 and the
+The [docfx project](api-reference/) delivers the API reference
+([[V01.01.13.04] #101](https://github.com/assimalign/viu/issues/101)) and the in-repository
+documentation site ([[V01.01.13.05] #102](https://github.com/assimalign/viu/issues/102)).
+Install PowerShell 7 and the
 .NET SDK selected by [`global.json`](../global.json). Prepare the solution's dependencies once,
 and repeat restore whenever its dependency graph changes:
 
 ```sh
 dotnet workload install wasm-tools --skip-manifest-update
 dotnet restore Assimalign.Viu.slnx -p:Configuration=Release
+pwsh scripts/Test-DocumentationLinks.ps1
 pwsh scripts/Build-ApiReference.ps1
 ```
 
@@ -176,14 +196,48 @@ generation. Keep work-item codes such as `[V01.01.13.04]` as work-item reference
 specification clauses. Never add an invented clause id or a framework counterpart to satisfy a
 documentation check.
 
-The site includes the [getting-started guide](guide/getting-started.md) and
-[developer examples](DEVELOPER-EXAMPLES.md), and docfx checks their relative links. Each page labels
-the package version evaluated from `ViuVersion` in
-[`Build.Version.props`](../build/Targets/Build.Version.props), supplied through docfx global metadata.
-CI builds on every push to `main` and relevant pull requests, fails on generation errors, and uploads
-the `api-reference` artifact. Pages deployment remains
-[[V01.01.13.05] #102](https://github.com/assimalign/viu/issues/102); the workflow header records the
-intended deployment job and its permissions.
+The documentation home has one navigation tree:
 
-Run `pwsh scripts/tests/Test-ApiReference.ps1` for the preprocessor's offline regression checks.
+- **Overview** — what Viu is, the documented package version and its implemented behavior, and
+  a plain repository link to the external sample gallery.
+- **Getting started** — the [packaged-consumer walkthrough](guide/getting-started.md).
+- **Guides** — [developer examples](DEVELOPER-EXAMPLES.md) and other reader pages under `docs/guide/`.
+- **Libraries** — every library `docs/OVERVIEW.md`, grouped by Runtime, Browser, Router, State,
+  ServerRenderer, DevTools, Syntax, and Utilities, plus SDK documentation including static prerendering.
+- **Specification** — Viu's normative behavior and stable clause anchors.
+- **API reference** — the generated public namespaces, types, and members.
+
+The staging pipeline publishes primary pages and their directly linked reader documentation.
+A library `DESIGN.md` publishes when its overview links it. Further source navigation uses links to
+the exact Git revision, keeping contributor instructions out of the reader tree. Adding an overview
+or guide extends the discovered navigation without a second generator.
+
+Each page labels the package version evaluated from `ViuVersion` in
+[`Build.Version.props`](../build/Targets/Build.Version.props), supplied through docfx global metadata.
+The landing page describes implemented behavior at that version; it is not a claim that a package
+has been published to a registry. Search uses a generated local index and bundled browser assets;
+see [search and static hosting](api-reference/README.md) for the serving requirements.
+CI builds on every push to `main` and relevant pull requests, fails on link or generation errors,
+and uploads the `api-reference` artifact.
+
+Run `pwsh scripts/tests/Test-ApiReference.ps1` and
+`pwsh scripts/tests/Test-DocumentationLinks.ps1` for the offline regression checks.
 The build log and machine-readable generation summary are in `_out/api-reference-work/`.
+
+## Publish the documentation site
+
+Deployment is **off until the repository owner enables it**. In repository Settings, select
+**Pages → Build and deployment → Source: GitHub Actions**, then set the repository Actions variable
+**`VIU_DEPLOY_DOCS=true`** under **Settings → Secrets and variables → Actions → Variables**.
+Both settings are required. A subsequent successful `main` workflow build then deploys its
+`api-reference` artifact through the `github-pages` environment. Pull requests never deploy.
+
+Only the separate `deploy` job receives `pages: write` and `id-token: write`, alongside
+`contents: read`; the build job retains read-only repository permissions. Disabling or removing
+the variable stops future deployment jobs; it does not remove an already published site.
+All workflow actions are pinned by commit with version comments.
+
+[ADR-0006](adr/0006-documentation-site-generator.md) records docfx as the interim generator and
+the remaining #102 dogfooding migration: move the landing page and examples index into the sibling
+`viu-docs` application after it adopts the base SDK's static-prerender target (`[SSG-1]` through
+`[SSG-6]`). This repository change does not modify that application or enable publication.

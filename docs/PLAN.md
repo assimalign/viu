@@ -199,7 +199,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered; the deferred compiler optimization set has explicit implemented-or-dropped outcomes, and the size/startup budget gates are live against measured `EndToEndBrowserApp` baselines | Complete diagnostic source attribution |
 | **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; hosted fingerprint selection and deterministic component-library/application CSS delivery are complete | Close built-in edge cases, generated State/source-map work, and deferred reactive `v-bind()` application for ordinary component styles |
 | **W05** | Host-neutral component-library and Browser SDK/framework segments, validated release packaging/staging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, explicit server-profile selection with reflection-free registration, installable `dotnet new` templates with an optional server host, editor hot-reload metadata, a working package-only `dotnet watch` component-CSS and component-remount path with connected-browser conformance, the ordinary real-browser end-to-end harness, live size/startup budget gates, lazy route factories with Browser scroll restoration, and the opt-in runtime-inspection protocol exist | Finish compatibility/conformance gates and Cohesion hosting integration |
-| **W06** | The versioned API-reference generation pipeline is delivered; semantic `@script` language-server work has begun; the former utility-composition train was parked and superseded by the 2026-08-13 removal | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, and the documentation site |
+| **W06** | The versioned documentation site and API-reference pipeline are delivered in repository, with one navigation tree, offline link validation/search, and owner-enabled Pages deployment; static prerendering is available through the base SDK; semantic `@script` language-server work has begun; the former utility-composition train was parked and superseded by the 2026-08-13 removal | Deliver complete Suspense, custom elements, persistent State extensions, the DevTools timeline/user interface, remaining editor support, and the documentation site's `viu-docs` dogfooding migration |
 
 This snapshot includes the 2026-08-13 area-layout and utility-removal decisions and the 2026-09-14
 scoped-CSS removal. Budget-gate activation and remaining style work are grouped by delivery theme;
@@ -443,7 +443,21 @@ example pages join the reference, and every page carries `ViuVersion`.
 writes `_out/api-reference/`; the [workflow](../.github/workflows/api-reference.yml) uploads the
 `api-reference` artifact on successful main and pull-request builds. Local setup and the task-only
 package exclusion are documented in [CONTRIBUTING.md](CONTRIBUTING.md#build-the-api-reference).
-Pages deployment remains [V01.01.13.05] ([#102](https://github.com/assimalign/viu/issues/102)).
+**In-repository site delivered — [V01.01.13.05] ([#102](https://github.com/assimalign/viu/issues/102)).**
+The same pipeline now presents Overview, Getting started, Guides, Libraries (area-grouped overviews
+and SDK documents), Specification, and API reference. It preserves directly linked reader-page
+publication and `ViuVersion` labels, generates a local browser search index, and gates the build on
+offline Markdown link, anchor, and clause validation. The separate Pages job deploys only successful
+`main` artifacts when the owner sets `VIU_DEPLOY_DOCS=true` and selects the GitHub Actions Pages
+source; publication is disabled until then. See the
+[deployment instructions](CONTRIBUTING.md#publish-the-documentation-site).
+
+The **dogfooding milestone remains tracked by #102**: migrate the landing page and examples index
+to the sibling `viu-docs` application after it adopts the existing base-SDK static-prerender target
+(`[SSG-1]` through `[SSG-6]`, [#68](https://github.com/assimalign/viu/issues/68)).
+[ADR-0006](adr/0006-documentation-site-generator.md) records the interim generator decision and
+the validation that triggers that swap. No sibling application change or Pages setting is part
+of this in-repository delivery.
 
 ## Operating references
 

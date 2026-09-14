@@ -41,9 +41,17 @@ bridge, the template compiler front end, the `.viu`/`.vue` single-file-component
 router's DOM-free route table and matcher, and the state package's `StateStoreDefinition` /
 `StateStoreRegistry` API are all in the tree at varying maturity; each library's `docs/OVERVIEW.md`
 states what it currently provides, and the specification describes implemented behavior only (its
-[§17](docs/SPECIFICATION.md#17-non-goals-and-current-limits) carries the non-goals and the current
+[§18](docs/SPECIFICATION.md#18-non-goals-and-current-limits) carries the non-goals and the current
 limits). The packaged-consumer showcase lives in the separate
 [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) repository.
+
+## Documentation
+
+Start at the [documentation home](docs/api-reference/index.md) for getting started, guides,
+library and SDK documentation, the specification, and the public API reference in one versioned
+navigation tree. [Build the site locally](docs/CONTRIBUTING.md#build-the-api-reference) to browse
+the generated reference and search. Publication is controlled by the repository owner's
+[Pages deployment switch](docs/CONTRIBUTING.md#publish-the-documentation-site).
 
 ## Repository map
 

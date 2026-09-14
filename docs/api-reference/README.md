@@ -1,6 +1,8 @@
-# Building the API reference
+# Building the documentation site
 
-This is the docfx project for [V01.01.13.04](https://github.com/assimalign/viu/issues/101).
+This is Viu's documentation home, extending the API-reference pipeline from
+[V01.01.13.04](https://github.com/assimalign/viu/issues/101) through the in-repository scope of
+[V01.01.13.05](https://github.com/assimalign/viu/issues/102).
 Run `pwsh scripts/Build-ApiReference.ps1` from the repository root after the prerequisite
 solution restore described in [CONTRIBUTING.md](../CONTRIBUTING.md#build-the-api-reference).
 
@@ -42,11 +44,56 @@ and links bracketed clause citations in staged XML to it. Unknown citations and 
 definitions fail generation. WBS ids such as `[V01.01.13.04]` are work items, not clause ids.
 Source XML comments and the normative Markdown remain unchanged.
 
-The site publishes the specification, getting-started guide, developer examples, and their directly
-linked reader documentation with repository-relative paths, so docfx validates local links and
-fragments. Further repository navigation and agent/contributor source files link to the exact Git
-revision after checking that their targets exist locally; they are not recursively published.
+## Navigation and publication
 
-The script evaluates `ViuVersion` through MSBuild and injects it into docfx global metadata for
-the navigation bar and footer. Generation fails on docfx warnings. Pages deployment is a separate
-deliverable, [#102](https://github.com/assimalign/viu/issues/102).
+One table of contents has Overview, Getting started, Guides, Libraries, Specification, and API
+reference. `New-ViuDocumentationNavigation` discovers every Markdown guide under `docs/guide/`,
+every `libraries/<Area>/<Assembly>/docs/OVERVIEW.md`, and the SDK overview plus Markdown reader
+documents under `sdks/<Sdk>/docs/`. Library areas are Runtime, Browser, Router, State,
+ServerRenderer, DevTools, Syntax, and Utilities, followed by SDKs. State keeps its Runtime source
+path and has its own reader-facing group. A new library area fails discovery until deliberately
+placed in navigation.
+
+These pages and their directly linked reader documentation publish with repository-relative paths,
+so docfx validates local links and fragments. A `DESIGN.md` linked from an overview is therefore
+published; further links do not recursively crawl repository documentation. Further repository
+navigation and agent/contributor source files link to the exact Git revision after checking that
+their targets exist locally. The landing-page source retains valid repository-relative links;
+staging relocates that page to the site's root `index.html` and rewrites links accordingly.
+
+The script evaluates `ViuVersion` through MSBuild and injects it into the landing page and docfx
+metadata for the navigation bar and footer. The landing page identifies the implemented behavior
+covered by that version; linked planning material remains distinct from shipped guarantees.
+Generation fails on docfx warnings. The offline repository link gate is
+`pwsh scripts/Test-DocumentationLinks.ps1`; it runs before the site build in the Documentation
+workflow.
+
+## Static search
+
+Docfx generates `index.json` from local rendered pages during `docfx build`. The bundled templates
+ship `public/docfx.min.js`, `public/search-worker.min.js`, and their local JavaScript chunks with the
+artifact; `_enableSearch` enables that client-side search. The page starts the module worker, which
+fetches `../index.json` and builds its in-memory Lunr index. With the checked-in default options,
+no language extension or remote resource is requested. An HTTP ETag allows an optional IndexedDB
+cache; neither is required for search.
+The build fails if the index omits the landing page, getting-started guide, specification, or all
+API pages, and reports the search-entry count in `_out/api-reference-work/summary.json`.
+
+Search needs no hosted search API, database, external index, CDN, or application server. It loads
+the local index and ranks results in the browser. Serve `_out/api-reference/` with an ordinary
+static HTTP file server (including GitHub Pages); the static host only returns files. Opening
+`index.html` directly with a `file://` URL is not supported because browsers restrict local fetches
+and worker loading. This is a browser-origin restriction, not a search-service dependency. Once the
+tool and build prerequisites are restored, generation is offline; once the files are served locally,
+search also works without internet access. Verification for this change executed the emitted worker
+and its bundled dependency against only the local index, with network access absent: searches for
+`StaticSiteGenerator` and `Getting started` returned the API page and guide respectively. This checks
+the actual search engine and local inputs; it does not replace a browser interaction check.
+
+## Publication and planned migration
+
+Deployment stays off until the owner enables GitHub Pages with **GitHub Actions** as its source and
+sets the repository Actions variable **`VIU_DEPLOY_DOCS=true`**. The main-only deployment job consumes
+the successful `api-reference` artifact. See [CONTRIBUTING.md](../CONTRIBUTING.md#publish-the-documentation-site)
+for the switch and [ADR-0006](../adr/0006-documentation-site-generator.md) for the interim generator
+decision and tracked Viu static-prerendering migration in `assimalign/viu-docs`.

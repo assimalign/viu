@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Runs offline regression checks for API-reference clause resolution ([V01.01.13.04]).
+    Runs offline regression checks for clause resolution and site navigation ([V01.01.13.04/05]).
 #>
 [CmdletBinding()]
 param()
@@ -123,6 +123,43 @@ memberLayout: SamePage
     )) {
         Assert-Failure { Merge-ViuApiReferenceTableOfContents -TablesOfContents @($libraryTable, $unexpected) } '*Unexpected DocFX table-of-contents*'
     }
+    # Documentation-home discovery is exercised against a tiny repository so adding a reader page
+    # cannot silently omit it from navigation or require editing a second hard-coded inventory.
+    $navigationRepository = Join-Path $fixtureRoot 'navigation'
+    $navigationDocuments = @(
+        'docs/api-reference/index.md', 'docs/guide/getting-started.md',
+        'docs/DEVELOPER-EXAMPLES.md', 'docs/SPECIFICATION.md', 'sdks/README.md',
+        'docs/guide/nested/new-guide.md', 'docs/guide/obj/ignored.md',
+        'libraries/Runtime/Assimalign.Viu.Components/docs/OVERVIEW.md',
+        'libraries/Runtime/Assimalign.Viu.State/docs/OVERVIEW.md',
+        'libraries/Runtime/Assimalign.Viu.Components/docs/DESIGN.md',
+        'libraries/Runtime/Assimalign.Viu.Components/obj/docs/OVERVIEW.md',
+        'sdks/Assimalign.Viu.Sdk/docs/STATIC-PRERENDER.md',
+        'sdks/Assimalign.Viu.Sdk/obj/docs/ignored.md'
+    )
+    foreach ($relative in $navigationDocuments) {
+        $path = Join-Path $navigationRepository $relative
+        [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($path))
+        [System.IO.File]::WriteAllText($path, "# Reader title: a new page`n")
+    }
+    $navigationTemplate = Join-Path $repository 'docs/api-reference/toc.yml'
+    $navigation = New-ViuDocumentationNavigation -RepositoryDirectory $navigationRepository -TemplatePath $navigationTemplate
+    Assert-Condition (($navigation.Sections -join '|') -ceq 'Overview|Getting started|Guides|Libraries|Specification|API reference') 'Documentation sections retain the requested order.'
+    Assert-Condition ($navigation.PrimaryDocuments -contains 'docs/guide/nested/new-guide.md') 'New nested reader guides enter the primary publication set.'
+    Assert-Condition ($navigation.PrimaryDocuments -contains 'sdks/Assimalign.Viu.Sdk/docs/STATIC-PRERENDER.md') 'SDK reader documents enter the primary publication set.'
+    Assert-Condition ($navigation.LibraryOverviews -eq 2 -and $navigation.SdkDocuments -eq 2) 'Navigation inventory counts only reader overviews and SDK documents.'
+    Assert-Condition (@($navigation.PrimaryDocuments | Where-Object { $_ -match '/obj/|/DESIGN\.md$' }).Count -eq 0) 'Generated folders and unlinked design pages are not primary reader documents.'
+    Assert-Condition ($navigation.TableOfContents.Contains('  - name: State') -and $navigation.TableOfContents.Contains('href: libraries/Runtime/Assimalign.Viu.State/docs/OVERVIEW.md')) 'State is a separate navigation area without moving its source.'
+    Assert-Condition ($navigation.TableOfContents.Contains('name: "Reader title: a new page"')) 'Markdown titles remain valid YAML scalars when they contain punctuation.'
+    Assert-Condition (-not $navigation.TableOfContents.Contains('{{Viu')) 'Generated navigation contains no unresolved placeholders.'
+    $invalidTemplate = Join-Path $fixtureRoot 'invalid-toc.yml'
+    [System.IO.File]::WriteAllText($invalidTemplate, '- name: Missing slots')
+    Assert-Failure { New-ViuDocumentationNavigation -RepositoryDirectory $navigationRepository -TemplatePath $invalidTemplate } '*must contain exactly one*'
+    $unmappedOverview = Join-Path $navigationRepository 'libraries/NewArea/Assimalign.Viu.New/docs/OVERVIEW.md'
+    [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($unmappedOverview))
+    [System.IO.File]::WriteAllText($unmappedOverview, '# New area')
+    Assert-Failure { New-ViuDocumentationNavigation -RepositoryDirectory $navigationRepository -TemplatePath $navigationTemplate } '*Unmapped library documentation area*'
+
     Write-Host "API-reference preprocessing checks passed: $checks."
 } finally {
     # Delete only this invocation's fixture directory after checking its resolved workspace boundary.

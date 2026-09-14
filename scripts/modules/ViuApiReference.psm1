@@ -252,4 +252,97 @@ function Merge-ViuApiReferenceTableOfContents {
     return "### YamlMime:TableOfContent`nitems:`n" + ($itemGroups -join "`n") + "`nmemberLayout: SamePage`n"
 }
 
-Export-ModuleMember -Function New-ViuSpecificationMap, Convert-ViuSpecification, Convert-ViuDocumentationXml, Merge-ViuApiReferenceTableOfContents
+function New-ViuDocumentationNavigation {
+    <#
+    .SYNOPSIS
+        Discovers reader documentation and fills the single documentation navigation tree.
+    .DESCRIPTION
+        Every guide and library OVERVIEW enters the primary publication set. State is presented as
+        its own reader area while retaining its Runtime source path. SDK reader pages are included
+        from sdks/README.md and each SDK's docs folder. Unknown library areas fail explicitly, so a
+        new area cannot silently disappear from the documentation home ([V01.01.13.05]).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $RepositoryDirectory,
+        [Parameter(Mandatory)][string] $TemplatePath
+    )
+
+    $primaryDocuments = [System.Collections.Generic.List[string]]::new()
+    foreach ($path in @('docs/api-reference/index.md', 'docs/guide/getting-started.md',
+        'docs/DEVELOPER-EXAMPLES.md', 'docs/SPECIFICATION.md', 'sdks/README.md')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $RepositoryDirectory $path) -PathType Leaf)) {
+            throw "Missing primary documentation page: $path"
+        }
+        $primaryDocuments.Add($path)
+    }
+    $guideItems = [System.Collections.Generic.List[string]]::new()
+    $guideItems.Add('  - name: Developer examples')
+    $guideItems.Add('    href: docs/DEVELOPER-EXAMPLES.md')
+    foreach ($guide in Get-ChildItem -LiteralPath (Join-Path $RepositoryDirectory 'docs/guide') -Filter '*.md' -Recurse -File | Sort-Object FullName) {
+        $relative = [System.IO.Path]::GetRelativePath($RepositoryDirectory, $guide.FullName).Replace('\', '/')
+        if ($relative -match '/(?:bin|obj|node_modules|_out)/' -or $relative -eq 'docs/guide/getting-started.md') { continue }
+        $title = [regex]::Match([System.IO.File]::ReadAllText($guide.FullName), '(?m)^#\s+(.+?)\s*#*\s*$')
+        if (-not $title.Success) { throw "Reader guide requires a level-one title: $relative" }
+        $guideItems.Add('  - name: ' + (ConvertTo-Json $title.Groups[1].Value -Compress))
+        $guideItems.Add('    href: ' + $relative)
+        $primaryDocuments.Add($relative)
+    }
+
+    $areas = [ordered]@{}
+    foreach ($name in @('Runtime', 'Browser', 'Router', 'State', 'ServerRenderer', 'DevTools', 'Syntax', 'Utilities')) {
+        $areas[$name] = [System.Collections.Generic.List[object]]::new()
+    }
+    $overviewCount = 0
+    foreach ($overview in Get-ChildItem -LiteralPath (Join-Path $RepositoryDirectory 'libraries') -Filter 'OVERVIEW.md' -Recurse -File | Sort-Object FullName) {
+        $relative = [System.IO.Path]::GetRelativePath($RepositoryDirectory, $overview.FullName).Replace('\', '/')
+        if ($relative -notmatch '^libraries/([^/]+)/([^/]+)/docs/OVERVIEW\.md$') { continue }
+        $area = $Matches[1]
+        $assemblyName = $Matches[2]
+        if ($assemblyName -eq 'Assimalign.Viu.State') { $area = 'State' }
+        if (-not $areas.Contains($area)) { throw "Unmapped library documentation area '$area': $relative" }
+        $areas[$area].Add(@{ Name = $assemblyName; Path = $relative })
+        $primaryDocuments.Add($relative)
+        $overviewCount++
+    }
+    $libraryItems = [System.Collections.Generic.List[string]]::new()
+    foreach ($area in $areas.Keys) {
+        if ($areas[$area].Count -eq 0) { continue }
+        $libraryItems.Add('  - name: ' + $area)
+        $libraryItems.Add('    items:')
+        foreach ($entry in $areas[$area]) {
+            $libraryItems.Add('    - name: ' + $entry.Name)
+            $libraryItems.Add('      href: ' + $entry.Path)
+        }
+    }
+    $libraryItems.Add('  - name: SDKs')
+    $libraryItems.Add('    items:')
+    $libraryItems.Add('    - name: SDK overview')
+    $libraryItems.Add('      href: sdks/README.md')
+    $sdkCount = 1
+    foreach ($document in Get-ChildItem -LiteralPath (Join-Path $RepositoryDirectory 'sdks') -Filter '*.md' -Recurse -File | Sort-Object FullName) {
+        $relative = [System.IO.Path]::GetRelativePath($RepositoryDirectory, $document.FullName).Replace('\', '/')
+        if ($relative -match '/(?:bin|obj|node_modules|_out)/' -or $relative -notmatch '^sdks/[^/]+/docs/.+\.md$') { continue }
+        $title = [regex]::Match([System.IO.File]::ReadAllText($document.FullName), '(?m)^#\s+(.+?)\s*#*\s*$')
+        if (-not $title.Success) { throw "SDK reader document requires a level-one title: $relative" }
+        $libraryItems.Add('    - name: ' + (ConvertTo-Json $title.Groups[1].Value -Compress))
+        $libraryItems.Add('      href: ' + $relative)
+        $primaryDocuments.Add($relative)
+        $sdkCount++
+    }
+    $template = [System.IO.File]::ReadAllText($TemplatePath)
+    foreach ($placeholder in @('{{ViuGuideItems}}', '{{ViuLibraryItems}}')) {
+        if ([regex]::Matches($template, [regex]::Escape($placeholder)).Count -ne 1) {
+            throw "The documentation navigation template must contain exactly one $placeholder."
+        }
+    }
+    [pscustomobject]@{
+        TableOfContents = $template.Replace('{{ViuGuideItems}}', ($guideItems -join "`n")).Replace('{{ViuLibraryItems}}', ($libraryItems -join "`n"))
+        PrimaryDocuments = $primaryDocuments.ToArray()
+        Sections = @('Overview', 'Getting started', 'Guides', 'Libraries', 'Specification', 'API reference')
+        LibraryOverviews = $overviewCount
+        SdkDocuments = $sdkCount
+    }
+}
+
+Export-ModuleMember -Function New-ViuSpecificationMap, Convert-ViuSpecification, Convert-ViuDocumentationXml, Merge-ViuApiReferenceTableOfContents, New-ViuDocumentationNavigation

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds the versioned Viu API reference ([V01.01.13.04], #101).
+    Builds Viu's versioned documentation home ([V01.01.13.04], #101; [V01.01.13.05], #102).
 .DESCRIPTION
     Requires an installed .NET SDK/workload and a prior Release solution restore. Only local-tool
     restore may access the network; compilation and docfx generation use restored local inputs.
@@ -148,15 +148,15 @@ try {
         if (-not $canonicalReferences.Contains($name)) { $canonicalReferences[$name] = $reference }
     }
 
-    # Publish the guide/specification and their directly linked reader documentation. Further
+    # Publish the landing page, guides, library overviews, SDK documents, specification, and their
+    # directly linked reader documentation. Further
     # repository navigation remains commit-pinned source links, not a crawl of contributor/agent
     # instructions. Preserve repository-relative paths for docfx's local link/fragment validation.
     $articles = New-Item -ItemType Directory -Path (Join-Path $working 'content')
-    foreach ($entry in @('index.md', 'toc.yml')) {
-        Copy-Item -LiteralPath (Join-Path $projectDirectory $entry) -Destination $articles.FullName
-    }
+    $navigation = New-ViuDocumentationNavigation -RepositoryDirectory $repository -TemplatePath (Join-Path $projectDirectory 'toc.yml')
+    [System.IO.File]::WriteAllText((Join-Path $articles.FullName 'toc.yml'), $navigation.TableOfContents)
     $queue = [System.Collections.Generic.Queue[string]]::new()
-    $primary = @('docs/SPECIFICATION.md', 'docs/guide/getting-started.md', 'docs/DEVELOPER-EXAMPLES.md')
+    $primary = $navigation.PrimaryDocuments
     $published = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $primary | ForEach-Object { $queue.Enqueue($_); [void]$published.Add($_) }
     $visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -164,7 +164,8 @@ try {
         $relative = $queue.Dequeue()
         if (-not $visited.Add($relative)) { continue }
         $source = Join-Path $repository $relative
-        $destination = Join-Path $articles.FullName $relative
+        $stagedRelative = if ($relative -eq 'docs/api-reference/index.md') { 'index.md' } else { $relative }
+        $destination = Join-Path $articles.FullName $stagedRelative
         New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
         if ([System.IO.Path]::GetExtension($source) -ne '.md') {
             Copy-Item -LiteralPath $source -Destination $destination
@@ -172,15 +173,24 @@ try {
         }
         $markdown = [System.IO.File]::ReadAllText($source)
         # Ignore fenced code when discovering Markdown links (examples are not navigation).
-        $fence = $null
+        $fenceCharacter = ''
+        $fenceLength = 0
         $lines = foreach ($line in $markdown -split '\r?\n') {
-            if ($line -match '^\s*(`{3,}|~{3,})') {
-                if ($null -eq $fence) { $fence = $Matches[1][0] }
-                elseif ($fence -eq $Matches[1][0]) { $fence = $null }
+            $fenceMatch = [regex]::Match($line, '^ {0,3}(?<marker>`{3,}|~{3,})(?<suffix>.*)$')
+            if ($fenceLength -gt 0) {
+                if ($fenceMatch.Success -and $fenceMatch.Groups['marker'].Value[0].ToString() -eq $fenceCharacter -and
+                    $fenceMatch.Groups['marker'].Length -ge $fenceLength -and [string]::IsNullOrWhiteSpace($fenceMatch.Groups['suffix'].Value)) {
+                    $fenceLength = 0
+                }
                 $line
                 continue
             }
-            if ($null -ne $fence) { $line; continue }
+            if ($fenceMatch.Success) {
+                $fenceCharacter = $fenceMatch.Groups['marker'].Value[0].ToString()
+                $fenceLength = $fenceMatch.Groups['marker'].Length
+                $line
+                continue
+            }
             [regex]::Replace($line, '(?<=\]\()(?<path>[^\s)#]+)(?<fragment>#[^\s)]*)?(?=\))', {
                 param($match)
                 $link = $match.Groups['path'].Value
@@ -204,19 +214,21 @@ try {
                 if (($relative -in $primary -and -not $targetRelative.StartsWith('.') -and $targetRelative -ne 'README.md') -or $published.Contains($targetRelative)) {
                     [void]$published.Add($targetRelative)
                     $queue.Enqueue($targetRelative)
-                    return $link + $match.Groups['fragment'].Value
+                    $targetStagedRelative = if ($targetRelative -eq 'docs/api-reference/index.md') { 'index.md' } else { $targetRelative }
+                    return [System.IO.Path]::GetRelativePath((Split-Path $destination), (Join-Path $articles.FullName $targetStagedRelative)).Replace('\', '/') + $match.Groups['fragment'].Value
                 }
                 return 'https://github.com/assimalign/viu/blob/' + $revision + '/' + $targetRelative + $match.Groups['fragment'].Value
             })
         }
         $markdown = $lines -join "`n"
+        if ($relative -eq 'docs/api-reference/index.md') { $markdown = $markdown.Replace('{{ViuVersion}}', $version) }
         if ($relative -eq 'docs/SPECIFICATION.md') { $markdown = Convert-ViuSpecification -Text $markdown -ClauseMap $clauses }
         [System.IO.File]::WriteAllText($destination, $markdown)
     }
 
     $configuration = Get-Content (Join-Path $projectDirectory 'docfx.json') -Raw | ConvertFrom-Json -AsHashtable
     $configuration.build.globalMetadata._appName = "Viu $version"
-    $configuration.build.globalMetadata._appTitle = "Viu $version API reference"
+    $configuration.build.globalMetadata._appTitle = "Viu $version documentation"
     $configuration.build.globalMetadata._appFooter = "Viu package version $version"
     $configuration.build.globalMetadata.ViuVersion = $version
     # Paths in the checked-in config are relative to docs/api-reference. Keep that base when writing
@@ -266,7 +278,14 @@ try {
         return $true
     })
     if ($pages.Count -eq 0) { throw 'Docfx produced no HTML pages.' }
-    $summary = [ordered]@{ docfxVersion = $toolVersion; sdkVersion = $sdkVersion; runtimeVersion = $runtimes[0].Version.ToString(); packageVersion = $version; warnings = 0; pages = $pages.Count; assemblies = $projects.Count; clauses = $clauses.Count; citations = $citationCount; output = $site }
+    # Search is generated from these local pages and ships in the artifact; no search service is
+    # configured. Require the offline index to cover both narrative and API documentation.
+    $searchIndex = Get-Content -LiteralPath (Join-Path $site 'index.json') -Raw | ConvertFrom-Json -AsHashtable
+    foreach ($requiredPage in @('index.html', 'docs/guide/getting-started.html', 'docs/SPECIFICATION.html')) {
+        if (-not $searchIndex.Contains($requiredPage)) { throw "Search index is missing $requiredPage." }
+    }
+    if (@($searchIndex.Keys | Where-Object { $_.StartsWith('api/') }).Count -eq 0) { throw 'Search index contains no API documentation.' }
+    $summary = [ordered]@{ docfxVersion = $toolVersion; sdkVersion = $sdkVersion; runtimeVersion = $runtimes[0].Version.ToString(); packageVersion = $version; warnings = 0; pages = $pages.Count; assemblies = $projects.Count; clauses = $clauses.Count; citations = $citationCount; navigationSections = $navigation.Sections; libraryOverviews = $navigation.LibraryOverviews; sdkDocuments = $navigation.SdkDocuments; searchEntries = $searchIndex.Count; output = $site }
     $summary | ConvertTo-Json | Set-Content (Join-Path $working 'summary.json')
     Write-Host ($summary | ConvertTo-Json)
 }

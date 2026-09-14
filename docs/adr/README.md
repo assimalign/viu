@@ -51,6 +51,7 @@ ADRs keep their own numbering within their library folder.
 | [0003](0003-batched-interop-dom-operations.md) | Batched JS-interop DOM operations as the performance budget | Accepted (framing annotated 2026-08-02) |
 | [0004](0004-composition-only-component-model.md) | Composition-only component model (no Options API, mixins, or global properties) | Accepted (framing annotated 2026-08-02; **stated replacement mechanism outdated — needs a superseding ADR**) |
 | [0005](0005-no-runtime-template-compilation.md) | No runtime template compilation (build-time source generators only) | Accepted (container framing partially superseded 2026-08-02; framework framing annotated) |
+| [0006](0006-documentation-site-generator.md) | Pinned docfx documentation site pending tracked Viu static-prerender dogfooding | Accepted |
 
 See also [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for how ADRs fit into the wider documentation
 convention.

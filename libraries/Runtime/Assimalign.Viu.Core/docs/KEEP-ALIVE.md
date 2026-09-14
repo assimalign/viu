@@ -78,5 +78,5 @@ subtree. The cache and its detached storage container are private to the host-ne
 do not appear in the application component tree.
 
 The behavior is specified by
-[`docs/SPECIFICATION.md` §7.2](../../../docs/SPECIFICATION.md#72-keepalive), and is implemented
+[`docs/SPECIFICATION.md` §7.2](../../../../docs/SPECIFICATION.md#72-keepalive), and is implemented
 within Viu's explicit, AOT-safe component activation boundary.

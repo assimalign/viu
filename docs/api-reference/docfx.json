@@ -33,7 +33,7 @@
     "dest": "../../_out/api-reference",
     "template": ["default", "modern"],
     "globalMetadata": {
-      "_appTitle": "Viu API reference",
+      "_appTitle": "Viu documentation",
       "_appName": "Viu",
       "_disableContribution": true,
       "_enableSearch": true
