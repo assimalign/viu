@@ -28,3 +28,32 @@ Assimalign.Viu.Reactivity.WatchFlushMode.Synchronous = 0 -> Assimalign.Viu.React
 static Assimalign.Viu.Reactivity.Reactive.Batch() -> System.IDisposable!
 static Assimalign.Viu.Reactivity.Reactive.EnterExecutionFlow() -> System.IDisposable!
 static Assimalign.Viu.Reactivity.Reactive.IsReadOnly(object? value) -> bool
+Assimalign.Viu.Reactivity.Dependency.Track(object? owner, string? memberName) -> void
+Assimalign.Viu.Reactivity.Dependency.Trigger(object? owner, string? memberName) -> void
+Assimalign.Viu.Reactivity.IReactivityInspectionHook
+Assimalign.Viu.Reactivity.IReactivityInspectionHook.DependencyTracked(in Assimalign.Viu.Reactivity.ReactivityInspectionDependency dependency) -> void
+Assimalign.Viu.Reactivity.IReactivityInspectionHook.DependencyTriggered(in Assimalign.Viu.Reactivity.ReactivityInspectionDependency dependency) -> void
+Assimalign.Viu.Reactivity.IReactivityInspectionHook.EffectRunCompleted(in Assimalign.Viu.Reactivity.ReactivityInspectionEffect effect) -> void
+Assimalign.Viu.Reactivity.IReactivityInspectionHook.EffectRunStarted(in Assimalign.Viu.Reactivity.ReactivityInspectionEffect effect) -> void
+Assimalign.Viu.Reactivity.IReactivityInspectionHook.EffectScheduled(in Assimalign.Viu.Reactivity.ReactivityInspectionEffect effect) -> void
+Assimalign.Viu.Reactivity.ReactiveValue.DebugLabel.get -> string?
+Assimalign.Viu.Reactivity.ReactivityInspection
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.DebugLabel.get -> string?
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.Dependency.get -> Assimalign.Viu.Reactivity.Dependency!
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.IsWrite.get -> bool
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.MemberKey.get -> object?
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.Owner.get -> object?
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.ReactivityInspectionDependency() -> void
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.Subscriber.get -> Assimalign.Viu.Reactivity.Subscriber?
+Assimalign.Viu.Reactivity.ReactivityInspectionDependency.Version.get -> int
+Assimalign.Viu.Reactivity.ReactivityInspectionEffect
+Assimalign.Viu.Reactivity.ReactivityInspectionEffect.Cause.get -> Assimalign.Viu.Reactivity.Dependency?
+Assimalign.Viu.Reactivity.ReactivityInspectionEffect.Effect.get -> Assimalign.Viu.Reactivity.ReactiveEffect!
+Assimalign.Viu.Reactivity.ReactivityInspectionEffect.ReactivityInspectionEffect() -> void
+Assimalign.Viu.Reactivity.ReactivityInspectionEffect.Succeeded.get -> bool
+const Assimalign.Viu.Reactivity.ReactivityInspection.FeatureSwitchName = "Assimalign.Viu.RuntimeInspection.IsSupported" -> string!
+static Assimalign.Viu.Reactivity.Reactive.WithDebugLabel<T>(T! reference, string! debugLabel) -> T!
+static Assimalign.Viu.Reactivity.ReactivityInspection.IsEnabled.get -> bool
+static Assimalign.Viu.Reactivity.ReactivityInspection.IsSupported.get -> bool
+static Assimalign.Viu.Reactivity.ReactivityInspection.Use(Assimalign.Viu.Reactivity.IReactivityInspectionHook! hook) -> System.IDisposable!

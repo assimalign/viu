@@ -32,7 +32,7 @@ internal static class TargetTracking
     {
         if (ReactivityState.ActiveSubscriber is not null && ReactivityState.ShouldTrack)
         {
-            GetDependency(target, key).Track();
+            GetDependency(target, key).TrackLink(target, key);
         }
     }
 
@@ -48,7 +48,7 @@ internal static class TargetTracking
         }
         if (map.TryGetValue(key, out var dependency))
         {
-            dependency.Trigger();
+            dependency.TriggerWithAttribution(target, key);
         }
         // Tracked target, untracked key: nothing observes it, so no version bump.
     }

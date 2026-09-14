@@ -5,8 +5,8 @@ namespace Assimalign.Viu.Reactivity;
 /// <summary>
 /// A single reactive dependency cell — the node every reactive value owns. Maintains a version
 /// counter and an intrusive doubly-linked list of subscriber <see cref="SubscriberLink"/>s.
-/// <see cref="Track"/> links the ambient active subscriber (deduplicating via link versions);
-/// <see cref="Trigger"/> bumps this dependency's version plus the global version and notifies
+/// <see cref="Track()"/> links the ambient active subscriber (deduplicating via link versions);
+/// <see cref="Trigger()"/> bumps this dependency's version plus the global version and notifies
 /// subscribers. Not thread-safe: designed for the single-threaded JS event-loop model. Specified
 /// by <c>[RCT-9]</c>.
 /// </summary>
@@ -43,13 +43,27 @@ public sealed class Dependency
     /// </summary>
     public void Track() => TrackLink();
 
-    /// <summary>Core of <see cref="Track"/>; returns the (new or reused) link for computed reads.</summary>
-    internal SubscriberLink? TrackLink()
+    /// <summary>
+    /// Tracks a read with reflection-free owner and generated property attribution. The owner is
+    /// borrowed only when inspection is enabled and is never retained strongly by the seam.
+    /// Specified by <c>[DVT-9]</c> and <c>[RCT-13]</c>.
+    /// </summary>
+    /// <param name="owner">The owner, or null for an anonymous cell.</param>
+    /// <param name="memberName">The generated property name, or null for a reference cell.</param>
+    public void Track(object? owner, string? memberName) => TrackLink(owner, memberName);
+
+    /// <summary>Core of <see cref="Track()"/>; returns the (new or reused) link for computed reads.</summary>
+    internal SubscriberLink? TrackLink(object? owner = null, object? memberKey = null)
     {
         var subscriber = ReactivityState.ActiveSubscriber;
         if (subscriber is null || !ReactivityState.ShouldTrack || ReferenceEquals(subscriber, Computed))
         {
             return null;
+        }
+        if (ReactivityInspection.IsEnabled)
+        {
+            ReactivityInspection.NotifyDependency(this, subscriber, owner, memberKey,
+                triggered: false, isWrite: false);
         }
         var link = ActiveLink;
         if (link is null || !ReferenceEquals(link.Subscriber, subscriber))
@@ -99,21 +113,42 @@ public sealed class Dependency
     /// Signals that the tracked value changed: bumps this dependency's version and the global
     /// version, then notifies all subscribers (batched — nested triggers coalesce).
     /// </summary>
-    public void Trigger()
+    public void Trigger() => TriggerWithAttribution(null, null);
+
+    /// <summary>
+    /// Triggers this dependency with reflection-free owner and generated property attribution.
+    /// The disabled path does not create metadata or retain the owner. Specified by
+    /// <c>[DVT-9]</c> and <c>[DVT-12]</c>.
+    /// </summary>
+    /// <param name="owner">The owner, or null to reuse weak attribution from a prior read.</param>
+    /// <param name="memberName">The generated property name, or null for a reference cell.</param>
+    public void Trigger(object? owner, string? memberName) => TriggerWithAttribution(owner, memberName);
+
+    /// <summary>Preserves an already-boxed target-map key without performing key formatting.</summary>
+    internal void TriggerWithAttribution(object? owner, object? memberKey)
     {
         Version++;
         ReactivityState.GlobalVersion++;
-        Notify();
+        Notify(owner, memberKey, isWrite: true);
     }
 
     /// <summary>Notifies subscribers without bumping versions (used by computed propagation).</summary>
-    internal void Notify()
+    internal void Notify(object? owner = null, object? memberKey = null, bool isWrite = false)
     {
+        if (ReactivityInspection.IsEnabled)
+        {
+            ReactivityInspection.NotifyDependency(this, ReactivityState.ActiveSubscriber,
+                owner, memberKey, triggered: true, isWrite);
+        }
         ReactivityState.StartBatch();
         try
         {
             for (var link = Subscribers; link is not null; link = link.PreviousSubscriber)
             {
+                if (ReactivityInspection.IsEnabled)
+                {
+                    ReactivityInspection.NotifyScheduled(this, link.Subscriber);
+                }
                 if (link.Subscriber.Notify())
                 {
                     // A computed became dirty: propagate to the computed's own readers.

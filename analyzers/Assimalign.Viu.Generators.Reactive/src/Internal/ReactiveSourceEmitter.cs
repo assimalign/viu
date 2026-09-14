@@ -105,7 +105,8 @@ internal static class ReactiveSourceEmitter
             AppendIndent(builder, indent + 1);
             builder.Append("{\n");
             AppendIndent(builder, indent + 2);
-            builder.Append("this.").Append(property.DependencyFieldName).Append(".Track();\n");
+            builder.Append("this.").Append(property.DependencyFieldName).Append(".Track(this, \"")
+                .Append(property.Name).Append("\");\n");
             AppendIndent(builder, indent + 2);
             builder.Append("return this.").Append(property.ValueFieldName).Append(";\n");
             AppendIndent(builder, indent + 1);
@@ -131,7 +132,8 @@ internal static class ReactiveSourceEmitter
                 AppendIndent(builder, indent + 3);
                 builder.Append("this.").Append(property.ValueFieldName).Append(" = value;\n");
                 AppendIndent(builder, indent + 3);
-                builder.Append("this.").Append(property.DependencyFieldName).Append(".Trigger();\n");
+                builder.Append("this.").Append(property.DependencyFieldName).Append(".Trigger(this, \"")
+                    .Append(property.Name).Append("\");\n");
                 AppendIndent(builder, indent + 2);
                 builder.Append("}\n");
             }

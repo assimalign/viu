@@ -20,6 +20,7 @@ namespace Assimalign.Viu;
 public static class Scheduler
 {
     private const int RecursionLimit = 100;
+    private static long _nextInspectionFlushIdentifier;
 
     private static SchedulerExecutionState State => CoreExecutionIsolation.Current.Scheduler;
 
@@ -154,6 +155,7 @@ public static class Scheduler
             _isFlushing = false;
             _isFlushPending = false;
             _nextInsertionSequence = 0;
+            ResetInspectionFlush(state);
             ResetExecutionCounters();
             _flushCompletion?.TrySetResult();
             _flushCompletion = null;
@@ -250,6 +252,12 @@ public static class Scheduler
 
                 try
                 {
+                    if (RuntimeInspection.IsEnabled)
+                    {
+                        BeginInspectionFlush(state);
+                        state.InspectionPreFlushCount++;
+                    }
+
                     job.Invoke();
                 }
                 finally
@@ -302,6 +310,12 @@ public static class Scheduler
                         if (callback.AllowRecurse)
                         {
                             callback.Flags &= ~SchedulerJobFlags.Queued;
+                        }
+
+                        if (RuntimeInspection.IsEnabled)
+                        {
+                            BeginInspectionFlush(state);
+                            state.InspectionPostFlushCount++;
                         }
 
                         callback.Invoke();
@@ -367,6 +381,11 @@ public static class Scheduler
                 return;
             }
 
+            if (RuntimeInspection.IsEnabled)
+            {
+                BeginInspectionFlush(state);
+            }
+
             try
             {
                 FlushPreFlushCallbacks();
@@ -374,7 +393,7 @@ public static class Scheduler
                 FlushPostFlushCallbacks();
                 FlushHostCommits();
 
-                if (_isFlushPending && _queue.Count == 0 && _pendingPostFlushCallbacks.Count == 0)
+                if (_queue.Count == 0 && _pendingPostFlushCallbacks.Count == 0)
                 {
                     _isFlushPending = false;
                     CompleteFlushChain();
@@ -383,7 +402,7 @@ public static class Scheduler
             catch
             {
                 AbandonFlush();
-                CompleteFlushChain();
+                CompleteFlushChain(faulted: true);
                 throw;
             }
         }
@@ -463,6 +482,11 @@ public static class Scheduler
 
             _isFlushPending = false;
             _isFlushing = true;
+            if (RuntimeInspection.IsEnabled)
+            {
+                BeginInspectionFlush(state);
+            }
+
             try
             {
                 do
@@ -480,6 +504,18 @@ public static class Scheduler
                         if (job.AllowRecurse)
                         {
                             job.Flags &= ~SchedulerJobFlags.Queued;
+                        }
+
+                        if (RuntimeInspection.IsEnabled)
+                        {
+                            if (job.IsPreFlush)
+                            {
+                                state.InspectionPreFlushCount++;
+                            }
+                            else
+                            {
+                                state.InspectionRenderCount++;
+                            }
                         }
 
                         job.Invoke();
@@ -501,7 +537,7 @@ public static class Scheduler
             {
                 AbandonFlush();
                 _isFlushing = false;
-                CompleteFlushChain();
+                CompleteFlushChain(faulted: true);
                 throw;
             }
         }
@@ -532,12 +568,64 @@ public static class Scheduler
         }
     }
 
-    private static void CompleteFlushChain()
+    private static void CompleteFlushChain(bool faulted = false)
     {
         ResetExecutionCounters();
         TaskCompletionSource? completion = _flushCompletion;
         _flushCompletion = null;
+        if (RuntimeInspection.IsEnabled)
+        {
+            SchedulerExecutionState state = State;
+            if (state.InspectionFlushStarted)
+            {
+                var flush = new RuntimeInspectionFlush(
+                    state.InspectionFlushIdentifier,
+                    state.InspectionPreFlushCount,
+                    state.InspectionRenderCount,
+                    state.InspectionPostFlushCount,
+                    faulted);
+                RuntimeInspection.NotifyFlushCompleted(in flush);
+            }
+
+            ResetInspectionFlush(state);
+        }
+
         completion?.TrySetResult();
+    }
+
+    internal static long GetInspectionFlushIdentifier()
+    {
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
+        {
+            if (state.InspectionFlushIdentifier == 0)
+            {
+                state.InspectionFlushIdentifier = Interlocked.Increment(ref _nextInspectionFlushIdentifier);
+            }
+
+            return state.InspectionFlushIdentifier;
+        }
+    }
+
+    private static void BeginInspectionFlush(SchedulerExecutionState state)
+    {
+        if (state.InspectionFlushStarted)
+        {
+            return;
+        }
+
+        state.InspectionFlushStarted = true;
+        var flush = new RuntimeInspectionFlush(GetInspectionFlushIdentifier(), 0, 0, 0, false);
+        RuntimeInspection.NotifyFlushStarted(in flush);
+    }
+
+    private static void ResetInspectionFlush(SchedulerExecutionState state)
+    {
+        state.InspectionFlushIdentifier = 0;
+        state.InspectionFlushStarted = false;
+        state.InspectionPreFlushCount = 0;
+        state.InspectionRenderCount = 0;
+        state.InspectionPostFlushCount = 0;
     }
 
     private static void FlushHostCommits()

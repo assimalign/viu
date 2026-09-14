@@ -73,7 +73,7 @@ public sealed class Computed<T> : ReactiveValue<T>
     {
         get
         {
-            var link = _dependency.TrackLink();
+            var link = _dependency.TrackLink(this);
             _subscriber.Refresh();
             if (link is not null)
             {
@@ -177,7 +177,7 @@ public sealed class Computed<T> : ReactiveValue<T>
         /// <see cref="Dependency"/> they subscribe through (invoked by the caller only when
         /// <see cref="Notify"/> returned <see langword="true"/>).
         /// </summary>
-        internal override void NotifyReaders() => _owner.Dependency.Notify();
+        internal override void NotifyReaders() => _owner.Dependency.Notify(_owner);
 
         /// <summary>
         /// Called when a source dependency triggers: marks the computed dirty and, when it is being

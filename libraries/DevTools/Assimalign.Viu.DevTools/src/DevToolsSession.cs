@@ -18,10 +18,12 @@ namespace Assimalign.Viu.DevTools;
 /// messages use a separate queue; a session-wide sequence preserves their shared enqueue order at
 /// drain time. One scheduler callback drains both queues after rendering and one asynchronous send
 /// carries the whole batch, so transport work never blocks or re-enters the renderer. The session
-/// is single-threaded by design. Specified by <c>[DVT-1]</c> through <c>[DVT-7]</c>.
+/// observes one application event loop. Queue access is serialized with asynchronous transport
+/// continuations. Specified by <c>[DVT-1]</c> through <c>[DVT-12]</c>.
 /// </remarks>
-public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
+public sealed partial class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
 {
+    private readonly object _messagesSynchronization = new();
     private readonly IDevToolsTransport _transport;
     private readonly DevToolsSessionOptions _options;
     private readonly BoundedMessageBuffer _telemetryBuffer;
@@ -39,6 +41,7 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
     private long _nextMessageSequence;
     private int? _negotiatedVersion;
     private bool _flushQueued;
+    private bool _sendInProgress;
     private bool _started;
     private bool _disposed;
 
@@ -53,6 +56,11 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
         _transport = transport;
         _options = options ?? new DevToolsSessionOptions();
         _telemetryBuffer = new BoundedMessageBuffer(_options.BufferCapacity);
+        _timeline = new TimelineRecorder(_options);
+        foreach (DevToolsTimelineLayer layer in CreateBuiltInTimelineLayers())
+        {
+            _timelineLayers.Add(layer.Identifier, layer);
+        }
         _valueEncoder = new SnapshotValueEncoder(_options.MaximumCollectionEntries);
         _flushJob = new SchedulerJob(Flush)
         {
@@ -75,18 +83,22 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
         }
 
         IDisposable hookRegistration = RuntimeInspection.Use(this);
+        IDisposable? reactivityRegistration = null;
         try
         {
+            reactivityRegistration = ReactivityInspection.Use(this);
             await _transport.StartAsync(ProcessIncomingAsync, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch
         {
+            reactivityRegistration?.Dispose();
             hookRegistration.Dispose();
             throw;
         }
 
         _runtimeHookRegistration = hookRegistration;
+        _reactivityHookRegistration = reactivityRegistration;
         _started = true;
     }
 
@@ -115,7 +127,7 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
     }
 
     /// <summary>
-    /// Registers custom timeline-layer metadata without enabling timeline event recording.
+    /// Registers custom timeline-layer metadata alongside the built-in captured layers.
     /// </summary>
     /// <param name="layer">The stable layer identity and presentation metadata.</param>
     /// <returns>A lease that unregisters this exact layer.</returns>
@@ -151,8 +163,15 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
         _sessionCancellation.Cancel();
         _runtimeHookRegistration?.Dispose();
         _runtimeHookRegistration = null;
-        _controlMessages.Clear();
-        _telemetryBuffer.Clear();
+        _reactivityHookRegistration?.Dispose();
+        _reactivityHookRegistration = null;
+        lock (_messagesSynchronization)
+        {
+            _controlMessages.Clear();
+            _telemetryBuffer.Clear();
+            _timeline.Clear();
+            _activeEffects.Clear();
+        }
         try
         {
             await _activeSend.ConfigureAwait(false);
@@ -178,6 +197,7 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
             "component.mounted",
             payload,
             DevToolsJsonSerializerContext.Default.ComponentChangePayload);
+        RecordComponent("component.mounted", payload.Identifier, payload.Name);
     }
 
     void IRuntimeInspectionHook.ComponentUpdated(
@@ -193,6 +213,7 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
             "component.updated",
             payload,
             DevToolsJsonSerializerContext.Default.ComponentChangePayload);
+        RecordComponent("component.updated", payload.Identifier, payload.Name);
     }
 
     void IRuntimeInspectionHook.ComponentUnmounted(object instance)
@@ -204,6 +225,7 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
                 "component.unmounted",
                 new ComponentIdentifierPayload(identifier.Value),
                 DevToolsJsonSerializerContext.Default.ComponentIdentifierPayload);
+            RecordComponent("component.unmounted", identifier.Value, "component unmounted");
         }
     }
 
@@ -254,14 +276,17 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
         TPayload payload,
         JsonTypeInfo<TPayload> typeInformation)
     {
-        if (_disposed || !_negotiatedVersion.HasValue)
+        lock (_messagesSynchronization)
         {
-            return;
-        }
+            if (_disposed || !_negotiatedVersion.HasValue)
+            {
+                return;
+            }
 
-        _telemetryBuffer.Enqueue(new SequencedProtocolEnvelope(
-            _nextMessageSequence++,
-            ProtocolCodec.CreateEnvelope(type, payload, typeInformation)));
+            _telemetryBuffer.Enqueue(new SequencedProtocolEnvelope(
+                _nextMessageSequence++,
+                ProtocolCodec.CreateEnvelope(type, payload, typeInformation)));
+        }
         QueueFlush();
     }
 
@@ -271,50 +296,72 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
         JsonTypeInfo<TPayload> typeInformation,
         bool allowBeforeHandshake = false)
     {
-        if (_disposed || !_negotiatedVersion.HasValue && !allowBeforeHandshake)
+        lock (_messagesSynchronization)
         {
-            return;
-        }
+            if (_disposed || !_negotiatedVersion.HasValue && !allowBeforeHandshake)
+            {
+                return;
+            }
 
-        _controlMessages.Enqueue(new SequencedProtocolEnvelope(
-            _nextMessageSequence++,
-            ProtocolCodec.CreateEnvelope(type, payload, typeInformation)));
+            _controlMessages.Enqueue(new SequencedProtocolEnvelope(
+                _nextMessageSequence++,
+                ProtocolCodec.CreateEnvelope(type, payload, typeInformation)));
+        }
         QueueFlush();
     }
 
     private void QueueFlush()
     {
-        if (_flushQueued)
+        lock (_messagesSynchronization)
         {
-            return;
+            if (_disposed || _flushQueued)
+            {
+                return;
+            }
+
+            _flushQueued = true;
         }
 
-        _flushQueued = true;
         Scheduler.QueuePostFlushCallback(_flushJob);
     }
 
     private void Flush()
     {
-        _flushQueued = false;
-        if (_disposed || !_started || !HasQueuedMessages())
+        lock (_messagesSynchronization)
         {
-            return;
-        }
+            _flushQueued = false;
+            if (_insideInspectedFlush)
+            {
+                _inspectionDrainCount++;
+                return;
+            }
 
-        if (!_activeSend.IsCompleted)
-        {
-            return;
-        }
+            if (_disposed || !_started || !HasQueuedMessages() || _sendInProgress)
+            {
+                return;
+            }
 
-        string batch = ProtocolCodec.SerializeBatch(DrainMessages());
-        _activeSend = SendBatchAsync(batch);
+            _sendInProgress = true;
+            _activeSend = DrainAndSendAsync();
+        }
     }
 
-    private async Task SendBatchAsync(string batch)
+    private async Task DrainAndSendAsync()
     {
         try
         {
             await Task.Yield();
+            string batch;
+            lock (_messagesSynchronization)
+            {
+                if (_disposed || _insideInspectedFlush || !HasQueuedMessages())
+                {
+                    return;
+                }
+
+                batch = ProtocolCodec.SerializeBatch(DrainMessages());
+            }
+
             if (!_disposed)
             {
                 await _transport.SendAsync(batch, _sessionCancellation.Token)
@@ -327,15 +374,29 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
         }
         finally
         {
-            if (!_disposed && HasQueuedMessages())
+            bool pending;
+            lock (_messagesSynchronization)
+            {
+                // The task itself remains incomplete until this finally exits. Release the
+                // send gate first so an immediately dispatched follow-up drain can proceed.
+                _sendInProgress = false;
+                pending = !_disposed && HasQueuedMessages();
+            }
+
+            if (pending)
             {
                 QueueFlush();
             }
         }
     }
 
-    private bool HasQueuedMessages() =>
-        _controlMessages.Count > 0 || _telemetryBuffer.Count > 0;
+    private bool HasQueuedMessages()
+    {
+        lock (_messagesSynchronization)
+        {
+            return _controlMessages.Count > 0 || _telemetryBuffer.Count > 0 || _timeline.HasEvents;
+        }
+    }
 
     private List<ProtocolEnvelope> DrainMessages()
     {
@@ -353,6 +414,9 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
                         new TelemetryDroppedPayload(droppedCount),
                         DevToolsJsonSerializerContext.Default.TelemetryDroppedPayload)));
         }
+
+        telemetry.AddRange(_timeline.Drain());
+        telemetry.Sort(static (left, right) => left.Sequence.CompareTo(right.Sequence));
 
         List<ProtocolEnvelope> messages = new(
             _controlMessages.Count + telemetry.Count);
@@ -492,8 +556,13 @@ public sealed class DevToolsSession : IAsyncDisposable, IRuntimeInspectionHook
         _negotiatedVersion = accepted
             ? DevToolsProtocol.CurrentVersion
             : null;
-        _controlMessages.Clear();
-        _telemetryBuffer.Clear();
+        lock (_messagesSynchronization)
+        {
+            _controlMessages.Clear();
+            _telemetryBuffer.Clear();
+            _timeline.Clear();
+            _pendingApplicationTimeline = false;
+        }
         EnqueueControl(
             "handshake.response",
             new HandshakeResponsePayload(

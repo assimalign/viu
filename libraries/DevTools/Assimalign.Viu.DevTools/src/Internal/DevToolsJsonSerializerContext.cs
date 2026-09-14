@@ -32,4 +32,6 @@ namespace Assimalign.Viu.DevTools;
 [JsonSerializable(typeof(InspectorStateRequestPayload))]
 [JsonSerializable(typeof(InspectorStateResponsePayload))]
 [JsonSerializable(typeof(TimelineLayerPayload))]
+[JsonSerializable(typeof(TimelineEventPayload))]
+[JsonSerializable(typeof(TimelineDroppedPayload))]
 internal sealed partial class DevToolsJsonSerializerContext : JsonSerializerContext;

@@ -38,6 +38,19 @@ public abstract class ReactiveValue : IReactiveTrackedReference, IReactiveReadOn
     public Dependency Dependency => _dependency;
 
     /// <summary>
+    /// The optional inspection label assigned once through <see cref="Reactive.WithDebugLabel{T}"/>.
+    /// Reading it never tracks; labels do not change value or dependency identity. Specified by
+    /// <c>[DVT-9]</c>.
+    /// </summary>
+    public string? DebugLabel { get; internal set; }
+
+    /// <summary>Tracks the cell with its owner available only to enabled observation.</summary>
+    private protected void TrackValue() => _dependency.Track(this, null);
+
+    /// <summary>Triggers the cell with its owner available only to enabled observation.</summary>
+    private protected void TriggerValue() => _dependency.Trigger(this, null);
+
+    /// <summary>
     /// The current value as <see cref="object"/> (boxing value types); reading it establishes a
     /// dependency on the ambient subscriber. This is how a caller reads a reference without knowing
     /// its element type — used by the reflection-free introspection and deep-traversal paths that

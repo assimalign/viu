@@ -51,7 +51,7 @@ namespace Demo
         {
             get
             {
-                this.__TitleDependency.Track();
+                this.__TitleDependency.Track(this, "Title");
                 return this.__TitleValue;
             }
             set
@@ -59,7 +59,7 @@ namespace Demo
                 if (!global::System.Collections.Generic.EqualityComparer<string>.Default.Equals(this.__TitleValue, value))
                 {
                     this.__TitleValue = value;
-                    this.__TitleDependency.Trigger();
+                    this.__TitleDependency.Trigger(this, "Title");
                 }
             }
         }
@@ -71,7 +71,7 @@ namespace Demo
         {
             get
             {
-                this.__DoneDependency.Track();
+                this.__DoneDependency.Track(this, "Done");
                 return this.__DoneValue;
             }
             set
@@ -79,7 +79,7 @@ namespace Demo
                 if (!global::System.Collections.Generic.EqualityComparer<bool>.Default.Equals(this.__DoneValue, value))
                 {
                     this.__DoneValue = value;
-                    this.__DoneDependency.Trigger();
+                    this.__DoneDependency.Trigger(this, "Done");
                 }
             }
         }
@@ -190,9 +190,9 @@ namespace Demo
 
         var generated = GeneratorTestHarness.GeneratedSource(GeneratorTestHarness.Run(source), "Frozen.Reactive.g.cs");
 
-        generated.ShouldContain("this.__NameDependency.Track();"); // reads still track
+        generated.ShouldContain("this.__NameDependency.Track(this, \"Name\");"); // reads still track
         generated.ShouldContain("[Viu warn] Set operation on key \\\"Name\\\" failed: target is read-only.");
-        generated.ShouldNotContain(".Trigger();"); // readonly setter does not trigger
+        generated.ShouldNotContain(".Trigger("); // readonly setter does not trigger
     }
 
     [Fact]

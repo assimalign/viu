@@ -75,7 +75,23 @@ public sealed class ReactiveEffect : Subscriber, IDisposable
     {
         if ((Flags & SubscriberFlags.Active) == 0)
         {
-            _function();
+            bool stoppedInvocationSucceeded = false;
+            if (ReactivityInspection.IsEnabled)
+            {
+                ReactivityInspection.NotifyEffect(this, null, completed: false, succeeded: false);
+            }
+            try
+            {
+                _function();
+                stoppedInvocationSucceeded = true;
+            }
+            finally
+            {
+                if (ReactivityInspection.IsEnabled)
+                {
+                    ReactivityInspection.NotifyEffect(this, null, completed: true, stoppedInvocationSucceeded);
+                }
+            }
             return;
         }
         Flags |= SubscriberFlags.Running;
@@ -84,9 +100,15 @@ public sealed class ReactiveEffect : Subscriber, IDisposable
         var previousShouldTrack = ReactivityState.ShouldTrack;
         ReactivityState.ActiveSubscriber = this;
         ReactivityState.ShouldTrack = true;
+        bool succeeded = false;
+        if (ReactivityInspection.IsEnabled)
+        {
+            ReactivityInspection.NotifyEffect(this, null, completed: false, succeeded: false);
+        }
         try
         {
             _function();
+            succeeded = true;
         }
         finally
         {
@@ -95,6 +117,10 @@ public sealed class ReactiveEffect : Subscriber, IDisposable
             ReactivityState.ActiveSubscriber = previousSubscriber;
             ReactivityState.ShouldTrack = previousShouldTrack;
             Flags &= ~SubscriberFlags.Running;
+            if (ReactivityInspection.IsEnabled)
+            {
+                ReactivityInspection.NotifyEffect(this, null, completed: true, succeeded);
+            }
         }
     }
 

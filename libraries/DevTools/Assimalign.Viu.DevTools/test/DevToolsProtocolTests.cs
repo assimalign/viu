@@ -37,9 +37,6 @@ public sealed class DevToolsProtocolTests
         + "{\"version\":1,\"type\":\"inspector.tree.request\",\"payload\":{\"inspectorIdentifier\":\"sample\"}},"
         + "{\"version\":1,\"type\":\"inspector.state.request\",\"payload\":{\"inspectorIdentifier\":\"sample\",\"nodeIdentifier\":\"root\",\"depth\":2}}]}";
 
-    static DevToolsProtocolTests() =>
-        AppContext.SetSwitch(RuntimeInspection.FeatureSwitchName, true);
-
     [Theory]
     [InlineData("postMessage")]
     [InlineData("webSocket")]
@@ -332,7 +329,9 @@ public sealed class DevToolsProtocolTests
             "component.",
             StringComparison.Ordinal) == true)
             .ShouldBe(4);
-        secondBatch.Select(message => MessageType(message) == "component.event"
+        secondBatch.Where(message => MessageType(message) != "timeline.event"
+                && MessageType(message) != "timeline.dropped")
+            .Select(message => MessageType(message) == "component.event"
                 ? message.GetProperty("payload").GetProperty("name").GetString()
                 : MessageType(message))
             .ShouldBe(

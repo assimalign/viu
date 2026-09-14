@@ -19,6 +19,12 @@ Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumCollectionEntries.get -> i
 Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumCollectionEntries.set -> void
 Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumSnapshotDepth.get -> int
 Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumSnapshotDepth.set -> void
+Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumTimelineEventsPerSecond.get -> int
+Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumTimelineEventsPerSecond.set -> void
+Assimalign.Viu.DevTools.DevToolsSessionOptions.TimelineCapacity.get -> int
+Assimalign.Viu.DevTools.DevToolsSessionOptions.TimelineCapacity.set -> void
+Assimalign.Viu.DevTools.DevToolsSessionOptions.TimelineSamplingInterval.get -> int
+Assimalign.Viu.DevTools.DevToolsSessionOptions.TimelineSamplingInterval.set -> void
 Assimalign.Viu.DevTools.DevToolsTimelineLayer
 Assimalign.Viu.DevTools.DevToolsTimelineLayer.Color.get -> string?
 Assimalign.Viu.DevTools.DevToolsTimelineLayer.DevToolsTimelineLayer(string! identifier, string! displayName, string? color = null) -> void

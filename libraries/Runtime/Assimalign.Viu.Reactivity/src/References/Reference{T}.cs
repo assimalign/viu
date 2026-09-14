@@ -33,7 +33,7 @@ public sealed class Reference<T> : ReactiveValue<T>
     {
         get
         {
-            _dependency.Track();
+            TrackValue();
             return _value;
         }
         set
@@ -41,7 +41,7 @@ public sealed class Reference<T> : ReactiveValue<T>
             if (!EqualityComparer<T>.Default.Equals(_value, value))
             {
                 _value = value;
-                _dependency.Trigger();
+                TriggerValue();
             }
         }
     }

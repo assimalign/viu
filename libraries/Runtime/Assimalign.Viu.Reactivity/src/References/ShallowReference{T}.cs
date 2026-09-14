@@ -36,7 +36,7 @@ public sealed class ShallowReference<T> : ReactiveValue<T>
     {
         get
         {
-            _dependency.Track();
+            TrackValue();
             return _value;
         }
         set
@@ -44,7 +44,7 @@ public sealed class ShallowReference<T> : ReactiveValue<T>
             if (!EqualityComparer<T>.Default.Equals(_value, value))
             {
                 _value = value;
-                _dependency.Trigger();
+                TriggerValue();
             }
         }
     }

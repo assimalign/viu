@@ -3,11 +3,11 @@ using System;
 namespace Assimalign.Viu.DevTools;
 
 /// <summary>
-/// Declares one named custom timeline layer without emitting timeline events.
+/// Declares stable identity and presentation metadata for one timeline layer.
 /// </summary>
 /// <remarks>
-/// Event recording belongs to the later timeline work item; this release reserves only stable
-/// layer identity and presentation metadata. Specified by <c>[DVT-7]</c>.
+/// Sessions register the reactivity, components, and scheduler layers automatically. Custom layer
+/// registration supplies metadata for clients. Specified by <c>[DVT-7]</c> and <c>[DVT-10]</c>.
 /// </remarks>
 public sealed class DevToolsTimelineLayer
 {

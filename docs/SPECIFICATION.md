@@ -549,7 +549,8 @@ degrades to the behavior the component would have had without the root convenien
 `[RCT-1]` `ReactiveValue` / `ReactiveValue<T>` is the engine base class; it holds the dependency
 cell inline as a field. `IReactiveReference`, covariant get-only
 `IReactiveReadOnlyReference<T>`, and mutable `IReactiveReference<T>` are the public substitutable
-contracts. Every Reactivity-owned public interface is prefixed `IReactive*`.
+contracts. Reactive value and execution contracts are prefixed `IReactive*`; the optional
+diagnostics-only `IReactivityInspectionHook` is the observation seam [DVT-8].
 
 `[RCT-2]` Hot-path dispatch rule: per-trigger notification, patching, and diffing MUST dispatch
 through an **abstract base-class vtable**, not an interface. Interface dispatch is for cold public
@@ -575,7 +576,7 @@ dependency access (forced triggering, graph inspection) additionally require
 `Computed`; `Effect`; `EffectScope`, `CurrentScope`, `OnScopeDispose`; `Watch`, `WatchEffect`;
 `TriggerReference`; `PauseTracking`, `ResetTracking`, `Batch`; and the inspection
 and escape hatches `IsRef`, `Unref`, `ToRef`, `IsReactive`, `IsReadOnly`, collection-specific
-`ToRaw`, and `MarkRaw`. Generic identity conversion and raw-object conversion are not part of the
+`ToRaw`, `MarkRaw`, and `WithDebugLabel` [DVT-9]. Generic identity conversion and raw-object conversion are not part of the
 surface; generated objects instead expose a typed `ToRawValues()` view over their backing values.
 `ReactiveValue<T>.Peek()` returns a fresh value without subscribing the ambient caller, while a
 stale computed still refreshes and tracks its own sources. Tracking state is restored if the read
@@ -620,6 +621,16 @@ values after that scope stops; its cleanup is driven by its subscriber count.
 `IReactiveWatchScheduler`. Core supplies the application scheduler adapter
 (`ApplicationWatchScheduler`), which routes watch callbacks into the scheduler's pre-flush phase
 ([§6.6](#66-the-scheduler)).
+
+`[RCT-13]` Reactivity inspection is observational. Hook invocation MUST suspend dependency
+collection, suppress recursive inspection, restore ambient tracking even after a hook throws,
+and isolate hook failures from effect execution and notification. Inspection MUST NOT subscribe
+the ambient application caller, advance dependency versions, or change effect batching merely
+to emit an observation. A hook that explicitly reads a stale computed may refresh it and collect
+that computed's own sources, as with `Peek`; suspension must not corrupt the computed's graph.
+Borrowed dependency, subscriber, owner, and member identities MUST NOT be retained by an observer
+except weakly. The engine retains its abstract-base dispatch [RCT-2]; optional diagnostics
+interface dispatch occurs only behind the enabled check [DVT-8], [DVT-12].
 
 *Authority: `libraries/Runtime/Assimalign.Viu.Reactivity/src/{Reactive.cs,References/,Effects/,Watch/,Collections/,ReactiveObjects/,Abstraction/,Reactive/}`;
 `libraries/Runtime/Assimalign.Viu.Reactivity/docs/DESIGN.md` (type model, interface naming, engine boundary);
@@ -2184,8 +2195,57 @@ preserving the same host/runtime dependency direction as Browser.Router [RTR-7].
 MUST pass one shared protocol-conformance suite.
 
 `[DVT-7]` Plugins MAY register named inspectors that supply a custom tree and per-node state, and
-MAY register custom timeline-layer metadata. Timeline event capture and the inspection user
-interface are not part of [V01.01.10.01]; they remain [V01.01.10.02] and [V01.01.10.03].
+MAY register custom timeline-layer metadata. The inspection user interface remains
+[V01.01.10.03] (#83), outside the protocol and recorder implementation.
+
+`[DVT-8]` Reactivity exposes `IReactivityInspectionHook`, installed by `ReactivityInspection.Use`,
+without referencing Core or DevTools. Dependency track/trigger and effect scheduled/run
+started/completed observations use readonly value payloads passed by `in`. Payload object
+references are borrowed only for the synchronous callback. Core discovers the optional sibling
+`IRuntimeSchedulerInspectionHook` on its installed runtime hook and reports flush start/completion
+through `RuntimeInspectionFlush`. Completed phase counts count attempted, non-disposed job
+invocations, including a throwing invocation, across the complete flush chain; completion reports
+failure and precedes `NextTickAsync` resolution. Hook failures MUST NOT change application behavior.
+
+`[DVT-9]` Attribution is reflection-free. Generated reactive property access supplies its owner and
+literal property name. `Reactive.WithDebugLabel` assigns a reference's optional debug label once;
+it is usable with facade-created references and computeds whose constructors are non-public.
+DevTools converts borrowed identities immediately through a weak identity registry into stable,
+positive session identifiers. Reference labels take precedence over member names; anonymous
+dependencies receive a nonempty `dependency-{identifier}` label. Neither queued timeline records
+nor identity entries may retain an application owner, dependency, effect, arbitrary member key,
+or value strongly. Inspectors MUST NOT invoke user-defined formatting to name a dependency.
+
+`[DVT-10]` Sessions automatically register `reactivity`, `components`, and `scheduler` layers as
+`DevToolsTimelineLayer` metadata. Timeline events carry a session enqueue sequence, monotonic
+elapsed microseconds, and the identifier reserved for the upcoming/current scheduler flush chain.
+Writes before scheduling and observations during that flush share the identifier. Dependency
+identifiers connect writes, triggers, tracked reads, and scheduled-effect causes; effect identifiers
+connect scheduling and runs, and component observations identify the active effect when present.
+Completed flushes include pre-flush, render, and post-flush counts and success. DevTools' own drain
+callbacks are excluded from timeline phase counts, and diagnostics-only drains MUST NOT generate
+timeline flush pairs or perpetually reschedule capture. Synchronous effects still emit events,
+associated with the next flush that drains them. A sampled or overloaded stream may have gaps.
+
+`[DVT-11]` Timeline capture uses a fixed-size oldest-first ring, independent of renderer telemetry
+and the reliable control queue [DVT-5]. It stores typed values and serializes only when drained,
+through the source-generated context. `TimelineCapacity`, `TimelineSamplingInterval`, and
+`MaximumTimelineEventsPerSecond` are positive session-construction options. Sampling captures
+candidate 1 and every Nth candidate thereafter; omitted samples are intentional, not losses.
+The rate limit applies after sampling in elapsed one-second session windows. Ring evictions and
+rate rejections accumulate in one `timeline.dropped` count per drain, at the earliest lost
+event's enqueue position. Admitted events become `timeline.event` envelopes in ordinary version 1
+transport batches. All three queues merge by their common sequence; control messages remain
+reliable. Async serialization/sending MUST NOT execute from a Reactivity or scheduler hook.
+
+`[DVT-12]` Reactivity and Core share the `Assimalign.Viu.RuntimeInspection.IsSupported` linker
+feature switch selected by `ViuEnableDevTools`. One static enabled check at every instrumented
+track, trigger, effect, and scheduler call site guards payload construction and dispatch. With
+support disabled, trimming can remove the observation path; a tight warmed write/effect loop
+MUST allocate zero bytes for inspection. Disabled paths MUST NOT perform weak-table lookups,
+boxing, formatting, or interface calls. Runtime feature configuration precedes application startup:
+the switch is read once when the inspection types initialize, so later changes have no effect, and
+the enabled flag is not an application scheduling policy.
 
 *Authority: `libraries/DevTools/Assimalign.Viu.DevTools/docs/PROTOCOL.md`;
 `libraries/DevTools/Assimalign.Viu.DevTools/{src,test}`.*
@@ -2310,7 +2370,7 @@ it move together.
 | `SingleFileComponentProjectionConformanceTests` | Build/editor projection equality [SFC-PIPE-2] |
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
 | `Assimalign.Viu.Sdk.Browser.Tasks.Tests` | Pure host-page stylesheet injection: close-tag placement, href idempotency, comment handling, newline preservation, and missing-head behavior |
-| `Assimalign.Viu.DevTools.Tests` | Handshake/version handling, unknown-message tolerance, bounded post-flush batches, weak live-tree identity and keyed reorder, safe snapshots, custom inspectors/layers, and one corpus over both transports [DVT-2]–[DVT-7] |
+| `Assimalign.Viu.DevTools.Tests` | Handshake/version handling, unknown-message tolerance, bounded post-flush batches, weak live-tree identity and keyed reorder, safe snapshots, custom inspectors/layers, correlated timelines, sampling/rate limits, and one corpus over both transports [DVT-2]–[DVT-12] |
 | `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; isolated Browser-SDK consumers pin library-only and library-before-app link delivery, both `OverrideHtmlAssetPlaceholders` states in Build and Publish, labeled fingerprint resolution plus explicit-href precedence, byte-equivalent identity/gzip/brotli outputs through trimmed and AOT publish, and complete removal of a disabled DevTools package and asset [DVT-1] |
 | `scripts/Test-EndToEnd.ps1` here, plus `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` in the sibling `viu-benchmarks` repository | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance; the isolated Chromium watch lane pins component-stylesheet replacement, a no-write/no-managed-update semantic no-op, and mounted `.vue` remount behavior [V01.01.12.05.02] |
 | `benchmarks/baselines/InteropCounts.json` (in `viu-benchmarks`) | Interop-call counts; a delta fails the gate [RND-IO-5] |

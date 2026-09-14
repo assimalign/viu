@@ -41,6 +41,35 @@ public static class Reactive
     public static Reference<T> Reference<T>(T value) => new(value);
 
     /// <summary>
+    /// Assigns a reference's optional inspection label once and returns that same typed reference.
+    /// This factory companion provides initialization for references whose constructors are
+    /// intentionally non-public. It never reads the value or joins the graph. Specified by
+    /// <c>[DVT-9]</c> and <c>[RCT-13]</c>.
+    /// </summary>
+    /// <typeparam name="T">The first-party reactive reference type.</typeparam>
+    /// <param name="reference">The reference to label.</param>
+    /// <param name="debugLabel">A nonempty display label.</param>
+    /// <returns>The same reference with its label initialized.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="debugLabel"/> is null, empty, or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">The reference is already labelled.</exception>
+    public static T WithDebugLabel<T>(T reference, string debugLabel) where T : ReactiveValue
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentException.ThrowIfNullOrWhiteSpace(debugLabel);
+        if (reference.DebugLabel is not null)
+        {
+            throw new InvalidOperationException("A reference's debug label can only be assigned once.");
+        }
+        reference.DebugLabel = debugLabel;
+        if (ReactivityInspection.IsSupported)
+        {
+            ReactivityInspection.AttributeReference(reference);
+        }
+        return reference;
+    }
+
+    /// <summary>
     /// Creates a reference cell that notifies only on assignment of a new instance, never on
     /// mutation of the instance it holds — the escape hatch for large or externally owned objects
     /// whose interiors must not be tracked.

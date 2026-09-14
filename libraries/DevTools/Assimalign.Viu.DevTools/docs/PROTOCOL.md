@@ -3,7 +3,7 @@
 - Protocol name: `assimalign.viu.devtools`
 - Current version: `1`
 
-This document is the standalone wire contract for `[DVT-1]` through `[DVT-7]`. Viu owns the
+This document is the standalone wire contract for `[DVT-1]` through `[DVT-12]`. Viu owns the
 message semantics. The browser transport applies the WHATWG HTML web-messaging model, and the
 socket transport applies the WHATWG WebSockets message model; those standards define transport
 delivery only, not Viu's inspection data.
@@ -120,9 +120,78 @@ Registration emits `inspector.registered` with `{ identifier, displayName }`; di
 `inspector.state`. Inspector state uses the same safe value representation as component state.
 
 Timeline registration emits `timeline.layer.registered`
-`{ identifier, displayName, color? }` and disposal emits `timeline.layer.unregistered`. Version 1
-defines registration only. It deliberately defines no timeline-event emission message; event
-recording belongs to `[V01.01.10.02]`.
+`{ identifier, displayName, color? }` and disposal emits `timeline.layer.unregistered`. Sessions
+automatically register `reactivity`, `components`, and `scheduler`; custom identifiers must not
+collide with those built-ins. Layer registration remains reliable under telemetry pressure.
+
+## Reactivity timeline ([V01.01.10.02], #82)
+
+Version 1 adds `timeline.event` envelopes inside the same complete batches as other messages.
+Older clients ignore these unknown message types [DVT-2]. Each event payload has:
+
+```json
+{
+  "sequence": 42,
+  "timestamp": 18025,
+  "correlationIdentifier": 7,
+  "layerIdentifier": "reactivity",
+  "kind": "dependency.triggered",
+  "label": "Count",
+  "dependencyIdentifier": 3,
+  "ownerIdentifier": 4,
+  "version": 2
+}
+```
+
+`sequence` is the common session enqueue order, including control and component telemetry;
+gaps are permitted. `timestamp` is monotonic elapsed **microseconds since session construction**,
+not a wall-clock time; equal timestamps are ordered by sequence. `correlationIdentifier` names
+the upcoming/current scheduler flush chain, including writes that precede the queued flush.
+Identifiers are meaningful only within the connected runtime/session. A handshake restarts sampling
+and clears pending queues, but does not recycle object identities or the elapsed clock.
+
+| Layer | `kind` | Additional fields |
+| --- | --- | --- |
+| `reactivity` | `state.write` | `dependencyIdentifier`, `ownerIdentifier?`, `effectIdentifier?`, `version` |
+| `reactivity` | `dependency.tracked`, `dependency.triggered` | `dependencyIdentifier`, `ownerIdentifier?`, `effectIdentifier?`, `version` |
+| `reactivity` | `effect.scheduled` | `effectIdentifier`, causal `dependencyIdentifier?` |
+| `reactivity` | `effect.run.started`, `effect.run.completed` | `effectIdentifier`; completion includes `succeeded` |
+| `components` | `component.mounted`, `component.updated`, `component.unmounted` | `componentIdentifier`, active `effectIdentifier?` |
+| `scheduler` | `flush.started`, `flush.completed` | completion includes `preFlushCount`, `renderCount`, `postFlushCount`, `succeeded` |
+
+`state.write` denotes an explicit dependency trigger (including a forced trigger), preceding
+`dependency.triggered`; computed invalidation propagation emits only the latter. This is dependency
+causality, not an old/new-value log: application values are never retained. An accepted batched
+effect invalidation emits `effect.scheduled`; multiple writes may coalesce into one scheduled run.
+`effectIdentifier` on dependency events identifies the ambient subscriber, which may also be a
+computed subscriber. Component identifiers match the component tree; dependency/effect/owner
+identifiers share a separate weak registry. Completion is emitted even for throwing effects/flushes.
+
+Names come from generated literal property names or `Reactive.WithDebugLabel(reference, "name")`.
+Anonymous dependencies use `dependency-{identifier}`. Weak identity entries and queued scalar
+records do not extend source-object lifetimes, and naming never calls arbitrary `ToString()`.
+
+Timeline options are captured at session construction:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `TimelineCapacity` | 1024 | Fixed number of admitted events in the ring; oldest is evicted on overflow |
+| `TimelineSamplingInterval` | 1 | Capture candidate 1, then 1 + N, 1 + 2N, and so on across all event kinds |
+| `MaximumTimelineEventsPerSecond` | 10000 | Maximum sampled events admitted in each elapsed one-second window |
+
+All values must be positive. Sampling omissions are deliberate and do not produce loss markers.
+Ring evictions and rate-limit rejections produce one `timeline.dropped` envelope with `{ count }`
+at the earliest lost event's sequence position on the next drain. Counts reset after draining;
+rate windows and sampling positions continue across drains. The timeline ring is independent of
+`BufferCapacity` and `telemetry.dropped`. Loss and sampling can omit either side of a pair: clients
+must tolerate incomplete runs and flushes. Reliable control messages cannot be evicted by either
+telemetry buffer. The drain merges all queues by sequence and serializes timeline values only then.
+
+Flush counts include attempted application jobs, including a throwing job, and exclude disposed
+jobs and the recorder's own drain callbacks. A post-flush callback that queues more application
+work stays in the same correlation chain. Diagnostics-only drains do not emit flush pairs. The
+completed hook schedules an asynchronous drain without queuing another scheduler flush solely for
+its own observation. The inspection UI remains #83 and is outside this wire contract.
 
 ## Serialization and transport invariants
 
@@ -132,10 +201,11 @@ recording belongs to `[V01.01.10.02]`.
   `telemetry.dropped` marker reports each drain's loss count without consuming telemetry capacity.
 - Handshake responses, requested snapshot and inspector responses, and registration changes use a
   separate reliable queue; telemetry pressure cannot evict them.
-- A monotonic session sequence stable-merges both queues, and the loss marker takes the first
+- A monotonic session sequence stable-merges all queues, and the loss marker takes the first
   evicted envelope's position so retained observations cannot cross a later control response.
-- Hook calls never perform transport I/O. The scheduler drains after render in its post-flush
-  phase, then sends asynchronously.
+- Hook calls never perform transport I/O or timeline serialization. The post-flush callback
+  requests a drain, flush completion finalizes timeline counts, then serialization and sending run
+  asynchronously after the hook returns.
 - The browser adapter sends a whole batch through one `window.postMessage` interop call and removes
   its `message` listener on disposal. See the
   [WHATWG HTML web-messaging standard](https://html.spec.whatwg.org/multipage/web-messaging.html).

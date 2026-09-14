@@ -30,4 +30,14 @@ internal sealed class SchedulerExecutionState
     internal TaskCompletionSource? FlushCompletion { get; set; }
 
     internal long NextInsertionSequence { get; set; }
+
+    internal long InspectionFlushIdentifier { get; set; }
+
+    internal bool InspectionFlushStarted { get; set; }
+
+    internal int InspectionPreFlushCount { get; set; }
+
+    internal int InspectionRenderCount { get; set; }
+
+    internal int InspectionPostFlushCount { get; set; }
 }

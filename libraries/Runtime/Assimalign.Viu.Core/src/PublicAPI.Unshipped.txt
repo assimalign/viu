@@ -57,3 +57,14 @@ Assimalign.Viu.ComponentRenderOperationOutcome.Succeeded = 0 -> Assimalign.Viu.C
 Assimalign.Viu.ComponentHost.ExecuteAsync(Assimalign.Viu.ComponentRenderRequest! request, Assimalign.Viu.ComponentRenderOperation! operation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.ComponentRenderOperationOutcome>
 Assimalign.Viu.RuntimeExecution
 static Assimalign.Viu.RuntimeExecution.EnterExecutionFlow() -> System.IDisposable!
+Assimalign.Viu.IRuntimeSchedulerInspectionHook
+Assimalign.Viu.IRuntimeSchedulerInspectionHook.FlushCompleted(in Assimalign.Viu.RuntimeInspectionFlush flush) -> void
+Assimalign.Viu.IRuntimeSchedulerInspectionHook.FlushStarted(in Assimalign.Viu.RuntimeInspectionFlush flush) -> void
+Assimalign.Viu.RuntimeInspectionFlush
+Assimalign.Viu.RuntimeInspectionFlush.Faulted.get -> bool
+Assimalign.Viu.RuntimeInspectionFlush.Identifier.get -> long
+Assimalign.Viu.RuntimeInspectionFlush.PostFlushCount.get -> int
+Assimalign.Viu.RuntimeInspectionFlush.PreFlushCount.get -> int
+Assimalign.Viu.RuntimeInspectionFlush.RenderCount.get -> int
+Assimalign.Viu.RuntimeInspectionFlush.RuntimeInspectionFlush() -> void
+static Assimalign.Viu.RuntimeInspection.FlushIdentifier.get -> long

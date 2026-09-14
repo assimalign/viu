@@ -23,6 +23,11 @@ public sealed class CustomReference<T> : ReactiveValue<T>
     internal CustomReference(CustomReferenceFactory<T> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
+        if (ReactivityInspection.IsSupported)
+        {
+            // Retained factory delegates must own only the dependency, never this reference.
+            ReactivityInspection.AttributeReference(this);
+        }
         var (get, set) = factory(_dependency.Track, _dependency.Trigger);
         _get = get ?? throw new ArgumentNullException(nameof(factory), "The factory returned a null getter.");
         _set = set ?? throw new ArgumentNullException(nameof(factory), "The factory returned a null setter.");
