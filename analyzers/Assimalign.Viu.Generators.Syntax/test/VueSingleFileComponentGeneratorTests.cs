@@ -21,7 +21,7 @@ public sealed class VueSingleFileComponentGeneratorTests
     private const string RootNamespace = "Demo";
 
     [Fact]
-    public void Generate_TagBasedBlocks_CompilesTemplateCSharpScriptScopedStyleAndCssModule()
+    public void Generate_TagBasedBlocks_CompilesTemplateCSharpScriptStyleAndCssModule()
     {
         const string source =
             "<template>\n" +
@@ -30,7 +30,7 @@ public sealed class VueSingleFileComponentGeneratorTests
             "<script lang=\"csharp\">\n" +
             "public int Count = 1;\n" +
             "</script>\n" +
-            "<style scoped>\n" +
+            "<style>\n" +
             ".card { color: red; }\n" +
             "</style>\n" +
             "<style module=\"theme\">\n" +
@@ -50,7 +50,8 @@ public sealed class VueSingleFileComponentGeneratorTests
         generated.ShouldContain("Theme.active");
         generated.ShouldContain("public int Count = 1;");
         generated.ShouldContain($"#line 4 \"{ProjectDirectory}/Card.vue\"");
-        generated.ShouldContain(".card[data-v-");
+        generated.ShouldContain(".card { color: red; }");
+        generated.ShouldNotContain("data-v-");
         generated.ShouldContain("internal static class Theme");
         generated.ShouldContain("public const string active = \"active_");
     }

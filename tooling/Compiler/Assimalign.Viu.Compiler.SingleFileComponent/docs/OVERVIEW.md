@@ -18,7 +18,7 @@ The generator and language service consume explicit public build-time contracts.
 types remain internal, and only the projection core's own tests receive friend access.
 
 - **`SingleFileComponentProjection`** — the facade: `Project(input, cancellationToken)` takes a
-  value-equatable `SingleFileComponentProjectionInput` (format, path, text, resolved names, scope id,
+  value-equatable `SingleFileComponentProjectionInput` (format, path, text, resolved names, CSS name salt,
   hot-reload identity) and returns a value-equatable `SingleFileComponentProjectionResult` (the
   scaffold `SingleFileComponentModel` plus host-neutral `DiagnosticInfo` diagnostics).
 - **`SingleFileComponentSourceEmitter`** — renders the model into the full generated C# source, with
@@ -46,7 +46,7 @@ types remain internal, and only the projection core's own tests receive friend a
 ## Boundaries
 
 - References `Assimalign.Viu.Syntax`, `.Syntax.SingleFileComponent`, `.Syntax.Templates`, and
-  `.Compiler.Css` (which owns the parser composition, scope-id hash, and style compilation), plus
+  `.Compiler.Css` (which owns parser composition, CSS Module naming hashes, and style compilation), plus
   `Microsoft.CodeAnalysis.CSharp` for the `@script` parse. Composition-root code, like the sibling
   `Assimalign.Viu.Compiler.Css` — not a peer `Assimalign.Viu.Syntax.*` language library.
 - **netstandard2.0** (`$(TargetFrameworkForAnalyzers)`), **no I/O** (`EnforceExtendedAnalyzerRules` /

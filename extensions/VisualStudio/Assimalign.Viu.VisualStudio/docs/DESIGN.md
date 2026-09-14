@@ -812,7 +812,7 @@ Three consequences follow, and they explain behavior that would otherwise look l
   IntelliSense works while the XML editor owns the file.
 - The XML parser reports its own diagnostics against C# and container syntax: `@script {` becomes
   "Invalid token 'Text' at root level of document", `Get<string>` becomes "Tag was not closed", and
-  `<style scoped>` becomes "Missing attribute value on attribute 'scoped'". These carry no error
+  `<style module>` becomes "Missing attribute value on attribute 'module'". These carry no error
   code, are editor-only, and never affect a build.
 - `.vue` is unaffected, because Web Tools claims that extension explicitly at `0x33`, outranking the
   wildcard.

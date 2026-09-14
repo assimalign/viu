@@ -10,6 +10,16 @@ namespace Assimalign.Viu.VisualStudio;
 public class ViuLexicalClassifierTests
 {
     [Fact]
+    public void Classify_UnsupportedScopedOption_IsAnOrdinaryAttribute()
+    {
+        // [V01.01.06.17] diagnoses scoped styles without assigning the option a special classification.
+        var spans = ViuLexicalClassifier.Classify(["<style scoped>", "</style>"]);
+
+        spans.Single(span => span.LineNumber == 0 && span.Start == 7)
+            .ClassificationKind.ShouldBe(ViuClassificationKind.MarkupAttribute);
+    }
+
+    [Fact]
     public void Classify_LegacyAtBlockSections_ProducesSectionSpecificClassifications()
     {
         // Transition-window pin ([V01.01.06.10]): the legacy @template/@style containers keep
@@ -22,7 +32,7 @@ public class ViuLexicalClassifierTests
             "@script {",
             "    public Reference<int> Count { get; } = Reactive.Reference(0);",
             "}",
-            "@style scoped {",
+            "@style module {",
             "    button { color: red; }",
             "}",
         ];
@@ -69,7 +79,7 @@ public class ViuLexicalClassifierTests
             "@script {",
             "    public Reference<int> Count { get; } = Reactive.Reference(0);",
             "}",
-            "<style scoped>",
+            "<style module>",
             "    button { color: red; }",
             "</style>",
         ];
@@ -389,7 +399,7 @@ public class ViuLexicalClassifierTests
     {
         string[] lines =
         [
-            "<style scoped>",
+            "<style module>",
             "    --brand-color: #123456;",
             "    button { color: red; }",
             "</style>",

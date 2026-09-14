@@ -424,7 +424,7 @@ internal static class ViuLexicalClassifier
 
     // Classifies a top-level container tag header: the tag punctuation as delimiters, the tag name as
     // the framework tag it always is at this position, and attributes (valueless ones such as
-    // 'scoped' included) as markup attributes with their quoted values.
+    // 'module' included) as markup attributes with their quoted values.
     private static void ClassifyTagHeader(
         string line,
         int lineNumber,

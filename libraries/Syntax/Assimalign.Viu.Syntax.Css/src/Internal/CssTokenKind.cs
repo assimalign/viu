@@ -3,7 +3,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <summary>
 /// The token categories the <see cref="CssTokenizer"/> produces, following the CSS Syntax Module Level 3
 /// tokenizer output (https://www.w3.org/TR/css-syntax-3/#tokenization). The set is trimmed to what
-/// rule-level parsing and scoped-selector rewriting need: numeric variants (number/percentage/dimension)
+/// rule-level parsing and selector processing need: numeric variants (number/percentage/dimension)
 /// collapse into <see cref="Number"/> because the rule parser keeps raw value slices rather than typed
 /// numerics, and the <c>url()</c>/unicode-range refinements are not modeled separately.
 /// </summary>

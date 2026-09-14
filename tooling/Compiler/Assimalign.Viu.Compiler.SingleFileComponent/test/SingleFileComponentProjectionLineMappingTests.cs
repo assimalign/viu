@@ -61,7 +61,7 @@ public sealed class SingleFileComponentProjectionLineMappingTests
     }
 
     // The value-equatable source read the language service builds when it drives the projection: the
-    // shared name resolver and scope-id derivation over the same two build properties the generator
+    // shared name resolver and CSS name hashing over the same two build properties the generator
     // reads (a script-only component, so the scaffold compiles against the base class library alone).
     private static SingleFileComponentProjectionInput CreateInput(string path, string content)
     {
@@ -74,7 +74,7 @@ public sealed class SingleFileComponentProjectionLineMappingTests
             names.Namespace,
             names.ClassName,
             names.HintName,
-            StyleScopeId.Resolve(path, ProjectDirectory),
+            CssComponentHash.Resolve(path, ProjectDirectory),
             HotReloadComponentIdentifier: null,
             HasCanonicalPeer: false);
     }

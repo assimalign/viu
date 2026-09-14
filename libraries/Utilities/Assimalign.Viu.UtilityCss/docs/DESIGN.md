@@ -137,7 +137,7 @@ resolution, package lookup, or file access.
 
 The remaining boundaries are explicit:
 
-- `@theme`, `@source`, CSS `@import`, subpath aliases, and style-block scoping remain parser or SDK
+- `@theme`, `@source`, CSS `@import`, subpath aliases, remain parser or SDK
   graph responsibilities. A host passes the resolved `UtilityTheme`, discovered candidates, and
   reference edges to this pure compiler. The browser-ready authored projection strips `@theme`,
   `@source`, and the virtual `@import "viu-utilities"` sentinel while retaining ordinary imports.

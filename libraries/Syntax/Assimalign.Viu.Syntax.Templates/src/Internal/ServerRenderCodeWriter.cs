@@ -318,15 +318,6 @@ internal sealed class ServerRenderCodeWriter
                 candidate,
                 booleanModelIsSelection: false);
         }
-
-        if (!string.IsNullOrEmpty(result.ScopeId))
-        {
-            EmitNamedAttribute(
-                stateName,
-                element.Tag,
-                result.ScopeId!,
-                CodeExpression.Literal("string.Empty"));
-        }
     }
 
     private void EmitStyleAttribute(

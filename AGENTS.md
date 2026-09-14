@@ -13,7 +13,7 @@ reflection-based serialization and dynamic code generation are forbidden.
 product feature ([V01.01.06.09], #250), alongside WHATWG HTML serialization and Language Server
 Protocol compatibility. Tailwind CSS v4.3.3 is only the target of the standalone add-on at
 `libraries/Utilities/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility target (owner
-decision, 2026-08-13). Component `<style>` CSS remains fully supported, including scoping, bundling,
+decision, 2026-08-13). Component `<style>` CSS remains fully supported, including CSS Modules, bundling,
 and hot reload.
 
 ## Layout
@@ -102,8 +102,8 @@ target.
 - `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}` is the independently published,
   standalone UtilityCss add-on library. It is not integrated into a Viu SDK or framework surface;
   consumer MSBuild integration arrives separately through [V01.01.12.30] (#346). Utility CSS remains
-  non-normative for Viu core. Component `<style>` CSS remains fully supported, including scoping,
-  bundling, and hot reload.
+  non-normative for Viu core. Component `<style>` CSS remains fully supported, including CSS Modules,
+  bundling, and hot reload. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367).
 - Ecosystem integrations use `extensions/{VisualStudio|VisualStudioCode|dotnet}`; templates live at
   `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives at
   `benchmarks/Assimalign.Viu.Testing.EndToEnd`, and SDK task projects use

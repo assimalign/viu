@@ -23,7 +23,7 @@ public class StyleClassCompletionTests
             "<template>\n" +
             "  <div class=\"ga\"></div>\n" +
             "</template>\n" +
-            "<style scoped>\n" +
+            "<style>\n" +
             "  .gallery, .gap-local:hover { display: grid; }\n" +
             "  @media (width >= 40rem) { .gallery-wide { gap: 1rem; } }\n" +
             "</style>\n";

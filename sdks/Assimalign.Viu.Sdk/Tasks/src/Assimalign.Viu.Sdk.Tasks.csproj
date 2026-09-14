@@ -38,7 +38,7 @@
          template expressions are parsed with the real C# parser) is compile-time-only for THIS host:
          the bundling task composes the style-only parsers
          (SingleFileComponentParserFactory.CreateForStyleExtraction), which never dispatch template
-         content, and the v-bind()/module/scoped rewrites live in Assimalign.Viu.Syntax.Css with no
+         content, and the v-bind()/module rewrites live in Assimalign.Viu.Syntax.Css with no
          Roslyn dependency — Roslyn-backed expression compilation of the recorded bindings runs only
          in the source generator, where the compiler host supplies Roslyn. Re-declaring the closure
          with ExcludeAssets=runtime (each member, because asset exclusion is not transitive) keeps

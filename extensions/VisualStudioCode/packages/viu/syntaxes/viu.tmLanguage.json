@@ -291,7 +291,7 @@
     },
 
     "plain-attribute": {
-      "comment": "An ordinary attribute. 'class' stays one lexical attribute value here; project-aware component-style class completion and authored-rule hover belong to the language server rather than the TextMate grammar.",
+      "comment": "An ordinary attribute, including unsupported component-style options; scoped has no special highlighting ([V01.01.06.17]). 'class' stays one lexical attribute value here; project-aware component-style class completion and authored-rule hover belong to the language server rather than the TextMate grammar.",
       "match": "([A-Za-z_][A-Za-z0-9_.:-]*)(?:[ \\t]*(=)[ \\t]*(\"[^\"]*\"|'[^']*'))?",
       "captures": {
         "1": { "name": "entity.other.attribute-name.viu" },

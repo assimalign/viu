@@ -22,7 +22,7 @@ internal static class TransformSlotOutlet
             var (slotName, slotProps) = ProcessSlotOutlet(element, context);
             var slotChildren = context.WorkingChildrenOf(element, element.Children);
 
-            var slotArguments = new List<object> { "$slots", slotName, "{}", "undefined", "true" };
+            var slotArguments = new List<object> { "$slots", slotName, "{}", "undefined" };
             var expectedLength = 2;
 
             if (slotProps is not null)
@@ -40,11 +40,6 @@ internal static class TransformSlotOutlet
                     isSlot: false,
                     element.Location);
                 expectedLength = 4;
-            }
-
-            if (context.ScopeId is not null && !context.Slotted)
-            {
-                expectedLength = 5;
             }
 
             slotArguments.RemoveRange(expectedLength, slotArguments.Count - expectedLength);

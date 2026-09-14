@@ -149,7 +149,6 @@ internal sealed class FrameRenderCodeWriter
     private CodeExpression EmitElementNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
         ElementPropertyEmission properties = EmitElementProperties(node.Properties);
-        AppendScopeBinding(properties);
         CodeExpression children = EmitChildren(node.Children);
         CodeExpression directives = EmitDirectiveInvocations(node.Directives);
         CodeExpression dynamicBindingIndices = EmitDynamicBindingIndices(
@@ -309,7 +308,6 @@ internal sealed class FrameRenderCodeWriter
     private CodeExpression EmitDynamicNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
         ElementPropertyEmission elementProperties = EmitElementProperties(node.Properties);
-        AppendScopeBinding(elementProperties);
         ComponentInvocationEmission componentInvocation = EmitComponentInvocation(
             node.Properties,
             node.Children,
@@ -394,18 +392,6 @@ internal sealed class FrameRenderCodeWriter
 
         defaultSlot = null!;
         return false;
-    }
-
-    private void AppendScopeBinding(ElementPropertyEmission properties)
-    {
-        if (string.IsNullOrEmpty(result.ScopeId))
-        {
-            return;
-        }
-
-        AppendStatement(
-            $"{properties.BindingsName}.Add({ComponentsNamespace}.ElementBinding.Attribute(new "
-            + $"{ComponentsNamespace}.QualifiedName({StringLiteral(result.ScopeId!)}), string.Empty));");
     }
 
     private CodeExpression EmitCallAsVirtualValue(CallExpression call)

@@ -13,9 +13,6 @@ internal static class CssTestHelpers
         return (CssStylesheetNode)result.Nodes[0];
     }
 
-    public static string Scope(string source, string scopeId = "data-v-test")
-        => CssScopedRewriter.Rewrite(ParseStylesheet(source), scopeId);
-
     // Asserts the exact-slice invariant on a node and all its descendants.
     public static void AssertExactSlice(CssSyntaxNode node, string source)
     {

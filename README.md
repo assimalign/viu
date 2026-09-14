@@ -77,7 +77,7 @@ Developer tooling follows `tooling/<Area>/<AssemblyId>/{src,test,docs}` under th
 | Syntax | [`Assimalign.Viu.Syntax`](libraries/Syntax/Assimalign.Viu.Syntax) | Shared located-node, diagnostic, and registration-based parser foundation | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax/docs/DESIGN.md) |
 | Syntax | [`Assimalign.Viu.Syntax.Templates`](libraries/Syntax/Assimalign.Viu.Syntax.Templates) | Template parsing, transformation, static analysis, patch inference, and render-source generation | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md) |
 | Syntax | [`Assimalign.Viu.Syntax.SingleFileComponent`](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent) | Canonical `.viu` and compatible `.vue` container parsers | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md) · [FORMAT](libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md) |
-| Syntax | [`Assimalign.Viu.Syntax.Css`](libraries/Syntax/Assimalign.Viu.Syntax.Css) | CSS tokenizer, parser, and scoped-style rewrite | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md) |
+| Syntax | [`Assimalign.Viu.Syntax.Css`](libraries/Syntax/Assimalign.Viu.Syntax.Css) | CSS tokenizer, parser, CSS Modules, and binding rewrites | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md) |
 | Syntax | [`Assimalign.Viu.Syntax.Html`](libraries/Syntax/Assimalign.Viu.Syntax.Html) | HTML parser used for host-page build-time rewriting | [OVERVIEW](libraries/Syntax/Assimalign.Viu.Syntax.Html/docs/OVERVIEW.md) · [DESIGN](libraries/Syntax/Assimalign.Viu.Syntax.Html/docs/DESIGN.md) |
 | Utilities | [`Assimalign.Viu.UtilityCss`](libraries/Utilities/Assimalign.Viu.UtilityCss) | Standalone utility-CSS parsing, scanning, registry, theme, and deterministic emission engine | [OVERVIEW](libraries/Utilities/Assimalign.Viu.UtilityCss/docs/OVERVIEW.md) · [DESIGN](libraries/Utilities/Assimalign.Viu.UtilityCss/docs/DESIGN.md) |
 
@@ -97,7 +97,9 @@ and none is currently published as an independent tooling package.
 [`libraries/Utilities/Assimalign.Viu.UtilityCss`](libraries/Utilities/Assimalign.Viu.UtilityCss).
 It remains outside every Viu SDK and framework surface, and its Tailwind CSS v4.3.3 compatibility
 target is not a Viu core contract. Consumer MSBuild integration arrives separately through #346;
-component `<style>` CSS compilation, bundling, delivery, and hot reload remain active Viu features.
+component `<style>` CSS compilation, CSS Modules, bundling, delivery, and hot reload remain active
+Viu features. Scoped CSS was removed on 2026-09-14 by owner decision [V01.01.06.17] (#367); use
+ordinary component styles or [CSS Modules](docs/SPECIFICATION.md#102-css-modules).
 
 ### Source generators and SDK build tools (`analyzers/`, `sdks/`)
 

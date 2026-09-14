@@ -205,7 +205,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             options.ProjectDirectory,
             options.RootNamespace,
             fileSet.RequiresCaseDiscriminator(additionalText.Path));
-        var scopeId = StyleScopeId.Resolve(additionalText.Path, options.ProjectDirectory);
+        var localHashSalt = CssComponentHash.Resolve(additionalText.Path, options.ProjectDirectory);
         var format = IsVueFile(additionalText.Path)
             ? SingleFileComponentFormat.Vue
             : SingleFileComponentFormat.Viu;
@@ -217,7 +217,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             names.Namespace,
             names.ClassName,
             names.HintName,
-            scopeId,
+            localHashSalt,
             options.EmitHotReloadMetadata
                 ? SingleFileComponentHotReloadMetadataFactory.ResolveComponentIdentifier(
                     additionalText.Path,

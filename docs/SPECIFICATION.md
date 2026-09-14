@@ -920,9 +920,7 @@ exception is rethrown to the host.
 `[RND-HOST-1]` `RendererOptions<TNode>` is the complete host contract. Required operations:
 `Insert`, `Remove`, `CreateElement`, `CreateText`, `CreateComment`, `SetText`, `ParentNode`,
 `NextSibling`, `PatchAttribute`. Optional operations: `ResolveTeleportTarget`, `Commit`,
-`InsertStaticContent`, `CreateHydrationReader`, `ScheduleHydrationTrigger`. A generated static
-style-scope identifier is an ordinary element attribute under [STY-1]; no separate host stamping
-operation exists.
+`InsertStaticContent`, `CreateHydrationReader`, `ScheduleHydrationTrigger`.
 
 `[RND-HOST-2]` A capability whose operation is absent is **unavailable, not degraded**. Rendering an
 `StaticNode` requires `InsertStaticContent`; hydration requires `CreateHydrationReader`; and a
@@ -1402,7 +1400,14 @@ grammar.
 `[VUE-2]` The compatibility descriptor is deliberately distinct from the canonical one: the `.vue`
 format allows one ordinary `<script>` and one `<script setup>` in the same file, while `.viu` has a
 single uniform `@script` slot. Both descriptor types reuse the same immutable block, option,
-diagnostic, and source-location values wherever their semantics are identical.
+diagnostic, and source-location values wherever their semantics are identical. A `.vue`
+`<style scoped>` block reports a located Warning (`VueScopedStyleNotSupported`, 1019;
+`VIU1002` from the generator) and compiles as ordinary global CSS. The same option in `.viu`,
+including legacy `@style scoped`, reports a located Error (`ScopedStyleNotSupported`, 1018;
+`VIU1001`). Both report: "Scoped styles are not supported; Viu compiles component styles as ordinary
+global stylesheets. Remove the scoped option or use a CSS module." The parsers preserve the option
+for tooling diagnostics. This is the owner-authorized compatibility decision of 2026-09-14,
+[V01.01.06.17] (#367); CSS Modules remain supported [STY-2]–[STY-5].
 
 `[VUE-3]` **Both engines share one internal tag scanner** (`SingleFileComponentTagScanner`) —
 opening-tag and attribute parsing, the nested-`<template>` boundary, the raw-text closing-tag
@@ -1435,8 +1440,8 @@ Viu SDK, and the Visual Studio language server re-checks the owning project befo
 compatibility document ([§15](#15-the-tooling-and-editor-contract)).
 
 `[VUE-9]` Everything downstream of the container parse is **shared with `.viu`**: template code
-generation, scoped styles, CSS Modules, `v-bind()` in CSS, source mapping, and component hot-reload
-metadata.
+generation, ordinary component styles, CSS Modules, `v-bind()` in CSS, source mapping, and component
+hot-reload metadata.
 
 `[VUE-10]` The implementation adds **no Vue JavaScript runtime and no dependency on Vue**.
 
@@ -1452,14 +1457,22 @@ compatibility", "Generator compatibility contract"; `sdks/README.md`;
 
 ### 10.1 Scoped CSS
 
-`[STY-1]` A single-file component with a scoped style computes one stable
-`data-v-<path-derived-hash>` identifier. The template transform emits that identifier as an ordinary
-empty attribute binding on **every native element** in the interactive virtual-node tree, and the
-`ServerMarkup` profile writes the same attribute directly [SSR-COMPILE-3]. This static compiler
-stamping requires no `ComponentContract`, `ComponentContext`, `VirtualNode`, renderer-host, or
-server-serializer scope field. Hand-authored trees receive no implicit identifier. Runtime root
-restamping and reactive style-variable application remain deferred under `[V01.01.06.12]` and
-[STY-6].
+> **Removed — non-normative history (2026-09-14).**
+
+`[STY-1]` **REMOVED AS A VIU FEATURE.** Scoped CSS formerly rewrote component selectors and emitted
+matching attributes into generated interactive and server markup. The style option, selector
+rewrite, attribute stamping, scope-identifier plumbing, and deferred runtime restamping plan were
+removed on 2026-09-14 by owner decision [V01.01.06.17]
+([#367](https://github.com/assimalign/viu/issues/367)); #319 was closed as superseded. This clause
+retains its stable id and the former boundary as design history only. It imposes no normative Viu
+core requirement.
+
+Ordinary component stylesheets retain compilation, bundling, library `.viu.css` packing, and hot
+reload. CSS Modules remain supported [STY-2]–[STY-5]. The container diagnostic behavior is recorded
+under [VUE-2]; `v-bind()` compile-time processing and its deferred runtime design remain separate
+[STY-6]–[STY-8].
+
+*Historical, non-normative sources: [V01.01.06.04] (#60), [V01.01.06.17] (#367).*
 
 ### 10.2 CSS Modules
 
@@ -1480,20 +1493,17 @@ member name (`$style.a-b` → `$style.a_b`), the same name the emitter writes as
 
 ### 10.3 `v-bind()` in CSS
 
-`[STY-6]` **Deferred under `[V01.01.06.12]` after completion of the `[V01.01.15]` arc.**
-`v-bind()` in a style block compiles to a `CssVariables` binding emitted from the generated setup
-path with an explicit `ComponentContext` owner. During the deferral the compiler emits no CSS
-variable application, and the Browser host retains the designed single-element
-`CssVariables.Bind` directive as the primitive the restored feature builds on.
+`[STY-6]` **Deferred runtime design for `v-bind()` in ordinary component styles.** Compile-time
+expression extraction and custom-property rewriting remain implemented. The compiler currently emits
+no CSS-variable application. The Browser host retains the single-element `CssVariables.Bind`
+directive; any future generated application needs an explicit component owner and lifetime.
 
-`[STY-7]` **Deferred with `[STY-6]`.** When restored: after mount, a post-flush watcher tracks the
-getter's reactive dependencies and applies each hashed custom property to every current outermost
-host element — fragment roots included — reapplying on root-set changes and stopping before
-unmount. Restoration requires the component-root host-range seam recorded in
-`docs/COMPONENT-MODEL-PLAN.md`; introducing that seam is part of the restoration work item, not
-the migration arc.
+`[STY-7]` **Deferred with `[STY-6]`.** The intended reactive application tracks the getter's
+dependencies after mount, applies the hashed custom properties needed by ordinary component styles,
+and stops its watcher before unmount. Element targeting and updates when rendered roots change need
+a separate design; no scoped-style identity or runtime restamping is part of that work.
 
-`[STY-8]` **Deferred with `[STY-6]`.** When restored: a `v-bind()` change updates the host without
+`[STY-8]` **Deferred with `[STY-6]`.** The intended `v-bind()` application updates the host without
 re-rendering the component — on a buffered host the properties are written into the command frame
 and the owning context queues its renderer-specific commit, reaching the host before `NextTickAsync`
 with no render.
@@ -1581,9 +1591,8 @@ unsupported subtrees use a subtree-local virtual-node fallback and rejoin the sa
 
 `[SSR-COMPILE-3]` Direct output obeys [SSR-6]: interpolation and attributes escape identically;
 class and style use the shared normalizers; model directives emit `value`, `checked`, or `selected`;
-show directives append `display:none`; and every native element receives the transformed scope
-identifier. Suspense renders its default content, Transition is a markup pass-through, and Teleport
-uses the ordinary context target buffer and unchanged marker protocol.
+show directives append `display:none`. Suspense renders its default content, Transition is a
+markup pass-through, and Teleport uses the ordinary context target buffer and unchanged marker protocol.
 
 `[SSR-COMPILE-4]` `CompiledServerRender` and `ServerRender.RenderCompiledTo{String,Stream}Async`
 create renderer-owned request state, preserve cancellation, component-fallback flushes, teleports,
@@ -2242,6 +2251,8 @@ correct-looking values.
 | Generalized handler caching | Deliberately dropped: syntax alone cannot prove a member-expression delegate has a stable receiver or infer every delegate arity; caching it could freeze mutable receiver state. Authors can supply an explicitly stable delegate when identity matters |
 | Slot/`v-for` destructuring | Deliberately unsupported: C# lambda parameters cannot represent generalized object/array destructuring without choosing new missing-member, null, and conversion semantics. A single valid C# identifier is accepted; other aliases report a located actionable template diagnostic and emit no invalid C# |
 | Server rendering | Compiler-informed server code generation, byte-oriented writer integration, static site generation, and directive-specific server properties are deferred |
+| Scoped CSS | **Removed 2026-09-14 by owner decision [V01.01.06.17] (#367).** `.viu` reports an error; `.vue` warns and compiles ordinary global CSS [VUE-2]. Use ordinary component styles or CSS Modules; [STY-1] is non-normative history. |
+| `v-bind()` in CSS | Compile-time extraction and rewriting remain; generated reactive application is deferred for ordinary component styles [STY-6]–[STY-8]. |
 | Utility-CSS add-on | **Standalone and non-normative for Viu core.** The engine is independently published from `libraries/Utilities/`, remains outside every Viu SDK/framework surface, and has consumer MSBuild integration tracked by #346 [STY-9]. |
 
 ---

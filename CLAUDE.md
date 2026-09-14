@@ -15,8 +15,8 @@ Language Server Protocol) are real product features and are documented as such; 
 evaluating other frameworks' performance work — including Vue's — for possible replication.
 Tailwind CSS v4.3.3 is only the target of the standalone add-on at
 `libraries/Utilities/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility target (owner decision,
-2026-08-13). Component `<style>` CSS remains fully supported, including scoping, bundling, and hot
-reload.
+2026-08-13). Component `<style>` CSS remains fully supported, including CSS Modules, bundling, and
+hot reload. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367).
 
 ## Layout
 

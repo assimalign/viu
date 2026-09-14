@@ -87,6 +87,6 @@ Browser-only response intents and modifier policy remain outside Components
 
 Components does not mount or patch trees, schedule updates, implement built-ins, serialize HTML,
 interpret event propagation or browser modifiers, own application lifetime, discover constructors,
-or provide an ambient hierarchical dependency API. Scoped style identity is absent from the
-component contract; generated native elements carry an ordinary static attribute instead
-(`[CMP-24]`, `[STY-1]`).
+or provide an ambient hierarchical dependency API. Scoped CSS and style-scope identity were removed
+on 2026-09-14 ([V01.01.06.17], #367); ordinary component styles and CSS Modules remain supported
+without component-contract members (`[CMP-24]`).

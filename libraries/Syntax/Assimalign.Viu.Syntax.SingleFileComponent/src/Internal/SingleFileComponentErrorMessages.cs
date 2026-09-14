@@ -43,9 +43,13 @@ internal static class SingleFileComponentErrorMessages
         [SingleFileComponentErrorCode.LegacyTemplateBlockSyntax] =
             "The '@template { }' block container is legacy syntax and will be removed. Rewrite the block as '<template>...</template>'; block options become tag attributes (for example lang=\"html\").",
         [SingleFileComponentErrorCode.LegacyStyleBlockSyntax] =
-            "The '@style { }' block container is legacy syntax and will be removed. Rewrite the block as '<style>...</style>'; block options become tag attributes (for example '<style scoped>' or '<style module=\"classes\">').",
+            "The '@style { }' block container is legacy syntax and will be removed. Rewrite the block as '<style>...</style>'; block options become tag attributes (for example '<style module=\"classes\">').",
         [SingleFileComponentErrorCode.ScriptTagBlockNotSupported] =
             "A top-level '<script>' tag is not supported in a .viu file and its content is never compiled or executed. Declare the component's C# with '@script { }'.",
+        [SingleFileComponentErrorCode.ScopedStyleNotSupported] =
+            "Scoped styles are not supported; Viu compiles component styles as ordinary global stylesheets. Remove the scoped option or use a CSS module.",
+        [SingleFileComponentErrorCode.VueScopedStyleNotSupported] =
+            "Scoped styles are not supported; Viu compiles component styles as ordinary global stylesheets. Remove the scoped option or use a CSS module.",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>
@@ -58,8 +62,8 @@ internal static class SingleFileComponentErrorMessages
     /// Gets the catalog severity for <paramref name="code"/>: the [V01.01.06.10] legacy-container codes
     /// (<see cref="SingleFileComponentErrorCode.LegacyTemplateBlockSyntax"/> /
     /// <see cref="SingleFileComponentErrorCode.LegacyStyleBlockSyntax"/>) are warnings — the blocks still
-    /// parse during the migration window — and every other code is a recoverable error, reported on the
-    /// result rather than thrown (<c>[SFC-DIAG-1]</c>).
+    /// parse during the migration window. The unsupported scoped option in <c>.vue</c> input also warns
+    /// ([V01.01.06.17]); other codes are recoverable errors reported rather than thrown (<c>[SFC-DIAG-1]</c>).
     /// </summary>
     /// <param name="code">The diagnostic code.</param>
     /// <returns>The severity every diagnostic reported with <paramref name="code"/> carries.</returns>
@@ -68,6 +72,7 @@ internal static class SingleFileComponentErrorMessages
         {
             SingleFileComponentErrorCode.LegacyTemplateBlockSyntax => DiagnosticSeverity.Warning,
             SingleFileComponentErrorCode.LegacyStyleBlockSyntax => DiagnosticSeverity.Warning,
+            SingleFileComponentErrorCode.VueScopedStyleNotSupported => DiagnosticSeverity.Warning,
             _ => DiagnosticSeverity.Error,
         };
 }

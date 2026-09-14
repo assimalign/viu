@@ -84,7 +84,7 @@ The shim treadmill exists because attachments were made without designed seams. 
 | `Router` | A navigation *convention* above the model — already the model citizen | Components + Reactivity |
 | `Core` | **The Application Model**: the composition root (D5/D5a `ApplicationOptions`/`ApplicationContext`, lifetime, middleware), the engine (renderer, scheduler, mounted internals), and the public operations (render lease, mounted views) | Components, Reactivity, State (composition-root sugar) |
 | Hosts (`Browser`, `ServerRenderer`, `Testing`, future platforms) | Platform adapters behind the host contract | Core |
-| Styling (component CSS modules and scoped CSS) | Build-time concern; compiled trees carry scope identifiers as ordinary static attributes, so the runtime component context carries no style-scope state. The standalone utility-CSS add-on remains outside this model. | compiler tooling — never in the runtime graph |
+| Styling (ordinary component styles and CSS Modules) | Build-time compilation, bundling, and hot reload remain supported. Scoped CSS and its deferred runtime plan were removed 2026-09-14 ([V01.01.06.17], #367); the component context carries no style-scope state. The standalone utility-CSS add-on remains outside this model. | compiler tooling — never in the runtime graph |
 
 Vocabulary lives low (Components declares what things *are*); composition lives high (Core wires
 what the *application* uses); conventions attach through seams. Core containing both the
@@ -184,7 +184,7 @@ public abstract class ComponentContext          // Assimalign.Viu.Components
     public abstract IReactiveEffectScope Scope { get; }        // first-class: Components → Reactivity
     public abstract IReactiveWatchScheduler? WatchScheduler { get; }
     public abstract ComponentContext? Parent { get; }          // subsumes T05's planned addition
-    // No runtime-carried scoped-style identity: compiled trees stamp ordinary attributes (§7 decision 4).
+    // Scoped CSS was removed by owner decision, 2026-09-14 (§7 decision 4; #367).
     public abstract void Emit(string name, params object?[] arguments);
     public abstract void Expose(object? value);
     public abstract void Warn(string message);                 // replaces IComponentWarningContext
@@ -210,8 +210,8 @@ Every current shim dies **structurally**, not by relocation:
 - Ambient-static `ViuWatch.Watch` (`ViuWatch.cs:23-58`) — becomes `context.Watch(...)`, scoped to the
   component's effect scope by construction.
 - SSR's `RequireComponentContext` (`ServerRender.cs:470-480`) — deleted; the serializer reads
-  the lease's tree. Scoped CSS is compiler-owned, with ordinary static scope attributes already in
-  that tree, so the serializer reads no context-carried style-scope state; that former reach is gone.
+  the lease's tree. The serializer reads no context-carried style-scope state; scoped CSS was
+  removed in full on 2026-09-14 ([V01.01.06.17], #367).
 - Core's own downcasts (`Suspense.cs:68`, `AsynchronousComponentTemplate.cs:39`,
   `ComponentHost.cs:117`, `Renderer{TNode}.cs:3381`) — become same-assembly typed access to Core's
   internal sealed `RuntimeComponentContext`; no public protocol involved.
@@ -399,15 +399,15 @@ P4; the planned two-member interface expansion was replaced by the public abstra
    references was rejected as the weaker boundary.
 3. **The authored contract is `IComponent`.** Components are authored behavior, nodes are immutable
    descriptions, and `ComponentNode` invokes a component.
-4. **Runtime style-scope identity — descoped (owner decision, 2026-08-07).** Scoped CSS itself is
-   fully active: the compiler rewrites selectors and stamps each known `data-v-*` attribute directly
-   into the generated render description. What this arc removed was the alternate runtime-carried
-   identity (`ComponentContract`/`ComponentContext` state, an SSR serializer attribute pass, and
-   runtime emitter propagation). Consequences, all simplifying: T05 Core decision 4's planned member
-   is moot; the `ComponentTreeSerializer.cs:97` friend reach disappears outright rather than needing
-   a public member; P3's context and the contract carry no style-scope state. Component CSS bundling,
-   scoped styles, CSS Modules, `v-bind()` rewrites, and style-only hot reload remain compiler/SDK
-   concerns and are unaffected.
+4. **Scoped CSS — removed (owner decision, 2026-09-14).** [V01.01.06.17]
+   ([#367](https://github.com/assimalign/viu/issues/367)) removes the style option, selector rewriting,
+   generated interactive and server attributes, scope-identifier plumbing, and deferred runtime
+   restamping plan. This supersedes the 2026-08-07 decision that removed runtime-carried identity
+   while retaining compiler stamping; #319 is closed as superseded. T05 Core decision 4's planned
+   member remains moot, and P3's context and contract carry no style-scope state. Ordinary component
+   CSS bundling, CSS Modules, `v-bind()` compile-time rewrites, and style-only hot reload remain.
+   Reactive `v-bind()` application stays deferred for ordinary styles and requires its own design;
+   it has no dependency on scoped-style restoration or a planned host-range seam.
 
 ---
 
@@ -423,7 +423,7 @@ clean build after promotion is the only complete enumeration. Result:
 | Consumer | Entire Core-internal footprint | Retired by |
 |---|---|---|
 | **Browser** | `ApplicationState` enum + `ApplicationContext.InitializeRuntime` + `SetIsRunning` — the `[APP-1]` lifecycle machine, nothing else | **S1** |
-| **ServerRenderer** | `ComponentContext` (including the former runtime scoped-style reach removed when compiler-owned attributes replaced it) + `MountedComponent` (`Create`/`InvokeServerPrefetchAsync`/`Render`/`Context`/`AbortMount`) | **S4** (T05's lease) |
+| **ServerRenderer** | `ComponentContext` (with the former runtime scoped-style reach removed; scoped CSS itself was removed 2026-09-14) + `MountedComponent` (`Create`/`InvokeServerPrefetchAsync`/`Render`/`Context`/`AbortMount`) | **S4** (T05's lease) |
 | **Testing** | `MountedTemplateNode<TNode>`/`MountedRenderNode<TNode>`/`MountedComponent` members, `ComponentContext.Parent`, `Renderer<TNode>.GetMountedTemplates`, `Scheduler.Reset`/`FlushDispatcher`, `ApplicationOptions.EventObserver` | **S5 + S2 + S3** |
 
 Browser needed zero `RendererOptions` hooks — `[RND-HOST-1]`'s completeness claim survived the
@@ -448,8 +448,8 @@ separately at P3 via `ComponentContext.Warn`.
   P3 replaces — either land now and accept the D1 plain-rename churn, or fold into P4. Recommended:
   fold into P4.
 - **S4 — the render lease** (T05's `ComponentHost.RenderAsync → IComponentRenderScope`): lands in
-  P4; depends on P3 only for the abstract context type (compiler-owned scoped attributes mean the
-  serializer needs no context-carried style identity, and `Parent` is Testing's need, not SSR's).
+  P4; depends on P3 only for the abstract context type (the serializer needs no style identity,
+  and `Parent` is Testing's need, not SSR's).
   Placement rationale
   (recorded so it isn't re-litigated): `IComponentRenderScope` lives in **Core, not Components**,
   even though its members are all Components types — it is a handle to lifetime 4 (mounted

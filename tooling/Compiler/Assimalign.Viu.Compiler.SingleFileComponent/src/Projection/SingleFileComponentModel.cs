@@ -40,14 +40,9 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// initializer during a structural edit. Specified by <c>[SFC-CG-9]</c> and
 /// <c>[SFC-OPT-1]</c> ([V01.01.06.14]).
 /// </param>
-/// <param name="ScopeId">
-/// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
-/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]). The template transform
-/// stamps this identifier on every emitted native element, keeping client and server output aligned.
-/// </param>
 /// <param name="ExtractedStyles">
-/// The component's compiled CSS — scoped style blocks rewritten with <see cref="ScopeId"/> and
-/// non-scoped blocks passed through unmodified, concatenated in source order — or <see langword="null"/>
+/// The component's compiled CSS — module classes and CSS bindings rewritten, ordinary blocks
+/// passed through unmodified, concatenated in source order — or <see langword="null"/>
 /// when the component declares no style block. Emitted as a generated string constant; the
 /// physical static-web-asset bundling is the MSBuild-side follow-up.
 /// </param>
@@ -75,7 +70,6 @@ public readonly record struct SingleFileComponentModel(
     EquatableArray<ScriptBinding> Bindings,
     string? RenderBody,
     int RenderCacheSize,
-    string? ScopeId,
     string? ExtractedStyles,
     EquatableArray<CssModuleClassEntry> ModuleClasses,
     EquatableArray<CssVariableBindingEntry> CssVariableBindings)

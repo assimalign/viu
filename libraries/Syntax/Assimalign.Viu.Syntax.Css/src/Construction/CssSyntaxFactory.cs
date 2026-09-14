@@ -10,8 +10,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// Level 3 parser output model (https://www.w3.org/TR/css-syntax-3/#parsing). The parser turns text into
 /// that graph; this factory builds the identical graph without any text, so a downstream generator (the
 /// build-time utility-first CSS engine [V01.01.12.16]) can synthesize rules from scratch and hand them to
-/// the same deterministic canonical serializer (<see cref="CssStylesheetWriter"/> /
-/// <see cref="CssScopedRewriter"/>).
+/// the same deterministic canonical serializer (<see cref="CssStylesheetWriter"/>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,8 +26,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <para>
 /// The surface is language-agnostic generic CSS construction: it knows nothing about utilities, variants,
 /// or themes. It builds ordinary selectors, and the reserved functional pseudos (<c>:deep()</c>,
-/// <c>:slotted()</c>, <c>:global()</c>) — which only the parser produces, and which the scoped rewrite,
-/// not construction, consumes — are intentionally out of scope; the factory builds ordinary pseudos only.
+/// <c>:slotted()</c>, <c>:global()</c>) are produced by the parser; the factory builds ordinary pseudos only.
 /// Invalid arguments throw <see cref="ArgumentNullException"/>, matching the serializer entry points; the
 /// recoverable never-throw contract applies to <em>parsing</em>, not to programmatic misuse.
 /// </para>

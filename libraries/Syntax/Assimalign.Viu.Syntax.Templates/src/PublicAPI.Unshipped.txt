@@ -1,0 +1,9 @@
+#nullable enable
+*REMOVED*Assimalign.Viu.Syntax.Templates.CompilerErrorCode.XScopeIdNotSupported = 50 -> Assimalign.Viu.Syntax.Templates.CompilerErrorCode
+*REMOVED*Assimalign.Viu.Syntax.Templates.TransformContext.ScopeId.get -> string?
+*REMOVED*Assimalign.Viu.Syntax.Templates.TransformContext.Slotted.get -> bool
+*REMOVED*Assimalign.Viu.Syntax.Templates.TransformOptions.ScopeId.get -> string?
+*REMOVED*Assimalign.Viu.Syntax.Templates.TransformOptions.ScopeId.set -> void
+*REMOVED*Assimalign.Viu.Syntax.Templates.TransformOptions.Slotted.get -> bool
+*REMOVED*Assimalign.Viu.Syntax.Templates.TransformOptions.Slotted.set -> void
+*REMOVED*Assimalign.Viu.Syntax.Templates.TransformResult.ScopeId.get -> string?

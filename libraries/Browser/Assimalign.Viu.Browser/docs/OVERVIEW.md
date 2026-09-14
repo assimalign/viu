@@ -29,9 +29,9 @@ transitions consume the public transition-node contract. Top-level startup is as
 lower-level mount APIs deliberately bypass lifetime middleware as specified by `[APP-1]`, `[APP-2]`,
 `[APP-6]`, and `[APP-7]`.
 
-Scoped-style identifiers need no Browser-specific path: compiled virtual trees carry the stable
-`data-v-*` value as an ordinary attribute, so the same buffered binding operation used for authored
-attributes applies it (`[STY-1]`).
+Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367). Ordinary component stylesheets and
+CSS Modules remain supported. The Browser `CssVariables.Bind` directive remains available; generated
+reactive application for `v-bind()` in ordinary styles is deferred (`[STY-6]`–`[STY-8]`).
 
 For a hydrating application with a composed state registry, Browser consumes and removes the single
 `script[data-viu-state]` JSON island after bridge initialization and calls the registry's explicit

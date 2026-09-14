@@ -9,7 +9,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// Pins the CSS Modules class-name rewrite (<see cref="CssModuleRewriter"/>, [V01.01.06.06], specified
 /// by <c>[STY-2]</c>): local class selectors are
 /// renamed to deterministic, component-scoped hashed names, the original → hashed map is returned for the
-/// generated <c>$style</c> accessor, and the rewrite composes with <c>scoped</c>.
+/// generated <c>$style</c> accessor, and the rewritten tree serializes deterministically.
 /// </summary>
 public sealed class CssModuleRewriterTests
 {
@@ -100,18 +100,6 @@ public sealed class CssModuleRewriterTests
         result.Classes.ShouldContainKey("outer");
         result.Classes.ShouldNotContainKey("inner");
         CssStylesheetWriter.Write(result.Stylesheet).ShouldContain(":not(.inner)");
-    }
-
-    [Fact]
-    public void Rewrite_ComposesWithScoped()
-    {
-        // The compiler runs the module rename over the tree, then the scoped serializer — both read the
-        // parsed selector parts, so the class is renamed AND the [data-v] attribute lands on it.
-        var module = CssModuleRewriter.Rewrite(CssTestHelpers.ParseStylesheet(".box { color: red; }"), Salt);
-
-        var scoped = CssScopedRewriter.Rewrite(module.Stylesheet, "data-v-test");
-
-        scoped.ShouldBe("." + module.Classes["box"] + "[data-v-test] {\n  color: red;\n}\n");
     }
 
     [Fact]

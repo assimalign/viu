@@ -108,7 +108,7 @@ public sealed class SingleFileComponentAdoptedModelTests
             "<template>\n" +
             "    <div :class=\"Style.box\" />\n" +
             "</template>\n" +
-            "<style scoped module=\"Style\">\n" +
+            "<style module=\"Style\">\n" +
             "    .box { color: v-bind(Color); }\n" +
             "</style>\n" +
             "@script {\n" +

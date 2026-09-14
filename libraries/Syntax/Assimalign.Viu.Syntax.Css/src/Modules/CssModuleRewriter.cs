@@ -14,10 +14,9 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <para>
 /// <b>The hashing scheme.</b> A class <c>foo</c> becomes <c>foo_&lt;hash&gt;</c>, where <c>&lt;hash&gt;</c>
 /// is the eight-hex-digit FNV-1a of <c>&lt;localHashSalt&gt;-foo</c> (<see cref="CssHash"/>). The caller
-/// passes the component's short scope id (the <c>data-v-</c> hash) as the salt, so the same class in two
+/// passes the component's deterministic project-relative path hash as the salt, so the same class in two
 /// components hashes differently (per-component uniqueness) while the same class in the same component is
-/// stable across rebuilds (the asset-caching contract) — consistent with the [V01.01.06.04] scope-id
-/// scheme. Keeping the original name as a readable prefix means the emitted CSS is still greppable and
+/// stable across rebuilds (the asset-caching contract). Keeping the original name as a readable prefix means the emitted CSS is still greppable and
 /// legible in browser dev tools, which a bare hash would not be.
 /// </para>
 /// <para>
@@ -25,8 +24,8 @@ namespace Assimalign.Viu.Syntax.Css;
 /// nested inside functional pseudo arguments — <c>:not(.foo)</c>, <c>:deep(.foo)</c>, <c>:slotted(.foo)</c>,
 /// <c>:global(.foo)</c> — are <em>not</em> renamed: <c>:deep</c>/<c>:global</c> deliberately target
 /// external / un-hashed names, and the parser keeps non-reserved functional-pseudo arguments as verbatim
-/// text (see the Css <c>DESIGN.md</c> non-goals). Composing with <c>scoped</c> is order-independent because
-/// the rename only rewrites the parsed <c>Text</c> the scoped serializer reads.
+/// text (see the Css <c>DESIGN.md</c> non-goals). The canonical serializer reads the renamed
+/// selector parts, so the class map and extracted stylesheet use identical names.
 /// </para>
 /// </remarks>
 public static class CssModuleRewriter
@@ -36,7 +35,7 @@ public static class CssModuleRewriter
     /// <paramref name="localHashSalt"/>.
     /// </summary>
     /// <param name="stylesheet">The parsed stylesheet to rewrite.</param>
-    /// <param name="localHashSalt">The component-scoped salt (the short <c>data-v-</c> scope id).</param>
+    /// <param name="localHashSalt">The deterministic component-local salt for class names.</param>
     /// <returns>The rewritten stylesheet and the original → hashed class map.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stylesheet"/> or <paramref name="localHashSalt"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">

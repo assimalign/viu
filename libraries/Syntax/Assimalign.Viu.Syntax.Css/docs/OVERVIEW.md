@@ -2,12 +2,12 @@
 
 The build-time CSS language area of the `Assimalign.Viu.Syntax.*` cluster: it tokenizes and rule-parses
 CSS per [CSS Syntax Module Level 3](https://www.w3.org/TR/css-syntax-3/) into a located,
-value-equatable tree, rewrites that tree into attribute-scoped CSS — the compile-time half of Viu's
-scoped-CSS feature (`[STY-1]`) — and
+value-equatable tree, rewrites CSS Modules and compile-time `v-bind()` expressions, and
 **constructs the same tree programmatically** so a build-time generator can emit CSS from scratch. It is
 reached through the aggregate-parser registration seam: the [V01.01.06.02] generator composition root
-registers `CssSyntaxParser` for `.viu` `@style` blocks, and runs `CssScopedRewriter` for the `scoped`
-ones.
+registers `CssSyntaxParser` for `<style>` blocks in `.viu` and `.vue` inputs and legacy `@style`
+blocks in `.viu`. Scoped CSS was removed on 2026-09-14 by [V01.01.06.17] (#367); use CSS Modules for local
+class names.
 
 ## Public surface
 
@@ -17,9 +17,8 @@ ones.
   `CssDeclarationNode` / `CssKeyframeRuleNode`, and the parsed selector model under `Selectors/`
   (`CssSelectorListNode` → `CssComplexSelectorNode` → the flat `CssSelectorPartNode` parts). Every node is
   an immutable record carrying an exact-slice `SourceLocation`.
-- **`CssScopedRewriter.Rewrite(stylesheet, scopeId)`** — the scoped transform, returning deterministic
-  scoped CSS text.
-- **`CssStylesheetWriter.Write(stylesheet)`** — the plain (unscoped) canonical serializer, the emission
+- **`CssModuleRewriter` / `CssBindingRewriter`** — deterministic class-name and custom-property rewrites.
+- **`CssStylesheetWriter.Write(stylesheet)`** — the canonical serializer, the emission
   path a generated stylesheet takes.
 - **The construction surface** ([V01.01.12.11]) — `CssSyntaxFactory` builds the record-graph node types
   (declarations, qualified rules, `@media`/conditional-group at-rules, selectors) from code; the fluent
@@ -33,7 +32,7 @@ ones.
 
 Roots on `Assimalign.Viu.Syntax` only. It never references the `SingleFileComponent` parser or any other
 language library; the composition root wires them together. Runtime framework projects do not reference it —
-they see only the scope-id string in generated component metadata — while developer tooling may consume the
+generated CSS and module accessor names form the output boundary, while developer tooling may consume the
 public parser directly. It targets the netstandard2.0 analyzer TFM so it can run inside Roslyn generator
 hosts and other build/editor-time processes.
 

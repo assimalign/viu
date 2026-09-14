@@ -348,11 +348,6 @@ internal static class StaticStringifier
             // v-bind/v-html/v-text expression as constant (no constant evaluation). See docs/DESIGN.md.
         }
 
-        if (context.ScopeId is not null)
-        {
-            builder.Append(' ').Append(context.ScopeId);
-        }
-
         builder.Append('>');
         foreach (var child in node.Children)
         {

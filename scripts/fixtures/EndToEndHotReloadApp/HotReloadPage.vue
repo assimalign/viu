@@ -25,7 +25,7 @@ public string UtilityClasses => "hidden";
 private void Increment() => CountReference.Value++;
 </script>
 
-<style scoped>
+<style>
 .hot-shell {
     display: grid;
     gap: 0.5rem;

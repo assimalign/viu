@@ -16,7 +16,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <para>
 /// <b>The variable scheme.</b> A usage <c>v-bind(expr)</c> becomes <c>var(--&lt;hash&gt;)</c>, where
 /// <c>&lt;hash&gt;</c> is the eight-hex-digit FNV-1a of <c>&lt;localHashSalt&gt;-&lt;expr&gt;</c>
-/// (<see cref="CssHash"/>). The caller passes the component's short scope id as the salt, so two
+/// (<see cref="CssHash"/>). The caller passes the component's project-relative path hash as the salt, so two
 /// components binding the same expression text still get distinct properties, and the CSS
 /// <c>var(--&lt;hash&gt;)</c> matches the runtime's
 /// <c>style.setProperty("--&lt;hash&gt;", …)</c> by construction because both derive from the same hash of
@@ -42,7 +42,7 @@ public static class CssBindingRewriter
     /// custom-property reference salted by <paramref name="localHashSalt"/>.
     /// </summary>
     /// <param name="stylesheet">The parsed stylesheet to rewrite.</param>
-    /// <param name="localHashSalt">The component-scoped salt (the short <c>data-v-</c> scope id).</param>
+    /// <param name="localHashSalt">The deterministic component-local salt for custom property names.</param>
     /// <returns>The rewritten stylesheet, the collected bindings, and any malformed-usage diagnostics.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stylesheet"/> or <paramref name="localHashSalt"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">

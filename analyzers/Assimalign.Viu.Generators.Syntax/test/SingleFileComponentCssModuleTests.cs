@@ -14,7 +14,7 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// End-to-end tests for the CSS Modules and <c>v-bind()</c> generator emission ([V01.01.06.06], issue #62):
 /// a <c>&lt;style module&gt;</c> block produces the hashed CSS plus the typed <c>$style</c>-equivalent accessor,
 /// a <c>v-bind()</c> block produces custom-property CSS while its former runtime seam remains deferred,
-/// both compose with <c>scoped</c>, malformed <c>v-bind()</c> surfaces a
+/// both compose in ordinary stylesheets, malformed <c>v-bind()</c> surfaces a
 /// style diagnostic on the <c>.viu</c> coordinates, and the additions stay strictly cached. The rewrite
 /// semantics themselves are pinned in the Css library's rewriter tests; these pin the generator wiring.
 /// </summary>
@@ -179,21 +179,20 @@ public sealed class SingleFileComponentCssModuleTests
     }
 
     [Fact]
-    public void ModuleAndVBind_ComposeWithScoped()
+    public void ModuleAndVBind_ComposeWithoutScopeAttributes()
     {
         const string source =
             "@script {\n    public string c = \"red\";\n}\n" +
-            "<style module scoped>\n    .box { color: v-bind(c); }\n</style>\n";
+            "<style module>\n    .box { color: v-bind(c); }\n</style>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
-        // All three compose: the class is hashed, the scope attribute lands on it, and the value is a
-        // custom property, while only extracted styles and the module accessor are emitted at runtime.
+        // [V01.01.06.17] Module and binding names remain hashed in ordinary component styles.
         generated.ShouldNotContain("internal const string ScopeId");
         generated.ShouldContain(".box_");
-        generated.ShouldContain("[data-v-");
+        generated.ShouldNotContain("data-v-");
         generated.ShouldContain("color: var(--");
         generated.ShouldContain("internal static class Style");
         generated.ShouldNotContain("ApplyCssVariables");
@@ -209,7 +208,7 @@ public sealed class SingleFileComponentCssModuleTests
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Plain.SingleFileComponent.g.cs");
         generated.ShouldNotContain("internal static class Style");
         generated.ShouldNotContain("ApplyCssVariables");
-        // A plain non-scoped block still passes through verbatim (unchanged [V01.01.06.04] behavior).
+        // A plain block still passes through verbatim (unchanged [V01.01.06.04] behavior).
         generated.ShouldContain(".box { color: red; }");
     }
 

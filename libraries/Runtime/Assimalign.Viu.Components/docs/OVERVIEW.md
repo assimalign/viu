@@ -21,8 +21,8 @@ Emit, Expose, Warn, concrete Watch), `ComponentBase`, `ComponentBindings` and it
 `Resolve`, `ComponentLifecycle`, `ComponentRegistration (Reference, Contract, Activator)`, and
 `IComponentFactory`/`ComponentFactory`. The runtime provides the single context implementation;
 conventions such as State attach only through `Services` and the ambient reactive scope and never
-earn a context member. The model deliberately carries no style-scope identity; compiled trees stamp
-their static scope id as an ordinary element attribute (`[STY-1]`).
+earn a context member. The model carries no style-scope identity; scoped CSS was removed on
+2026-09-14 ([V01.01.06.17], #367). Ordinary component styles and CSS Modules remain compiler concerns.
 
 `ComponentBindings.Resolve` performs the full pure resolution step: exact, camelized, and
 hyphenated parameter aliases; declared-listener and node-lifecycle filtering; fallthrough splitting;

@@ -1,10 +1,8 @@
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// The base of the parts that make up a <see cref="CssComplexSelectorNode"/>: a simple selector
-/// (<see cref="CssSimpleSelectorNode"/>), a pseudo selector (<see cref="CssPseudoSelectorNode"/>), or a
-/// combinator (<see cref="CssCombinatorNode"/>). Kept flat and source-ordered so the scoped rewrite can
-/// find its attribute-insertion point with one reverse scan over the parts, with no tree walk.
+/// A source-ordered part of a complex selector: a simple selector, pseudo selector, or combinator.
+/// The physical order is retained for CSS Modules traversal and canonical serialization.
 /// </summary>
 public abstract record CssSelectorPartNode : CssSyntaxNode
 {

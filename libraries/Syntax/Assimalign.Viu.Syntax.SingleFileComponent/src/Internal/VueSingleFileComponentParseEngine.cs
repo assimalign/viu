@@ -230,6 +230,17 @@ internal sealed class VueSingleFileComponentParseEngine
 
                 break;
             case SingleFileComponentStyleBlock styleBlock:
+                // [V01.01.06.17] retains the parsed token and raw block for tooling, with a located
+                // error for .viu or compatibility warning for .vue instead of selector rewriting.
+                foreach (var option in styleBlock.Options)
+                {
+                    if (string.Equals(option.Name, "scoped", StringComparison.Ordinal))
+                    {
+                        Report(SingleFileComponentErrorCode.VueScopedStyleNotSupported,
+                            SpanOf(option.Location.Start.Offset, option.Location.Start.Offset + option.Name.Length));
+                    }
+                }
+
                 styles.Add(styleBlock);
                 break;
             case SingleFileComponentCustomBlock customBlock:

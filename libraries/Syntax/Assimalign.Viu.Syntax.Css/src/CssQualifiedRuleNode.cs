@@ -5,7 +5,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// the CSS Syntax Level 3 <c>&lt;qualified-rule&gt;</c>
 /// (https://www.w3.org/TR/css-syntax-3/#qualified-rule). <see cref="Prelude"/> is the exact raw slice of
 /// the selector text before the <c>{</c> (trimmed); <see cref="Selectors"/> is that prelude parsed into
-/// the selector list the scoped rewrite operates on. <see cref="Declarations"/> holds the block's
+/// the selector list CSS Modules traverses. <see cref="Declarations"/> holds the block's
 /// property/value pairs.
 /// </summary>
 public sealed record CssQualifiedRuleNode : CssSyntaxNode
@@ -13,7 +13,7 @@ public sealed record CssQualifiedRuleNode : CssSyntaxNode
     /// <summary>The raw selector prelude text, trimmed of surrounding whitespace.</summary>
     public required string Prelude { get; init; }
 
-    /// <summary>The prelude parsed into a selector list — the scoped rewrite's input.</summary>
+    /// <summary>The prelude parsed into a selector list — the input to CSS Modules renaming.</summary>
     public required CssSelectorListNode Selectors { get; init; }
 
     /// <summary>The declarations in the rule's block, in source order.</summary>

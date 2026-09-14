@@ -6,6 +6,8 @@
 > `libraries/Utilities/Assimalign.Viu.UtilityCss.Build` through [V01.01.12.30] (#346). This document is retained as add-on
 > design history; its Tailwind CSS v4.3.3 target is not part of Viu's core compatibility contract.
 
+> **Historical note (2026-09-14):** scoped CSS references below are superseded by its removal under [V01.01.06.17] (#367); ordinary component styles and CSS Modules remain supported.
+
 # Viu Utilities — standalone Tailwind CSS v4.3.3 compatibility design
 
 This document is the authoritative design for **Viu Utilities**, Viu's built-in utility-first CSS

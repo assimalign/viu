@@ -10,7 +10,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// selector prelude plus a declaration block; an at-rule is an at-keyword, a prelude, and either a block
 /// or a <c>;</c>. Conditional-group at-rules (<c>@media</c>/<c>@supports</c>/<c>@container</c>) recurse
 /// into nested rules and <c>@keyframes</c> into keyframe rules. Parsing is context-directed rather than a
-/// full generic component-value tree — enough to make correct scoping decisions — and is recoverable:
+/// full generic component-value tree — enough for module and binding rewrites — and is recoverable:
 /// malformed input reports a <see cref="CssError"/> and the parser resynchronizes; it never throws.
 /// </summary>
 internal sealed class CssParseEngine
@@ -443,7 +443,7 @@ internal sealed class CssParseEngine
 
     private static string DeVendorPrefix(string name)
     {
-        // Strip a single leading vendor prefix like "-webkit-" / "-moz-" so "@-webkit-keyframes" scopes.
+        // Strip a single leading vendor prefix like "-webkit-" / "-moz-" so "@-webkit-keyframes" receives a keyframe-rule body.
         if (name.Length > 1 && name[0] == '-')
         {
             var secondDash = name.IndexOf('-', 1);

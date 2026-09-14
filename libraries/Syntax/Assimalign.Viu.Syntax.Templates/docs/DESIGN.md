@@ -247,8 +247,7 @@ enclosing method's `state`, `component`, `frame`, and `parent` parameters.
 - interpolations and dynamic attributes call the public ServerRenderer normalizers, preserving the
   current WHATWG escaping, Boolean-attribute, class, style, and property rules;
 - `v-model` writes input values/check state, textarea content, and option selection; `v-show` composes
-  `display:none;` into the authored style position; a scoped-style id is written on every native
-  element;
+  `display:none;` into the authored style position;
 - fragments and structural branches use Core's named `HydrationMarkers`, never duplicated marker
   literals; Teleport, Suspense, and Transition lower to the ServerRenderer helper protocol, default
   content, and pass-through children respectively.
@@ -260,10 +259,10 @@ escaping, markers, streaming, state handoff, and teleport resolution stay in the
 protocol. The compiler assembly still references no runtime assembly; all runtime names exist only in
 the emitted consumer source.
 
-`ServerRenderFunctionEmitterTests` snapshot the allocation-free direct body, form/show/scope transforms,
+`ServerRenderFunctionEmitterTests` snapshot the allocation-free direct body, form/show transforms,
 built-ins, and fallback source. `CompiledServerRenderDifferentialTests` compile the emitted body in the
 test host and execute it through the production compiled-body seam against equivalent virtual trees,
-including escaping, attribute order, forms, scope ids, structural markers, and both dynamic-component
+including escaping, attribute order, forms, structural markers, and both dynamic-component
 and property-spread fallbacks.
 
 The public compiler facade keeps explicit profile selection for tooling and tests. The

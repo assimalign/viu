@@ -444,8 +444,9 @@ is in [`FORMAT.md`](../../libraries/Syntax/Assimalign.Viu.Syntax.SingleFileCompo
 `@template`/`@style` `@`-blocks still parse with a migration warning). A `.viu` with a
 `<template>`/`@script` compiles to a **mountable component** (see the note below,
 [#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **bundled CSS** unit.
-Per-component scope identifiers remain deferred under `[V01.01.06.12]`; their later addition is
-additive to `ComponentContract` and does not change the file format.
+Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367). Use ordinary component stylesheets
+or [CSS Modules](../SPECIFICATION.md#102-css-modules). `.viu` rejects `scoped` with `VIU1001`;
+`.vue` reports `VIU1002` and compiles the style as ordinary global CSS.
 
 > **`.vue` files compile too.** Viu ships a `.vue` single-file-component compatibility parser as a
 > product feature ([V01.01.06.09], [#250](https://github.com/assimalign/viu/issues/250)). The SDK globs

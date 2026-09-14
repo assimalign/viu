@@ -104,7 +104,7 @@ the six decisions remains pending:
 | 1. Delete `EmptyComponentFactory`. | The type is gone. `ApplicationOptions.Components` defaults to an empty `ComponentFactory`; resolving an unregistered component throws. `ComponentFactory` remains a public extensibility seam with registration and overridable resolution. |
 | 2. Make DI absence explicit. | `ApplicationOptions.Services`, `IApplicationContext.Services`, and `ComponentContext.Services` are nullable. The production empty-provider shim is gone. |
 | 3. Promote application state. | Public `ApplicationState` is available through `ApplicationLifetime.State`, as specified by `[APP-1]`. |
-| 4. Decide mounted context members. | The old mounted-context interface is gone. Public abstract `ComponentContext` exposes `Parent`; scoped-style identity was deliberately deferred by the component-model plan rather than leaked as a placeholder. |
+| 4. Decide mounted context members. | The old mounted-context interface is gone. Public abstract `ComponentContext` exposes `Parent`; scoped-style identity was removed with scoped CSS by owner decision on 2026-09-14 ([V01.01.06.17], #367). |
 | 5. Promote `MountedComponent`. | The old promotion is moot. The runtime keeps `MountedComponent<TNode>` internal and exposes the operation seam `ComponentHost.RenderAsync(ComponentRenderRequest, CancellationToken)` returning `IComponentRenderScope`, which SSR owns with `await using`. |
 | 6. Promote `MountedTemplateNode<TNode>`. | The type is gone. `MountedComponentView<TNode>` and `Renderer<TNode>.GetMountedComponentViews()` provide the stable diagnostic/testing view. |
 

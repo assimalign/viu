@@ -367,6 +367,39 @@ public sealed class SingleFileComponentHotReloadMetadataTests
         Normalize(handler.SourceText.ToString()).ShouldBe(Normalize(expected));
     }
 
+    [Fact]
+    public void VueScopedOptionOnlyEdit_InvalidatesStyleHashAndDiagnosticWithoutChangingCss()
+    {
+        // [V01.01.06.17]: ignored compatibility options still participate in incremental metadata.
+        const string projectDirectory = "C:/project";
+        const string path = projectDirectory + "/Components/Counter.vue";
+        const string source = "<template><div class=\"box\">hi</div></template>\n<style>.box { color: red; }</style>";
+        var compilation = GeneratorTestHarness.CreateCompilation();
+        AdditionalText originalFile = new InMemoryAdditionalText(path, source);
+        var driver = GeneratorTestHarness.CreateDriver(
+            ImmutableArray.Create(originalFile), RootNamespace, projectDirectory, configuration: "Debug")
+            .RunGenerators(compilation);
+        var baseline = GeneratedMetadata(driver);
+        AdditionalText changedFile = new InMemoryAdditionalText(path, source.Replace("<style>", "<style scoped>"));
+        driver = driver.ReplaceAdditionalText(originalFile, changedFile).RunGenerators(compilation);
+        var changedResult = driver.GetRunResult().Results[0];
+        var diagnostic = changedResult.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VIU1002");
+        var changed = changedResult.GeneratedSources.Single(item =>
+            item.HintName == "Components.Counter.SingleFileComponent.g.cs").SourceText.ToString();
+        MarkerHash(changed, "SingleFileComponentStyleUpdateMarker").ShouldNotBe(baseline.StyleContentHash);
+        MarkerHash(changed, "SingleFileComponentTemplateUpdateMarker").ShouldBe(baseline.TemplateContentHash);
+        MarkerHash(changed, "SingleFileComponentScriptUpdateMarker").ShouldBe(baseline.ScriptContentHash);
+        string ExtractedStyleLine(string generated) => generated.Split('\n').Single(line =>
+            line.Contains("internal static string ExtractedStyles =>", StringComparison.Ordinal));
+        ExtractedStyleLine(changed).ShouldBe(ExtractedStyleLine(baseline.GeneratedSource));
+        changed.ShouldNotContain("data-v-");
+
+        driver = driver.ReplaceAdditionalText(changedFile, originalFile).RunGenerators(compilation);
+        var restored = GeneratedMetadata(driver);
+        restored.StyleContentHash.ShouldBe(baseline.StyleContentHash);
+    }
+
     private static HotReloadMetadataValues Generate(
         string path,
         string projectDirectory,
@@ -433,7 +466,7 @@ public sealed class SingleFileComponentHotReloadMetadataTests
                 "<template><div>" + templateValue + "</div></template>\n" +
                 "<script setup lang=\"csharp\">public string SetupValue = \"setup\";</script>\n" +
                 "<script lang=\"csharp\">public string Value = \"" + scriptValue + "\";</script>\n" +
-                "<style scoped>.box { color: " + styleValue + "; }</style>\n";
+                "<style>.box { color: " + styleValue + "; }</style>\n";
         }
 
         return
@@ -443,7 +476,7 @@ public sealed class SingleFileComponentHotReloadMetadataTests
             "@script {\n" +
             "    public string Value = \"" + scriptValue + "\";\n" +
             "}\n" +
-            "<style scoped>\n" +
+            "<style>\n" +
             "    .box { color: " + styleValue + "; }\n" +
             "</style>\n";
     }

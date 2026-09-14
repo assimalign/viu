@@ -3,20 +3,12 @@ using System.Globalization;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// The deterministic FNV-1a hash the CSS Modules class-name rewrite (<see cref="CssModuleRewriter"/>) and
-/// the <c>v-bind()</c> custom-property rewrite (<see cref="CssBindingRewriter"/>) derive their local,
-/// component-scoped names from. It is the same FNV-1a scheme the generator's scope id uses
-/// (<c>Assimalign.Viu.Compiler.Css.StyleScopeId</c>, [V01.01.06.04]) so all three families of hash
-/// are consistent: culture-free, stable across machines and rebuilds (the asset-caching contract), and
-/// eight lowercase hex digits. String-only (no <c>System.IO</c>), so it stays inside the analyzer API
-/// surface (RS1035).
+/// Computes deterministic FNV-1a hexadecimal hashes for CSS module class names and CSS binding
+/// custom properties. Callers salt each input with the component path hash so equal local names
+/// in different components remain distinct. The algorithm and spelling are stable across rebuilds
+/// and are retained by <c>[V01.01.06.17]</c>.
 /// </summary>
-/// <remarks>
-/// The caller salts the input with the component's short scope id (the <c>data-v-</c> hash), so the same
-/// class name or expression in two different components hashes differently — the per-component uniqueness
-/// the CSS Modules and <c>v-bind()</c> acceptance criteria require. Without the salt, two components
-/// declaring <c>.button</c> would collide into one rule and silently overwrite each other.
-/// </remarks>
+/// <remarks>The value is a CSS name suffix only; it does not identify element attributes.</remarks>
 internal static class CssHash
 {
     /// <summary>Computes the eight-hex-digit FNV-1a hash of <paramref name="value"/>.</summary>

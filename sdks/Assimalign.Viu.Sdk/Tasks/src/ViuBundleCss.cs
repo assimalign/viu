@@ -48,8 +48,9 @@ public sealed class ViuBundleCss : Microsoft.Build.Utilities.Task, ICancelableTa
 
     /// <summary>
     /// The consuming project's directory (<c>$(ProjectDir)</c>). Used to derive each component's
-    /// project-relative path — the input to the <c>data-v-&lt;hash&gt;</c> scope id and the bundle's
-    /// deterministic ordering — so the task's scope ids match the generator's exactly.
+    /// project-relative path — the input to CSS Module/custom-property hashes and the bundle's
+    /// deterministic ordering — so the task's generated class and custom-property names match
+    /// the generator's exactly.
     /// </summary>
     public string? ProjectDirectory { get; set; }
 

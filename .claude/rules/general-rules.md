@@ -39,8 +39,8 @@ core compatibility target (owner decision, 2026-08-13).
 - `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}` is the independently published,
   standalone UtilityCss add-on library. It is not integrated into a Viu SDK or framework surface;
   consumer MSBuild integration arrives separately through [V01.01.12.30] (#346). Utility CSS remains
-  non-normative for Viu core. Component `<style>` CSS remains fully supported, including scoping,
-  bundling, and hot reload.
+  non-normative for Viu core. Component `<style>` CSS remains fully supported, including CSS Modules,
+  bundling, and hot reload. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367).
 - `libraries/Utilities/Assimalign.Viu.FileRouting/{src,test}` is the independently published,
   host-free folder-routing add-on beside UtilityCss. Its generator ships in its own package;
   it remains outside every Viu SDK and framework surface and produces ordinary eager route records.

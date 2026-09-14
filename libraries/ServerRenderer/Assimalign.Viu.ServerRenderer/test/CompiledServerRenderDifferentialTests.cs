@@ -38,34 +38,32 @@ public sealed class CompiledServerRenderDifferentialTests
     /// <summary>Gets the templates exercised by the byte-equality differential test.</summary>
     public static IEnumerable<object[]> FixtureSource =>
     [
-        ["<section id=\"root\"><h1>{{ title }}</h1><p :class=\"classes\" :style=\"styles\" :title=\"title\">{{ body }}</p><!--safe--></section>", ""],
-        ["<span>{{ title }}</span><input disabled :title=\"body\">", ""],
-        ["<textarea :value=\"body\">ignored</textarea>", ""],
-        ["<div v-if=\"visible\">yes</div>", ""],
-        ["<ul><li v-for=\"item in items\">{{ item }}</li></ul>", ""],
-        ["<input v-model=\"modelText\">", ""],
-        ["<input type=\"checkbox\" value=\"yes\" v-model=\"checkboxModel\">", ""],
-        ["<textarea v-model=\"body\">ignored</textarea>", ""],
-        ["<select v-model=\"choice\"><option value=\"one\">One</option><option :value=\"second\">Two</option></select>", ""],
-        ["<select v-model=\"choice\"><option>{{ choice }}</option></select>", ""],
-        ["<div :style=\"styles\" v-show=\"visible\">hidden</div>", ""],
-        ["<main><h1>heading</h1><p>body</p></main>", "data-v-c0ffee00"],
-        ["<template v-if=\"!visible\"><span>one</span><span>two</span></template>", ""],
-        ["<component :is=\"viewName\"><span>{{ body }}</span></component>", ""],
-        ["<div v-bind=\"attributes\"><span>{{ body }}</span></div>", "data-v-fallback00"],
-        ["<input :value.prop=\"body\">", ""],
+        ["<section id=\"root\"><h1>{{ title }}</h1><p :class=\"classes\" :style=\"styles\" :title=\"title\">{{ body }}</p><!--safe--></section>"],
+        ["<span>{{ title }}</span><input disabled :title=\"body\">"],
+        ["<textarea :value=\"body\">ignored</textarea>"],
+        ["<div v-if=\"visible\">yes</div>"],
+        ["<ul><li v-for=\"item in items\">{{ item }}</li></ul>"],
+        ["<input v-model=\"modelText\">"],
+        ["<input type=\"checkbox\" value=\"yes\" v-model=\"checkboxModel\">"],
+        ["<textarea v-model=\"body\">ignored</textarea>"],
+        ["<select v-model=\"choice\"><option value=\"one\">One</option><option :value=\"second\">Two</option></select>"],
+        ["<select v-model=\"choice\"><option>{{ choice }}</option></select>"],
+        ["<div :style=\"styles\" v-show=\"visible\">hidden</div>"],
+        ["<main><h1>heading</h1><p>body</p></main>"],
+        ["<template v-if=\"!visible\"><span>one</span><span>two</span></template>"],
+        ["<component :is=\"viewName\"><span>{{ body }}</span></component>"],
+        ["<div v-bind=\"attributes\"><span>{{ body }}</span></div>"],
+        ["<input :value.prop=\"body\">"],
     ];
 
     [Theory]
     [MemberData(nameof(FixtureSource))]
     public async Task CompiledMarkup_EquivalentVirtualTree_IsByteIdentical(
-        string source,
-        string scopeId)
+        string source)
     {
         MethodInfo renderMethod = CompileServerRender(
             source,
-            out object component,
-            string.IsNullOrEmpty(scopeId) ? null : scopeId);
+            out object component);
         ComponentVirtualNode referenceTree = CreateReferenceTree(source);
         ComponentFactory components = new();
         ServerRenderApplication compiledApplication = new(new ComponentTextNode("unused"), components);
@@ -78,6 +76,8 @@ public sealed class CompiledServerRenderDifferentialTests
         string traversed = await ServerRender.RenderToStringAsync(referenceTree);
 
         compiled.ShouldBe(traversed);
+        // [V01.01.06.17]: neither direct markup nor virtual-tree fallback adds style attributes.
+        compiled.ShouldNotContain("data-v-");
     }
 
     [Fact]
@@ -149,15 +149,13 @@ public sealed class CompiledServerRenderDifferentialTests
         Justification = "The test-owned generated type has the public constructor and method declared below.")]
     private static MethodInfo CompileServerRender(
         string source,
-        out object component,
-        string? scopeId = null)
+        out object component)
     {
         RootNode root = TemplateParser.Parse(source, ParserOptions.CreateHtml());
         TransformOptions transformOptions = TransformOptions.CreateDom();
         transformOptions.PrefixIdentifiers = true;
         transformOptions.BindingMetadata = BindingMetadata.Empty;
         transformOptions.IsServerRendering = true;
-        transformOptions.ScopeId = scopeId;
         TransformResult transformed = Transformer.Transform(root, transformOptions);
         RenderFunctionEmitterResult emitted = RenderFunctionEmitter.Emit(
             transformed,
@@ -364,20 +362,14 @@ public sealed class CompiledServerRenderDifferentialTests
             "<main><h1>heading</h1><p>body</p></main>" =>
                 Element(
                     "main",
-                    [ElementBinding.Attribute(new QualifiedName("data-v-c0ffee00"), string.Empty)],
+                    children:
                     [
                         Element(
                             "h1",
-                            [ElementBinding.Attribute(
-                                new QualifiedName("data-v-c0ffee00"),
-                                string.Empty)],
-                            [new ComponentTextNode("heading")]),
+                            children: [new ComponentTextNode("heading")]),
                         Element(
                             "p",
-                            [ElementBinding.Attribute(
-                                new QualifiedName("data-v-c0ffee00"),
-                                string.Empty)],
-                            [new ComponentTextNode("body")]),
+                            children: [new ComponentTextNode("body")]),
                     ]),
             "<template v-if=\"!visible\"><span>one</span><span>two</span></template>" =>
                 new ComponentFragmentNode(
@@ -397,18 +389,12 @@ public sealed class CompiledServerRenderDifferentialTests
                     "div",
                     [
                         ElementBinding.Attribute(new QualifiedName("title"), "<fallback>"),
-                        ElementBinding.Attribute(
-                            new QualifiedName("data-v-fallback00"),
-                            string.Empty),
                     ],
                     children:
                     [
                         Element(
                             "span",
-                            [ElementBinding.Attribute(
-                                new QualifiedName("data-v-fallback00"),
-                                string.Empty)],
-                            [new ComponentTextNode("body & text")]),
+                            children: [new ComponentTextNode("body & text")]),
                     ]),
             "<input :value.prop=\"body\">" =>
                 Element(

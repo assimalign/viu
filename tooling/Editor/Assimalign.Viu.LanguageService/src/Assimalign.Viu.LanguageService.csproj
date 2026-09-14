@@ -10,12 +10,12 @@
          (SingleFileComponentDiagnostics.ComposeToFilePosition) are the same code the build's source
          generator runs, so editor results and build results agree by construction. -->
     <ViuProjectReference Include="Assimalign.Viu.Compiler.SingleFileComponent" />
-    <!-- StyleScopeId feeds the semantic engine's projection inputs ([V01.01.12.23], #259) with the
-         exact scope id the build's source generator derives, so the editor-built generated document
+    <!-- CssComponentHash feeds the semantic engine's projection inputs ([V01.01.12.23], #259) with the
+         exact CSS hash salt the build's source generator derives, so the editor-built generated document
          is identical to the generator's by construction. -->
     <ViuProjectReference Include="Assimalign.Viu.Compiler.Css" />
     <!-- Component style-class completion ([V01.01.12.07.13], #334) reads selectors from the same
-         recoverable CSS tree the compiler scopes and emits. Already in the closure transitively;
+         recoverable CSS tree the compiler parses and emits. Already in the closure transitively;
          declared here because this project now compiles directly against its syntax types. -->
     <ViuProjectReference Include="Assimalign.Viu.Syntax.Css" />
     <!-- Template element folding ([V01.01.12.07.07]) parses the template block's markup with the same

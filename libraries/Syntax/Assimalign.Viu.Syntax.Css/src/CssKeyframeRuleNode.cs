@@ -4,7 +4,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// A keyframe rule inside an <c>@keyframes</c> block — a keyframe selector (a percentage, or <c>from</c>
 /// / <c>to</c>, or a comma-separated list of them) and a declaration block, per CSS Animations Level 1
 /// (https://www.w3.org/TR/css-animations-1/#keyframes). The keyframe selector is <b>not</b> a CSS
-/// selector and is never scoped, so it is kept as the raw <see cref="Selector"/> text rather than parsed
+/// selector, so it is kept as the raw <see cref="Selector"/> text rather than parsed
 /// into a selector list.
 /// </summary>
 public sealed record CssKeyframeRuleNode : CssSyntaxNode

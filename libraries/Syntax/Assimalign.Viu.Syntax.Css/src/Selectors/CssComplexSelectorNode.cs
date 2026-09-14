@@ -1,13 +1,9 @@
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// A complex selector — a flat, source-order sequence of <see cref="CssSelectorPartNode"/> parts
-/// (simple selectors, pseudo selectors, and the combinators between compound selectors), the W3C
-/// Selectors Level 4 <c>&lt;complex-selector&gt;</c>
-/// (https://www.w3.org/TR/selectors-4/#typedef-complex-selector). The model is deliberately flat rather
-/// than a nested compound tree, because the one question the scoped rewrite asks is positional — which
-/// compound receives the <c>[data-v-hash]</c> attribute, namely the last part that is neither a
-/// combinator nor a pseudo — and a flat list answers it with a single reverse scan.
+/// A complex selector represented as a flat, source-ordered sequence of simple selectors,
+/// pseudo selectors, and combinators. The flat representation supports deterministic serialization
+/// and CSS Modules class renaming without losing ordering.
 /// </summary>
 public sealed record CssComplexSelectorNode : CssSyntaxNode
 {

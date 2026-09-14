@@ -168,7 +168,7 @@ payload (`[EXE-4]`).
 The low-level render entry points do not own request scopes. The host adaptor owns only the
 factory-returned scope for one invocation; it never owns the output or prescribes an HTTP response.
 ServerRenderer does not own browser application lifetime, DOM hydration, client directives,
-transition timing, or persistent mounted state. The runtime-tree entry point has no compiled
-scope-identifier input; scoped identifiers are emitted only by the server compiler profile
-(`[SSR-COMPILE-3]`). The document-shell seam does not parse templates, buffer the completed body,
+transition timing, or persistent mounted state. Scoped CSS and compiler scope-attribute emission
+were removed on 2026-09-14 ([V01.01.06.17], #367). The document-shell seam does not parse templates,
+buffer the completed body,
 or support random-access insertion into a prefix that has already streamed (`[SSR-14]`).

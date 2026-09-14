@@ -8,18 +8,14 @@ namespace Assimalign.Viu.Compiler.Css;
 /// The result of compiling one <c>.viu</c> or compatible <c>.vue</c> file's style blocks
 /// (<see cref="SingleFileComponentStyleCompiler.Compile"/>) — the shared, deterministic output both
 /// build-time hosts consume ([V01.01.12.12]). The <c>Assimalign.Viu.Generators.Syntax</c> generator maps it
-/// into its cached model to emit the <c>ScopeId</c>/<c>ExtractedStyles</c> constants, the <c>$style</c>
+/// into its cached model to emit the <c>ExtractedStyles</c> constant, the <c>$style</c>
 /// accessors, and the <c>v-bind()</c> seam; the <c>ViuBundleCss</c> MSBuild task consumes only
 /// <see cref="ExtractedStyles"/> to write the physical bundle. Because both hosts call this one method over
 /// the same input, the generated constant and the physical file are byte-identical by construction.
 /// </summary>
-/// <param name="ScopeId">
-/// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
-/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]).
-/// </param>
 /// <param name="ExtractedStyles">
-/// The component's compiled CSS — <c>scoped</c> blocks rewritten with <see cref="ScopeId"/>, <c>module</c>
-/// class names locally hashed, <c>v-bind()</c> rewritten to custom properties, and untouched non-scoped
+/// The component's compiled CSS — <c>module</c> class names locally hashed,
+/// <c>v-bind()</c> rewritten to custom properties, and untouched ordinary
 /// blocks passed through verbatim, concatenated in source order — or <see langword="null"/> when the
 /// component declares no style block. This is the exact text the generator emits as its
 /// <c>ExtractedStyles</c> constant and the task writes into the bundle.
@@ -39,7 +35,6 @@ namespace Assimalign.Viu.Compiler.Css;
 /// compiled cleanly.
 /// </param>
 public sealed record SingleFileComponentStyleCompilation(
-    string? ScopeId,
     string? ExtractedStyles,
     IReadOnlyList<SingleFileComponentStyleModuleClass> ModuleClasses,
     IReadOnlyList<SingleFileComponentStyleVariableBinding> VariableBindings,
@@ -47,7 +42,6 @@ public sealed record SingleFileComponentStyleCompilation(
 {
     /// <summary>An empty compilation — no style block was declared.</summary>
     public static readonly SingleFileComponentStyleCompilation Empty = new(
-        ScopeId: null,
         ExtractedStyles: null,
         ModuleClasses: System.Array.Empty<SingleFileComponentStyleModuleClass>(),
         VariableBindings: System.Array.Empty<SingleFileComponentStyleVariableBinding>(),

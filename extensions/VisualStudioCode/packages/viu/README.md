@@ -171,3 +171,9 @@ without the executable bit. The client restores it (`chmod 0755`) before spawnin
 
 The package-local `Build.ps1` intentionally stops after payload staging and client compilation;
 the root `Build.ps1` owns `vsce` invocation for both Visual Studio Code packages.
+
+Scoped CSS is unsupported (removed 2026-09-14, [V01.01.06.17], #367). Style completions offer
+ordinary component styles and CSS Modules; `scoped` is an ordinary unknown attribute in the grammar.
+The language service reports a located error for `.viu` and a compatibility warning for `.vue`,
+whose style block compiles as ordinary global CSS. Component stylesheet bundling and hot reload remain
+supported.

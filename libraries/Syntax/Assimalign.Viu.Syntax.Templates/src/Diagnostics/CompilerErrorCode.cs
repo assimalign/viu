@@ -174,9 +174,6 @@ public enum CompilerErrorCode
     /// <summary>Handler caching was requested without the identifier prefixing it depends on.</summary>
     XCacheHandlerNotSupported = 49,
 
-    /// <summary>A scope id was supplied outside module mode, where it cannot be applied.</summary>
-    XScopeIdNotSupported = 50,
-
     /// <summary>An <c>@vnode-*</c> lifecycle hook was used; the <c>vue:</c> prefix replaces it.</summary>
     XVnodeHooks = 51,
 

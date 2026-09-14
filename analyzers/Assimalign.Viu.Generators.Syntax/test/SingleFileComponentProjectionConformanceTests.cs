@@ -36,7 +36,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
 
     // Canonical hybrid .viu exercising every emitter seam at once: a dynamic interpolation (render
     // body + #line (l,c)-(l,c) span map), a hoisted using + IReactiveReference member + method
-    // (two-region @script #line map, unwrap seam), <style scoped> (ScopeId/ExtractedStyles),
+    // (two-region @script #line map, unwrap seam), <style> (ExtractedStyles),
     // <style module> (accessor class + $style resolution), and v-bind() (CSS-variable seam through
     // binding metadata).
     private const string CanonicalHybridSource =
@@ -50,7 +50,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
         "    public int Doubled() => Math.Max(Count.Value * 2, 0);\n" +
         "}\n" +
         "\n" +
-        "<style scoped>\n" +
+        "<style>\n" +
         "    .box { color: v-bind(Count); }\n" +
         "</style>\n" +
         "\n" +
@@ -65,7 +65,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
         "    <div>legacy</div>\n" +
         "}\n";
 
-    // Tag-based .vue compatibility ([V01.01.06.09]): C# script, scoped style, and a named CSS module.
+    // Tag-based .vue compatibility ([V01.01.06.09]): C# script, ordinary style, and a named CSS module.
     private const string VueTagSource =
         "<template>\n" +
         "<div :class=\"theme.active\">{{ Count }}</div>\n" +
@@ -73,7 +73,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
         "<script lang=\"csharp\">\n" +
         "public int Count = 1;\n" +
         "</script>\n" +
-        "<style scoped>\n" +
+        "<style>\n" +
         ".card { color: red; }\n" +
         "</style>\n" +
         "<style module=\"theme\">\n" +
@@ -90,7 +90,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
     // Degenerate shapes guarding the conditional seams: style-only (no bridge, no using static),
     // script-only (no render function), and a fully static template (the RenderCacheSize slot path).
     private const string StyleOnlySource =
-        "<style scoped>\n" +
+        "<style>\n" +
         "    .box { color: red; }\n" +
         "</style>\n";
 
@@ -161,7 +161,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
         libraryDiagnostics.ShouldBe(generatorDiagnostics);
     }
 
-    // Mirrors the generator's ReadFile: the same name resolution, scope-id derivation, format
+    // Mirrors the generator's ReadFile: the same name resolution, CSS name hashing, format
     // detection, and hot-reload gating over the same two build properties.
     private static SingleFileComponentProjectionInput CreateInput(string path, string content, string? configuration)
     {
@@ -178,7 +178,7 @@ public sealed class SingleFileComponentProjectionConformanceTests
             names.Namespace,
             names.ClassName,
             names.HintName,
-            StyleScopeId.Resolve(path, ProjectDirectory),
+            CssComponentHash.Resolve(path, ProjectDirectory),
             emitHotReloadMetadata
                 ? SingleFileComponentHotReloadMetadataFactory.ResolveComponentIdentifier(path, ProjectDirectory)
                 : null,

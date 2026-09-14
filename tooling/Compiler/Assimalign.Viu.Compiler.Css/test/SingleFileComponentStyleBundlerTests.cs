@@ -19,15 +19,15 @@ public sealed class SingleFileComponentStyleBundlerTests
     private const string ProjectDirectory = "C:/proj";
 
     private static readonly SingleFileComponentStyleInput Card = new(
-        "C:/proj/Components/Card.viu", "<style scoped>\n    .card { color: red; }\n</style>\n");
+        "C:/proj/Components/Card.viu", "<style>\n    .card { color: red; }\n</style>\n");
 
     private static readonly SingleFileComponentStyleInput Panel = new(
-        "C:/proj/Components/Panel.viu", "<style scoped>\n    .panel { color: blue; }\n</style>\n");
+        "C:/proj/Components/Panel.viu", "<style>\n    .panel { color: blue; }\n</style>\n");
 
     private static readonly SingleFileComponentStyleInput VueBadge = new(
         "C:/proj/Components/Badge.vue",
         "<template><span class=\"badge\">ready</span></template>\n" +
-        "<style scoped>\n.badge { color: green; }\n</style>\n");
+        "<style>\n.badge { color: green; }\n</style>\n");
 
     /// <summary>Components are ordered by ascending project-relative path, independent of input order.</summary>
     [Fact]
@@ -77,8 +77,8 @@ public sealed class SingleFileComponentStyleBundlerTests
     {
         var parser = SingleFileComponentParserFactory.CreateVueForStyleExtraction();
         var parse = parser.ParseComponent(VueBadge.Text);
-        var scopeId = StyleScopeId.Resolve(VueBadge.FilePath, ProjectDirectory);
-        var compiled = SingleFileComponentStyleCompiler.Compile(parse, scopeId);
+        var localHashSalt = CssComponentHash.Resolve(VueBadge.FilePath, ProjectDirectory);
+        var compiled = SingleFileComponentStyleCompiler.Compile(parse, localHashSalt);
 
         var bundle = SingleFileComponentStyleBundler.Bundle(new[] { VueBadge }, ProjectDirectory);
 
@@ -86,7 +86,8 @@ public sealed class SingleFileComponentStyleBundlerTests
         compiled.ExtractedStyles.ShouldNotBeNull();
         bundle!.ShouldContain("Components/Badge.vue");
         bundle.ShouldContain(compiled.ExtractedStyles!);
-        bundle.ShouldContain(".badge[" + scopeId + "]");
+        bundle.ShouldContain(".badge { color: green; }");
+        bundle.ShouldNotContain("data-v-");
     }
 
     /// <summary>

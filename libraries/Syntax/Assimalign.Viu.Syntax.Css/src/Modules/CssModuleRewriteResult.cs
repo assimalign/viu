@@ -10,8 +10,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// binds against (specified by <c>[STY-2]</c>).
 /// </summary>
 /// <param name="Stylesheet">
-/// The stylesheet with local class selectors renamed. Feed it to <see cref="CssScopedRewriter.Rewrite"/>
-/// (when the block is also <c>scoped</c>) or <see cref="CssStylesheetWriter.Write"/> to serialize —
+/// The stylesheet with local class selectors renamed. Feed it to <see cref="CssStylesheetWriter.Write"/> to serialize —
 /// both render selectors from the parsed parts, so the renamed <c>Text</c> is what they emit.
 /// </param>
 /// <param name="Classes">

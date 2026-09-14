@@ -89,9 +89,9 @@ Server rendering still resolves the authored subtree; the client may then adopt 
 without activating it until its host trigger fires. Asynchronous definitions emit exactly one outer
 boundary (`[SSR-MARKERS-1]`, `[HYD-LAZY-1]`, `[HYD-LAZY-2]`).
 
-The runtime-tree serializer has no scope-identifier input, so it performs no scope-identifier
-attribute pass. The compiler profile does emit the transform's known scope identifier on every
-native element. Application services, factories, directives, state registries, and diagnostics are borrowed
+Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367); neither the runtime-tree serializer
+nor the compiler profile emits style-scope attributes. Application services, factories, directives,
+state registries, and diagnostics are borrowed
 from `IApplicationContext`. The low-level renderer never disposes them; the host adaptor disposes
 only the request scope explicitly returned by the downstream factory. The test project includes a
 BCL-only loopback HTTP smoke host, proving that neither the contract nor its execution requires

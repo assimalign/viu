@@ -23,9 +23,9 @@ internal sealed class ViuLanguageService :
             // as migration guidance during the transition window.
             ["template"] = "**`<template>`** contains the component's template markup, compiled to a render function at build time.",
             ["@script"] = "**`@script`** contains C# members merged into the generated partial component.",
-            ["style"] = "**`<style>`** contains component CSS and can be `scoped` or a CSS `module`.",
+            ["style"] = "**`<style>`** contains ordinary global component CSS or a CSS `module`.",
             ["@template"] = "**`@template { }`** is the legacy Viu template container. Rewrite the block as `<template>...</template>`; block options become tag attributes.",
-            ["@style"] = "**`@style { }`** is the legacy Viu style container. Rewrite the block as `<style>...</style>`; block options become tag attributes such as `scoped`.",
+            ["@style"] = "**`@style { }`** is the legacy Viu style container. Rewrite the block as `<style>...</style>`; block options become tag attributes such as `module`.",
             ["v-if"] = "**`v-if`** conditionally renders an element or component.",
             ["v-for"] = "**`v-for`** repeats an element or component for values in a source.",
             ["v-model"] = "**`v-model`** creates a two-way form value binding.",

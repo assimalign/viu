@@ -1,14 +1,9 @@
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Discriminates the kinds of node the CSS parser produces, following the CSS Syntax Module Level 3
-/// parser output model (https://www.w3.org/TR/css-syntax-3/#parsing): a stylesheet is a list of rules;
-/// a rule is a qualified rule or an at-rule; declarations live inside rule blocks. The prelude of a
-/// qualified rule is parsed into a selector list (sufficient for scoped-CSS rewriting per the W3C
-/// Selectors grammar, https://www.w3.org/TR/selectors-4/), so the catalog also covers the selector tree.
-/// The catalog is Viu's own; values are additive only, because <see cref="CssSyntaxNode.RawKind"/>
-/// projects them for language-agnostic infrastructure. It grew from the scaffold
-/// with the scoped-CSS work ([V01.01.06.04]); CSS Modules ([V01.01.06.06]) extends it further.
+/// Discriminates stylesheet, rule, declaration, and selector records in the CSS syntax tree.
+/// The categories follow CSS Syntax Level 3 and retain the explicit selector structure
+/// needed by CSS Modules and canonical serialization.
 /// </summary>
 public enum CssSyntaxNodeKind
 {

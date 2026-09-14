@@ -1,14 +1,15 @@
 # The `.viu` single-file component format
 
-`Assimalign.Viu.Syntax.SingleFileComponent` defines and parses the `.viu` single-file component (SFC) format — the Viu
-counterpart to Vue's `.vue` files. This document is the authoritative specification for the container
+`Assimalign.Viu.Syntax.SingleFileComponent` defines and parses the `.viu` single-file component (SFC)
+format. This document is the authoritative specification for the container
 syntax and the block parser (`SingleFileComponentParser.Parse`). It matches the parser's behavior exactly; the test
 suite (`libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/test/`) pins every rule stated here.
 
 Work items: **[V01.01.06.01]** (original @-block format), **[V01.01.06.10]** (hybrid-container pivot,
-#257). Block semantics mirror the Vue SFC specification (<https://vuejs.org/api/sfc-spec.html>);
-descriptor shape mirrors `parse()` in `@vue/compiler-sfc` (vuejs/core,
-`packages/compiler-sfc/src/parse.ts`).
+#257), and **[V01.01.06.17]** (scoped CSS removal, #367). Viu's block semantics are defined by
+`docs/SPECIFICATION.md`. The separate `.vue` compatibility parser accepts the foreign container
+format; its format reference is
+[Vue 3.5.34 container parsing](https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts).
 
 ## 1. The hybrid container
 
@@ -36,16 +37,16 @@ custom blocks keep the `@`-form.
     public string Message = "Hello";
 }
 
-<style scoped>
+<style>
     /* CSS */
     .box { color: red; }
 </style>
 ```
 
-Only the **container** differs from Vue (and only for script/custom blocks). The block *semantics* —
-what `template`/`script`/`style`/custom blocks mean, and what their options mean — follow the Vue SFC
-spec unchanged. In particular, the markup inside `<template>` is **standard Vue template syntax**; the
-block parser does not parse it. It only slices the file into blocks and records their source spans.
+The block parser slices the file into blocks and records their source spans. It does not parse
+template markup, C#, or CSS. Viu's template and style semantics are defined by
+`docs/SPECIFICATION.md`; accepting the `.vue` container does not add foreign runtime semantics.
+In particular, scoped CSS is unsupported in both containers (§5.1).
 The template markup is parsed later by the template compiler (`Assimalign.Viu.Syntax.Templates`,
 [V01.01.05.01]); the C# in `@script` is analysed by [V01.01.06.03].
 
@@ -62,18 +63,17 @@ template block (a `<style>`-only CSS-bundle unit, or a `@script`-only partial) s
 class — no component bridge — so it keeps compiling exactly as before. This library still only
 *slices*; the bridge is emitted by the generator that consumes the descriptor.
 
-### Upstream-semantics mapping
+### Container-format mapping
 
-| `.viu`                           | Vue SFC                          | Meaning (per the Vue SFC spec)                    |
+| `.viu`                           | `.vue` compatibility input       | Meaning in Viu                                    |
 | -------------------------------- | -------------------------------- | ------------------------------------------------- |
 | `<template> … </template>`       | `<template> … </template>`       | The component's markup.                            |
 | `<template lang="html">`         | `<template lang="html">`         | Markup pre-processor language.                     |
 | `@script { … }`                  | `<script> … </script>`           | The component's script body (**C#**; §6.2).        |
 | `@script lang="csharp" { … }`    | `<script lang="…">`              | Script language.                                   |
 | `<style> … </style>`             | `<style> … </style>`             | Component CSS (a file may have several).           |
-| `<style scoped>`                 | `<style scoped>`                 | [Scoped CSS](https://vuejs.org/api/sfc-css-features.html#scoped-css). |
-| `<style module>`                 | `<style module>`                 | [CSS Modules](https://vuejs.org/api/sfc-css-features.html#css-modules) (default name). |
-| `<style module="classes">`       | `<style module="classes">`       | CSS Modules bound to a named object.              |
+| `<style module>`                 | `<style module>`                 | CSS Modules with the default compile-time accessor ([STY-2]). |
+| `<style module="classes">`       | `<style module="classes">`       | CSS Modules with a named compile-time accessor.    |
 | `<style lang="scss">`            | `<style lang="scss">`            | CSS pre-processor language.                        |
 | `@docs { … }` (any other name)   | `<docs>` (custom block)          | [Custom block](https://vuejs.org/api/sfc-spec.html#custom-blocks), preserved verbatim. |
 
@@ -164,13 +164,13 @@ A tag block is introduced by an **opening tag whose `<` is at column 0** (§2):
 
 ```
 <template lang="html">
-<style scoped>
+<style module>
 ```
 
 - The tag name matches the HTML tag-name grammar (a letter, then letters, digits, `-`, `_`, `:`, `.`)
   and the two block names `template`/`style` are matched **case-sensitively and in lowercase**.
 - The opening tag may span multiple lines and is parsed with the **HTML attribute grammar** (§5).
-- A **self-closing** tag (`<template />`, `<style scoped />`) is an empty block.
+- A **self-closing** tag (`<template />`, `<style module />`) is an empty block.
 - A top-level `<script …>` tag is **not** a block — it is diagnosed and discarded (§6.2).
 - Any **other** tag name at the top level (e.g. `<docs>`) is **not** a custom block — custom blocks
   stay @-syntax. It reports `StrayTopLevelContent` at the opening tag; recovery skips the whole
@@ -210,14 +210,13 @@ tag-attribute mapping is the identity mapping; only the header grammar differs.
 
 | Container | Grammar | Surfaced as |
 |---|---|---|
-| `<template lang="html">`, `<style scoped>`, `<style module="classes">`, `<style lang="scss">` | HTML attribute grammar (the `.vue` one): values quoted with `"` or `'`, or unquoted; whitespace allowed around `=`; a repeated attribute reports `DuplicateTagAttribute` (1013) | identical `SingleFileComponentBlockOption` records → `Lang`, `Scoped`, `IsModule`, `ModuleName` |
+| `<template lang="html">`, `<style module>`, `<style module="classes">`, `<style lang="scss">` | HTML attribute grammar (the `.vue` one): values quoted with `"` or `'`, or unquoted; whitespace allowed around `=`; a repeated attribute reports `DuplicateTagAttribute` (1013) | identical `SingleFileComponentBlockOption` records → `Lang`, `IsModule`, `ModuleName` |
 | `@script`, custom `@name`, legacy `@template`/`@style` | @-option grammar (§3.1): double-quoted values only, no whitespace around `=`; malformed values report `MalformedOptionValue` (1005) | unchanged — the same records |
 
-Honored (typed) options, per the Vue SFC spec:
+Supported typed options:
 
 | Option              | Blocks                    | Surfaced as                                        |
 | ------------------- | ------------------------- | -------------------------------------------------- |
-| `scoped`            | `<style>`                 | `SingleFileComponentStyleBlock.Scoped` (`bool`)                    |
 | `module`            | `<style>`                 | `SingleFileComponentStyleBlock.IsModule` (`bool`)                  |
 | `module="name"`     | `<style>`                 | `SingleFileComponentStyleBlock.IsModule` + `SingleFileComponentStyleBlock.ModuleName` |
 | `lang="…"`          | `<style>`/`@script`/`<template>` (and custom) | `SingleFileComponentBlock.Lang` (`string?`)      |
@@ -226,6 +225,22 @@ All other options remain available through `SingleFileComponentBlock.HasOption(n
 `SingleFileComponentBlock.GetOptionValue(name)`. Options are preserved on every block, in source
 order, each with its own source span; unknown options and any options on custom blocks are preserved
 rather than rejected.
+
+### 5.1 Removed scoped option
+
+Scoped CSS was removed by owner decision on 2026-09-14 ([V01.01.06.17], #367).
+The generic option token remains in the descriptor so tooling can diagnose its exact name span:
+
+- In a `.viu` file, `<style scoped>` and legacy `@style scoped { }` report
+  `ScopedStyleNotSupported` (1018, **Error**).
+- In a `.vue` compatibility file, `<style scoped>` reports `VueScopedStyleNotSupported`
+  (1019, **Warning**), and compilation treats the block as ordinary global component CSS.
+
+Both diagnostics say: "Scoped styles are not supported; Viu compiles component styles as ordinary
+global stylesheets. Remove the scoped option or use a CSS module." The source generator surfaces
+1018 as `VIU1001` and 1019 as `VIU1002`; the language service uses `VIU1018` and `VIU1019`.
+Plain component styles still bundle and hot reload; CSS Modules remain supported ([STY-2]–[STY-5]).
+There is no typed `Scoped` accessor, selector rewriting, or scope attribute generation.
 
 ## 6. Migration rules
 
@@ -240,8 +255,8 @@ diagnostic:
 | `@template … {`      | `LegacyTemplateBlockSyntax` 1015 | Warning  |
 | `@style … {`         | `LegacyStyleBlockSyntax` 1016    | Warning  |
 
-Rewrite `@template { … }` as `<template>…</template>` and `@style scoped { … }` as
-`<style scoped>…</style>`; block options become tag attributes unchanged. The window is temporary —
+Rewrite `@template { … }` as `<template>…</template>` and `@style module { … }` as
+`<style module>…</style>`; supported block options become tag attributes unchanged. The window is temporary —
 the legacy forms will be removed. `@script` and custom blocks are canonical @-forms and report
 nothing.
 
@@ -299,7 +314,8 @@ Parsing is **recoverable**: malformed input is reported through `SingleFileCompo
 never throws for bad content (a `null` source argument throws `ArgumentNullException` — that is API
 misuse, not input). Multiple problems are reported in a single pass, each with a code, a message, a
 catalog severity, and a source location. Since [V01.01.06.10], `Errors` carries **all severities** —
-the legacy-container diagnostics (1015/1016) are warnings; check `Severity` before treating an entry
+the legacy-container diagnostics (1015/1016) and compatibility scoped-style diagnostic (1019)
+are warnings; check `Severity` before treating an entry
 as fatal.
 
 The diagnostic codes (`SingleFileComponentErrorCode`) are **Viu-defined**. Unlike `Assimalign.Viu.Syntax.Templates`'s
@@ -328,6 +344,8 @@ has no setup slot).
 | `LegacyTemplateBlockSyntax`   | 1015  | **Warning** | A legacy `@template { }` container parsed (§6.1).                    |
 | `LegacyStyleBlockSyntax`      | 1016  | **Warning** | A legacy `@style … { }` container parsed (§6.1).                     |
 | `ScriptTagBlockNotSupported`  | 1017  | Error    | A top-level `<script>` tag appeared in a `.viu` file (§6.2).            |
+| `ScopedStyleNotSupported` | 1018 | Error | A `.viu` style block declares `scoped` (§5.1). |
+| `VueScopedStyleNotSupported` | 1019 | Warning | A `.vue` style block declares `scoped`; compilation uses ordinary global CSS (§5.1). |
 
 ### Recovery policy
 

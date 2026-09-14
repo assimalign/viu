@@ -5,8 +5,8 @@
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-VIU1001 | Assimalign.Viu.Generators.Syntax | Error | Single-file component parse error
-VIU1002 | Assimalign.Viu.Generators.Syntax | Warning | Single-file component parse warning
+VIU1001 | Assimalign.Viu.Generators.Syntax | Error | Single-file component parse error, including unsupported scoped styles in .viu ([V01.01.06.17])
+VIU1002 | Assimalign.Viu.Generators.Syntax | Warning | Single-file component parse warning, including ignored scoped styles in .vue ([V01.01.06.17])
 VIU1003 | Assimalign.Viu.Generators.Syntax | Info | Single-file component parse information
 VIU1004 | Assimalign.Viu.Generators.Syntax | Error | Canonical .viu and compatibility .vue files conflict
 VIU1101 | Assimalign.Viu.Generators.Syntax | Error | Single-file component template parse error

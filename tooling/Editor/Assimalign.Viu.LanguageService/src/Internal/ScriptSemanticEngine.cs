@@ -23,7 +23,7 @@ namespace Assimalign.Viu.LanguageService;
 /// sibling <c>.cs</c> sources plus sibling <c>.viu</c>/<c>.vue</c> components projected through the
 /// exact <see cref="SingleFileComponentProjection"/> + <see cref="SingleFileComponentSourceEmitter"/>
 /// pipeline the build's source generator runs (names via
-/// <see cref="SingleFileComponentNameResolver"/>, scope ids via <see cref="StyleScopeId"/>), so the
+/// <see cref="SingleFileComponentNameResolver"/>, CSS hash salts via <see cref="CssComponentHash"/>), so the
 /// editor's compilation is identical to the generator's by construction — answered through
 /// <see cref="SemanticModel.LookupSymbols(int, INamespaceOrTypeSymbol, string, bool)"/>. No
 /// workspace, no MEF, no Features assemblies: the deliberate increment-1 backend, with the
@@ -2013,7 +2013,7 @@ internal sealed class ScriptSemanticEngine
             name.Namespace,
             name.ClassName,
             name.HintName,
-            StyleScopeId.Resolve(filePath, context.ProjectDirectory),
+            CssComponentHash.Resolve(filePath, context.ProjectDirectory),
             HotReloadComponentIdentifier: null,
             HasCanonicalPeer: false);
         return SingleFileComponentProjection.Project(input, cancellationToken);

@@ -24,15 +24,9 @@ internal static class ViuCompletionCatalog
         Snippet(
             "style",
             "Viu CSS style block",
-            "Contains component CSS; `scoped`, `module`, and `lang` are tag attributes.",
+            "Contains component CSS; `module` and `lang` are tag attributes.",
             "<style>\n\t$0\n</style>",
             "03"),
-        Snippet(
-            "style scoped",
-            "Scoped Viu CSS style block",
-            "Contains component CSS scoped to this component.",
-            "<style scoped>\n\t$0\n</style>",
-            "04"),
         Snippet(
             "style module",
             "Viu CSS module style block",
@@ -64,7 +58,7 @@ internal static class ViuCompletionCatalog
         Snippet(
             "style",
             "Vue-format CSS style block",
-            "Contains component CSS and supports scoped, module, and CSS language attributes.",
+            "Contains component CSS and supports module and CSS language attributes.",
             "<style>\n\t$0\n</style>",
             "04"),
     ];
@@ -87,7 +81,6 @@ internal static class ViuCompletionCatalog
 
     internal static IReadOnlyList<LanguageCompletionItem> StyleHeaderOptions { get; } =
     [
-        Text("scoped", LanguageCompletionItemKind.Keyword, "Scoped CSS", "Scopes the style block to this component.", "01"),
         Text("module", LanguageCompletionItemKind.Keyword, "CSS module", "Compiles class names as a CSS module.", "02"),
         Text("module=\"$style\"", LanguageCompletionItemKind.Property, "Named CSS module", "Exposes the module through the selected template binding.", "03"),
         Text("lang=\"css\"", LanguageCompletionItemKind.Property, "Style language", "Selects CSS syntax.", "04"),

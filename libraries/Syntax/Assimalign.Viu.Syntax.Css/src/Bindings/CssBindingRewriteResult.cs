@@ -11,8 +11,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// the stylesheet which property to read.
 /// </summary>
 /// <param name="Stylesheet">
-/// The stylesheet with rewritten declaration values. Feed it to <see cref="CssScopedRewriter.Rewrite"/>
-/// (when the block is also <c>scoped</c>) or <see cref="CssStylesheetWriter.Write"/> to serialize.
+/// The stylesheet with rewritten declaration values. Feed it to <see cref="CssStylesheetWriter.Write"/> to serialize.
 /// </param>
 /// <param name="Bindings">
 /// The distinct bindings, in first-seen source order — each a hashed custom-property name paired with the

@@ -139,7 +139,7 @@ are length-framed, so different block boundaries cannot collapse into the same c
   framed separately, followed by its name, options, and exact raw content. Adding or deleting either slot
   changes this hash.
 - The style hash covers every style block in source order. Each block's name, options, and exact raw content
-  participates. An option-only edit such as adding `scoped` or changing a module name therefore invalidates
+  participates. An option-only edit such as changing a module name therefore invalidates
   the style revision even when the CSS text is unchanged.
 
 Container whitespace outside these blocks and custom-block content do not participate. Adding, deleting,

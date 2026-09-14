@@ -18,7 +18,7 @@ public class MixedContainerTests
         var source =
             "<template>\n    <div>{{ x }}</div>\n</template>\n" +
             "@script {\n    public int X;\n}\n" +
-            "<style scoped>\n    .a { color: red; }\n</style>\n" +
+            "<style module>\n    .a { color: red; }\n</style>\n" +
             "@docs {\n    notes\n}\n";
 
         var result = SingleFileComponentParser.Parse(source);
@@ -29,7 +29,7 @@ public class MixedContainerTests
         result.Descriptor.Script.ShouldNotBeNull();
         result.Descriptor.Script!.Content.ShouldBe("    public int X;\n");
         result.Descriptor.Styles.Count.ShouldBe(1);
-        result.Descriptor.Styles[0].Scoped.ShouldBeTrue();
+        result.Descriptor.Styles[0].IsModule.ShouldBeTrue();
         result.Descriptor.CustomBlocks.Count.ShouldBe(1);
         result.Descriptor.CustomBlocks[0].Name.ShouldBe("docs");
         SingleFileComponentTestHelpers.AssertAllSpansExact(result);
@@ -73,13 +73,13 @@ public class MixedContainerTests
         // Styles are repeatable, so tag and legacy style blocks accumulate; only the legacy header warns.
         var source =
             "<style>\n    .a { color: red; }\n</style>\n" +
-            "@style scoped {\n    .b { color: blue; }\n}\n";
+            "@style module {\n    .b { color: blue; }\n}\n";
 
         var result = SingleFileComponentParser.Parse(source);
 
         result.Descriptor.Styles.Count.ShouldBe(2);
-        result.Descriptor.Styles[0].Scoped.ShouldBeFalse();
-        result.Descriptor.Styles[1].Scoped.ShouldBeTrue();
+        result.Descriptor.Styles[0].IsModule.ShouldBeFalse();
+        result.Descriptor.Styles[1].IsModule.ShouldBeTrue();
         result.Errors.Count.ShouldBe(1);
         result.Errors[0].Code.ShouldBe(SingleFileComponentErrorCode.LegacyStyleBlockSyntax);
         result.Errors[0].Severity.ShouldBe(DiagnosticSeverity.Warning);

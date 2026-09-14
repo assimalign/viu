@@ -10,7 +10,8 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// compatibility parser — are also reachable from <c>.viu</c> files, whose canonical
 /// <c>&lt;template&gt;</c>/<c>&lt;style&gt;</c> blocks are tag-based. Each code's severity comes from
 /// the catalog (<c>SingleFileComponentErrorMessages.GetSeverity</c>): the legacy-container codes
-/// (1015/1016) are warnings; everything else is an error.
+/// (1015/1016) and the unsupported scoped option on compatibility input (1019) are warnings;
+/// everything else is an error.
 /// </summary>
 public enum SingleFileComponentErrorCode
 {
@@ -76,4 +77,16 @@ public enum SingleFileComponentErrorCode
     /// compiled or executed.
     /// </summary>
     ScriptTagBlockNotSupported = 1017,
+
+    /// <summary>
+    /// A canonical or legacy <c>.viu</c> style block declares the unsupported <c>scoped</c> option.
+    /// Error severity; the option token and raw block remain available to tooling ([V01.01.06.17]).
+    /// </summary>
+    ScopedStyleNotSupported = 1018,
+
+    /// <summary>
+    /// A <c>.vue</c> compatibility style block declares the unsupported <c>scoped</c> option.
+    /// Warning severity; compilation treats the block as ordinary component CSS ([V01.01.06.17]).
+    /// </summary>
+    VueScopedStyleNotSupported = 1019,
 }

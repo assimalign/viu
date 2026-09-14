@@ -420,7 +420,6 @@ public sealed class SingleFileComponentScriptTests
             Bindings: bindings,
             RenderBody: null,
             RenderCacheSize: 0,
-            ScopeId: null,
             ExtractedStyles: null,
             ModuleClasses: EquatableArray<CssModuleClassEntry>.Empty,
             CssVariableBindings: EquatableArray<CssVariableBindingEntry>.Empty);
@@ -452,7 +451,6 @@ public sealed class SingleFileComponentScriptTests
             Bindings: EquatableArray<ScriptBinding>.Empty,
             RenderBody: null,
             RenderCacheSize: 0,
-            ScopeId: null,
             ExtractedStyles: null,
             ModuleClasses: EquatableArray<CssModuleClassEntry>.Empty,
             CssVariableBindings: EquatableArray<CssVariableBindingEntry>.Empty);

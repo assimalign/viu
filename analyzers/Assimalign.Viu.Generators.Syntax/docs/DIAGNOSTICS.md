@@ -79,6 +79,11 @@ content is never compiled or executed — because a component's C# lives in `@sc
 parser message rides verbatim: *"A top-level '&lt;script&gt;' tag is not supported in a .viu file and
 its content is never compiled or executed. Declare the component's C# with '@script { }'."*
 
+Since [V01.01.06.17] (owner decision 2026-09-14), `ScopedStyleNotSupported`
+(`SingleFileComponentErrorCode` 1018) rejects `<style scoped>` and legacy `@style scoped { }`
+in `.viu` at the option span: "Scoped styles are not supported; Viu compiles component styles as
+ordinary global stylesheets. Remove the scoped option or use a CSS module."
+
 ### VIU1002
 
 Single-file component parse warning — a warning reported by the `.viu` block-container parser.
@@ -93,6 +98,10 @@ The legacy-container migration diagnostics of the [V01.01.06.10] hybrid-containe
 
 Both are Warning severity: the legacy blocks still slice and compile during the transition window, so
 a legacy component builds with warnings instead of breaking.
+
+For `.vue` compatibility input, `VueScopedStyleNotSupported` (code 1019) reports the same
+scoped-style removal message as a warning at the option span. The style content compiles as an
+ordinary global stylesheet; CSS Modules remain supported ([V01.01.06.17], [VUE-2]).
 
 ### VIU1003
 

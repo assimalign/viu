@@ -69,12 +69,6 @@ public sealed record TransformResult
     public bool IsServerRendering => context.IsServerRendering;
 
     /// <summary>
-    /// Gets the scoped-style attribute stamped on every directly rendered native element, or null.
-    /// </summary>
-    /// <remarks>Specified by <c>[V01.01.06.04]</c> and <c>[SSR-COMPILE-3]</c>.</remarks>
-    public string? ScopeId => context.ScopeId;
-
-    /// <summary>
     /// Resolves the code-generation node of <paramref name="node"/>: a container carries it directly, while an
     /// element's node is looked up from the transform's side table.
     /// </summary>

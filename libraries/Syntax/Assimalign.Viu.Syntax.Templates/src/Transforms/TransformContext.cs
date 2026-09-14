@@ -47,8 +47,6 @@ public sealed class TransformContext
         BindingRewriteMode = options.BindingRewriteMode;
         IsNestedServerRendering = options.IsNestedServerRendering;
         IsServerRendering = options.IsServerRendering;
-        Slotted = options.Slotted;
-        ScopeId = options.ScopeId;
         onError = options.OnError;
         CurrentNode = root;
         OnNodeRemoved = static () => { };
@@ -101,12 +99,6 @@ public sealed class TransformContext
 
     /// <summary>Whether compilation targets SSR.</summary>
     public bool IsServerRendering { get; }
-
-    /// <summary>Whether component slots inherit the parent scope id.</summary>
-    public bool Slotted { get; }
-
-    /// <summary>The scoped-styles id, or <see langword="null"/>.</summary>
-    public string? ScopeId { get; }
 
     /// <summary>The number of <c>v-for</c> scopes currently open.</summary>
     public int ScopeVFor { get; set; }

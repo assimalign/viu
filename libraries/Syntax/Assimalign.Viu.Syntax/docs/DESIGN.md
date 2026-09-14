@@ -68,7 +68,8 @@ scheduling cost and no parallelism worth having; `AnalyzerTimeout` bounds the pa
 - No async parsing surface.
 - The Html/JavaScript scaffolds intentionally parse to a raw whole-source root node until their work
   items land — the scaffolds exist to pin the pipeline seam, project shape, and caching contract, not
-  to promise parsing. The Css scaffold's raw root was replaced by real rule-level parsing and the
-  scoped-selector rewrite with scoped CSS [V01.01.06.04] (see
+  to promise parsing. The Css scaffold's raw root was replaced by real rule-level parsing;
+  CSS Modules and binding rewrites remain. Scoped CSS [V01.01.06.04] was removed on 2026-09-14
+  under [V01.01.06.17] (#367) (see
   `libraries/Syntax/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`); it is the flagship consumer of the
   registration seam — the generator composition root registers `CssSyntaxParser` for `@style` blocks.

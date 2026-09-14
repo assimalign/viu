@@ -13,9 +13,9 @@ namespace Assimalign.Viu.Compiler.Css;
 /// Compiles a single-file component's style blocks into extracted CSS — the shared, deterministic core
 /// reused by <b>both</b> build-time hosts ([V01.01.12.12]/[V01.01.06.09]). Each block is run through the
 /// CSS-Modules class rename (<c>module</c> blocks, <see cref="CssModuleRewriter"/>), the <c>v-bind()</c>
-/// custom-property rewrite (<see cref="CssBindingRewriter"/>), and then serialized — <c>scoped</c> blocks via
-/// <see cref="CssScopedRewriter"/> with the component's stable scope id, rewritten non-scoped blocks via
-/// <see cref="CssStylesheetWriter"/>, and untouched non-scoped blocks verbatim — concatenated in source order.
+/// custom-property rewrite (<see cref="CssBindingRewriter"/>), and then serialized through
+/// <see cref="CssStylesheetWriter"/> when rewritten. Untouched ordinary blocks pass through verbatim;
+/// all blocks are concatenated in source order ([V01.01.06.17]).
 /// <para>
 /// This is the exact logic that produced the generator's <c>ExtractedStyles</c> constant when it lived inside
 /// <c>Assimalign.Viu.Generators.Syntax</c>; it was lifted here unchanged so the generator and the
@@ -29,12 +29,8 @@ namespace Assimalign.Viu.Compiler.Css;
 /// </summary>
 public static class SingleFileComponentStyleCompiler
 {
-    // The scope-id prefix ([V01.01.06.04] StyleScopeId), stripped to recover the short salt the module/v-bind
-    // hashes use ([V01.01.06.06]).
-    private const string ScopeIdPrefix = "data-v-";
-
     /// <summary>
-    /// Parses <paramref name="viuText"/> with <paramref name="parser"/>, resolves the scope id from the path,
+    /// Parses <paramref name="viuText"/> with <paramref name="parser"/>, resolves the CSS name salt from the path,
     /// and compiles the component's style blocks. The convenience entry point for the
     /// <c>ViuBundleCss</c> task, which starts from raw file text; the generator uses
     /// <see cref="Compile(AggregateSyntaxParserResult{SingleFileComponentBlock}, string, CancellationToken)"/> directly
@@ -42,7 +38,7 @@ public static class SingleFileComponentStyleCompiler
     /// </summary>
     /// <param name="parser">The composed parser from <see cref="SingleFileComponentParserFactory.Create"/>.</param>
     /// <param name="viuText">The <c>.viu</c> file's full text.</param>
-    /// <param name="filePath">The <c>.viu</c> file path (drives the scope-id hash).</param>
+    /// <param name="filePath">The <c>.viu</c> file path (drives the CSS name hash).</param>
     /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
     /// <param name="cancellationToken">Cancels the compilation.</param>
     /// <returns>The component's style compilation.</returns>
@@ -59,23 +55,22 @@ public static class SingleFileComponentStyleCompiler
         }
 
         var parse = parser.ParseComponent(viuText, cancellationToken);
-        var scopeId = StyleScopeId.Resolve(filePath, projectDirectory);
-        return Compile(parse, scopeId, cancellationToken);
+        var localHashSalt = CssComponentHash.Resolve(filePath, projectDirectory);
+        return Compile(parse, localHashSalt, cancellationToken);
     }
 
     /// <summary>
     /// Compiles the style blocks in an already-dispatched <paramref name="parse"/> using
-    /// <paramref name="componentScopeId"/> (the component's <c>data-v-&lt;hash&gt;</c>, from
-    /// <see cref="StyleScopeId.Resolve"/>). The generator host calls this directly with the parse and scope id
-    /// it already computed for template compilation, so the component is parsed once.
+    /// <paramref name="localHashSalt"/> from <see cref="CssComponentHash.Resolve"/>. The generator
+    /// shares its container parse with this compiler, so each component is parsed once.
     /// </summary>
     /// <param name="parse">The dispatched <c>.viu</c> or <c>.vue</c> parse; its style source results are read.</param>
-    /// <param name="componentScopeId">The component's <c>data-v-&lt;hash&gt;</c> scope id.</param>
+    /// <param name="localHashSalt">The deterministic component-local salt for module and binding names.</param>
     /// <param name="cancellationToken">Cancels the compilation.</param>
     /// <returns>The component's style compilation.</returns>
     public static SingleFileComponentStyleCompilation Compile(
         AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
-        string componentScopeId,
+        string localHashSalt,
         CancellationToken cancellationToken = default)
     {
         if (parse is null)
@@ -83,16 +78,10 @@ public static class SingleFileComponentStyleCompiler
             throw new ArgumentNullException(nameof(parse));
         }
 
-        string? scopeId = null;
         StringBuilder? styles = null;
         List<SingleFileComponentStyleModuleClass>? moduleClasses = null;
         List<SingleFileComponentStyleVariableBinding>? variableBindings = null;
         List<SingleFileComponentStyleDiagnostic>? diagnostics = null;
-
-        // The module/v-bind hashes are salted by the component's short scope id (the path hash without the
-        // `data-v-` prefix), which is always available — so a `module`/`v-bind` block is component-scoped even
-        // when it is not `scoped` ([V01.01.06.06]).
-        var localHashSalt = ShortScopeId(componentScopeId);
 
         foreach (var sourceResult in parse.SourceResults)
         {
@@ -145,22 +134,15 @@ public static class SingleFileComponentStyleCompiler
                     }
                 }
 
-                if (styleBlock.Scoped)
+                if (rewritten)
                 {
-                    // A scoped block is serialized with the component's stable scope id (module/v-bind rewrites
-                    // already updated the tree the scoped serializer reads).
-                    scopeId ??= componentScopeId;
-                    css = CssScopedRewriter.Rewrite(stylesheet, scopeId);
-                }
-                else if (rewritten)
-                {
-                    // A rewritten non-scoped block is serialized canonically (its class names / values changed,
+                    // A rewritten block is serialized canonically (its class names / values changed,
                     // so the raw content no longer matches).
                     css = CssStylesheetWriter.Write(stylesheet);
                 }
                 else
                 {
-                    // An untouched non-scoped block passes through verbatim (issue acceptance criterion).
+                    // An untouched ordinary block passes through verbatim (issue acceptance criterion).
                     css = styleBlock.Content;
                 }
             }
@@ -183,19 +165,11 @@ public static class SingleFileComponentStyleCompiler
         }
 
         return new SingleFileComponentStyleCompilation(
-            scopeId,
             styles.ToString(),
             (IReadOnlyList<SingleFileComponentStyleModuleClass>?)moduleClasses ?? Array.Empty<SingleFileComponentStyleModuleClass>(),
             (IReadOnlyList<SingleFileComponentStyleVariableBinding>?)variableBindings ?? Array.Empty<SingleFileComponentStyleVariableBinding>(),
             (IReadOnlyList<SingleFileComponentStyleDiagnostic>?)diagnostics ?? Array.Empty<SingleFileComponentStyleDiagnostic>());
     }
-
-    // The component's short scope id — the `data-v-` scope id with its prefix stripped — used to salt the
-    // module/v-bind hashes so they are component-scoped and deterministic ([V01.01.06.06]).
-    private static string ShortScopeId(string scopeId)
-        => scopeId.StartsWith(ScopeIdPrefix, StringComparison.Ordinal)
-            ? scopeId.Substring(ScopeIdPrefix.Length)
-            : scopeId;
 
     // The generated accessor class name for a `module` option: the default (valueless `module`) maps to
     // `Style`, because the `$style` name a template writes has no legal C# spelling; `module="name"` maps

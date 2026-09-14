@@ -123,6 +123,10 @@ These eight dated decisions define Viu's C# and WebAssembly architecture:
    `libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
    explicitly scoped tag-based `.vue` compatibility input. Both containers feed the same Viu
    template compiler.
+   **2026-09-14 owner decision:** scoped CSS was removed by [V01.01.06.17]
+   ([#367](https://github.com/assimalign/viu/issues/367)), including compiler attribute stamping and
+   the deferred runtime restamping plan (#319, closed as superseded). Ordinary component styles,
+   CSS Modules, bundling, library style packing, and hot reload remain supported.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer
    applied by one JS call per flush; events use one delegated JS listener forwarding into .NET;
    static content is stringified aggressively into `innerHTML` inserts.
@@ -193,12 +197,12 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W01** | Rendering, reactivity, browser-host, testing, solution, and CI foundations are delivered; every planned feature row is closed | No planned feature row remains |
 | **W02** | The component/application foundation, watch/reactive collections, keyed reconciliation, browser bootstrap, and test utilities are delivered; every planned feature row is closed | No planned feature row remains |
 | **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered; the deferred compiler optimization set has explicit implemented-or-dropped outcomes, and the size/startup budget gates are live against measured `EndToEndBrowserApp` baselines | Complete diagnostic source attribution |
-| **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; generated trees and compiled SSR share static scoped-style attributes; hosted fingerprint selection and deterministic component-library/application CSS delivery are complete | Close built-in edge cases, generated State/source-map work, and the deferred reactive scoped-CSS runtime |
+| **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; hosted fingerprint selection and deterministic component-library/application CSS delivery are complete | Close built-in edge cases, generated State/source-map work, and deferred reactive `v-bind()` application for ordinary component styles |
 | **W05** | Host-neutral component-library and Browser SDK/framework segments, validated release packaging/staging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, explicit server-profile selection with reflection-free registration, installable `dotnet new` templates with an optional server host, editor hot-reload metadata, a working package-only `dotnet watch` component-CSS and component-remount path with connected-browser conformance, the ordinary real-browser end-to-end harness, live size/startup budget gates, lazy route factories with Browser scroll restoration, and the opt-in runtime-inspection protocol exist | Finish compatibility/conformance gates and Cohesion hosting integration |
 | **W06** | Semantic `@script` language-server work has begun; the former utility-composition train was parked and superseded by the 2026-08-13 removal | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
 
-This snapshot reconciles the plan with the 2026-08-13 area-layout and utility-removal decisions. The
-budget-gate activation and scoped-CSS follow-ups are grouped with their closest delivery themes here;
+This snapshot includes the 2026-08-13 area-layout and utility-removal decisions and the 2026-09-14
+scoped-CSS removal. Budget-gate activation and remaining style work are grouped by delivery theme;
 Project #15 remains authoritative for their Wave custom fields.
 
 ### [V01.01.14] API hardening — complete
@@ -323,7 +327,7 @@ completed P0–P6 sequence, and verification record remain in
 | `V01.01.06.01` | Define the .viu SFC file format (@-block syntax) and block parser | W03 | P003 |
 | `V01.01.06.02` | Integrate SFC compilation into MSBuild and the source generator | W03 | P003 |
 | `V01.01.06.03` | Implement script-block integration with partial classes | W03 | P003 |
-| `V01.01.06.04` | Implement scoped CSS compilation | W04 | P004 |
+| ~~`V01.01.06.04`~~ | ~~Implement scoped CSS compilation~~ — removed 2026-09-14 ([V01.01.06.17], #367) | W04 | P004 |
 | `V01.01.06.05` | Emit hot-reload metadata for per-block updates | W05 | P005 |
 | `V01.01.06.06` | Implement CSS Modules and v-bind() in CSS | W04 | P004 |
 | `V01.01.06.09` | Add tag-based .vue single-file-component compatibility | W05 | P005 |
@@ -414,8 +418,9 @@ The utility-specific descendants `[V01.01.12.05.01]` (utility stylesheet watch),
 conformance) are likewise parked and superseded by the 2026-08-13 removal. Their completed work is
 retained as non-normative design history in [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) for the
 standalone add-on now published from `libraries/Utilities/`. Consumer MSBuild integration is tracked
-by [V01.01.12.30] (#346). Component CSS bundling, scoped styles, CSS Modules,
-and component-style hot reload remain active Viu features.
+by [V01.01.12.30] (#346). Component CSS bundling, CSS Modules,
+and component-style hot reload remain active Viu features. Scoped CSS was removed on 2026-09-14
+([V01.01.06.17], #367).
 
 ### [V01.01.13] Framework - Documentation (W02, P003)
 

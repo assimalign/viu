@@ -1,16 +1,13 @@
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// A pseudo-class or pseudo-element selector. For an ordinary pseudo (<see cref="CssPseudoSelectorKind.Normal"/>)
-/// the serializer emits <see cref="SyntaxNode.Location"/><c>.Source</c> verbatim, so <c>:hover</c>,
-/// <c>::before</c>, and <c>:not(.x)</c> round-trip unchanged. For the three functional pseudos the
-/// scoped rewrite reserves
-/// (<c>:deep()</c>, <c>:slotted()</c>, <c>:global()</c>) the parsed <see cref="Argument"/> carries the
-/// inner selector list the scoped rewrite consumes.
+/// A pseudo-class or pseudo-element selector. Ordinary pseudos preserve their source text.
+/// Recognized functional selector syntax carries an inner <see cref="Argument"/> list for
+/// CSS Modules processing and lossless source representation; no scope attributes are introduced.
 /// </summary>
 public sealed record CssPseudoSelectorNode : CssSelectorPartNode
 {
-    /// <summary>The pseudo's role in the scoped rewrite.</summary>
+    /// <summary>The parsed pseudo-selector classification.</summary>
     public required CssPseudoSelectorKind Pseudo { get; init; }
 
     /// <summary>The pseudo name without its leading colon(s), as authored (e.g. <c>hover</c>, <c>before</c>, <c>deep</c>, <c>v-deep</c>).</summary>

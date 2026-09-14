@@ -28,7 +28,7 @@ parse templates, CSS, and single-file-component containers.
 | --- | --- |
 | `Assimalign.Viu.Syntax.Templates` | The Viu template language — HTML-flavored markup with directives and interpolation |
 | `Assimalign.Viu.Syntax.SingleFileComponent` | The `.viu` container, plus the `.vue` compatibility parser ([V01.01.06.09]) |
-| `Assimalign.Viu.Syntax.Css` | Rule-level CSS parsing, scoped rewriting, and programmatic construction |
+| `Assimalign.Viu.Syntax.Css` | Rule-level CSS parsing, CSS Modules, binding rewrites, and programmatic construction |
 | `Assimalign.Viu.Syntax.Html` | Plain HTML documents, e.g. the WASM host page (scaffold) |
 
 All target netstandard2.0 so they can run inside Roslyn generator hosts

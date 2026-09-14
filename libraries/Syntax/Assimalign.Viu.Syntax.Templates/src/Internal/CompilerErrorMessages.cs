@@ -84,7 +84,6 @@ internal static class CompilerErrorMessages
         [CompilerErrorCode.XModuleModeNotSupported] = "ES module mode is not supported in this build of compiler.",
         [CompilerErrorCode.XCacheHandlerNotSupported] =
             "\"cacheHandlers\" option is only supported when the \"prefixIdentifiers\" option is enabled.",
-        [CompilerErrorCode.XScopeIdNotSupported] = "\"scopeId\" option is only supported in module mode.",
         [CompilerErrorCode.XVnodeHooks] =
             "@vnode-* hooks in templates are no longer supported. Use the vue: prefix instead. " +
             "For example, @vnode-mounted should be changed to @vue:mounted. " +

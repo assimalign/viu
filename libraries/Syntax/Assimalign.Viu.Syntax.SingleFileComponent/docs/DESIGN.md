@@ -113,7 +113,17 @@ Where the `.viu` container deliberately differs from the `.vue` container it sta
 - **A separate error-code catalog** (`SingleFileComponentErrorCode`, 1000-based) so a container
   diagnostic is distinguishable at a glance from the template compiler's `CompilerErrorCode`, whose
   parse band occupies the low numbers. Severity is a catalog property: the legacy-container codes
-  (1015/1016) are warnings; everything else is an error.
+  (1015/1016) and unsupported `scoped` on `.vue` input (1019) are warnings; everything else
+  is an error.
+
+## Scoped CSS removal ([V01.01.06.17])
+
+Scoped CSS was removed by owner decision on 2026-09-14 (#367). The parser keeps the generic
+`scoped` option token and the raw block content, but provides no typed scoping accessor. A
+canonical or legacy `.viu` style block reports a located Error (1018); a `.vue` compatibility
+style block reports a located Warning (1019) and compiles as ordinary global CSS. This deliberate
+compatibility choice is pinned by `ScopedStyleDiagnosticsTests`. Plain component stylesheet
+bundling and hot reload, and CSS Modules ([STY-2]–[STY-5]), remain supported.
 
 ## Non-goals
 

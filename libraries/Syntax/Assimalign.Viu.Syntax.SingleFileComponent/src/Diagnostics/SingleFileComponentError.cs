@@ -25,8 +25,8 @@ public sealed record SingleFileComponentError : Diagnostic
         Message = message;
         Location = location;
         // Severity is a catalog decision, made per code, never per instance: the [V01.01.06.10]
-        // legacy-container codes are warnings (the block still parses during the migration window);
-        // every other code stays a recoverable error, reported rather than thrown ([SFC-DIAG-1]).
+        // legacy-container codes and the [V01.01.06.17] .vue scoped-style compatibility code warn;
+        // other codes stay recoverable errors, reported rather than thrown ([SFC-DIAG-1]).
         Severity = SingleFileComponentErrorMessages.GetSeverity(code);
     }
 

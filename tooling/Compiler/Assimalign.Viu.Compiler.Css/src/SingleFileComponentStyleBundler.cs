@@ -11,7 +11,7 @@ namespace Assimalign.Viu.Compiler.Css;
 /// Composes a project's per-component compiled style CSS into one deterministic bundle string — the
 /// pure (I/O-free) core of the <c>ViuBundleCss</c> MSBuild task
 /// ([V01.01.12.12]/[V01.01.06.09]). It resolves each
-/// component's scope id, parses and compiles its styles through the shared
+/// component's CSS name salt, parses and compiles its styles through the shared
 /// <see cref="SingleFileComponentStyleCompiler"/> (the identical path the generator runs, so each segment is
 /// byte-identical to that component's generated <c>ExtractedStyles</c> constant), drops components with no
 /// styles, applies the generator's canonical <c>.viu</c>-over-<c>.vue</c> collision policy, orders the
@@ -22,11 +22,10 @@ namespace Assimalign.Viu.Compiler.Css;
 /// <list type="number">
 /// <item>a single header comment line, then a blank line;</item>
 /// <item>for each component, in ascending ordinal order of its project-relative path (normalized to forward
-/// slashes): a <c>/* &lt;relative-path&gt; (&lt;scope-id&gt;) */</c> comment line, the component's compiled
+/// slashes): a <c>/* &lt;relative-path&gt; */</c> comment line, the component's compiled
 /// CSS verbatim (which already ends in a newline), then a blank separator line.</item>
 /// </list>
-/// Every newline the bundler itself emits is <c>\n</c>; the compiled CSS segments are LF for scoped / module
-/// / <c>v-bind()</c> blocks (the canonical serializer emits <c>\n</c>) and preserve source newlines only for
+/// Every newline the bundler itself emits is <c>\n</c>; the compiled CSS segments are LF for module / <c>v-bind()</c> blocks (the canonical serializer emits <c>\n</c>) and preserve source newlines only for
 /// verbatim pass-through blocks — matching the generator's constant exactly.
 /// </para>
 /// This bundles opaque compiled component-CSS strings and embeds no add-on-specific knowledge. The former
@@ -47,7 +46,7 @@ public static class SingleFileComponentStyleBundler
     /// Compiles and bundles the style CSS of <paramref name="components"/>.
     /// </summary>
     /// <param name="components">The project's <c>.viu</c> and compatible <c>.vue</c> components.</param>
-    /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown (drives the project-relative scope-id hash and ordering).</param>
+    /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown (drives the project-relative CSS name hash and ordering).</param>
     /// <param name="cancellationToken">Cancels the compilation.</param>
     /// <returns>
     /// The deterministic bundle text, or <see langword="null"/> when no component declares any
@@ -100,17 +99,17 @@ public static class SingleFileComponentStyleBundler
                 continue;
             }
 
-            var scopeId = StyleScopeId.Resolve(component.FilePath, projectDirectory);
+            var localHashSalt = CssComponentHash.Resolve(component.FilePath, projectDirectory);
             SingleFileComponentStyleCompilation compilation;
             if (isVueFile)
             {
                 var parse = vueParser.ParseComponent(component.Text, cancellationToken);
-                compilation = SingleFileComponentStyleCompiler.Compile(parse, scopeId, cancellationToken);
+                compilation = SingleFileComponentStyleCompiler.Compile(parse, localHashSalt, cancellationToken);
             }
             else
             {
                 var parse = viuParser.ParseComponent(component.Text, cancellationToken);
-                compilation = SingleFileComponentStyleCompiler.Compile(parse, scopeId, cancellationToken);
+                compilation = SingleFileComponentStyleCompiler.Compile(parse, localHashSalt, cancellationToken);
             }
 
             if (string.IsNullOrEmpty(compilation.ExtractedStyles))
@@ -120,7 +119,6 @@ public static class SingleFileComponentStyleBundler
 
             entries.Add(new BundleEntry(
                 RelativePath(component.FilePath, projectDirectory),
-                scopeId,
                 compilation.ExtractedStyles!));
         }
 
@@ -137,7 +135,7 @@ public static class SingleFileComponentStyleBundler
         builder.Append(Header).Append('\n').Append('\n');
         foreach (var entry in entries)
         {
-            builder.Append("/* ").Append(entry.RelativePath).Append(" (").Append(entry.ScopeId).Append(") */").Append('\n');
+            builder.Append("/* ").Append(entry.RelativePath).Append(" */").Append('\n');
             builder.Append(entry.Css);
             // The compiled CSS already ends in '\n' (the compiler guarantees a trailing newline); add one
             // more so a blank line separates components. A defensive guard keeps output stable even if a
@@ -168,8 +166,7 @@ public static class SingleFileComponentStyleBundler
     }
 
     // The component's path relative to the project directory (forward slashes), for the bundle comment and
-    // ordering. Mirrors StyleScopeId's relative-path derivation so the comment names the same short path the
-    // scope-id hash is computed over; falls back to the leaf name for a linked file outside the project.
+    // ordering. Uses the same relative-path derivation as CssComponentHash; falls back to the leaf name for a linked file outside the project.
     private static string RelativePath(string filePath, string? projectDirectory)
     {
         var normalizedPath = filePath.Replace('\\', '/');
@@ -192,16 +189,13 @@ public static class SingleFileComponentStyleBundler
 
     private readonly struct BundleEntry
     {
-        public BundleEntry(string relativePath, string scopeId, string css)
+        public BundleEntry(string relativePath, string css)
         {
             RelativePath = relativePath;
-            ScopeId = scopeId;
             Css = css;
         }
 
         public string RelativePath { get; }
-
-        public string ScopeId { get; }
 
         public string Css { get; }
     }

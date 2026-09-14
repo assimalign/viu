@@ -9,9 +9,9 @@ namespace Assimalign.Viu.Syntax.Css;
 /// string or comment reports a diagnostic and is consumed to a safe stopping point rather than throwing.
 /// </summary>
 /// <remarks>
-/// The token set is trimmed to what rule-level parsing and scoped-selector rewriting need (see
+/// The token set is trimmed to what rule-level parsing and selector processing need (see
 /// <see cref="CssTokenKind"/>); <c>url()</c> and unicode-range are not special-cased, which never affects
-/// selector scoping or block structure.
+/// selector processing or block structure.
 /// </remarks>
 internal sealed class CssTokenizer
 {

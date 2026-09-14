@@ -6,7 +6,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// Conditional-group rules (<c>@media</c>, <c>@supports</c>, <c>@container</c>) recurse: their
 /// <see cref="Body"/> holds nested <see cref="CssQualifiedRuleNode"/>/<see cref="CssAtRuleNode"/> the
 /// rewrite descends into. An <c>@keyframes</c> body holds <see cref="CssKeyframeRuleNode"/> children
-/// (its name is scoped and referencing animation values rewritten). Declaration-only at-rules
+/// (its frames have declaration bodies). Declaration-only at-rules
 /// (<c>@font-face</c>, <c>@page</c>) hold <see cref="CssDeclarationNode"/> children; statement at-rules
 /// (<c>@import</c>, <c>@charset</c>) have <see cref="HasBlock"/> <see langword="false"/> and an empty body.
 /// </summary>

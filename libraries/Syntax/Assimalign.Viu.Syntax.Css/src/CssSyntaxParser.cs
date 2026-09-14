@@ -4,19 +4,16 @@ using System.Threading;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// The CSS language's <see cref="SyntaxParser{T}"/> — the parser build tooling registers for
-/// <c>@style</c> blocks and <c>.css</c> sources (scoped CSS [V01.01.06.04], CSS Modules
-/// [V01.01.06.06], and build-embedded style tooling such as utility-class generation). It tokenizes and
-/// rule-parses the source per CSS Syntax Module Level 3 (https://www.w3.org/TR/css-syntax-3/) into a
-/// <see cref="CssStylesheetNode"/> tree — qualified rules with parsed selector lists, at-rules
-/// (<c>@media</c>/<c>@supports</c> recursed, <c>@keyframes</c> bodies), and declarations.
+/// Parses component style blocks and CSS sources into immutable, located CSS syntax nodes.
+/// The aggregate parser dispatches embedded style content through this implementation.
+/// CSS Modules and binding rewrites consume the same tree. Parsing recovers diagnostics
+/// without throwing, except when cancellation is requested.
 /// </summary>
 /// <remarks>
 /// Parsing is recoverable per the spec's error handling: malformed input reports a <see cref="CssError"/>
 /// on the result's diagnostics and never throws (the only expected exception is
-/// <see cref="System.OperationCanceledException"/>, on cancellation). The scoped-selector rewrite that
-/// consumes the parsed tree lives in <see cref="CssScopedRewriter"/>; the composition root registers this
-/// parser against <c>@style</c> block sources on the aggregate seam.
+/// <see cref="System.OperationCanceledException"/>, on cancellation). The composition root registers this parser
+/// against component style block sources on the aggregate seam.
 /// </remarks>
 public sealed class CssSyntaxParser : SyntaxParser<CssSyntaxNode>
 {

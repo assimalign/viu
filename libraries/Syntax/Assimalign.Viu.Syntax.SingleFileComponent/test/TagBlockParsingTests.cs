@@ -71,7 +71,7 @@ public class TagBlockParsingTests
     [Fact]
     public void Parse_SelfClosingTagBlocks_YieldEmptyBlocks()
     {
-        var source = "<template />\n<style scoped />\n";
+        var source = "<template />\n<style module />\n";
 
         var result = SingleFileComponentParser.Parse(source);
 
@@ -80,7 +80,7 @@ public class TagBlockParsingTests
         result.Descriptor.Template!.Content.ShouldBe(string.Empty);
         result.Descriptor.Styles.Count.ShouldBe(1);
         result.Descriptor.Styles[0].Content.ShouldBe(string.Empty);
-        result.Descriptor.Styles[0].Scoped.ShouldBeTrue();
+        result.Descriptor.Styles[0].IsModule.ShouldBeTrue();
         SingleFileComponentTestHelpers.AssertAllSpansExact(result);
     }
 

@@ -9,7 +9,7 @@ namespace Assimalign.Viu.LanguageService;
 /// <summary>
 /// Resolves a class token in template markup to the declaration authored in this component's style
 /// blocks ([V01.01.12.07.16], #337). Parsing uses the shared CSS syntax tree, so hover follows the
-/// same selector grammar as scoped-style and CSS-module compilation.
+/// same selector grammar as component-style and CSS-module compilation.
 /// </summary>
 internal static class StyleClassHoverProvider
 {

@@ -20,19 +20,6 @@ public sealed class SingleFileComponentStyleCompilerTests
         => SingleFileComponentStyleCompiler.CompileFile(
             SingleFileComponentParserFactory.CreateForStyleExtraction(), text, filePath, ProjectDirectory);
 
-    /// <summary>A <c>scoped</c> block rewrites its selector with the component's stable scope id, canonically.</summary>
-    [Fact]
-    public void Compile_ScopedBlock_RewritesSelectorWithScopeIdCanonically()
-    {
-        const string path = "C:/proj/Components/Card.viu";
-        var scopeId = StyleScopeId.Resolve(path, ProjectDirectory);
-
-        var result = Compile("<style scoped>\n    .card { color: red; }\n</style>\n", path);
-
-        result.ScopeId.ShouldBe(scopeId);
-        result.ExtractedStyles.ShouldBe($".card[{scopeId}] {{\n  color: red;\n}}\n");
-    }
-
     /// <summary>A component with no style block compiles to the empty result.</summary>
     [Fact]
     public void Compile_NoStyleBlock_ReturnsEmpty()
@@ -41,19 +28,31 @@ public sealed class SingleFileComponentStyleCompilerTests
 
         result.ShouldBe(SingleFileComponentStyleCompilation.Empty);
         result.ExtractedStyles.ShouldBeNull();
-        result.ScopeId.ShouldBeNull();
     }
 
-    /// <summary>A non-scoped, non-module, non-v-bind block passes through verbatim (no scope id stamped).</summary>
+    /// <summary>An ordinary block without modules or bindings passes through verbatim.</summary>
     [Fact]
     public void Compile_PlainBlock_PassesThroughVerbatim()
     {
         var result = Compile("<style>\n    .a { color: red; }\n</style>\n", "C:/proj/Components/Plain.viu");
 
-        result.ScopeId.ShouldBeNull();
         result.ExtractedStyles.ShouldNotBeNull();
         result.ExtractedStyles!.ShouldContain(".a { color: red; }");
         result.ExtractedStyles!.ShouldNotContain("data-v-");
+    }
+
+    [Fact]
+    public void Compile_ModuleAndBinding_PreservesNamesAfterScopedCssRemoval()
+    {
+        // [V01.01.06.17] Retain the pre-removal module and binding hashes for the same component path.
+        const string path = "C:/proj/Components/Card.viu";
+        var result = Compile("<style module>\n.box { color: v-bind(color); }\n</style>\n", path);
+
+        CssComponentHash.Resolve(path, ProjectDirectory).ShouldBe("0e7c3b3e");
+        result.ModuleClasses.ShouldHaveSingleItem().Hashed.ShouldBe("box_3f13189d");
+        result.ExtractedStyles.ShouldBe(".box_3f13189d {\n  color: var(--c22325db);\n}\n");
+        result.VariableBindings.Count.ShouldBe(1);
+        result.Diagnostics.ShouldBeEmpty();
     }
 
     /// <summary>Compilation is deterministic: identical input yields the identical string.</summary>
@@ -61,7 +60,7 @@ public sealed class SingleFileComponentStyleCompilerTests
     public void Compile_IsDeterministic()
     {
         const string path = "C:/proj/Components/Card.viu";
-        const string text = "<style scoped>\n    .card { color: red; padding: 8px; }\n</style>\n";
+        const string text = "<style>\n    .card { color: red; padding: 8px; }\n</style>\n";
 
         Compile(text, path).ExtractedStyles.ShouldBe(Compile(text, path).ExtractedStyles);
     }

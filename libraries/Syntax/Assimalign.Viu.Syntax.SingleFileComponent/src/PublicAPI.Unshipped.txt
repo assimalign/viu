@@ -1,0 +1,4 @@
+#nullable enable
+*REMOVED*Assimalign.Viu.Syntax.SingleFileComponent.SingleFileComponentStyleBlock.Scoped.get -> bool
+Assimalign.Viu.Syntax.SingleFileComponent.SingleFileComponentErrorCode.ScopedStyleNotSupported = 1018 -> Assimalign.Viu.Syntax.SingleFileComponent.SingleFileComponentErrorCode
+Assimalign.Viu.Syntax.SingleFileComponent.SingleFileComponentErrorCode.VueScopedStyleNotSupported = 1019 -> Assimalign.Viu.Syntax.SingleFileComponent.SingleFileComponentErrorCode

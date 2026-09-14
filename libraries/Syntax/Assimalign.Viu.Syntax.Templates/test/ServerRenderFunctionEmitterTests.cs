@@ -59,34 +59,6 @@ public sealed class ServerRenderFunctionEmitterTests
     }
 
     [Fact]
-    public void ServerMarkup_ScopedStyleIdentifier_IsWrittenOnEveryNativeElement()
-    {
-        string code = Emit(
-            "<main><h1>heading</h1><p>body</p></main>",
-            scopeId: "data-v-c0ffee00").Code;
-
-        code.OccurrencesOf("SsrRenderDynamicAttribute(\"data-v-c0ffee00\"")
-            .ShouldBe(3);
-    }
-
-    [Fact]
-    public void VirtualNodeTree_ScopedStyleIdentifier_IsBoundOnEveryNativeElement()
-    {
-        RootNode root = TemplateParser.Parse(
-            "<main><h1>heading</h1><p>body</p></main>",
-            ParserOptions.CreateHtml());
-        TransformOptions options = TransformOptions.CreateDom();
-        options.PrefixIdentifiers = true;
-        options.BindingMetadata = BindingMetadata.Empty;
-        options.ScopeId = "data-v-c0ffee00";
-
-        string code = RenderFunctionEmitter.Emit(Transformer.Transform(root, options)).Code;
-
-        code.OccurrencesOf("new global::Assimalign.Viu.Components.QualifiedName(\"data-v-c0ffee00\")")
-            .ShouldBe(3);
-    }
-
-    [Fact]
     public void ServerMarkup_DynamicComponent_UsesSubtreeLocalVirtualNodeFallback()
     {
         string code = Emit("<component :is=\"viewName\"></component>").Code;
@@ -195,14 +167,13 @@ public sealed class ServerRenderFunctionEmitterTests
         exception.Message.ShouldContain("IsServerRendering");
     }
 
-    private static RenderFunctionEmitterResult Emit(string source, string? scopeId = null)
+    private static RenderFunctionEmitterResult Emit(string source)
     {
         RootNode root = TemplateParser.Parse(source, ParserOptions.CreateHtml());
         TransformOptions transformOptions = TransformOptions.CreateDom();
         transformOptions.PrefixIdentifiers = true;
         transformOptions.BindingMetadata = BindingMetadata.Empty;
         transformOptions.IsServerRendering = true;
-        transformOptions.ScopeId = scopeId;
         TransformResult transformed = Transformer.Transform(root, transformOptions);
         return RenderFunctionEmitter.Emit(
             transformed,

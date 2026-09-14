@@ -1,9 +1,8 @@
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// The kind of a simple selector, per the W3C Selectors Level 4 simple selectors
-/// (https://www.w3.org/TR/selectors-4/#simple). A simple selector is the granularity the scoped rewrite
-/// attaches its <c>[data-v-hash]</c> attribute after (the last simple of the last compound).
+/// Classifies simple selector syntax for CSS Modules processing and canonical serialization.
+/// The categories follow W3C Selectors Level 4 (https://www.w3.org/TR/selectors-4/#simple).
 /// </summary>
 public enum CssSimpleSelectorKind
 {

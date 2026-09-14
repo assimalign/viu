@@ -82,12 +82,12 @@ public sealed class SingleFileComponentPathComparisonTests
     }
 
     [Fact]
-    public void ScopeIdentifier_CaseChangedProjectDirectory_FollowsOperatingSystemPathIdentity()
+    public void CssNameHash_CaseChangedProjectDirectory_FollowsOperatingSystemPathIdentity()
     {
         const string filePath = "C:/project/Components/Choice.viu";
-        var matching = StyleScopeId.Resolve(filePath, "C:/project");
-        var caseChanged = StyleScopeId.Resolve(filePath, "C:/Project");
-        var outside = StyleScopeId.Resolve(filePath, "C:/outside");
+        var matching = CssComponentHash.Resolve(filePath, "C:/project");
+        var caseChanged = CssComponentHash.Resolve(filePath, "C:/Project");
+        var outside = CssComponentHash.Resolve(filePath, "C:/outside");
 
         caseChanged.ShouldBe(
             RuntimeInformation.IsOSPlatform(OSPlatform.Windows)

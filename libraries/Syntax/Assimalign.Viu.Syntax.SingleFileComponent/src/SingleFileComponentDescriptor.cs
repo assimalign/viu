@@ -11,7 +11,7 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// A file has at most one <see cref="Template"/> and at most one <see cref="Script"/> (a second of
 /// either is reported as a duplicate-block diagnostic and ignored, keeping the first), any number of
 /// <see cref="Styles"/>, and any number of <see cref="CustomBlocks"/>. Style and custom blocks are
-/// deliberately unlimited: several style blocks can carry different options (one scoped, one global,
+/// deliberately unlimited: several style blocks can carry different options (one global,
 /// one module) and each contributes, while a custom block's meaning belongs to whatever tooling
 /// registered for it, so the container has no basis for a limit. Template and script are singular
 /// because both merge into one generated partial class, where a second of either has no coherent

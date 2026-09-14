@@ -3,14 +3,9 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Parses a qualified rule's prelude token range into a <see cref="CssSelectorListNode"/> — comma-separated
-/// complex selectors, each a flat source-order list of simple selectors, pseudo selectors, and the
-/// combinators between compounds. This is the "sufficient for scoping decisions" selector parse the
-/// scoped rewrite reads: it recovers enough structure to place the scope attribute, including
-/// the reserved functional pseudos <c>:deep()</c>/<c>:slotted()</c>/<c>:global()</c> whose inner selector
-/// lists are parsed recursively. It follows the W3C Selectors Level 4 grammar
-/// (https://www.w3.org/TR/selectors-4/) only as far as scoping needs — attribute-selector internals and
-/// non-reserved functional pseudo arguments are kept as verbatim text, never re-parsed.
+/// Parses a flat, source-ordered selector tree for CSS Modules processing and serialization.
+/// Recognized functional pseudo arguments are parsed as selector lists; ordinary pseudo text
+/// and unsupported syntax are retained so serialization never silently drops source.
 /// </summary>
 internal sealed class CssSelectorParser
 {
@@ -186,7 +181,7 @@ internal sealed class CssSelectorParser
                 }
 
                 // An unrecognized delimiter (e.g. a namespace bar) is preserved verbatim as a type piece
-                // so serialization never drops source; it is not the scoped attribute anchor of interest.
+                // so serialization never drops source.
                 index++;
                 return SimpleSelector(CssSimpleSelectorKind.Type, token.Start, token.End);
             }

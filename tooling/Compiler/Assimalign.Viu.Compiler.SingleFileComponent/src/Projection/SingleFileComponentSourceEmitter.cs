@@ -913,15 +913,14 @@ public static class SingleFileComponentSourceEmitter
         builder.Append("#line default\n");
     }
 
-    // [V01.01.06.04] Style extraction remains a build-time channel. Scoped-CSS identifiers are applied
-    // by the template transform; runtime v-bind application remains absent during the component-model
-    // migration. CSS Modules accessors and the extracted text consumed by bundling remain.
+    // [V01.01.06.17] Style extraction remains a build-time channel. CSS Modules and binding
+    // compilation remain; runtime CSS-variable application is deferred under [STY-6].
     private static void AppendStyleSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
         if (model.ExtractedStyles is not { } styles)
         {
             AppendIndent(builder, indent);
-            builder.Append("// [V01.01.06.04] Style seam. This component declares no style block, so no\n");
+            builder.Append("// [V01.01.06.17] Style seam. This component declares no style block, so no\n");
             AppendIndent(builder, indent);
             builder.Append("// compiled CSS is emitted.\n");
             return;
@@ -929,9 +928,7 @@ public static class SingleFileComponentSourceEmitter
 
         builder.Append('\n');
         AppendIndent(builder, indent);
-        builder.Append("// [V01.01.06.04] Compiled style blocks retained for static asset bundling; scoped-CSS\n");
-        AppendIndent(builder, indent);
-        builder.Append("// identifiers are already stamped by the generated render function.\n");
+        builder.Append("// [V01.01.06.17] Compiled component styles retained for static asset bundling.\n");
 
         AppendIndent(builder, indent);
         builder.Append("/// <summary>\n");

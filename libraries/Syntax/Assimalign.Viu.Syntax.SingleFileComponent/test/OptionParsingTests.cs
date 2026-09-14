@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
-// The honored (typed) block options, per docs/FORMAT.md: scoped, module[="name"], and lang on
+// The honored (typed) block options, per docs/FORMAT.md: module[="name"] and lang on
 // <style>; lang on <template>; lang on
 // @script; custom blocks keep their @-options. The [V01.01.06.10] hybrid container has two header
 // grammars — HTML attributes on tag blocks ('"'/'\''/unquoted values, whitespace around '=') and the
@@ -13,11 +13,11 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 public class OptionParsingTests
 {
     [Fact]
-    public void Parse_StyleScopedAttribute_SetsScoped()
+    public void Parse_UnknownStyleAttribute_PreservesToken()
     {
-        var style = SingleFileComponentTestHelpers.Parse("<style scoped>\n</style>\n").Styles[0];
+        var style = SingleFileComponentTestHelpers.Parse("<style custom>\n</style>\n").Styles[0];
 
-        style.Scoped.ShouldBeTrue();
+        style.HasOption("custom").ShouldBeTrue();
         style.IsModule.ShouldBeFalse();
         style.ModuleName.ShouldBeNull();
     }
@@ -41,11 +41,11 @@ public class OptionParsingTests
     }
 
     [Fact]
-    public void Parse_StyleScopedAndLang_HonorsBoth()
+    public void Parse_UnknownStyleAttributeAndLang_PreservesBoth()
     {
-        var style = SingleFileComponentTestHelpers.Parse("<style scoped lang=\"scss\">\n</style>\n").Styles[0];
+        var style = SingleFileComponentTestHelpers.Parse("<style custom lang=\"scss\">\n</style>\n").Styles[0];
 
-        style.Scoped.ShouldBeTrue();
+        style.HasOption("custom").ShouldBeTrue();
         style.Lang.ShouldBe("scss");
     }
 
@@ -64,11 +64,11 @@ public class OptionParsingTests
     [Fact]
     public void Parse_TagAttributes_PreserveOrderNamesAndValues()
     {
-        var style = SingleFileComponentTestHelpers.Parse("<style scoped module=\"m\" lang=\"scss\">\n</style>\n").Styles[0];
+        var style = SingleFileComponentTestHelpers.Parse("<style custom module=\"m\" lang=\"scss\">\n</style>\n").Styles[0];
 
         style.Options.Count.ShouldBe(3);
 
-        style.Options[0].Name.ShouldBe("scoped");
+        style.Options[0].Name.ShouldBe("custom");
         style.Options[0].Value.ShouldBeNull();
 
         style.Options[1].Name.ShouldBe("module");
@@ -96,7 +96,7 @@ public class OptionParsingTests
     [Fact]
     public void Parse_DuplicateTagAttribute_IsReported()
     {
-        var result = SingleFileComponentParser.Parse("<style scoped scoped>\n</style>\n");
+        var result = SingleFileComponentParser.Parse("<style custom custom>\n</style>\n");
 
         result.Descriptor.Styles.Count.ShouldBe(1);
         result.Errors.Count.ShouldBe(1);

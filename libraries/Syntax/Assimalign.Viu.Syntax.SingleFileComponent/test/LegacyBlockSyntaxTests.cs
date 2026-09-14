@@ -27,12 +27,12 @@ public class LegacyBlockSyntaxTests
     [Fact]
     public void Parse_LegacyStyleBlock_ReportsMigrationWarningAndStillSlices()
     {
-        var source = "@style scoped {\n    .a { color: red; }\n}\n";
+        var source = "@style module {\n    .a { color: red; }\n}\n";
 
         var result = SingleFileComponentParser.Parse(source);
 
         result.Descriptor.Styles.Count.ShouldBe(1);
-        result.Descriptor.Styles[0].Scoped.ShouldBeTrue();
+        result.Descriptor.Styles[0].IsModule.ShouldBeTrue();
         result.Descriptor.Styles[0].Content.ShouldBe("    .a { color: red; }\n");
         result.Errors.Count.ShouldBe(1);
         result.Errors[0].Code.ShouldBe(SingleFileComponentErrorCode.LegacyStyleBlockSyntax);
@@ -83,7 +83,7 @@ public class LegacyBlockSyntaxTests
             "@template {\n    <div>{{ x }}</div>\n}\n" +
             "@script {\n    public int X;\n}\n" +
             "@style {\n    .a { color: red; }\n}\n" +
-            "@style scoped {\n    .b { color: blue; }\n}\n";
+            "@style module {\n    .b { color: blue; }\n}\n";
 
         var result = SingleFileComponentParser.Parse(source);
 

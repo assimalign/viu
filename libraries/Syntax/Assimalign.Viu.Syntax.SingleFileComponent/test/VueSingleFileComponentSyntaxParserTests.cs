@@ -21,7 +21,7 @@ public class VueSingleFileComponentSyntaxParserTests
             new CapturingParser());
         var parser = new VueSingleFileComponentSyntaxParser(options);
         var source =
-            "<style scoped>.first { color: red; }</style>" +
+            "<style module>.first { color: red; }</style>" +
             "<template><div /></template>" +
             "<style module>.second { color: blue; }</style>";
 

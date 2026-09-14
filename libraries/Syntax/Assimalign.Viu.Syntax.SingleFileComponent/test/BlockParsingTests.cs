@@ -17,7 +17,7 @@ public class BlockParsingTests
         "@script {\n" +
         "    public string Message = \"Hello\";\n" +
         "}\n" +
-        "<style scoped>\n" +
+        "<style module>\n" +
         "    .box { color: red; }\n" +
         "</style>\n";
 
@@ -111,13 +111,13 @@ public class BlockParsingTests
     {
         var source =
             "<style>\n    .a { color: red; }\n</style>\n" +
-            "<style scoped>\n    .b { color: blue; }\n</style>\n";
+            "<style module>\n    .b { color: blue; }\n</style>\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
 
         descriptor.Styles.Count.ShouldBe(2);
-        descriptor.Styles[0].Scoped.ShouldBeFalse();
-        descriptor.Styles[1].Scoped.ShouldBeTrue();
+        descriptor.Styles[0].IsModule.ShouldBeFalse();
+        descriptor.Styles[1].IsModule.ShouldBeTrue();
         SingleFileComponentTestHelpers.Errors(source).Count.ShouldBe(0);
     }
 

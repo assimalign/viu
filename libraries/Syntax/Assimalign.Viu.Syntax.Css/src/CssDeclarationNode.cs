@@ -6,7 +6,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <see cref="Value"/> is the exact raw slice between the <c>:</c> and the terminating <c>;</c> or
 /// <c>}</c>, trimmed of surrounding whitespace; <see cref="Important"/> records a trailing
 /// <c>!important</c>. Value components are not further tokenized — rule-level parsing keeps raw value
-/// text, which is all the scoped rewrite (keyframe/animation names) needs.
+/// text, preserving values for serialization and CSS binding rewriting.
 /// </summary>
 public sealed record CssDeclarationNode : CssSyntaxNode
 {

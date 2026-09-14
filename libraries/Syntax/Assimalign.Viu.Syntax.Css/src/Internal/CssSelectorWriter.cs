@@ -11,8 +11,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// agree) and deterministic — two rules built from equal selector lists carry equal preludes.
 /// </summary>
 /// <remarks>
-/// The prelude is <em>not</em> what the serializers emit — <see cref="CssStylesheetWriter"/> and
-/// <see cref="CssScopedRewriter"/> both render a rule's selector from its parsed parts, never from the raw
+/// The prelude is <em>not</em> what the serializer emits — <see cref="CssStylesheetWriter"/> renders a rule's selector from its parsed parts, never from the raw
 /// prelude — so this renderer's output only has to match the parts (which it does, sharing the same
 /// part-walking logic) and stay deterministic; it is deliberately independent of the serializers so this
 /// construction-only path can never perturb them.

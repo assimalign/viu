@@ -86,7 +86,7 @@ serialization, runtime member discovery, emitted code, or dynamically generated 
 ## Non-goals
 
 Browser does not own the virtual-node vocabulary, mounted diff engine, component activation,
-application composition dependencies, routing, server serialization, or scoped-CSS rewriting.
-Routing joins through Browser.Router. Generated scope identifiers arrive as ordinary attributes;
-host-driven scope stamping and reactive style-variable application remain absent (`[STY-1]`,
-`[STY-6]`).
+application composition dependencies, routing, or server serialization. Routing joins through
+Browser.Router. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367). The single-element
+`CssVariables.Bind` directive stays supported; generated reactive `v-bind()` application for ordinary
+component styles remains deferred (`[STY-6]`–`[STY-8]`).

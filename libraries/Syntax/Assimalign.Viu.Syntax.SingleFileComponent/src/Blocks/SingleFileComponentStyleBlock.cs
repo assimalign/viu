@@ -1,21 +1,15 @@
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// A style block — the component's CSS, carrying the <c>scoped</c> and <c>module</c> options that
-/// select the compile-time rewrite applied to it (<c>[STY-1]</c>, <c>[STY-2]</c>). Unlike template and
-/// script, style is <em>not</em> limited to one per component: several blocks may declare different
-/// options — one scoped, one global, one module — and all of them contribute.
+/// A style block containing ordinary component CSS or a CSS module (<c>[STY-2]</c>).
+/// Unlike template and script, style is not limited to one block per component: all blocks contribute
+/// in source order. Unsupported options remain available as tokens for located diagnostics
+/// ([V01.01.06.17]).
 /// </summary>
 public sealed record SingleFileComponentStyleBlock : SingleFileComponentBlock
 {
     /// <inheritdoc />
     public override SingleFileComponentBlockKind Kind => SingleFileComponentBlockKind.Style;
-
-    /// <summary>
-    /// Whether the <c>scoped</c> option is present — every selector is rewritten to the component's
-    /// scope identifier, so the CSS applies only to the component's own elements (<c>[STY-1]</c>).
-    /// </summary>
-    public bool Scoped => HasOption("scoped");
 
     /// <summary>
     /// Whether the <c>module</c> option is present — local class names are hashed and exposed through a

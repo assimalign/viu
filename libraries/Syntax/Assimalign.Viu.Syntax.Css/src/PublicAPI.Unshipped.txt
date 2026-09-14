@@ -1,0 +1,3 @@
+#nullable enable
+*REMOVED*Assimalign.Viu.Syntax.Css.CssScopedRewriter
+*REMOVED*static Assimalign.Viu.Syntax.Css.CssScopedRewriter.Rewrite(Assimalign.Viu.Syntax.Css.CssStylesheetNode! stylesheet, string! scopeId) -> string!

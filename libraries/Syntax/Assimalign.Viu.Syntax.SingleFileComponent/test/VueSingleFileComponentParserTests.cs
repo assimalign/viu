@@ -23,7 +23,7 @@ public class VueSingleFileComponentParserTests
         var source =
             "<template lang=\"html\"><main /></template>\n" +
             "<script setup lang='csharp'>public string Title = \"Hello\";</script>\n" +
-            "<style scoped module=\"classes\">.first { color: red; }</style>\n" +
+            "<style data-x module=\"classes\">.first { color: red; }</style>\n" +
             "<style lang=css>.second { color: blue; }</style>\n" +
             "<docs locale=\"en-US\">Documentation</docs>\n";
 
@@ -39,7 +39,7 @@ public class VueSingleFileComponentParserTests
         result.Descriptor.ScriptSetup.HasOption("setup").ShouldBeTrue();
         result.Descriptor.ScriptSetup.Lang.ShouldBe("csharp");
         result.Descriptor.Styles.Count.ShouldBe(2);
-        result.Descriptor.Styles[0].Scoped.ShouldBeTrue();
+        result.Descriptor.Styles[0].HasOption("data-x").ShouldBeTrue();
         result.Descriptor.Styles[0].ModuleName.ShouldBe("classes");
         result.Descriptor.Styles[1].Lang.ShouldBe("css");
         result.Descriptor.CustomBlocks.Count.ShouldBe(1);
@@ -152,7 +152,7 @@ public class VueSingleFileComponentParserTests
     [Fact]
     public void Parse_UnclosedBlock_PreservesContentToEndAndReportsOpeningTag()
     {
-        var source = "<style scoped>\r\n.card {\r\n  display: grid;\r\n}";
+        var source = "<style module>\r\n.card {\r\n  display: grid;\r\n}";
 
         var result = VueSingleFileComponentParser.Parse(source);
 
@@ -160,7 +160,7 @@ public class VueSingleFileComponentParserTests
         result.Descriptor.Styles[0].Content.ShouldBe("\r\n.card {\r\n  display: grid;\r\n}");
         result.Errors.Count.ShouldBe(1);
         result.Errors[0].Code.ShouldBe(SingleFileComponentErrorCode.UnterminatedTagBlock);
-        result.Errors[0].Location.Source.ShouldBe("<style scoped>");
+        result.Errors[0].Location.Source.ShouldBe("<style module>");
         result.Descriptor.Styles[0].ContentLocation.Start.ShouldBe(new Position(14, 1, 15));
         result.Descriptor.Styles[0].ContentLocation.End.ShouldBe(new Position(source.Length, 4, 2));
         SingleFileComponentTestHelpers.AssertAllSpansExact(result);
@@ -173,7 +173,7 @@ public class VueSingleFileComponentParserTests
             "stray text\n" +
             "</template>\n" +
             "<1invalid>\n" +
-            "<style scoped scoped>.card { color: red; }</style>";
+            "<style module module>.card { color: red; }</style>";
 
         var result = VueSingleFileComponentParser.Parse(source);
 
@@ -201,7 +201,7 @@ public class VueSingleFileComponentParserTests
     [Fact]
     public void Parse_SameSourceTwice_ProducesStructurallyEqualResults()
     {
-        var source = "<template><p>Hello</p></template><style scoped>.p { color: red; }</style>";
+        var source = "<template><p>Hello</p></template><style module>.p { color: red; }</style>";
 
         VueSingleFileComponentParser.Parse(source).ShouldBe(VueSingleFileComponentParser.Parse(source));
     }

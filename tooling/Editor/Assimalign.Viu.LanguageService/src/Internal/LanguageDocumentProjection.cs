@@ -39,7 +39,7 @@ internal static class LanguageDocumentProjection
             name.Namespace,
             name.ClassName,
             name.HintName,
-            StyleScopeId.Resolve(filePath, context?.ProjectDirectory),
+            CssComponentHash.Resolve(filePath, context?.ProjectDirectory),
             HotReloadComponentIdentifier: null,
             HasCanonicalPeer: false);
         return SingleFileComponentProjection.Project(input, cancellationToken);

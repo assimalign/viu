@@ -4,25 +4,15 @@ using System.Text;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Serializes a parsed (or rewritten) <see cref="CssStylesheetNode"/> back to CSS text with no scoping —
-/// the plain counterpart of <see cref="CssScopedRewriter"/>. It is the serializer the composition-root
-/// generator uses for a non-<c>scoped</c> <c>@style module</c> or <c>v-bind()</c> block, whose tree
-/// <see cref="CssModuleRewriter"/> / <see cref="CssBindingRewriter"/> rewrote (renamed class selectors,
-/// rewritten declaration values) but which carries no <c>data-v-</c> attribute. Selectors are rendered from
-/// the parsed parts (so a renamed class's <c>Text</c> is what appears), not from the now-stale raw prelude.
+/// Serializes a parsed or rewritten stylesheet to deterministic CSS text. Selectors use their
+/// parsed parts, so module renames are reflected even when the original prelude is unchanged.
+/// The compiler uses this writer for module and binding rewrites; ordinary blocks pass through
+/// verbatim. Specified by <c>[STY-2]</c> and <c>[V01.01.06.17]</c>.
 /// </summary>
-/// <remarks>
-/// Output uses the same deterministic canonical form as <see cref="CssScopedRewriter"/> — two-space
-/// indentation, <c>prop: value;</c>, <c>selector {</c> — so identical input yields identical output (the
-/// incremental-caching contract) and a scoped and non-scoped block of the same component format alike.
-/// Because the form is canonical, a non-scoped block that <em>is</em> rewritten no longer round-trips its
-/// original whitespace or comments, exactly as a scoped block does not (see the Css <c>DESIGN.md</c>); a
-/// non-scoped block with neither modules nor <c>v-bind()</c> is still emitted verbatim by the generator and
-/// never reaches this writer.
-/// </remarks>
+/// <remarks>Output uses two-space indentation and LF newlines. Canonical output does not preserve source whitespace or comments.</remarks>
 public static class CssStylesheetWriter
 {
-    /// <summary>Serializes <paramref name="stylesheet"/> to canonical, unscoped CSS text.</summary>
+    /// <summary>Serializes <paramref name="stylesheet"/> to canonical CSS text.</summary>
     /// <param name="stylesheet">The stylesheet to serialize.</param>
     /// <returns>The deterministic CSS text.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stylesheet"/> is <see langword="null"/>.</exception>

@@ -10,7 +10,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// Pins the <c>v-bind()</c>-in-CSS rewrite (<see cref="CssBindingRewriter"/>, [V01.01.06.06], specified
 /// by <c>[STY-6]</c>): each <c>v-bind(expr)</c> becomes a
 /// component-scoped <c>var(--&lt;hash&gt;)</c>, expressions are collected (and de-duplicated) for the
-/// runtime, malformed usages surface recoverable diagnostics, and the rewrite composes with <c>scoped</c>.
+/// runtime, malformed usages surface recoverable diagnostics, and the rewritten tree serializes deterministically.
 /// </summary>
 public sealed class CssBindingRewriterTests
 {
@@ -125,18 +125,6 @@ public sealed class CssBindingRewriterTests
             Salt);
 
         result.Bindings.Select(binding => binding.Expression).ShouldBe(new[] { "a", "c" });
-    }
-
-    [Fact]
-    public void Rewrite_ComposesWithScoped()
-    {
-        // v-bind rewrite over the tree, then the scoped serializer: the value carries var(--hash) and the
-        // selector carries the [data-v] attribute.
-        var bound = CssBindingRewriter.Rewrite(CssTestHelpers.ParseStylesheet(".a { color: v-bind(color); }"), Salt);
-
-        var scoped = CssScopedRewriter.Rewrite(bound.Stylesheet, "data-v-test");
-
-        scoped.ShouldBe(".a[data-v-test] {\n  color: var(--" + bound.Bindings[0].Name + ");\n}\n");
     }
 
     [Fact]

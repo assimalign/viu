@@ -16,7 +16,7 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// <param name="Namespace">The resolved containing namespace, or <see langword="null"/> for the global namespace.</param>
 /// <param name="ClassName">The resolved generated partial class name.</param>
 /// <param name="HintName">The resolved, unique <c>AddSource</c> hint name.</param>
-/// <param name="ScopeId">The resolved scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>), derived from the project-relative path ([V01.01.06.04]).</param>
+/// <param name="CssHashSalt">The component-local CSS name salt derived from its project-relative path; used only by module and binding rewrites ([V01.01.06.17]).</param>
 /// <param name="HotReloadComponentIdentifier">
 /// The development-only path-stable component identifier, or <see langword="null"/> when hot-reload
 /// metadata is disabled.
@@ -35,7 +35,7 @@ public readonly record struct SingleFileComponentProjectionInput(
     string? Namespace,
     string ClassName,
     string HintName,
-    string ScopeId,
+    string CssHashSalt,
     string? HotReloadComponentIdentifier,
     bool HasCanonicalPeer)
 {

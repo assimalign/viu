@@ -152,7 +152,7 @@ public static class SingleFileComponentProjection
         var moduleClasses = new List<CssModuleClassEntry>();
         var cssVariableBindings = new List<CssVariableBindingEntry>();
         var moduleTemplateNames = new Dictionary<string, string>(StringComparer.Ordinal);
-        var (scopeId, extractedStyles) = CompileStyles(
+        var extractedStyles = CompileStyles(
             input, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, bindingMetadata, cancellationToken);
 
         var model = new SingleFileComponentModel(
@@ -169,7 +169,6 @@ public static class SingleFileComponentProjection
             Bindings: bindings,
             RenderBody: null,
             RenderCacheSize: 0,
-            ScopeId: scopeId,
             ExtractedStyles: extractedStyles,
             ModuleClasses: moduleClasses.Count == 0
                 ? EquatableArray<CssModuleClassEntry>.Empty
@@ -193,7 +192,6 @@ public static class SingleFileComponentProjection
             parse,
             bindingMetadata,
             cssModules,
-            scopeId,
             diagnostics,
             cancellationToken,
             RenderFunctionTargetProfile.VirtualNodeTree);
@@ -203,7 +201,6 @@ public static class SingleFileComponentProjection
                 parse,
                 bindingMetadata,
                 cssModules,
-                scopeId,
                 diagnostics,
                 cancellationToken,
                 RenderFunctionTargetProfile.ServerMarkup)
@@ -455,7 +452,6 @@ public static class SingleFileComponentProjection
         AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
         BindingMetadata bindingMetadata,
         CssModuleAccessors cssModules,
-        string? scopeId,
         List<DiagnosticInfo> diagnostics,
         CancellationToken cancellationToken,
         RenderFunctionTargetProfile targetProfile)
@@ -476,10 +472,6 @@ public static class SingleFileComponentProjection
             transformOptions.BindingMetadata = bindingMetadata;
             transformOptions.IsServerRendering =
                 targetProfile == RenderFunctionTargetProfile.ServerMarkup;
-            // Scoped styles ([V01.01.06.04], [V01.01.07.02]): the style compiler and render compiler share
-            // one path-derived identifier, so every client-rendered element carries the same attribute that
-            // the server-markup target emits for hydration.
-            transformOptions.ScopeId = scopeId;
             // CSS Modules accessors ([V01.01.05.04.01]): resolve `$style.<class>` (and named-module) references
             // against the emitted accessor class. The map is complete (every declared class), so an access to an
             // undeclared member is reported on the .viu coordinate.
@@ -544,9 +536,9 @@ public static class SingleFileComponentProjection
     /// the compile-only concerns on top: the
     /// template-facing module-name map ([V01.01.05.04.01]) and the [V01.01.06.06.01] binding-metadata
     /// rewrite of each <c>v-bind()</c> expression, whose diagnostics compose onto exact <c>.viu</c> style
-    /// coordinates. The scope id is returned only when a <c>scoped</c> block is declared.
+    /// coordinates.
     /// </summary>
-    private static (string? ScopeId, string? ExtractedStyles) CompileStyles(
+    private static string? CompileStyles(
         SingleFileComponentProjectionInput input,
         AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
         List<DiagnosticInfo> diagnostics,
@@ -556,7 +548,7 @@ public static class SingleFileComponentProjection
         BindingMetadata bindingMetadata,
         CancellationToken cancellationToken)
     {
-        var compilation = SingleFileComponentStyleCompiler.Compile(parse, input.ScopeId, cancellationToken);
+        var compilation = SingleFileComponentStyleCompiler.Compile(parse, input.CssHashSalt, cancellationToken);
 
         foreach (var moduleClass in compilation.ModuleClasses)
         {
@@ -589,7 +581,7 @@ public static class SingleFileComponentProjection
                 input.FilePath, styleDiagnostic.Diagnostic, styleDiagnostic.BlockContentStart));
         }
 
-        return (compilation.ScopeId, compilation.ExtractedStyles);
+        return compilation.ExtractedStyles;
     }
 
     // The template spelling of a `module` option ([V01.01.05.04.01]): the default (valueless `module`) is
