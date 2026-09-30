@@ -14,12 +14,16 @@ be reachable from `main`.
 
 The workflow performs these stages in order:
 
-1. Every library, tooling project, and source generator runs through the same composite build and
+1. The `resolve-release` job checks the release identity once: the tag is exactly `v` plus
+   `ViuVersion`, the tagged commit is reachable from `main`, and the GitHub Release prerelease flag
+   matches `ViuVersionSuffix`. Every other job, including both editor-extension publishers, waits on
+   it and consumes its outputs, so a mistagged release fails in its first job and publishes nothing.
+2. Every library, tooling project, and source generator runs through the same composite build and
    test action used by area CI.
-2. [`scripts/Pack-Release.ps1`](../scripts/Pack-Release.ps1) packs the authoritative inventory with
+3. [`scripts/Pack-Release.ps1`](../scripts/Pack-Release.ps1) packs the authoritative inventory with
    warnings as errors, package validation, portable symbols, physical layout checks, and checksums.
-3. The validated main packages stage automatically in the Assimalign GitHub Packages feed.
-4. The `nuget-org` GitHub environment pauses promotion for its required reviewers. Approval promotes
+4. The validated main packages stage automatically in the Assimalign GitHub Packages feed.
+5. The `nuget-org` GitHub environment pauses promotion for its required reviewers. Approval promotes
    the exact downloaded artifact, including `.snupkg` symbol packages, to nuget.org. Rejecting or not
    approving the deployment leaves the release in staging.
 
@@ -30,8 +34,9 @@ push and no pull-request event can publish a package.
 The same workflow has two separately protected editor-extension paths:
 
 - A published GitHub Release can publish the two Visual Studio preview VSIXs through the protected
-  `visual-studio-marketplace` environment. Its required reviewers and Marketplace credential remain
-  the approval boundary.
+  `visual-studio-marketplace` environment once `resolve-release` accepts the release; this path runs
+  its own editor tests and does not wait for the `validate-release` matrix. Its required reviewers
+  and Marketplace credential remain the approval boundary.
 - The same release can publish the two Visual Studio Code extensions only after the
   `validate-release` matrix succeeds. A non-matrix job resolves one Marketplace version per package
   and emits only the missing package/platform cells. The protected
@@ -240,9 +245,12 @@ deployment; a partial-failure rerun contains only the targets still missing at t
 
 1. Set the intended full version once in
    [`build/Targets/Build.Version.props`](../build/Targets/Build.Version.props) and merge it to `main`.
-2. Create a tag such as `v10.0.0-alpha.2` or `v10.0.0` at that commit.
+2. Create a tag such as `v10.0.0-alpha.2` or `v10.0.0` at that commit. The `v` is required; a bare
+   `10.0.0-alpha.2` tag is rejected.
 3. Publish a GitHub Release for the tag. Mark it prerelease if and only if `ViuVersionSuffix` is
-   nonempty; the Visual Studio Code job rejects a mismatch.
+   nonempty; `resolve-release` rejects a mismatch before anything builds or publishes. Re-running
+   cannot repair a rejected release, because its tag and prerelease flag are part of the release
+   event: delete the release and its wrong tag, then publish a new release from the correct tag.
 4. Confirm the area-test matrix, pack validation, checksum verification, and GitHub Packages staging
    succeed.
 5. A required reviewer inspects the staged packages and approves the `nuget-org` deployment when the

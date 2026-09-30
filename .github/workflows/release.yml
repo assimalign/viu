@@ -1,9 +1,10 @@
 # Official Viu release pipeline.
 #
 # A published GitHub Release is the only package-publication trigger. The release tag must match
-# the complete centrally declared ViuVersion, including any prerelease suffix. The validated set is
-# staged automatically in GitHub Packages; promotion of that same artifact to nuget.org pauses at
-# the protected nuget-org environment ([V01.01.12.03]).
+# the complete centrally declared ViuVersion, including any prerelease suffix. resolve-release checks
+# that identity once, and every other job waits on it, so a mistagged release publishes nothing. The
+# validated set is staged automatically in GitHub Packages; promotion of that same artifact to
+# nuget.org pauses at the protected nuget-org environment ([V01.01.12.03]).
 name: release
 
 on:
@@ -27,8 +28,100 @@ permissions:
   contents: read
 
 jobs:
+  # The single release-identity gate. Every other job needs it, so a release whose tag, canonical
+  # version, or prerelease flag disagree stops here - before the validation matrix spends runner
+  # time and before any feed or Marketplace receives a package. Downstream jobs consume its outputs
+  # instead of re-deriving the identity.
+  resolve-release:
+    name: resolve release identity
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      pre-release: ${{ steps.release.outputs.pre-release }}
+    steps:
+      - name: Checkout release tag
+        # actions/checkout v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Validate checked-out commit
+        shell: pwsh
+        run: |
+          & git fetch origin main --no-tags
+          if ($LASTEXITCODE -ne 0) {
+            throw "Fetching origin/main failed with exit code $LASTEXITCODE."
+          }
+
+          $checkedOutCommit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Resolving the checked-out commit failed.'
+          }
+          & git merge-base --is-ancestor $checkedOutCommit origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Release builds must use a commit reachable from main.'
+          }
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Validate release tag and prerelease flag
+        id: release
+        shell: pwsh
+        env:
+          VIU_GITHUB_RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
+          VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $versionProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
+          function Read-BuildProperty {
+            param([string] $PropertyName)
+
+            $propertyValue = (
+              & dotnet msbuild $versionProject -nologo "-getProperty:$PropertyName"
+            ) -join [System.Environment]::NewLine
+            if ($LASTEXITCODE -ne 0) {
+              throw "Reading $PropertyName failed with exit code $LASTEXITCODE."
+            }
+
+            return ([string] $propertyValue).Trim()
+          }
+
+          $canonicalVersion = Read-BuildProperty -PropertyName 'ViuVersion'
+          $versionSuffix = Read-BuildProperty -PropertyName 'ViuVersionSuffix'
+          if ($canonicalVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
+            throw "Canonical Viu version '$canonicalVersion' is not supported SemVer."
+          }
+
+          # The tag is exactly 'v' followed by the complete canonical version. Naming the expected
+          # tag makes the common mistake - a bare-version tag such as 10.0.0-preview.1 - obvious.
+          # The tag is part of the release event, so re-running cannot repair it: publish a new
+          # release from the expected tag.
+          $expectedTag = "v$canonicalVersion"
+          if ($env:VIU_RELEASE_TAG -cne $expectedTag) {
+            throw "Release tag '$($env:VIU_RELEASE_TAG)' must be '$expectedTag' to match canonical Viu version $canonicalVersion from build/Targets/Build.Version.props."
+          }
+
+          $isPreRelease = -not [string]::IsNullOrWhiteSpace($versionSuffix)
+          $githubReleaseIsPreRelease = [string]::Equals(
+            $env:VIU_GITHUB_RELEASE_IS_PRERELEASE,
+            'true',
+            [System.StringComparison]::OrdinalIgnoreCase)
+          if ($isPreRelease -ne $githubReleaseIsPreRelease) {
+            throw "GitHub Release prerelease=$githubReleaseIsPreRelease does not match ViuVersionSuffix '$versionSuffix'."
+          }
+
+          "version=$canonicalVersion" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "pre-release=$($isPreRelease.ToString().ToLowerInvariant())" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release $($env:VIU_RELEASE_TAG): Viu $canonicalVersion, prerelease=$isPreRelease"
+
   validate-release:
     name: validate ${{ matrix.project }}
+    needs: resolve-release
     if: github.event_name == 'release'
     runs-on: ubuntu-24.04
     strategy:
@@ -74,11 +167,11 @@ jobs:
 
   pack-packages:
     name: pack all NuGet packages
-    needs: validate-release
+    needs: [resolve-release, validate-release]
     if: github.event_name == 'release' && github.event.release.draft == false
     runs-on: ubuntu-24.04
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ needs.resolve-release.outputs.version }}
       package-count: ${{ steps.package-count.outputs.count }}
     steps:
       - name: Checkout
@@ -111,51 +204,16 @@ jobs:
         with:
           install-wasm-tools: 'true'
 
-      - name: Resolve package version
-        id: version
-        shell: pwsh
-        env:
-          VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
-          $canonicalVersion = (
-            & dotnet msbuild $sdkProject -nologo -getProperty:ViuVersion
-          ) -join [System.Environment]::NewLine
-          if ($LASTEXITCODE -ne 0) {
-            throw "Reading the canonical Viu version failed with exit code $LASTEXITCODE."
-          }
-          $canonicalVersion = $canonicalVersion.Trim()
-          if ($canonicalVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
-            throw "Canonical Viu version '$canonicalVersion' is not supported SemVer."
-          }
-
-          $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
-            $env:VIU_RELEASE_TAG,
-            '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?)$',
-            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
-          if (-not $tagMatch.Success) {
-            throw 'GitHub releases must use a vMAJOR.MINOR.PATCH[-PRERELEASE] tag.'
-          }
-
-          $releaseVersion = $tagMatch.Groups['version'].Value
-          if ($releaseVersion -ne $canonicalVersion) {
-            throw "Release tag version $releaseVersion does not match canonical Viu version $canonicalVersion."
-          }
-
-          "version=$releaseVersion" |
-            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "Release package version: $releaseVersion"
-
       - name: Pack release
         shell: pwsh
         env:
-          VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+          VIU_PACKAGE_VERSION: ${{ needs.resolve-release.outputs.version }}
         run: ./scripts/Pack-Release.ps1 -Version $env:VIU_PACKAGE_VERSION
 
       - name: Validate fresh package-only consumers
         shell: pwsh
         env:
-          VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+          VIU_PACKAGE_VERSION: ${{ needs.resolve-release.outputs.version }}
         run: >-
           ./scripts/Test-ApplicationLifetimeConsumer.ps1
           -PackageDirectory _out/release/packages
@@ -353,6 +411,10 @@ jobs:
 
   publish-visual-studio-preview:
     name: publish Visual Studio Marketplace preview
+    # Deliberately independent of the validate-release matrix (the job runs its own editor tests),
+    # but gated on the release identity like every other publisher, so a mistagged release cannot
+    # reach the Marketplace.
+    needs: resolve-release
     if: github.event_name == 'release' && github.event.release.draft == false
     runs-on: windows-latest
     environment:
@@ -809,7 +871,7 @@ jobs:
 
   resolve-visual-studio-code-marketplace:
     name: resolve Visual Studio Code Marketplace versions
-    needs: validate-release
+    needs: [resolve-release, validate-release]
     if: github.event_name == 'release' && github.event.release.draft == false
     runs-on: ubuntu-24.04
     outputs:
@@ -840,52 +902,14 @@ jobs:
             throw 'Release builds must use a commit reachable from main.'
           }
 
-      - name: Set up .NET
-        uses: ./.github/actions/setup-dotnet-wasm
-
       - name: Resolve Marketplace versions and missing targets
         id: marketplace
         shell: pwsh
         env:
-          VIU_GITHUB_RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
-          VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          VIU_CANONICAL_VERSION: ${{ needs.resolve-release.outputs.version }}
+          VIU_PRE_RELEASE: ${{ needs.resolve-release.outputs.pre-release }}
         run: |
-          $versionProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
-          function Read-BuildProperty {
-            param([string] $PropertyName)
-
-            $propertyValue = (
-              & dotnet msbuild $versionProject -nologo "-getProperty:$PropertyName"
-            ) -join [System.Environment]::NewLine
-            if ($LASTEXITCODE -ne 0) {
-              throw "Reading $PropertyName failed with exit code $LASTEXITCODE."
-            }
-
-            return ([string] $propertyValue).Trim()
-          }
-
-          $canonicalVersion = Read-BuildProperty -PropertyName 'ViuVersion'
-          $versionSuffix = Read-BuildProperty -PropertyName 'ViuVersionSuffix'
-          $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
-            $env:VIU_RELEASE_TAG,
-            '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?)$',
-            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
-          if (-not $tagMatch.Success) {
-            throw 'GitHub releases must use a vMAJOR.MINOR.PATCH[-PRERELEASE] tag.'
-          }
-          if ($tagMatch.Groups['version'].Value -ne $canonicalVersion) {
-            throw "Release tag version $($tagMatch.Groups['version'].Value) does not match canonical Viu version $canonicalVersion."
-          }
-
-          $isPreRelease = -not [string]::IsNullOrWhiteSpace($versionSuffix)
-          $githubReleaseIsPreRelease = [string]::Equals(
-            $env:VIU_GITHUB_RELEASE_IS_PRERELEASE,
-            'true',
-            [System.StringComparison]::OrdinalIgnoreCase)
-          if ($isPreRelease -ne $githubReleaseIsPreRelease) {
-            throw "GitHub Release prerelease=$githubReleaseIsPreRelease does not match ViuVersionSuffix '$versionSuffix'."
-          }
-
+          $canonicalVersion = $env:VIU_CANONICAL_VERSION
           $targetDefinitions = @(
             [pscustomobject]@{
               RuntimeIdentifier = 'win-x64'
@@ -913,7 +937,6 @@ jobs:
             & ./scripts/Resolve-VisualStudioCodeMarketplaceVersion.ps1 -CanonicalVersion $canonicalVersion -PackageName 'viu-utilitycss'
           )
 
-          $preRelease = $isPreRelease.ToString().ToLowerInvariant()
           $matrixRows = @(
             foreach ($resolution in $resolutions) {
               foreach ($targetDefinition in $targetDefinitions) {
@@ -926,7 +949,7 @@ jobs:
                   runtime_identifier = $targetDefinition.RuntimeIdentifier
                   target = $targetDefinition.Target
                   version = $resolution.Version
-                  pre_release = $preRelease
+                  pre_release = $env:VIU_PRE_RELEASE
                 }
               }
             }
