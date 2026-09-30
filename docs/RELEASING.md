@@ -84,19 +84,35 @@ pre-release update channel. See the
 
 ## Package contract
 
-The [V01.01.12.30] release inventory is exactly 17 main packages and 12 symbol packages, as enforced
+The [V01.01.08.08] release inventory is exactly 19 main packages and 13 symbol packages, as enforced
 by [`scripts/Pack-Release.ps1`](../scripts/Pack-Release.ps1) and
-[`scripts/Test-Packages.ps1`](../scripts/Test-Packages.ps1). It includes eleven independently published
-libraries, both SDKs, both targeting packs, the Browser runtime pack, and the template pack.
-`Assimalign.Viu.UtilityCss` is independently included while remaining outside every Viu SDK and
-framework payload. `Assimalign.Viu.DevTools` is
+[`scripts/Test-Packages.ps1`](../scripts/Test-Packages.ps1). The main packages are thirteen
+independently published libraries, both SDKs, both targeting packs, the Browser runtime pack, and the
+template pack. The symbol packages belong to twelve of those libraries and the Browser runtime pack;
+the symbol policy below explains which packages deliberately have none.
+
+The thirteen libraries, in the dependency-safe publication order that
+[`scripts/modules/ViuPackaging.psm1`](../scripts/modules/ViuPackaging.psm1) defines, are
+`Assimalign.Viu.Reactivity`, `Assimalign.Viu.Components`, `Assimalign.Viu.State`,
+`Assimalign.Viu.Router`, `Assimalign.Viu.FileRouting`, `Assimalign.Viu.UtilityCss`,
+`Assimalign.Viu.UtilityCss.Build`, `Assimalign.Viu.Core`, `Assimalign.Viu.DevTools`,
+`Assimalign.Viu.Browser`, `Assimalign.Viu.ServerRenderer`, `Assimalign.Viu.Testing`, and
+`Assimalign.Viu.Browser.Router`.
+
+Three of those libraries are standalone Utilities add-ons, independently included while remaining
+outside every Viu SDK and framework payload: the [V01.01.12.30] utility-CSS engine
+`Assimalign.Viu.UtilityCss` and its MSBuild integration `Assimalign.Viu.UtilityCss.Build`, and the
+[V01.01.08.08] folder-based routing add-on `Assimalign.Viu.FileRouting`. FileRouting carries its
+`Assimalign.Viu.Generators.FileRouting` source generator and that generator's parser closure inside
+its own package under `analyzers/dotnet/cs`, so the generator is released only through that package.
+`Assimalign.Viu.DevTools` is
 an opt-in library like Router: it is published on its own and is never included in
 `Assimalign.Viu.App` or
 `Assimalign.Viu.App.Browser`.
 
 Shared build targets stamp every packable project with the repository URL and commit, embedded
 `LICENSE`, a package README, deterministic portable PDB settings, and SourceLink data. Executable
-library/runtime packages produce a `.snupkg`; content-only packages and these four compile/build-time
+library/runtime packages produce a `.snupkg`; content-only packages and these five compile/build-time
 containers deliberately do not:
 
 - `Assimalign.Viu.App.Ref` and `Assimalign.Viu.App.Browser.Ref` contain targeting reference assemblies
@@ -105,6 +121,9 @@ containers deliberately do not:
   whose implementation debugging stays at the repository/build-log boundary rather than the public
   application symbol feed. This is a deliberate tooling-distribution policy; the validator enforces
   that neither SDK produces a symbol package.
+- `Assimalign.Viu.UtilityCss.Build` ([V01.01.12.30]) contains only its MSBuild task closure under
+  `tasks/netstandard2.0/` and its `build/` props and targets, under the same tooling-distribution
+  policy; the validator enforces that it produces no symbol package either.
 
 The Browser runtime symbol package stores each PDB at
 `runtimes/browser-wasm/lib/<tfm>/<assembly>.pdb`, exactly beside the corresponding DLL path in the
