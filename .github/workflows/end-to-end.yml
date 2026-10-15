@@ -53,7 +53,7 @@ jobs:
       - name: Upload traces, screenshots, and result summaries
         if: always()
         # actions/upload-artifact v4
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: end-to-end-browser-results
           path: _out/test-results/end-to-end/**
@@ -113,7 +113,7 @@ jobs:
       - name: Upload watch log, trace, screenshot, and result summary
         if: always()
         # actions/upload-artifact v4
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: end-to-end-hot-reload-results
           path: _out/test-results/end-to-end-hot-reload/**
