@@ -942,6 +942,436 @@ function Clear-ViuPackageCache {
     return $removed
 }
 
+# Prerelease identifiers the CI channel reserves. A canonical ViuVersion may not contain them, so a
+# release can never be mistaken for a CI build, and the pruner can never select one.
+$script:ViuCiReservedIdentifier = @('local', 'ci', 'pr')
+
+function Get-ViuCiPackageVersion {
+    <#
+    .SYNOPSIS
+        Derives the unique CI package version .github/workflows/ci-packages.yml publishes for one
+        build of the canonical Viu version.
+
+    .DESCRIPTION
+        A CI version must sort BELOW the canonical version it builds toward. Appending to the
+        canonical prerelease sorts above it: 10.0.0-preview.1.ci.7 is higher than
+        10.0.0-preview.1, so every CI build on the feed would outrank the real release.
+
+        So the CI version extends the canonical version's PREDECESSOR. The final prerelease
+        identifier must be a positive integer, and it is decremented. The channel and build
+        identifiers then follow:
+
+            canonical 10.0.0-preview.1   ->  base 10.0.0-preview.0
+            push to main, run 57         ->  10.0.0-preview.0.ci.57
+            pull request 380, run 58     ->  10.0.0-preview.0.pr.380.58
+
+        Every CI build therefore sorts above the previous line and below the canonical version, and
+        within a channel builds order by the workflow run number.
+
+        Numeric identifiers are Int32 because NuGet's VersionComparer parses them with
+        Int32.TryParse and compares a larger value as text, which orders "9" above "10". The
+        parameters bind as [int], so a value NuGet would misorder is rejected before it reaches a
+        package.
+
+        A stable canonical version, or a prerelease that does not end in a positive integer, has no
+        derivable predecessor and is rejected rather than given an invented one. The reserved local,
+        ci, and pr identifiers may not appear in the canonical version.
+
+    .PARAMETER Version
+        The canonical ViuVersion from build/Targets/Build.Version.props.
+
+    .PARAMETER BuildNumber
+        A number unique to the build within its channel; ci-packages.yml passes github.run_number.
+
+    .PARAMETER PullRequestNumber
+        The pull request the build belongs to. Selects the pr channel; omitted for main.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 2147483647)]
+        [int] $BuildNumber,
+
+        [ValidateRange(1, 2147483647)]
+        [int] $PullRequestNumber
+    )
+
+    $versionPattern = '^(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)(?:-(?<suffix>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
+    $versionMatch = [System.Text.RegularExpressions.Regex]::Match(
+        $Version,
+        $versionPattern,
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+    if (-not $versionMatch.Success) {
+        throw "Version '$Version' must be SemVer in the supported form MAJOR.MINOR.PATCH-PRERELEASE."
+    }
+
+    if (-not $versionMatch.Groups['suffix'].Success) {
+        throw "Canonical version '$Version' is stable, so no CI version can sort between the previous release and it. Move ViuPatchVersion to a prerelease line before publishing CI packages."
+    }
+
+    $canonicalIdentifier = $versionMatch.Groups['suffix'].Value.Split('.')
+    foreach ($identifier in $canonicalIdentifier) {
+        if ($identifier -match '^[0-9]+$' -and $identifier -notmatch '^(0|[1-9][0-9]*)$') {
+            throw "Version '$Version' contains a numeric prerelease identifier with a leading zero."
+        }
+
+        if ($script:ViuCiReservedIdentifier -contains $identifier.ToLowerInvariant()) {
+            throw "Canonical version '$Version' contains the reserved '$identifier' identifier."
+        }
+    }
+
+    $lastIdentifier = $canonicalIdentifier[-1]
+    $lastNumber = 0
+    if ($lastIdentifier -notmatch '^[1-9][0-9]*$' -or
+        -not [int]::TryParse($lastIdentifier, [ref] $lastNumber)) {
+        throw "Canonical version '$Version' must end in a positive integer prerelease identifier (for example preview.1) so its CI builds can sort below it."
+    }
+
+    $versionPrefix = '{0}.{1}.{2}' -f
+        $versionMatch.Groups['major'].Value,
+        $versionMatch.Groups['minor'].Value,
+        $versionMatch.Groups['patch'].Value
+
+    $baseIdentifier = @($canonicalIdentifier | Select-Object -SkipLast 1) + @([string] ($lastNumber - 1))
+    if ($PSBoundParameters.ContainsKey('PullRequestNumber')) {
+        $channel = 'pr'
+        $channelIdentifier = @('pr', [string] $PullRequestNumber, [string] $BuildNumber)
+    }
+    else {
+        $channel = 'ci'
+        $channelIdentifier = @('ci', [string] $BuildNumber)
+    }
+
+    $baseSuffix = $baseIdentifier -join '.'
+    $versionSuffix = @($baseIdentifier + $channelIdentifier) -join '.'
+
+    return [pscustomobject]@{
+        CanonicalVersion = $Version
+        BaseVersion      = "$versionPrefix-$baseSuffix"
+        Version          = "$versionPrefix-$versionSuffix"
+        VersionPrefix    = $versionPrefix
+        VersionSuffix    = $versionSuffix
+        Channel          = $channel
+    }
+}
+
+function ConvertFrom-ViuCiPackageVersion {
+    <#
+    .SYNOPSIS
+        Parses a version Get-ViuCiPackageVersion produced back into its parts, and returns nothing
+        for every other version.
+
+    .DESCRIPTION
+        The inverse of Get-ViuCiPackageVersion, and the gate .github/workflows/ci-packages-prune.yml
+        applies before it deletes anything: a version is a CI build only if it has exactly the shape
+        the derivation emits,
+
+            <base>.ci.<build>                   main
+            <base>.pr.<pull request>.<build>    pull request
+
+        where <base> is MAJOR.MINOR.PATCH-<prerelease>, its last prerelease identifier is a number
+        (the decremented canonical number, so 0 is allowed), no identifier in it is the reserved
+        local, ci, or pr, and <build> and <pull request> are positive Int32 values without a leading
+        zero. Release versions (10.0.0-preview.1), stable versions, and near misses (10.0.0-ci.5,
+        10.0.0-preview.0.ci.05, 10.0.0-preview.0.pr.15) all return nothing, so the pruner can never
+        select them.
+
+        The ci and pr labels compare case-insensitively, as NuGet compares prerelease labels.
+
+    .PARAMETER Version
+        A package version as the feed lists it.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Version
+    )
+
+    $coreMatch = [System.Text.RegularExpressions.Regex]::Match(
+        $Version,
+        '^(?<prefix>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))-(?<suffix>.+)$',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+    if (-not $coreMatch.Success) {
+        return
+    }
+
+    $identifier = $coreMatch.Groups['suffix'].Value.Split('.')
+    foreach ($part in $identifier) {
+        if ($part -notmatch '^[0-9A-Za-z-]+$') {
+            return
+        }
+
+        if ($part -match '^[0-9]+$' -and $part -notmatch '^(0|[1-9][0-9]*)$') {
+            return
+        }
+    }
+
+    $pullRequestNumber = $null
+    if ($identifier.Count -ge 4 -and $identifier[-3] -ieq 'pr') {
+        $channel = 'pr'
+        $pullRequestText = $identifier[-2]
+        $buildText = $identifier[-1]
+        $baseIdentifier = @($identifier | Select-Object -SkipLast 3)
+    }
+    elseif ($identifier.Count -ge 3 -and $identifier[-2] -ieq 'ci') {
+        $channel = 'ci'
+        $pullRequestText = $null
+        $buildText = $identifier[-1]
+        $baseIdentifier = @($identifier | Select-Object -SkipLast 2)
+    }
+    else {
+        return
+    }
+
+    $buildNumber = 0
+    if ($buildText -notmatch '^[1-9][0-9]*$' -or -not [int]::TryParse($buildText, [ref] $buildNumber)) {
+        return
+    }
+
+    if ($channel -eq 'pr') {
+        $parsedPullRequest = 0
+        if ($pullRequestText -notmatch '^[1-9][0-9]*$' -or
+            -not [int]::TryParse($pullRequestText, [ref] $parsedPullRequest)) {
+            return
+        }
+
+        $pullRequestNumber = $parsedPullRequest
+    }
+
+    # The base is a canonical version with its last number decremented, so it is never empty, never
+    # carries a reserved identifier, and ends in a number Get-ViuCiPackageVersion could emit.
+    $baseNumber = 0
+    if ($baseIdentifier.Count -lt 1 -or
+        $baseIdentifier[-1] -notmatch '^(0|[1-9][0-9]*)$' -or
+        -not [int]::TryParse($baseIdentifier[-1], [ref] $baseNumber)) {
+        return
+    }
+
+    foreach ($part in $baseIdentifier) {
+        if ($script:ViuCiReservedIdentifier -contains $part.ToLowerInvariant()) {
+            return
+        }
+    }
+
+    $versionPrefix = $coreMatch.Groups['prefix'].Value
+    return [pscustomobject]@{
+        Version           = $Version
+        BaseVersion       = "$versionPrefix-$($baseIdentifier -join '.')"
+        VersionPrefix     = $versionPrefix
+        Channel           = $channel
+        PullRequestNumber = $pullRequestNumber
+        BuildNumber       = $buildNumber
+    }
+}
+
+function Select-ViuCiPackageVersionToPrune {
+    <#
+    .SYNOPSIS
+        Selects the CI package versions .github/workflows/ci-packages-prune.yml deletes from GitHub
+        Packages.
+
+    .DESCRIPTION
+        Takes every version of every package the pruner listed and returns the ones to delete, in
+        the order to delete them. Two rules select a version, and nothing else does:
+
+            pull request   every <base>.pr.<N>.<build> version whose N is in
+                           ClosedPullRequestNumber. N is compared as an integer, so closing pull
+                           request 15 never selects pr.152 or pr.151.
+            main           for each base, the main builds outside the MainBuildCount newest ones.
+                           Omit MainBuildCount to leave main builds alone.
+
+        A version that ConvertFrom-ViuCiPackageVersion does not recognize - a release, a stable, or
+        any malformed version - is never selected, whatever the parameters say.
+
+        Main builds are ranked as whole builds, not per package: a build's recency is the newest
+        CreatedAt among its versions on any package, ties broken by the higher build number, and a
+        build outside the newest MainBuildCount is selected on every package that carries it. So
+        each kept build stays complete. Ranking by publish time rather than by build number keeps
+        fresh builds if the workflow's run numbers ever restart, instead of deleting them as old.
+        Each base is ranked on its own, so moving ViuPatchVersion to a new prerelease line does not
+        count the previous line's builds against the new one.
+
+        The output is in deletion order: closed pull requests (by number, then build), then main
+        builds oldest first. Within one build the SDK packages come first, so a build the pruner
+        stops partway through no longer resolves from its SDK pin, rather than failing somewhere in
+        the package graph.
+
+    .PARAMETER PackageVersion
+        Every listed version, each with PackageName, VersionId, Version, and CreatedAt. CreatedAt
+        is required on main versions when MainBuildCount is passed.
+
+    .PARAMETER ClosedPullRequestNumber
+        Pull requests whose builds are deleted. Pass only numbers the GitHub API reported closed.
+
+    .PARAMETER MainBuildCount
+        How many main builds to keep per base.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]] $PackageVersion,
+
+        [AllowEmptyCollection()]
+        [int[]] $ClosedPullRequestNumber = @(),
+
+        [ValidateRange(1, 2147483647)]
+        [int] $MainBuildCount
+    )
+
+    $closedPullRequest = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($number in $ClosedPullRequestNumber) {
+        $null = $closedPullRequest.Add($number)
+    }
+
+    $parsed = foreach ($entry in $PackageVersion) {
+        foreach ($property in @('PackageName', 'VersionId', 'Version')) {
+            $value = $entry.PSObject.Properties[$property]
+            if ($null -eq $value -or $null -eq $value.Value -or [string]::IsNullOrWhiteSpace([string] $value.Value)) {
+                throw "Package version entry is missing '$property'."
+            }
+        }
+
+        $ciVersion = ConvertFrom-ViuCiPackageVersion -Version ([string] $entry.Version)
+        if ($null -eq $ciVersion) {
+            continue
+        }
+
+        [pscustomobject]@{
+            Entry       = $entry
+            CiVersion   = $ciVersion
+            BaseKey     = $ciVersion.BaseVersion.ToLowerInvariant()
+            IsSdk       = ([string] $entry.PackageName) -match '^Assimalign\.Viu\.Sdk(\.|$)'
+            PackageName = [string] $entry.PackageName
+        }
+    }
+    $parsed = @($parsed)
+
+    $selected = [System.Collections.Generic.List[object]]::new()
+
+    $pullRequestCandidate = @(
+        $parsed |
+            Where-Object {
+                $_.CiVersion.Channel -eq 'pr' -and
+                $closedPullRequest.Contains([int] $_.CiVersion.PullRequestNumber)
+            } |
+            Sort-Object `
+                @{ Expression = { $_.CiVersion.PullRequestNumber } },
+                @{ Expression = { $_.CiVersion.BuildNumber } },
+                @{ Expression = { -not $_.IsSdk } },
+                @{ Expression = { $_.PackageName } }
+    )
+    foreach ($candidate in $pullRequestCandidate) {
+        $selected.Add((New-ViuCiPackagePruneEntry `
+                -Candidate $candidate `
+                -Reason "pull request #$($candidate.CiVersion.PullRequestNumber) is closed"))
+    }
+
+    if ($PSBoundParameters.ContainsKey('MainBuildCount')) {
+        $mainVersion = @($parsed | Where-Object { $_.CiVersion.Channel -eq 'ci' })
+        foreach ($baseGroup in @($mainVersion | Group-Object -Property BaseKey | Sort-Object Name)) {
+            $build = foreach ($buildGroup in @($baseGroup.Group | Group-Object -Property { $_.CiVersion.BuildNumber })) {
+                $publishedAt = foreach ($candidate in $buildGroup.Group) {
+                    ConvertTo-ViuPackageTimestamp -Value $candidate.Entry.CreatedAt -Version $candidate.Entry.Version
+                }
+
+                [pscustomobject]@{
+                    BuildNumber = [int] $buildGroup.Group[0].CiVersion.BuildNumber
+                    PublishedAt = ($publishedAt | Sort-Object -Descending | Select-Object -First 1)
+                    Candidate   = $buildGroup.Group
+                }
+            }
+
+            $newestFirst = @(
+                $build |
+                    Sort-Object `
+                        @{ Expression = { $_.PublishedAt }; Descending = $true },
+                        @{ Expression = { $_.BuildNumber }; Descending = $true }
+            )
+            if ($newestFirst.Count -le $MainBuildCount) {
+                continue
+            }
+
+            $expired = @($newestFirst | Select-Object -Skip $MainBuildCount)
+            [array]::Reverse($expired)
+            foreach ($expiredBuild in $expired) {
+                $orderedCandidate = @(
+                    $expiredBuild.Candidate |
+                        Sort-Object `
+                            @{ Expression = { -not $_.IsSdk } },
+                            @{ Expression = { $_.PackageName } }
+                )
+                foreach ($candidate in $orderedCandidate) {
+                    $selected.Add((New-ViuCiPackagePruneEntry `
+                            -Candidate $candidate `
+                            -Reason "main build $($expiredBuild.BuildNumber) of $($candidate.CiVersion.BaseVersion) is older than the newest $MainBuildCount"))
+                }
+            }
+        }
+    }
+
+    return , $selected.ToArray()
+}
+
+function New-ViuCiPackagePruneEntry {
+    param(
+        [Parameter(Mandatory)]
+        [object] $Candidate,
+
+        [Parameter(Mandatory)]
+        [string] $Reason
+    )
+
+    return [pscustomobject]@{
+        PackageName       = $Candidate.PackageName
+        VersionId         = $Candidate.Entry.VersionId
+        Version           = [string] $Candidate.Entry.Version
+        CreatedAt         = $Candidate.Entry.CreatedAt
+        Channel           = $Candidate.CiVersion.Channel
+        BaseVersion       = $Candidate.CiVersion.BaseVersion
+        PullRequestNumber = $Candidate.CiVersion.PullRequestNumber
+        BuildNumber       = $Candidate.CiVersion.BuildNumber
+        Reason            = $Reason
+    }
+}
+
+function ConvertTo-ViuPackageTimestamp {
+    param(
+        [AllowNull()]
+        [object] $Value,
+
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+
+    # ConvertFrom-Json turns the API's ISO 8601 strings into DateTime values on PowerShell 7, so
+    # accept those as well as the raw text. Converting each to UTC keeps the order whatever their
+    # Kind is.
+    if ($Value -is [System.DateTimeOffset]) {
+        return $Value.ToUniversalTime()
+    }
+
+    if ($Value -is [datetime]) {
+        return ([System.DateTimeOffset] $Value.ToUniversalTime())
+    }
+
+    $parsed = [System.DateTimeOffset]::MinValue
+    if ($Value -is [string] -and
+        [System.DateTimeOffset]::TryParse(
+            $Value,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::AssumeUniversal,
+            [ref] $parsed)) {
+        return $parsed.ToUniversalTime()
+    }
+
+    throw "Main build version '$Version' has no parseable CreatedAt, so it cannot be ranked for retention."
+}
+
 Export-ModuleMember -Function `
     Get-ViuLibraryPackageId,
     Get-ViuLibraryProject,
@@ -952,4 +1382,7 @@ Export-ModuleMember -Function `
     Assert-ViuReleasePackageSet,
     Assert-ViuFrameworkPackage,
     Get-ViuPackageCacheRoot,
-    Clear-ViuPackageCache
+    Clear-ViuPackageCache,
+    Get-ViuCiPackageVersion,
+    ConvertFrom-ViuCiPackageVersion,
+    Select-ViuCiPackageVersionToPrune

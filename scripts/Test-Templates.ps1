@@ -26,6 +26,12 @@
 .PARAMETER SkipPack
     Reuses the exact current-version packages already present in PackageDirectory.
 
+.PARAMETER Version
+    The package version to validate, which the packed template also stamps into the generated
+    global.json files. Defaults to the canonical ViuVersion. Only a -SkipPack run may name another
+    version, because this script's own pack always produces the canonical one;
+    .github/workflows/ci-packages.yml passes its CI package version here.
+
 .PARAMETER Aot
     Publishes the default application with WebAssembly ahead-of-time compilation. The wasm-tools
     workload must be installed. Without this switch the same application receives a normal trimmed
@@ -44,6 +50,8 @@ param(
     [string] $ScratchRoot = '',
 
     [switch] $SkipPack,
+
+    [string] $Version = '',
 
     [switch] $Aot,
 
@@ -278,6 +286,19 @@ $null = New-Item -ItemType Directory -Path $scratchRootPath -Force
 Assert-NoReparsePoint -Path $scratchRootPath
 
 $viuVersion = Get-ViuVersion
+if (-not [string]::IsNullOrWhiteSpace($Version) -and
+    -not [string]::Equals($Version, $viuVersion, [System.StringComparison]::Ordinal)) {
+    if (-not $SkipPack) {
+        throw "-Version $Version differs from the canonical $viuVersion, which is the only version this script packs; pass -SkipPack with a feed already packed at $Version."
+    }
+
+    if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
+        throw "-Version '$Version' must be SemVer in the supported form MAJOR.MINOR.PATCH[-PRERELEASE]."
+    }
+
+    $viuVersion = $Version
+}
+
 if (-not $SkipPack) {
     Write-Host "Packing the Viu $viuVersion package graph." -ForegroundColor Cyan
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'Install-Local.ps1') `

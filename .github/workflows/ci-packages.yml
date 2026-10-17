@@ -1,0 +1,305 @@
+# Continuous package channel for downstream integration work.
+#
+# Every push to main (each merged pull request) and every commit to an open same-repository pull
+# request packs the complete release set and stages it in the Assimalign GitHub Packages feed at a
+# unique CI version. viu-platforms, viu-examples, and viu-benchmarks can then pin an exact build of
+# main, or of a pull request still in review, instead of packing this repository from source.
+#
+# This workflow never writes to nuget.org and never publishes a canonical version. Release versions
+# stay with .github/workflows/release.yml. .github/workflows/ci-packages-prune.yml deletes a pull
+# request's versions when it closes and keeps the newest 20 main builds.
+#
+# The version comes from Get-ViuCiPackageVersion in scripts/modules/ViuPackaging.psm1. It extends
+# the PREDECESSOR of the canonical ViuVersion, so every CI build sorts below the release it builds
+# toward:
+#
+#     canonical 10.0.0-preview.1   ->  main: 10.0.0-preview.0.ci.<run>
+#                                      PR:   10.0.0-preview.0.pr.<pr>.<run>
+#
+# Appending to the canonical version instead (10.0.0-preview.1.ci.N) would sort ABOVE
+# 10.0.0-preview.1, so every CI build would outrank the release. docs/RELEASING.md, "CI packages",
+# has the full policy.
+#
+# The set and its checks are the release's: Pack-Release.ps1 strictly packs the inventory in
+# ViuPackaging.psm1, and the packed set passes the same package-only consumer, template, and
+# no-Node gates release.yml runs before a single package is pushed. There is no per-project
+# validation matrix here: the area workflows already build and test these commits.
+name: CI Packages
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.claude/**'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - '.claude/**'
+      - 'docs/**'
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: resolve CI package version
+    # Same-repository pull requests only. A fork's pull_request run and a Dependabot-triggered run
+    # both get a read-only token, so their push would fail after the full pack. Never trigger this
+    # workflow on pull_request_target, which grants packages:write to the code under review.
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      commit: ${{ steps.version.outputs.commit }}
+      version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
+    steps:
+      # A pull request builds its head commit, not the synthetic refs/pull/N/merge commit. The head
+      # is what the author pushed, and it stays resolvable after the pull request moves on, so the
+      # RepositoryCommit stamped into each package keeps pointing at real history.
+      - name: Checkout build commit
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      # The version derivation and its checks come from the commit this workflow file came from, not
+      # from the build commit. A pull request runs the workflow from GitHub's merge commit, so a
+      # branch cut before Get-ViuCiPackageVersion existed still gets it. The canonical version still
+      # comes from the build commit's own Build.Version.props.
+      - name: Checkout workflow tooling
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          path: _ci/tooling
+          sparse-checkout: |
+            scripts/modules
+            scripts/tests
+
+      - name: Test CI package version and prune policy
+        shell: pwsh
+        run: ./_ci/tooling/scripts/tests/Test-CiPackages.ps1
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Resolve CI package version
+        id: version
+        shell: pwsh
+        env:
+          VIU_EVENT_NAME: ${{ github.event_name }}
+          VIU_BUILD_NUMBER: ${{ github.run_number }}
+          VIU_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          Import-Module ./_ci/tooling/scripts/modules/ViuPackaging.psm1 -Force
+
+          $versionProject = 'sdks/Assimalign.Viu.Sdk/Tasks/src/Assimalign.Viu.Sdk.Tasks.csproj'
+          $canonicalVersion = ((& dotnet msbuild $versionProject -nologo '-getProperty:ViuVersion') -join '').Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $canonicalVersion) {
+            throw "Reading ViuVersion from $versionProject failed with exit code $LASTEXITCODE."
+          }
+
+          # The run number is shared by both channels, so main and pull request builds can never
+          # collide. A re-run attempt keeps its run number and so its version; the publish job
+          # handles that case.
+          $arguments = @{
+            Version     = $canonicalVersion
+            BuildNumber = [int] $env:VIU_BUILD_NUMBER
+          }
+          if ($env:VIU_EVENT_NAME -eq 'pull_request') {
+            $arguments.PullRequestNumber = [int] $env:VIU_PULL_REQUEST_NUMBER
+          }
+
+          $ciVersion = Get-ViuCiPackageVersion @arguments
+          $commit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Resolving the checked-out commit failed.'
+          }
+
+          "commit=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "version=$($ciVersion.Version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "channel=$($ciVersion.Channel)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Canonical version: $($ciVersion.CanonicalVersion)"
+          Write-Host "CI package version: $($ciVersion.Version) ($($ciVersion.Channel) channel, commit $commit)"
+
+  pack-packages:
+    name: pack and validate all NuGet packages
+    needs: prepare
+    runs-on: ubuntu-24.04
+    # release.yml's pack job, which runs the same pack and gates, measured 7m29s (run 33098364871,
+    # v10.0.0-beta.11). Four times that, rounded up, leaves room for a cold NuGet cache.
+    timeout-minutes: 30
+    # A newer commit on the same pull request cancels a pack still in progress. The group covers
+    # this job only, never the publish job, so a run that has already started pushing finishes and
+    # no superseded version is left half-published. Each main run gets its own group, so a main
+    # build is never cancelled.
+    concurrency:
+      group: viu-ci-packages-pack-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+    outputs:
+      package-count: ${{ steps.package-count.outputs.count }}
+    steps:
+      - name: Checkout build commit
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.prepare.outputs.commit }}
+
+      - name: Set up .NET with WebAssembly tools
+        uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
+
+      - name: Pack CI packages
+        shell: pwsh
+        env:
+          VIU_PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+          VIU_BUILD_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: >-
+          ./scripts/Pack-Release.ps1
+          -Version $env:VIU_PACKAGE_VERSION
+          -RepositoryCommit $env:VIU_BUILD_COMMIT
+
+      - name: Validate fresh package-only consumers
+        shell: pwsh
+        env:
+          VIU_PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: >-
+          ./scripts/Test-ApplicationLifetimeConsumer.ps1
+          -PackageDirectory _out/release/packages
+          -Version $env:VIU_PACKAGE_VERSION
+
+      - name: Validate installed template matrix
+        shell: pwsh
+        env:
+          VIU_PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: >-
+          ./scripts/Test-Templates.ps1
+          -PackageDirectory _out/release/packages
+          -SkipPack
+          -Version $env:VIU_PACKAGE_VERSION
+
+      - name: Verify no Node toolchain in CI packages
+        shell: pwsh
+        run: >-
+          ./scripts/Test-NoNodeToolchain.ps1
+          -Artifact (Get-ChildItem _out/release/packages -Filter '*.nupkg' | ForEach-Object FullName)
+
+      - name: Record package count
+        id: package-count
+        shell: pwsh
+        run: |
+          $packageCount = @(Get-Content -LiteralPath '_out/release/packages/package-order.txt').Count
+          if ($packageCount -lt 1) {
+            throw 'Pack-Release.ps1 produced no packages.'
+          }
+
+          "count=$packageCount" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "CI package count: $packageCount"
+
+      - name: Verify package checksums
+        shell: bash
+        working-directory: _out/release/packages
+        run: sha256sum --check checksums.sha256
+
+      - name: Upload CI package artifact
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Assimalign.Viu.CiPackages
+          path: _out/release/packages
+          if-no-files-found: error
+          # The feed holds the published copy; the artifact only carries the set between jobs.
+          retention-days: 3
+
+  publish-github-packages:
+    name: publish ${{ needs.prepare.outputs.version }} to GitHub Packages
+    needs: [prepare, pack-packages]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download validated packages
+        # actions/download-artifact v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: Assimalign.Viu.CiPackages
+          path: _ci/packages
+
+      - name: Verify package checksums
+        shell: bash
+        working-directory: _ci/packages
+        run: sha256sum --check checksums.sha256
+
+      - name: Publish validated packages
+        shell: pwsh
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ github.token }}
+          VIU_PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+          VIU_PACKAGE_COUNT: ${{ needs.pack-packages.outputs.package-count }}
+          VIU_PACKAGE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+          VIU_BUILD_COMMIT: ${{ needs.prepare.outputs.commit }}
+          VIU_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          $packageDirectory = '_ci/packages'
+          $packageFiles = @(Get-Content -LiteralPath "$packageDirectory/package-order.txt")
+          $expectedPackageCount = [int] $env:VIU_PACKAGE_COUNT
+          if ($packageFiles.Count -ne $expectedPackageCount) {
+            throw "Expected $expectedPackageCount CI packages, found $($packageFiles.Count)."
+          }
+
+          # A first attempt must create every version. A conflict there means the run number
+          # repeated a version already on the feed (a renamed or recreated workflow restarts its run
+          # numbers), and --skip-duplicate would silently keep the older packages. Only a re-run of
+          # this same run, whose earlier attempt may have stopped partway, may skip existing ones.
+          $duplicateArgument = @()
+          if ([int] $env:VIU_RUN_ATTEMPT -gt 1) {
+            $duplicateArgument = @('--skip-duplicate')
+          }
+
+          # One at a time, in package-order.txt's order: libraries, targeting and runtime packs,
+          # the SDKs, then the template pack. A consumer resolves a build through its SDK pin, so
+          # the SDKs arrive only after everything they reference is already on the feed.
+          foreach ($packageFile in $packageFiles) {
+            $packagePath = Join-Path $packageDirectory $packageFile
+            if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+              throw "The CI artifact is missing $packageFile."
+            }
+
+            & dotnet nuget push $packagePath `
+              --source 'https://nuget.pkg.github.com/assimalign/index.json' `
+              --api-key $env:GITHUB_PACKAGES_TOKEN `
+              --no-symbols `
+              @duplicateArgument
+            if ($LASTEXITCODE -ne 0) {
+              throw "Publishing $packageFile to GitHub Packages failed with exit code $LASTEXITCODE."
+            }
+          }
+
+          @"
+          ## Published CI packages
+
+          | | |
+          | --- | --- |
+          | Version | ``$($env:VIU_PACKAGE_VERSION)`` |
+          | Channel | ``$($env:VIU_PACKAGE_CHANNEL)`` |
+          | Commit | ``$($env:VIU_BUILD_COMMIT)`` |
+          | Packages | $($packageFiles.Count) |
+
+          Pin ``Assimalign.Viu.Sdk`` and ``Assimalign.Viu.Sdk.Browser`` in a consumer's
+          ``global.json`` ``msbuild-sdks`` block, and its Viu package references, to
+          ``$($env:VIU_PACKAGE_VERSION)``. The feed is
+          ``https://nuget.pkg.github.com/assimalign/index.json`` and requires a token with
+          ``read:packages``; see docs/RELEASING.md, "CI packages".
+          "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
