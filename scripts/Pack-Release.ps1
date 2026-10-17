@@ -18,6 +18,12 @@
 .PARAMETER PackageValidationBaselineVersion
     Optional previously published version used by the .NET SDK package-validation
     baseline. PublicAPI baselines and physical package validation always run.
+
+.PARAMETER RepositoryCommit
+    The commit stamped into every package's repository metadata. Defaults to
+    GITHUB_SHA, then to the checked-out HEAD. ci-packages.yml passes a pull
+    request's head commit, because GITHUB_SHA there is GitHub's synthetic merge
+    commit, which stops resolving once the pull request moves on.
 #>
 [CmdletBinding()]
 param(
@@ -27,7 +33,10 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Release',
 
-    [string] $PackageValidationBaselineVersion
+    [string] $PackageValidationBaselineVersion,
+
+    [ValidatePattern('^[0-9a-f]{40}$')]
+    [string] $RepositoryCommit
 )
 
 $ErrorActionPreference = 'Stop'
@@ -93,9 +102,13 @@ Get-ChildItem -LiteralPath $packageDirectory -File |
         Remove-Item -LiteralPath $_.FullName -Force
     }
 
-$repositoryCommit = $env:GITHUB_SHA
-if ([string]::IsNullOrWhiteSpace($repositoryCommit)) {
-    $repositoryCommit = (& git -C $repositoryDirectory rev-parse HEAD).Trim()
+# A separate variable: assigning to $RepositoryCommit would re-run its ValidatePattern.
+$packageCommit = $RepositoryCommit
+if ([string]::IsNullOrWhiteSpace($packageCommit)) {
+    $packageCommit = $env:GITHUB_SHA
+}
+if ([string]::IsNullOrWhiteSpace($packageCommit)) {
+    $packageCommit = (& git -C $repositoryDirectory rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0) {
         throw 'Resolving the repository commit failed.'
     }
@@ -112,7 +125,7 @@ $buildProperties = @(
     "-p:VersionSuffix=$versionSuffix",
     "-p:PackageVersion=$Version",
     '-p:ContinuousIntegrationBuild=true',
-    "-p:RepositoryCommit=$repositoryCommit",
+    "-p:RepositoryCommit=$packageCommit",
     "-p:PackageOutputPath=$packageDirectory"
 )
 if (-not [string]::IsNullOrWhiteSpace($PackageValidationBaselineVersion)) {
@@ -144,7 +157,7 @@ function Invoke-PackageBuild {
     }
 }
 
-Write-Host "Packing Viu $Version from $repositoryCommit" -ForegroundColor Cyan
+Write-Host "Packing Viu $Version from $packageCommit" -ForegroundColor Cyan
 foreach ($libraryProject in $configuredLibraryProjects) {
     Invoke-PackageBuild -Project $libraryProject
 }

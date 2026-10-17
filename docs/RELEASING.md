@@ -25,7 +25,9 @@ The workflow performs these stages in order:
 
 Both stable and prerelease versions use this flow. A GitHub Release marked prerelease therefore
 stages automatically and can be promoted only by an explicit environment approval; no main-branch
-push and no pull-request event can publish a package.
+push and no pull-request event can publish a release version. Those events feed only the separate
+[CI package channel](#ci-packages), whose versions never equal a canonical `ViuVersion` and never
+reach nuget.org.
 
 The same workflow has two separately protected editor-extension paths:
 
@@ -136,6 +138,97 @@ published baseline.
 `Deterministic=true` makes compiled PE/PDB content reproducible. NuGet may vary ZIP timestamps and
 package-core metadata between pack invocations, so reproducibility comparisons normalize archive
 metadata and compare the extracted payload and manifest rather than raw `.nupkg` bytes.
+
+## CI packages
+
+[`.github/workflows/ci-packages.yml`](../.github/workflows/ci-packages.yml) publishes the complete
+release set to GitHub Packages for every push to `main` and every commit to an open pull request from
+a branch of this repository. Downstream repositories (`viu-platforms`, `viu-examples`,
+`viu-benchmarks`) can then pin an exact build of `main`, or of a pull request still in review,
+instead of packing this repository from source. The workflow never writes to nuget.org, never
+publishes a canonical version, and never replaces a published version.
+
+### Version shape
+
+`Get-ViuCiPackageVersion` in [`ViuPackaging.psm1`](../scripts/modules/ViuPackaging.psm1) derives the
+version from the canonical `ViuVersion`. Appending to the canonical prerelease would be wrong:
+`10.0.0-preview.1.ci.57` sorts **above** `10.0.0-preview.1`, so every CI build would outrank the
+release it precedes. The CI version instead extends the canonical version's predecessor, made by
+decrementing its final prerelease number:
+
+| Canonical | Build | CI version |
+| --- | --- | --- |
+| `10.0.0-preview.1` | push to `main`, run 57 | `10.0.0-preview.0.ci.57` |
+| `10.0.0-preview.1` | pull request 380, run 58 | `10.0.0-preview.0.pr.380.58` |
+| `10.0.0-preview.2` (after the next line opens) | push to `main`, run 90 | `10.0.0-preview.1.ci.90` |
+
+- **The run number makes each version unique.** `github.run_number` is shared by both channels, so
+  a `main` build and a pull request build never collide. A re-run keeps its run number and version;
+  only a re-run may skip packages already on the feed, because a first attempt that meets an
+  existing version means the run numbers restarted.
+- **Numeric identifiers stay within Int32**, because NuGet compares a larger numeric identifier as
+  text and would order `9` above `10`.
+- **The canonical line must end in a positive number.** A stable `ViuPatchVersion`, or a prerelease
+  such as `preview` or `preview.0`, has no derivable predecessor, so the workflow fails rather than
+  inventing one. The identifiers `local`, `ci`, and `pr` are reserved.
+- **No commit SHA in the version.** Each package's repository metadata records the commit instead:
+  a pull request build packs and stamps the pull request's **head** commit (`Pack-Release.ps1
+  -RepositoryCommit`), not GitHub's synthetic merge commit.
+
+### What is validated before publishing
+
+The set and its gates are the release's. `Pack-Release.ps1` strictly packs the 19-package inventory
+with warnings as errors, package validation, and checksums; then the fresh package-only consumers,
+the installed template matrix, and the no-Node-toolchain check run against that exact artifact on
+Linux before any package is pushed. There is no per-project validation matrix: the area workflows
+already build and test the same commits, and `release.yml` still runs its full gate before a release
+version is staged. Packages are pushed in `package-order.txt` order, the SDKs after the libraries
+and framework packs they reference, so a consumer pinning an SDK cannot resolve it before its
+framework has arrived. Forks, Dependabot runs, and pull requests that change only `docs/` or
+`.claude/` publish nothing.
+
+### Consuming CI packages
+
+- **Pin an exact version.** Set `Assimalign.Viu.Sdk` and `Assimalign.Viu.Sdk.Browser` in the
+  consumer's `global.json` `msbuild-sdks` block, and its `Assimalign.Viu.*` package references, to
+  the same CI version. The publish job's name and summary show the version for each run.
+- **A pin is temporary.** A pull request's builds are deleted when it closes, and a `main` build
+  once 20 newer `main` builds of its base exist. Pin a release version for anything that must keep
+  restoring.
+- **Float only within a channel.** `10.0.0-preview.0.ci.*` tracks the latest `main` build. `pr`
+  sorts above `ci`, so an unbounded float such as `10.0.0-*` picks the newest pull request build.
+- **Authenticate without committing a credential.** GitHub Packages requires a token with
+  `read:packages` even for public packages. Declare the source by key only and supply the
+  credential from the environment, for example
+  `NuGetPackageSourceCredentials_assimalign=Username=<user>;Password=<token>` for a source keyed
+  `assimalign`. In a consumer's workflow, `${{ github.token }}` with `packages: read` is enough,
+  because these packages are public.
+
+### Feed growth
+
+[`.github/workflows/ci-packages-prune.yml`](../.github/workflows/ci-packages-prune.yml) is the only
+thing that deletes from the feed, and it deletes two kinds of CI version:
+
+- **Closed pull requests.** Every `<base>.pr.<N>.<build>` version of a pull request the GitHub API
+  reports closed, merged or not. `N` is compared as a number, so closing #15 never touches #152.
+- **Old `main` builds.** For each base, every `main` build outside the newest **20**: 380 versions,
+  20 per package, so each package's version list stays on one API page.
+
+**A release version is never deleted.** `Select-ViuCiPackageVersionToPrune` considers only versions
+`ConvertFrom-ViuCiPackageVersion` recognizes, the exact shapes the derivation produces, and the
+deleting loop checks the shape again before each request.
+[`scripts/tests/Test-CiPackages.ps1`](../scripts/tests/Test-CiPackages.ps1), which `ci-packages.yml`
+runs before deriving a version, pins both, including a run that asks for the most aggressive
+selection possible. Builds are ranked as whole builds by their newest publish time, so every kept
+build stays complete and a restart of the run counter does not delete fresh builds as old.
+
+The pruner examines the ids `Get-ViuPackageId` returns, because `GITHUB_TOKEN` cannot use the
+organization's list-packages endpoint. Deleting through `GITHUB_TOKEN` needs the Admin role on each
+package, which GitHub grants to the repository whose workflow published it. If deletions are refused
+(HTTP 403; the run stops after five in a row), open the package's settings, choose **Manage Actions
+access**, and give `assimalign/viu` the **Admin** role. Each run lists 19 packages and deletes a
+second apart within the hourly `GITHUB_TOKEN` budget; one that stops early on the budget or its
+45-minute limit leaves the rest to the next hourly run. `workflow_dispatch` defaults to a dry run.
 
 ## One-time repository and service setup
 
