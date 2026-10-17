@@ -132,10 +132,9 @@ the Viu glyph in both CPS/SDK-style Solution Explorer trees and loose-file views
 
 The standard `area-visual-studio` workflow only builds and tests. The official
 [`release`](../../.github/workflows/release.yml) workflow publishes a validated Marketplace preview
-after a pull request merges into `main`, and only when the extension or one of its packaged parser
-or editor dependencies changed. It queries the existing listing to assign the next numeric
-VSIX revision, then builds, tests, validates, and publishes from the protected
-`visual-studio-marketplace` environment.
+when a GitHub Release is published and its release identity check (`resolve-release`) passes. It
+queries the existing listing to assign the next numeric VSIX revision, then builds, tests,
+validates, and publishes from the protected `visual-studio-marketplace` environment.
 
 Visual Studio Marketplace does not provide a per-version prerelease channel. The Viu listing itself
 is explicitly marked as a preview, and the release workflow verifies `<Preview>true</Preview>`
