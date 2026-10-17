@@ -179,10 +179,13 @@ jobs:
 
       - name: Validate installed template matrix
         shell: pwsh
+        env:
+          VIU_PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
         run: >-
           ./scripts/Test-Templates.ps1
           -PackageDirectory _out/release/packages
           -SkipPack
+          -Version $env:VIU_PACKAGE_VERSION
 
       - name: Verify no Node toolchain in CI packages
         shell: pwsh
