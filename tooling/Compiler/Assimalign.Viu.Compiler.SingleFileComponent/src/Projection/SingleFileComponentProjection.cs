@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Syntax.Templates;
@@ -167,7 +171,9 @@ public static class SingleFileComponentProjection
             scriptSetup,
             scriptSetupBindings);
         var hasScript = script is not null || scriptSetup is not null;
-        var bindingMetadata = SingleFileComponentModel.BuildBindingMetadata(hasScript, bindings);
+        var bindingMetadata = SingleFileComponentModel.BuildBindingMetadata(hasScript, bindings,
+            string.IsNullOrEmpty(input.Namespace) ? "global::" + input.ClassName
+                : "global::" + input.Namespace + "." + input.ClassName);
 
         var moduleClasses = new List<CssModuleClassEntry>();
         var cssVariableBindings = new List<CssVariableBindingEntry>();
@@ -197,6 +203,7 @@ public static class SingleFileComponentProjection
                 ? EquatableArray<CssVariableBindingEntry>.Empty
                 : new EquatableArray<CssVariableBindingEntry>(cssVariableBindings.ToArray()))
         {
+            RegisteredName = ReadRegisteredName(input, scriptRegions, scriptSetupRegions, diagnostics),
             Declarations = MergeDeclarations(scriptDeclarations, scriptSetupDeclarations),
             ScriptSetup = scriptSetupRegions,
             IsScriptSetupFirst =
@@ -240,6 +247,48 @@ public static class SingleFileComponentProjection
         {
             ComponentUsages = render.Usages,
         };
+    }
+
+    private static string ReadRegisteredName(SingleFileComponentProjectionInput input,
+        ScriptRegions script, ScriptRegions setup, List<DiagnosticInfo> diagnostics)
+    {
+        string? name = null;
+        foreach (string? region in new[] { script.MemberRegion, setup.MemberRegion })
+        {
+            if (region is null)
+            {
+                continue;
+            }
+            var probe = ScriptBlockAnalyzer.ParseProbe(region).Probe;
+            if (probe is null)
+            {
+                continue;
+            }
+            foreach (MemberDeclarationSyntax member in probe.Members)
+            {
+                if (member is not FieldDeclarationSyntax field || !field.Modifiers.Any(SyntaxKind.ConstKeyword))
+                {
+                    continue;
+                }
+                foreach (VariableDeclaratorSyntax variable in field.Declaration.Variables)
+                {
+                    if (variable.Identifier.ValueText != "RegisteredName")
+                    {
+                        continue;
+                    }
+                    if (name is not null || variable.Initializer?.Value is not LiteralExpressionSyntax literal
+                        || literal.Token.Value is not string value || string.IsNullOrWhiteSpace(value))
+                    {
+                        diagnostics.Add(SingleFileComponentDiagnostics.CreateFileRule(
+                            SingleFileComponentDiagnostics.ConflictingComponentIdentity,
+                            "RegisteredName must be one nonempty string literal constant.", input.FilePath));
+                        continue;
+                    }
+                    name = value;
+                }
+            }
+        }
+        return name ?? input.ClassName.TrimStart('@');
     }
 
     private static SingleFileComponentHotReloadMetadata? CreateHotReloadMetadata(

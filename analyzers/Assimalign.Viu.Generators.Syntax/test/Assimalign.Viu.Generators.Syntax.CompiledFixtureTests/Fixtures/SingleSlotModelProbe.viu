@@ -1,0 +1,17 @@
+<template>
+    <main>
+        <SlotChild><input ref="Input" v-model.trim="Model" /></SlotChild>
+        <p>{{ Model }}</p>
+    </main>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.Reactivity;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    public Reference<object?> Model = Reactive.Reference<object?>("initial");
+    public object? Input;
+}

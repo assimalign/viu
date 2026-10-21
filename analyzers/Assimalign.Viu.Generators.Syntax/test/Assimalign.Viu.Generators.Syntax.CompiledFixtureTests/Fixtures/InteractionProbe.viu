@@ -2,7 +2,7 @@
 <main>
   <h2>{{ Title }}</h2>
   <button @click="Raise">raise</button>
-  <input v-model="Model" />
+  <SlotChild><input ref="Input" v-model="Model" /><p>{{ Model }}</p></SlotChild>
 </main>
 </template>
 
@@ -17,6 +17,7 @@ public string Title { get; set; } = "Default";
 public partial void Changed(string value);
 
 public Reference<object?> Model = Reactive.Reference<object?>("initial");
+public object? Input;
 
 private void Raise() => Changed(Title);
 }

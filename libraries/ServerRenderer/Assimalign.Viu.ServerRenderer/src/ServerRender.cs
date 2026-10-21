@@ -23,6 +23,8 @@ namespace Assimalign.Viu.ServerRenderer;
 /// lease-backed traversal semantics as <see cref="ServerRenderer"/>. HTML escaping targets the
 /// WHATWG fragment-serialization format and is reflection-free for trimming and AOT safety.
 /// Specified by <c>[SSR-1]</c>, <c>[SSR-3]</c>, and <c>[SSR-6]</c>.
+/// ARIA boolean attribute values use lowercase enumerated tokens per <c>[RND-ARIA-1]</c> and
+/// <see href="https://www.w3.org/TR/2023/REC-wai-aria-1.2-20230606/#state_prop_def">WAI-ARIA 1.2</see>.
 /// </remarks>
 public static partial class ServerRender
 {
@@ -490,6 +492,12 @@ public static partial class ServerRender
         if (!HtmlSerializationRules.IsSsrSafeAttributeName(attributeKey))
         {
             return string.Empty;
+        }
+
+        // [RND-ARIA-1] WAI-ARIA 1.2 states use lowercase string tokens, including false.
+        if (attributeKey.StartsWith("aria-", StringComparison.OrdinalIgnoreCase) && value is bool boolean)
+        {
+            return string.Concat(" ", attributeKey, "=\"", boolean ? "true" : "false", "\"");
         }
 
         return value is string { Length: 0 }

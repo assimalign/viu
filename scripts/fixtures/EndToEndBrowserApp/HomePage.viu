@@ -14,6 +14,19 @@
             <p data-testid="model-output">{{ ModelText }}</p>
         </section>
 
+        <section aria-label="Slot model and event modifiers">
+            <ModelCard>
+                <input data-testid="slot-model-input" v-model="SlotModel" />
+                <p data-testid="slot-model-output">{{ SlotModel }}</p>
+            </ModelCard>
+            <form data-testid="prevent-form" @submit.prevent="Submit">
+                <input data-testid="enter-input" @keydown.enter="Enter" />
+                <button type="submit" data-testid="submit-button">Submit</button>
+            </form>
+            <p data-testid="submit-count">{{ SubmitCount }}</p>
+            <p data-testid="enter-count">{{ EnterCount }}</p>
+        </section>
+
         <section aria-label="Keyed list">
             <button type="button" data-testid="reorder" @click="Reorder">Reverse keyed items</button>
             <ol data-testid="keyed-list">
@@ -61,6 +74,12 @@
         Reactive.Reference(0);
     private readonly ReactiveList<string> ItemList = new(["alpha", "beta", "gamma"]);
     private int LastCommittedCount;
+    private readonly Reference<string> SlotModel = Reactive.Reference("slot initial");
+    private readonly Reference<int> SubmitCount = Reactive.Reference(0);
+    private readonly Reference<int> EnterCount = Reactive.Reference(0);
+
+    private void Submit() => SubmitCount.Value++;
+    private void Enter() => EnterCount.Value++;
 
     public int Count => CountReference.Value;
 

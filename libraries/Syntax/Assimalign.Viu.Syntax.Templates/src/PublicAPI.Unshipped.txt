@@ -1,4 +1,10 @@
 #nullable enable
+Assimalign.Viu.Syntax.Templates.BindingMetadata.ModelValueTypes.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Assimalign.Viu.Syntax.Templates.BindingMetadata.ModelValueTypes.init -> void
+Assimalign.Viu.Syntax.Templates.BindingMetadata.StaticReceivers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Assimalign.Viu.Syntax.Templates.BindingMetadata.StaticReceivers.init -> void
+Assimalign.Viu.Syntax.Templates.BindingMetadata.HandlerTypes.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Assimalign.Viu.Syntax.Templates.BindingMetadata.HandlerTypes.init -> void
 *REMOVED*Assimalign.Viu.Syntax.Templates.CompilerErrorCode.XScopeIdNotSupported = 50 -> Assimalign.Viu.Syntax.Templates.CompilerErrorCode
 *REMOVED*Assimalign.Viu.Syntax.Templates.TransformContext.ScopeId.get -> string?
 *REMOVED*Assimalign.Viu.Syntax.Templates.TransformContext.Slotted.get -> bool

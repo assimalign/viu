@@ -276,8 +276,8 @@ public sealed class SingleFileComponentUsageValidationTests
             RootNamespace,
             ProjectDirectory);
 
-        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
-        diagnostic.Id.ShouldBe("VIU1405");
+        outcome.Diagnostics.Count(diagnostic => diagnostic.Id == "VIU1005").ShouldBe(2);
+        var diagnostic = outcome.Diagnostics.Where(diagnostic => diagnostic.Id == "VIU1405").ShouldHaveSingleItem();
         diagnostic.Severity.ShouldBe(RoslynDiagnosticSeverity.Error);
         diagnostic.GetMessage().ShouldContain("more than one in-scope declaration");
         diagnostic.GetMessage().ShouldContain("exactly one target");

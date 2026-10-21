@@ -12,6 +12,19 @@ namespace Assimalign.Viu.ServerRenderer.Tests;
 
 public sealed class ServerRenderSerializationTests
 {
+    [Theory]
+    [InlineData(true, "true")]
+    [InlineData(false, "false")]
+    public async Task AriaBoolean_DirectAndTreeSerialization_EmitSameToken(bool value, string token)
+    {
+        // [RND-ARIA-1], WAI-ARIA 1.2 https://www.w3.org/TR/2023/REC-wai-aria-1.2-20230606/#aria-checked
+        ServerRender.SsrRenderDynamicAttribute("aria-checked", value)
+            .ShouldBe($" aria-checked=\"{token}\"");
+        string html = await ServerRender.RenderToStringAsync(new ElementNode(new QualifiedName("button"),
+            bindings: [ElementBinding.Attribute(new QualifiedName("aria-checked"), value)]));
+        html.ShouldBe($"<button aria-checked=\"{token}\"></button>");
+    }
+
     [Fact]
     public void EscapeHtml_FiveCharacterContract_UsesExactEntities()
     {

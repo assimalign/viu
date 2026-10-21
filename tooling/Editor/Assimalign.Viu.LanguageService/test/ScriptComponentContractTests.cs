@@ -19,6 +19,46 @@ namespace Assimalign.Viu.LanguageService.Tests;
 public class ScriptComponentContractTests
 {
     [Fact]
+    public void GetComponentContracts_RegisteredNameConstant_UsesTheAuthoredIdentity()
+    {
+        // [CMP-35] The editor consumes the shared projection's registered name, not its C# type name.
+        var engine = new ScriptSemanticEngine();
+        var context = ScriptSemanticFixture.CreateContext(new LanguageProjectSourceDocument(
+            "C:/workspace/App/Widget.viu",
+            "<template><p>widget</p></template>\n@script {\n public const string RegisteredName = \"RenamedWidget\";\n}\n",
+            IsComponent: true));
+        var contracts = engine.GetComponentContracts(context, ScriptSemanticFixture.DocumentFilePath,
+            "<template><RenamedWidget /></template>", default).ShouldNotBeNull();
+        contracts.ShouldContain(contract => contract.CompilerDeclaration.Name == "RenamedWidget");
+        contracts.ShouldNotContain(contract => contract.CompilerDeclaration.Name == "Widget");
+    }
+
+    [Fact]
+    public void GetComponentContracts_ReferencedMetadata_UsesTheRegisteredIdentity()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "viu-registered-component-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string referencePath = Path.Combine(directory, "Referenced.Components.dll");
+            WriteComponentReference(referencePath, "Label", "RenamedWidget");
+            var context = ScriptSemanticFixture.CreateContext("registered-reference") with
+            {
+                ReferenceAssemblyPaths = ScriptSemanticFixture.ReferenceAssemblyPaths().Append(referencePath).ToArray(),
+            };
+            var contracts = new ScriptSemanticEngine().GetComponentContracts(context,
+                ScriptSemanticFixture.DocumentFilePath, "<template><RenamedWidget /></template>", default)
+                .ShouldNotBeNull();
+            contracts.ShouldContain(contract => contract.CompilerDeclaration.Name == "RenamedWidget");
+            contracts.ShouldNotContain(contract => contract.CompilerDeclaration.Name == "ReferencedWidget");
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void GetComponentContracts_SiblingSingleFileComponent_UsesProjectionDeclarations()
     {
         const string componentSource =
@@ -360,11 +400,12 @@ public class ScriptComponentContractTests
         service.ComponentProjectionBuildCount.ShouldBe(2);
     }
 
-    private static void WriteComponentReference(string filePath, string propertyName)
+    private static void WriteComponentReference(string filePath, string propertyName, string? registeredName = null)
     {
         var source =
             "using Assimalign.Viu.Components;\n" +
             "\n" +
+            (registeredName is null ? string.Empty : $"[ComponentMetadata(\"{registeredName}\")]\n") +
             "public sealed class ReferencedWidget : IComponent\n" +
             "{\n" +
             "    [Parameter]\n" +

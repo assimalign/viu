@@ -17,6 +17,8 @@ namespace Assimalign.Viu.Browser;
 /// [V01.01.01.03].
 /// Style map keys are CSS property names (kebab-case or <c>--custom</c>); camelCase
 /// normalization arrives with the [V01.01.01.02] helpers.
+/// ARIA booleans use enumerated string tokens per <c>[RND-ARIA-1]</c> and
+/// <see href="https://www.w3.org/TR/2023/REC-wai-aria-1.2-20230606/#state_prop_def">WAI-ARIA 1.2</see>.
 /// </summary>
 internal static class BrowserPropertyPatcher
 {
@@ -328,7 +330,8 @@ internal static class BrowserPropertyPatcher
         }
         if (nextValue is bool boolValue)
         {
-            if (EnumeratedAttributeNames.Contains(propertyName))
+            if (EnumeratedAttributeNames.Contains(propertyName)
+                || propertyName.StartsWith("aria-", StringComparison.OrdinalIgnoreCase))
             {
                 // Enumerated attributes must WRITE "false" — removal would mean "inherit"
                 // (spellcheck/draggable/translate).

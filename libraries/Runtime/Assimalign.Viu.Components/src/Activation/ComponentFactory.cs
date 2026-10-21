@@ -16,6 +16,23 @@ namespace Assimalign.Viu.Components;
 public class ComponentFactory : IComponentFactory
 {
     private readonly Dictionary<ComponentReference, ComponentRegistration> _registrations = [];
+    private readonly HashSet<string> _generatedCatalogs = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Registers available generated catalogs in ordinal assembly order, once per catalog on this
+    /// factory. Distinct catalogs declaring the same name still throw. Specified by <c>[CMP-36]</c>.
+    /// </summary>
+    public void RegisterGeneratedComponents() => GeneratedComponentCatalogs.Apply(this);
+
+    internal void RegisterGeneratedCatalog(string identity, Action<ComponentFactory> register)
+    {
+        if (_generatedCatalogs.Contains(identity))
+        {
+            return;
+        }
+        register(this);
+        _generatedCatalogs.Add(identity);
+    }
 
     /// <summary>Registers a component, throwing on a duplicate reference.</summary>
     /// <param name="registration">The explicit registration.</param>

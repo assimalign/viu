@@ -14,8 +14,9 @@ seam version. This does not make an add-on part of the Viu SDK or its runtime fr
 A Browser application can receive two component-style sources:
 
 - its own `<PackageId>.viu.css` bundle; and
-- one `<PackageId>.viu.css` bundle from each referenced component-library package, carried by that
-  package's base-SDK `buildTransitive` registration.
+- one `<PackageId>.viu.css` bundle from each referenced component library, carried by a package's
+  base-SDK `buildTransitive` registration or queried through `GetViuComponentLibraryStyles` on built
+  ProjectReferences (including transitive references, [PKG-STYLE-1]).
 
 The Browser SDK copies library bundles to
 `_content/<PackageId>/<PackageId>.viu.css`. It links referenced-library bundles first in ordinal
@@ -23,6 +24,10 @@ route order, then links the application bundle. The application therefore retain
 position. All missing links are inserted in one host-page read/write pass, and an existing `href`
 suppresses only its matching generated link. A file name mentioned in text or an HTML comment does
 not suppress injection.
+
+Project-reference task outputs may carry `OriginalItemSpec` and `MSBuildSourceProjectFile` metadata
+that identify the library project. Browser Content registration strips that foreign metadata before
+static-web-asset compression. CSS extraction and copying preserve unchanged file timestamps.
 
 The injection is independent of `OverrideHtmlAssetPlaceholders`. When that WebAssembly property is
 `true`, Viu runs after the SDK's boot-placeholder rewrite; when it is `false`, Viu reads the resolved

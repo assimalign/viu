@@ -41,6 +41,20 @@ public sealed class SingleFileComponentGeneratorTests
         "</style>\n";
 
     [Fact]
+    public void ServerMarkup_CompoundInterpolationAsOnlyChild_GeneratesWithoutCrash()
+    {
+        // [SFC-CG-11] A merged text expression remains valid server content.
+        GeneratorOutcome outcome = GeneratorTestHarness.Run(
+            $"{ProjectDirectory}/Progress.viu",
+            "<template><span class=\"x\">{{ Value }} / {{ Maximum }}</span></template>\n@script {\n public int Value = 2; public int Maximum = 5;\n}\n",
+            RootNamespace, ProjectDirectory, serverRendering: "true");
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        GeneratorTestHarness.GeneratedSource(outcome, "Progress.SingleFileComponent.g.cs")
+            .ShouldContain("SsrInterpolate");
+    }
+
+    [Fact]
     public void Generates_PartialClassWithCompiledRender_ForWellFormedComponent()
     {
         // [V01.01.06.17] Ordinary component CSS stays in the generated asset without attribute stamping.
@@ -203,7 +217,7 @@ public sealed class SingleFileComponentGeneratorTests
         generated.ShouldContain("var listSource");
         generated.ShouldContain("foreach (var listItem");
         generated.ShouldContain("component.items");
-        generated.ShouldContain("RenderGlue.ComponentListener(component.onPress)");
+        generated.ShouldContain("RenderGlue.ComponentListener(component.onPress, component.Context!.Lifecycle)");
 
         var tree = GeneratorTestHarness.Parse(generated);
         tree.GetDiagnostics()

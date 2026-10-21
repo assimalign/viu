@@ -75,6 +75,11 @@ public readonly record struct SingleFileComponentModel(
     EquatableArray<CssVariableBindingEntry> CssVariableBindings)
 {
     /// <summary>
+    /// Gets the ordinal registered name. A script's string constant RegisteredName overrides the
+    /// sanitized file name; the generated class identity remains path-derived. Specified by <c>[CMP-35]</c>.
+    /// </summary>
+    public string RegisteredName { get; init; } = ClassName.TrimStart('@');
+    /// <summary>
     /// The compiled direct-markup render body when the project declares server rendering, or
     /// <see langword="null"/> for client-only projects and renderless components. The body is emitted
     /// alongside, never instead of, <see cref="RenderBody"/> so a dual-target project retains one
@@ -121,7 +126,8 @@ public readonly record struct SingleFileComponentModel(
     /// script block at all, because a Viu component has exactly one script slot.
     /// </summary>
     /// <returns>The binding metadata, or <see cref="BindingMetadata.Empty"/> for a scriptless component.</returns>
-    public BindingMetadata ToBindingMetadata() => BuildBindingMetadata(HasScript, Bindings);
+    public BindingMetadata ToBindingMetadata() => BuildBindingMetadata(HasScript, Bindings,
+        string.IsNullOrEmpty(Namespace) ? "global::" + ClassName : "global::" + Namespace + "." + ClassName);
 
     /// <summary>
     /// Builds the template compiler's <see cref="BindingMetadata"/> from the classified script bindings — the
@@ -132,6 +138,19 @@ public readonly record struct SingleFileComponentModel(
     /// <param name="bindings">The classified script bindings.</param>
     /// <returns>The binding metadata, or <see cref="BindingMetadata.Empty"/> for a scriptless component.</returns>
     public static BindingMetadata BuildBindingMetadata(bool hasScript, EquatableArray<ScriptBinding> bindings)
+        => BuildBindingMetadata(hasScript, bindings, null);
+
+    /// <summary>
+    /// Builds binding metadata with a declaring type so static script members use type-qualified
+    /// access. The type name is emitted directly, without runtime metadata inspection.
+    /// Specified by <c>[SFC-CG-12]</c>.
+    /// </summary>
+    /// <param name="hasScript">Whether the component declares a script block.</param>
+    /// <param name="bindings">The classified script bindings.</param>
+    /// <param name="declaringType">The fully qualified component type for static access, when known.</param>
+    /// <returns>The template binding metadata.</returns>
+    public static BindingMetadata BuildBindingMetadata(bool hasScript, EquatableArray<ScriptBinding> bindings,
+        string? declaringType)
     {
         if (!hasScript)
         {
@@ -144,13 +163,33 @@ public readonly record struct SingleFileComponentModel(
         }
 
         var map = new Dictionary<string, BindingType>(bindings.Count, StringComparer.Ordinal);
+        var staticReceivers = new Dictionary<string, string>(StringComparer.Ordinal);
+        var handlerTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var modelValueTypes = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var binding in bindings)
         {
             // A later declaration of the same name wins (e.g. method overloads share a name); an
             // illegal duplicate-member script is already surfaced as a script diagnostic.
             map[binding.Name] = binding.Type;
+            if (binding.IsStatic && declaringType is not null)
+            {
+                staticReceivers[binding.Name] = declaringType;
+            }
+            if (binding.HandlerType is { } handlerType)
+            {
+                handlerTypes[binding.Name] = handlerType;
+            }
+            if (binding.ModelValueType is { } modelValueType)
+            {
+                modelValueTypes[binding.Name] = modelValueType;
+            }
         }
 
-        return new BindingMetadata(map, isScriptSetup: true);
+        return new BindingMetadata(map, isScriptSetup: true)
+        {
+            StaticReceivers = staticReceivers,
+            HandlerTypes = handlerTypes,
+            ModelValueTypes = modelValueTypes,
+        };
     }
 }

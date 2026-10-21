@@ -352,6 +352,16 @@ hand-authored slot sets. A caller whose slot structure can change MUST explicitl
 `SlotStability.Dynamic`; a caller forwarding its parent's slots MUST supply `SlotStability.Forwarded`.
 An over-optimistic classification manifests as a child that silently stops updating.
 
+`[CMP-37]` **Slot content owns a complete optimization boundary.** Reactive reads performed by
+an invoked slot are tracked by the invoking component's active render effect; its cached descriptions
+and handlers remain owned by the declaring mount. A generated single-element slot root collects
+its dynamic descendants in its own block, even when that root has positive binding or event patch
+flags. Multiple slot siblings form a stable fragment block. An outlet tracks the returned root in
+its own frame, so nested model-dependent text, bindings, and conditional or keyed descendants MUST
+update without an unrelated declaring-component render. Compiler-generated conditional branch keys
+inside these fixed slot siblings retain their branch identity. A failed slot invocation MUST discard
+incomplete block assembly in the declaring frame before propagating the error to the outlet.
+
 ### 4.7 Lifecycle
 
 `[CMP-20]` `ComponentLifecycle` exposes **named, typed hooks**, not an enum-keyed callback
@@ -541,6 +551,38 @@ degrades to the behavior the component would have had without the root convenien
 `docs/COMPONENT-MODEL-PLAN.md` §§2, 8, 9.*
 
 ---
+
+### 4.11 Generated definitions and catalogs
+
+`[CMP-35]` **Typed component definitions.** Generated template components are partial classes
+with ComponentMetadataAttribute and IComponentDefinition. Their static interface Registration returns
+the same registration used by the assembly catalog. ComponentNode.For<TComponent>() describes that
+reference without activation. The default registered name is the sanitized file base name [SFC-CG-10].
+An authored public partial declaration exposes a component across assembly boundaries; generation
+preserves the existing default accessibility.
+A script may override it with one nonempty string literal constant named RegisteredName. Conflicting
+overrides or duplicate registered names within a compilation produce a located diagnostic.
+
+`[CMP-36]` **Generated catalogs.** Assembly attributes identify public component and server-render
+catalog types to referencing compilers. Catalog type names include a stable assembly-name discriminator,
+so assemblies sharing a root namespace remain unambiguous. Existing GeneratedViuComponents and
+GeneratedViuServerRenders entry points remain explicit forwarding catalogs. Generated module
+initialization publishes direct delegates for the assembly's own catalog and every catalog marked in
+compilation references, with no runtime metadata access. Registries key catalogs by full assembly
+identity, apply them in ordinal identity
+order from a synchronized snapshot, and apply each catalog once per target factory or render registry
+even across diamond paths. Catalogs published during population become available on the next call.
+Different catalogs declaring the same component reference remain errors. Setting
+ViuAutoRegisterGeneratedCatalogs=false omits module initialization but retains explicit catalogs and
+their metadata. Direct delegates root only their catalog registrations; runtime discovery never roots
+unregistered types. Executable compilations enable aggregation by default; library projects can opt in.
+An opted-out assembly with no generated components emits no catalog or aggregate simply because its
+references carry catalog metadata; this preserves targeting-only and metadata-only consumer topologies.
+Hot reload retains registration objects and updates render methods using [SFC-CG-9];
+replacing a published catalog affects newly populated factories, not existing registrations. Browser
+builders populate generated components only while ApplicationOptions.Components retains the builder's
+default factory; an explicitly supplied resolver takes precedence. Generated server catalogs must be
+applied before freezing the target registry.
 
 ## 5. Reactivity
 
@@ -1114,6 +1156,15 @@ the browser event loop and are not thread-safe [EXE-1], [EXE-2].
 
 ---
 
+### 6.10 Accessible attribute values
+
+`[RND-ARIA-1]` **ARIA boolean values.** Attribute bindings whose names begin with aria- (case
+insensitively) serialize boolean values as the lowercase string tokens "true" and "false" on both
+Browser and server paths. Null removes the attribute; false never removes it. Hydration uses the same
+binding rule and compares ARIA boolean tokens during ordinary attribute mismatch validation.
+This implements the enumerated states and properties of
+[WAI-ARIA 1.2](https://www.w3.org/TR/2023/REC-wai-aria-1.2-20230606/#state_prop_def).
+
 ## 7. Built-in components
 
 Each built-in is specified with its **current limits** inline.
@@ -1363,6 +1414,7 @@ normative and is the contract between the compiler, code generation, and the rea
 | Classification | Read | Write (assignment, `++`, `--`) |
 | --- | --- | --- |
 | template-local (a `v-for`/`v-slot` alias in scope) | `name` | `name` |
+| known static script member | `DeclaringType.name` (plus `.Value` for a reference) | same |
 | allowed global | `name` | `name` |
 | `SetupReference` | `_ctx.name.Value` | `_ctx.name.Value` |
 | `SetupMaybeReference` | `unref(_ctx.name)` | `_ctx.name.Value` |
@@ -1542,6 +1594,24 @@ rewritten and its column must be re-aligned; the `@script` merge uses the line-o
 columns already match. Non-expression scaffolding, and any second expression sharing one physical
 render line, falls back to the generated file.
 
+`[SFC-CG-11]` **Compound text and handler identity.** A sole compound text child, including adjacent
+interpolations with literal separators, MUST compile in both client and server profiles. Server
+emission escapes each displayed value and preserves separators. Native event glue MUST retain the
+delegate's event type, including modifier/key wrappers, so the Browser dispatches the same event
+instance and propagates prevention and stop decisions before returning to the browser.
+
+`[SFC-CG-12]` **Typed write-back and method groups.** Model assignment converts the event value to
+the target's declared scalar type (including a reference's Value type). String, boolean, integral,
+floating-point, decimal, and nullable scalar targets are supported without reflection. Numeric
+conversion uses invariant culture after `.number`; null or empty nullable input becomes null.
+Invalid scalar conversions throw their normal conversion exception. Object and other already-typed
+component payloads pass through by cast. `.trim`, `.lazy`, and `.number` remain directive policies.
+Known script targets use their declared type as a default-value conversion witness, so conversion
+does not introduce another target getter read. Nullable reference targets preserve a null payload.
+Single-argument script method-group listeners retain their declared parameter and return types,
+including Task-returning handlers. Synchronous return values are discarded; Task and Task<T> completion
+remains observable. Static script members use the generated declaring type as receiver.
+
 ### 8.6 Static optimization
 
 `[SFC-OPT-1]` A fully static subtree is marked `PatchFlags.Cached` and stored in a
@@ -1607,6 +1677,8 @@ of each conflicting component file after [SFC-CG-10] disambiguation. It identifi
 and asks the author to rename a component or directory. This includes lossy sanitization, linked files
 that resolve to one type, and collisions involving the `GeneratedComponents` leaf. Hint uniqueness is
 a separate contract and cannot make two identical C# type identities valid.
+The same diagnostic reports invalid RegisteredName constants and conflicting registered names
+[CMP-35]. Those registration conflicts omit catalog entries while retaining distinct generated types.
 
 ### 8.8 Component-usage validation
 
@@ -2327,6 +2399,12 @@ parameters and ordinal `FullPath` equality, including raw query spelling and emp
 
 ---
 
+`[RTR-31]` **Route collection conveniences.** ICollection<RouteRecord>.Add(path, componentName,
+title, children, meta, argumentsResolver, name) creates an ordinary eager route record. The name
+defaults to componentName. A nonnull title replaces the copied metadata's title entry; null preserves
+any supplied title metadata. The generic Add<TComponent> uses IComponentDefinition's registered-name
+reference. Neither overload mutates caller-owned metadata or changes RouteRecord constructors.
+
 ## 13. State
 
 `[STA-1]` `StateStoreDefinition<TStore>` is reusable metadata with a diagnostic `Identifier` and an
@@ -2701,6 +2779,19 @@ be developed without a pack/restore cycle in the loop.
 `.claude/rules/build-system.md`; `docs/RELEASING.md`.*
 
 ---
+
+### 16.1 Referenced styles and host queries
+
+`[PKG-STYLE-1]` **Referenced library styles.** Base-SDK libraries expose extracted styles through
+GetViuComponentLibraryStyles. After building project references, the Browser SDK queries that target
+and publishes the returned CSS just like packaged library CSS under _content/PackageId/PackageId.viu.css.
+Foreign task-output metadata MUST NOT flow onto Content items. Host-page injection adds referenced
+library links in ordinal order before the application bundle, skipping already present links.
+
+`[PKG-HOST-1]` **Browser identity query.** GetViuBrowserClientInfo returns one item identified by the
+absolute project path, with IsViuBrowserApplication, AssemblyName, TargetFramework, TargetPath,
+OutputDirectory, StaticWebAssetsRuntimeManifestPath, and StaticWebAssetsEndpointsManifestPath
+metadata. It computes paths without building; callers build first when they require existing files.
 
 ## 17. Conformance and how behavior is pinned
 

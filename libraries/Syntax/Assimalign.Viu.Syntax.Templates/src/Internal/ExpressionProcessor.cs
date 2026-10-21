@@ -197,6 +197,10 @@ internal static class ExpressionProcessor
 
     private static string RewriteBoundIdentifier(string raw, BindingType type, bool isWriteTarget, TransformContext context)
     {
+        if (context.BindingMetadata.StaticReceivers.TryGetValue(raw, out string? receiver))
+        {
+            return receiver + "." + raw + (type == BindingType.SetupReference ? ".Value" : string.Empty);
+        }
         if (context.BindingRewriteMode == BindingRewriteMode.InstanceMember)
         {
             // The v-bind() CSS getter ([V01.01.06.06.01]) is an instance member: bindings read through the

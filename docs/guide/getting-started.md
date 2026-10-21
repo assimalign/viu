@@ -115,9 +115,19 @@ dotnet run --project HelloViu/Server/HelloViu.Server.csproj
 
 That variant moves the counter into a host-neutral component project, declares
 `ViuServerRendering=true`, and adds an ASP.NET host. The Browser and server projects share the same
-compiled component assembly; the host explicitly registers `GeneratedViuComponents` and
-`GeneratedViuServerRenders`, so server selection performs no reflection or assembly scanning.
+compiled component assembly. Generated catalogs are discovered from reference metadata at compile
+time; the server calls `components.RegisterGeneratedComponents()` and
+`serverRenders.RegisterGeneratedRenders()`. The Browser builder uses generated components by default
+when `ApplicationOptions.Components` is unset. Both hosts can use `ComponentNode.For<Counter>()`.
+No runtime reflection or assembly scanning is involved ([CMP-35], [CMP-36]).
 Specified by `[SSR-TARGET-1]` through `[SSR-TARGET-3]` and [V01.01.12.28].
+
+For generated components, `ComponentNode.For<App>()` and `routes.Add<HomePage>("/", "Home")` use
+compile-time registrations. A reusable library can expose a definition with `public partial class
+HomePage;`. Its registered name defaults to the sanitized file name; declare `public const string
+RegisteredName = "Acme.Home";` inside `@script` to override it. Component-library styles flow over
+ordinary ProjectReferences as well as packages, with library links injected before the application
+bundle. See [the SDK contracts](../../sdks/README.md) for catalog opt-out and host identity queries.
 
 ## Create the project by hand
 
@@ -504,9 +514,9 @@ and the injection mechanism is
 > **mountable component**: the generator emits the render function, merges the script into the partial
 > class, **and** implements `IComponent` with a synchronous `Setup(ComponentContext)` returning a
 > frame-based `ComponentRenderer`. Its generated registration carries a static `ComponentContract`
-> beside an explicit activator. Register that definition in the application `IComponentFactory`,
-> request it with `new ComponentNode(ComponentReference.ForType(typeof(Greeting)))`, and assign the factory to `ApplicationOptions.Components`
-> before building and invoking the `RunAsync` extension. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive
+> beside an explicit activator. Request it with `ComponentNode.For<Greeting>()`; the Browser builder
+> registers generated components automatically when `ApplicationOptions.Components` is unset.
+> Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive
 > re-render, and a
 > template event handler (`@click="Increment"`) calls the like-named `@script` method:
 >

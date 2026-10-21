@@ -95,3 +95,9 @@ projection is unavailable in that mode. Disconnect unmounts and releases handles
 reconnect creates a fresh component instance (`[CEL-6]` through `[CEL-8]`). The packaged consumer at
 `scripts/fixtures/EndToEndCustomElementApp` demonstrates attributes, properties, styles, slots and
 fallbacks, events, and registry cleanup.
+
+## Generated defaults and attribute tokens
+
+`BrowserApplicationBuilder.Build()` populates generated component catalogs when `ApplicationOptions.Components` is unset. An explicitly supplied factory takes precedence and is not supplemented ([CMP-36]). A generated root can be requested with `ComponentNode.For<App>()`.
+
+Modifier and key wrappers retain their Browser event delegate type through generated glue, including synchronous and Task-returning methods. ARIA attribute booleans write the enumerated strings `true` and `false`; null removes them ([SFC-CG-11], [RND-ARIA-1]).

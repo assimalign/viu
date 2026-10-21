@@ -1,0 +1,119 @@
+<!-- Forms and lists: native v-model, event modifiers, keyed v-for, and shared application state. -->
+<template>
+    <Card title="Add a task">
+        <form class="task-form" @submit.prevent="AddTask">
+            <input v-model="NewTitle" placeholder="What needs doing?" aria-label="Task title" />
+            <button type="submit" :disabled="!CanAdd">Add [{{ NewTitleText }}]</button>
+        </form>
+    </Card>
+
+    <Card title="Tasks">
+        <template #badge>
+            <Pill :label="Summary" :tone="SummaryTone" />
+        </template>
+
+        <ul v-if="Tasks.Items.Count > 0" class="task-list">
+            <!-- :key gives each row a stable identity, so removals patch instead of re-render. -->
+            <li v-for="task in Tasks.Items" :key="task.Id" :class="TaskClass(task)">
+                <!-- An explicit binding + event pair, typed end to end. -->
+                <input type="checkbox" :checked="task.IsDone" @change="ToggleDone(task)" :aria-label="task.Title" />
+                <RouterLink :to="DetailPath(task)">{{ task.Title }}</RouterLink>
+                <button type="button" class="task__remove" @click="Tasks.Remove(task)" aria-label="Remove">×</button>
+            </li>
+        </ul>
+        <!-- No default-slot content would show the Card's fallback; this overrides it. -->
+        <p v-else>All clear.</p>
+
+        <template #footer>
+            <button type="button" :disabled="Tasks.Completed.Value == 0" @click="Tasks.ClearCompleted">
+                Clear completed
+            </button>
+        </template>
+    </Card>
+</template>
+
+@script {
+    using Assimalign.Viu.Reactivity;
+
+
+
+    public TaskStore Tasks { get; private set; } = null!;
+
+    // A native v-model target: the template unwraps the reference and writes the input's value back
+    // untyped, so the reference holds object?. NewTitleText reads it typed.
+    public Reference<object?> NewTitle { get; } = Reactive.Reference<object?>(string.Empty);
+
+    public string NewTitleText => NewTitle.Value as string ?? string.Empty;
+
+    public bool CanAdd => NewTitleText.Length > 0;
+
+    public string Summary => $"{Tasks.Remaining.Value} of {Tasks.Items.Count} open";
+
+    public string SummaryTone => Tasks.Remaining.Value == 0 ? "success" : "warning";
+
+    partial void OnSetup()
+    {
+        Tasks = TaskStore.Definition.Use(Context!);
+    }
+
+    // Template expressions resolve against the component instance, so helpers are instance members.
+    private string TaskClass(TaskItem task) => task.IsDone ? "task task--done" : "task";
+
+    private string DetailPath(TaskItem task) => $"/tasks/{task.Id}";
+
+    private void ToggleDone(TaskItem task) => task.IsDone = !task.IsDone;
+
+    private void AddTask()
+    {
+        Tasks.Add(NewTitleText);
+        NewTitle.Value = string.Empty;
+    }
+}
+
+<style>
+    .task-form {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .task-form input {
+        flex: 1;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid var(--viu-border);
+        border-radius: 0.5rem;
+        font: inherit;
+    }
+
+    .task-list {
+        display: grid;
+        gap: 0.25rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .task {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.4rem 0.25rem;
+    }
+
+    .task a {
+        flex: 1;
+        color: inherit;
+    }
+
+    .task--done a {
+        color: var(--viu-text-muted);
+        text-decoration: line-through;
+    }
+
+    .task__remove {
+        border: 0;
+        background: none;
+        color: var(--viu-text-muted);
+        font-size: 1.1rem;
+        cursor: pointer;
+    }
+</style>

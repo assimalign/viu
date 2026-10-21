@@ -88,3 +88,9 @@ static Assimalign.Viu.ServerRenderer.SsrStateIsland.CreateMarkup(string! json) -
 static Assimalign.Viu.ServerRenderer.SsrStateIsland.Deserialize<T>(string! json, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>! typeInformation) -> T?
 static Assimalign.Viu.ServerRenderer.SsrStateIsland.NormalizePayload(string! json) -> string!
 static Assimalign.Viu.ServerRenderer.SsrStateIsland.WriteAsync(System.IO.TextWriter! writer, string! json, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Assimalign.Viu.ServerRenderer.ServerRenderCatalogAttribute
+Assimalign.Viu.ServerRenderer.GeneratedServerRenderCatalogs
+Assimalign.Viu.ServerRenderer.ServerRenderRegistry.RegisterGeneratedRenders() -> void
+Assimalign.Viu.ServerRenderer.ServerRenderCatalogAttribute.ServerRenderCatalogAttribute(System.Type! catalogType) -> void
+Assimalign.Viu.ServerRenderer.ServerRenderCatalogAttribute.CatalogType.get -> System.Type!
+static Assimalign.Viu.ServerRenderer.GeneratedServerRenderCatalogs.Register(string! identity, System.Action<Assimalign.Viu.ServerRenderer.ServerRenderRegistry!>! register) -> void

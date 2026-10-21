@@ -121,3 +121,9 @@ surface in Core [SFC-CG-2] through [SFC-CG-4].
 Mounted node variants, component activations, built-in state, and update registrations remain
 internal. Hosts consume the public operations and renderer contracts; no host is a compile-time
 friend of Core.
+
+## ARIA hydration tokens
+
+Hydration compares boolean `aria-*` bindings as lowercase `true` and `false` tokens, matching Browser
+and server attribute serialization. A differing token uses the ordinary attribute mismatch warning
+policy without replacing the adopted element ([RND-ARIA-1]).

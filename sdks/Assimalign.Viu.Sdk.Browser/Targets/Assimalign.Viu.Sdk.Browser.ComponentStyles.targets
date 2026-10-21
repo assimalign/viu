@@ -1,14 +1,31 @@
 <Project>
-    <!-- Flow styles extracted by base-SDK component-library packages into Browser output. -->
+    <!-- [PKG-STYLE-1] Query each resolved reference after its build, ignoring non-Viu targets. -->
+    <Target Name="ViuCollectReferencedComponentLibraryStyles"
+            DependsOnTargets="ResolveProjectReferences"
+            Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
+        <MSBuild Projects="@(_MSBuildProjectReferenceExistent)"
+                 Targets="GetViuComponentLibraryStyles"
+                 BuildInParallel="$(BuildInParallel)"
+                 SkipNonexistentTargets="true"
+                 Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"
+                 RemoveProperties="RuntimeIdentifier;SelfContained;OutputType;PublishDir;OutputPath;IntermediateOutputPath"
+                 Condition="'@(_MSBuildProjectReferenceExistent)' != ''">
+            <Output TaskParameter="TargetOutputs" ItemName="ViuComponentLibraryStyle" />
+        </MSBuild>
+    </Target>
+
+    <!-- Flow styles extracted by component-library packages and projects into Browser output. -->
     <Target Name="ViuFlowComponentLibraryStyles"
             BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths"
-            Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true' and '@(ViuComponentLibraryStyle)' != ''">
+            DependsOnTargets="ViuCollectReferencedComponentLibraryStyles"
+            Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
         <ItemGroup>
-            <_ViuComponentLibraryStyle Include="@(ViuComponentLibraryStyle)" />
+            <_ViuComponentLibraryStyle Include="@(ViuComponentLibraryStyle->Distinct())" KeepMetadata="PackageId" />
             <_ViuComponentLibraryStyleDestination Include="@(_ViuComponentLibraryStyle->'wwwroot/_content/%(PackageId)/%(Filename)%(Extension)')" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuComponentLibraryStyle)"
               DestinationFiles="@(_ViuComponentLibraryStyleDestination->'%(FullPath)')"
+              Condition="'@(_ViuComponentLibraryStyle)' != ''"
               SkipUnchangedFiles="true" />
         <ItemGroup>
             <!--
@@ -21,7 +38,7 @@
             <Content Remove="@(_ViuComponentLibraryStyleDestination)"
                      MatchOnMetadata="FullPath"
                      MatchOnMetadataOptions="PathLike" />
-            <Content Include="@(_ViuComponentLibraryStyleDestination)">
+            <Content Include="@(_ViuComponentLibraryStyleDestination)" KeepMetadata="">
                 <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
                 <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
             </Content>

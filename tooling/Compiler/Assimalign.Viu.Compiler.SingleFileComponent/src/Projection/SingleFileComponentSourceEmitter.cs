@@ -80,13 +80,20 @@ public static class SingleFileComponentSourceEmitter
             .Append(", custom=").Append(Count(model.CustomBlockCount)).Append(".\n");
 
         AppendIndent(builder, indent);
+        if (model.RenderBody is not null)
+        {
+            builder.Append("[global::Assimalign.Viu.Components.ComponentMetadata(")
+                .Append(Literal(model.RegisteredName)).Append(")]\n");
+            AppendIndent(builder, indent);
+        }
         builder.Append("partial class ").Append(model.ClassName);
         if (model.RenderBody is not null)
         {
             // [SFC-CG-4] The base owns only Context storage; the generated partial opts into the
             // authored component contract explicitly. A renderless file remains a plain partial class.
             builder.Append(" : ").Append(ComponentsNamespace).Append(".ComponentBase, ")
-                .Append(ComponentsNamespace).Append(".IComponent");
+                .Append(ComponentsNamespace).Append(".IComponent, ")
+                .Append(ComponentsNamespace).Append(".IComponentDefinition");
         }
 
         builder.Append('\n');
@@ -94,6 +101,12 @@ public static class SingleFileComponentSourceEmitter
         builder.Append("{\n");
 
         var bodyIndent = indent + 1;
+        if (model.RenderBody is not null)
+        {
+            AppendIndent(builder, bodyIndent);
+            builder.Append("static global::Assimalign.Viu.Components.ComponentRegistration ")
+                .Append("global::Assimalign.Viu.Components.IComponentDefinition.Registration => __ViuRegistration;\n");
+        }
         AppendHotReloadMetadata(builder, bodyIndent, model);
         if (model.HotReloadMetadata is not null)
         {
@@ -277,9 +290,7 @@ public static class SingleFileComponentSourceEmitter
     // returns a renderer that receives the mount-owned frame.
     private static void AppendComponentDefinitionBridge(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
-        var displayName = model.ClassName.Length > 0 && model.ClassName[0] == '@'
-            ? model.ClassName.Substring(1)
-            : model.ClassName;
+        var displayName = model.RegisteredName;
 
         builder.Append('\n');
         AppendIndent(builder, indent);

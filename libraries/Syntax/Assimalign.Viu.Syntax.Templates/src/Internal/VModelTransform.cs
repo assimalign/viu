@@ -136,7 +136,7 @@ internal static class VModelTransform
         var eventName = BuildEventName(argument);
 
         // eventArg is "$event" in the opaque (non-TS) build.
-        var assignment = CreateAssignment(expression);
+        var assignment = CreateAssignment(expression, context);
 
         var properties = new List<ObjectProperty>
         {
@@ -173,9 +173,10 @@ internal static class VModelTransform
     /// <c>onUpdate:modelValue</c> property.
     /// </summary>
     /// <param name="expression">The writable model expression.</param>
+    /// <param name="context">The declared script binding types.</param>
     /// <returns>The generated assignment lambda.</returns>
-    internal static CompoundExpressionNode CreateAssignment(ExpressionNode expression)
-        => Ir.CompoundExpression("$event => ((", expression, ") = $event)");
+    internal static CompoundExpressionNode CreateAssignment(ExpressionNode expression, TransformContext context)
+        => Ir.CompoundExpression("$event => ((", expression, ") = ", ConvertModelValue(expression, context), ")");
 
     /// <summary>
     /// Builds the statement-bodied assignment lambda required by <c>Action&lt;object?&gt;</c>. The
@@ -183,9 +184,22 @@ internal static class VModelTransform
     /// value-returning handler; a parenthesized assignment is not a valid C# statement expression.
     /// </summary>
     /// <param name="expression">The writable model expression.</param>
+    /// <param name="context">The declared script binding types.</param>
     /// <returns>The generated assignment action.</returns>
-    private static CompoundExpressionNode CreateAssignmentAction(ExpressionNode expression)
-        => Ir.CompoundExpression("$event => { ", expression, " = $event; }");
+    private static CompoundExpressionNode CreateAssignmentAction(ExpressionNode expression, TransformContext context)
+        => Ir.CompoundExpression("$event => { ", expression, " = ", ConvertModelValue(expression, context), "; }");
+
+    private static CompoundExpressionNode ConvertModelValue(ExpressionNode expression, TransformContext context)
+    {
+        if (context.BindingMetadata.ModelValueTypes.TryGetValue(expression.Location.Source.Trim(), out string? type))
+        {
+            var conversion = Ir.CompoundExpression("global::Assimalign.Viu.Generated.RenderGlue.ModelValue($event, default(", type, "))");
+            return type.TrimEnd().EndsWith("?", StringComparison.Ordinal)
+                ? Ir.CompoundExpression("($event is null ? default(", type, ") : ", conversion, ")")
+                : conversion;
+        }
+        return Ir.CompoundExpression("global::Assimalign.Viu.Generated.RenderGlue.ModelValue($event, ", expression, ")");
+    }
 
     /// <summary>
     /// Builds the Browser runtime carrier for a native <c>v-model</c>. Viu cannot recover a setter
@@ -194,10 +208,12 @@ internal static class VModelTransform
     /// </summary>
     /// <param name="expression">The writable model expression.</param>
     /// <param name="modifiers">The compile-time modifier names carried by the typed binding.</param>
+    /// <param name="context">The declared script binding types.</param>
     /// <returns>The generated <c>ModelBinding</c> construction.</returns>
     internal static CompoundExpressionNode CreateNativeBinding(
         ExpressionNode expression,
-        IReadOnlyList<SimpleExpressionNode> modifiers)
+        IReadOnlyList<SimpleExpressionNode> modifiers,
+        TransformContext context)
     {
         if (modifiers.Count == 0)
         {
@@ -205,7 +221,7 @@ internal static class VModelTransform
                 "new global::Assimalign.Viu.Browser.ModelBinding(",
                 expression,
                 ", ",
-                CreateAssignmentAction(expression),
+                CreateAssignmentAction(expression, context),
                 ")");
         }
 
@@ -214,7 +230,7 @@ internal static class VModelTransform
             "new global::Assimalign.Viu.Browser.ModelBinding(",
             expression,
             ", ",
-            CreateAssignmentAction(expression),
+            CreateAssignmentAction(expression, context),
             ", new string[] { ",
         };
         for (var index = 0; index < modifiers.Count; index++)

@@ -1,4 +1,22 @@
 <Project>
+    <!-- Public query used after ResolveProjectReferences; extraction writes only when CSS changes. -->
+    <Target Name="GetViuComponentLibraryStyles"
+            DependsOnTargets="ResolveProjectReferences;_ViuExtractComponentLibraryStyles"
+            Returns="@(_ViuExportedComponentLibraryStyle)">
+        <MSBuild Projects="@(_MSBuildProjectReferenceExistent)"
+                 Targets="GetViuComponentLibraryStyles"
+                 SkipNonexistentTargets="true"
+                 Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"
+                 RemoveProperties="RuntimeIdentifier;SelfContained;OutputType;PublishDir;OutputPath;IntermediateOutputPath"
+                 Condition="'@(_MSBuildProjectReferenceExistent)' != ''">
+            <Output TaskParameter="TargetOutputs" ItemName="_ViuExportedComponentLibraryStyle" />
+        </MSBuild>
+        <ItemGroup Condition="'$(_ViuComponentStyleExists)' == 'true' and Exists('$(_ViuComponentStylePath)')">
+            <_ViuExportedComponentLibraryStyle Include="$([System.IO.Path]::GetFullPath('$(_ViuComponentStylePath)'))" KeepMetadata="">
+                <PackageId>$(PackageId)</PackageId>
+            </_ViuExportedComponentLibraryStyle>
+        </ItemGroup>
+    </Target>
     <!-- Host-neutral component-style extraction and package carriage ([V01.01.12.27], #323). -->
     <PropertyGroup>
         <ViuBundleSingleFileComponentCss Condition="'$(ViuBundleSingleFileComponentCss)' == '' and '$(ViuUseSingleFileComponents)' == 'true'">true</ViuBundleSingleFileComponentCss>

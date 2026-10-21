@@ -1,0 +1,52 @@
+<template>
+<main>
+    <input v-model.number="Value0" />
+    <input v-model.number="Value1" />
+    <input v-model.number="Value2" />
+    <input v-model.number="Value3" />
+    <input v-model.number="Value4" />
+    <input v-model.number="Value5" />
+    <input v-model.number="Value6" />
+    <input v-model.number="Value7" />
+    <input v-model.number="Value8" />
+    <input v-model.number="Value9" />
+    <input v-model.number="Value10" />
+    <input v-model.number="Value11" />
+    <input v-model.number="Value12" />
+    <input v-model.number="Value13" />
+    <input v-model.number="Value14" />
+    <input v-model.number="Value15" />
+    <input v-model.number="Value16" />
+    <input v-model.number="Value17" />
+    <input v-model.number="Value18" />
+    <input v-model.number="Value19" />
+    <input v-model.number="Value20" />
+    <input v-model.number="Value21" />
+</main>
+</template>
+
+@script {
+    public byte Value0 { get; set; }
+    public byte? Value1 { get; set; }
+    public sbyte Value2 { get; set; }
+    public sbyte? Value3 { get; set; }
+    public short Value4 { get; set; }
+    public short? Value5 { get; set; }
+    public ushort Value6 { get; set; }
+    public ushort? Value7 { get; set; }
+    public int Value8 { get; set; }
+    public int? Value9 { get; set; }
+    public uint Value10 { get; set; }
+    public uint? Value11 { get; set; }
+    public long Value12 { get; set; }
+    public long? Value13 { get; set; }
+    public ulong Value14 { get; set; }
+    public ulong? Value15 { get; set; }
+    public float Value16 { get; set; }
+    public float? Value17 { get; set; }
+    public double Value18 { get; set; }
+    public double? Value19 { get; set; }
+    public decimal Value20 { get; set; }
+    public decimal? Value21 { get; set; }
+}
+

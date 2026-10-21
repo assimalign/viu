@@ -128,3 +128,7 @@ from supported invocation and preserves the linker/AOT boundary (`[RTR-11]`).
 Router does not own component activation, mounted state, rendering, DOM event policy, application
 shutdown, dependency disposal, browser history, selector lookup, or scroll application
 (`[CMP-9]`, `[RTR-10]`).
+
+## Collection conveniences
+
+The route helpers target ICollection<RouteRecord> so host option collections typed as IList also receive them. They construct ordinary eager RouteRecord values and leave constructors, matching, argument resolution, and navigation policy unchanged. Typed registration uses IComponentDefinition's static registration rather than runtime type inspection ([CMP-35], [RTR-31]).

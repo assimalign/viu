@@ -211,3 +211,9 @@ transition timing, or persistent mounted state. Scoped CSS and compiler scope-at
 were removed on 2026-09-14 ([V01.01.06.17], #367). The document-shell seam does not parse templates,
 buffer the completed body,
 or support random-access insertion into a prefix that has already streamed (`[SSR-14]`).
+
+## Catalog rooting and serialization agreement
+
+`ServerRenderCatalogAttribute` is consumed at compile time, where referenced catalog methods become direct delegates. Runtime publication snapshots delegates in ordinal assembly-identity order and applies them to a host-owned registry before freezing. This preserves request-independent registration and concurrent frozen lookup without reflection or assembly scanning ([CMP-36]).
+
+Merged text expressions are represented as text children in the server transform's immutable child view; they are never cast to an unrelated child type. Attribute serialization uses explicit lowercase ARIA boolean tokens, so compiled markup, traversal, and client hydration agree ([SFC-CG-11], [RND-ARIA-1]).

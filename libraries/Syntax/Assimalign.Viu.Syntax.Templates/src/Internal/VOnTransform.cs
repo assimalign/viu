@@ -148,6 +148,12 @@ internal static class VOnTransform
             }
 
             handler = processedExpression;
+            if (isMemberExpression && context.BindingMetadata.HandlerTypes.TryGetValue(
+                expression.Content.Trim(), out string? handlerType))
+            {
+                handler = Ir.CompoundExpression("global::Assimalign.Viu.Generated.RenderGlue.AdaptHandler((",
+                    handlerType, ")(", processedExpression, "))");
+            }
             if (isInlineStatement || (shouldCache && isMemberExpression))
             {
                 var parameter = isInlineStatement ? (context.PrefixIdentifiers ? "__event" : "$event") : "(...args)";

@@ -55,3 +55,11 @@ they add lifetime or delegate-semantic risk without reducing host operations ([V
   consumed directly by other build/editor-time tooling.
 - Everything a parse or transform produces is value-equatable to preserve the incremental-generator
   caching contract.
+
+## Typed text and binding emission
+
+Generated slot roots collect their dynamic descendants in independent blocks. Multiple siblings
+use a stable fragment, preserving nested model updates and conditional branch identity when the
+outlet renders under another component's effect ([CMP-37]).
+
+Server emission accepts merged compound text as a text child ([SFC-CG-11]). Generated model write-back calls scalar conversion glue using the target's declared type; both native carriers and component listeners share that conversion ([SFC-CG-12]). BindingMetadata carries explicit static receivers and method-group delegate types from the script projection. Native event glue retains Browser event delegate identity, while Task-returning component listeners are observed by their owning component lifecycle.

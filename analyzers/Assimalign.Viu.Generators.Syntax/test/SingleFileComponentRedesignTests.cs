@@ -258,7 +258,7 @@ public sealed class SingleFileComponentRedesignTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "AsyncButton.SingleFileComponent.g.cs");
-        generated.ShouldContain("RenderGlue.Handler(component.SaveAsync)");
+        generated.ShouldContain("RenderGlue.AdaptHandler((global::System.Func<global::System.Threading.Tasks.Task>)(component.SaveAsync))");
         generated.ShouldNotContain("component.SaveAsync();");
     }
 

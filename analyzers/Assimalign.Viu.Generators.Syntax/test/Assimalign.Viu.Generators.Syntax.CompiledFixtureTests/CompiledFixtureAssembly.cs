@@ -100,6 +100,17 @@ internal sealed class CompiledFixtureAssembly
             "PatchProbe.viu",
             "TargetedTextProbe.viu",
             "InteractionProbe.viu",
+            "SingleSlotModelProbe.viu",
+            "Card.viu",
+            "Pill.viu",
+            "TasksPage.viu",
+            "TasksPageSibling.viu",
+            "ThrowingSlotProbe.viu",
+            "BindingSeams.viu",
+            "HandlerShapes.viu",
+            "ScalarModels.viu",
+            "EventSource.viu",
+            "ModelSource.viu",
             "NullableParameterProbe.viu",
             "SlotChild.viu",
             "SlotOwner.viu",
@@ -140,7 +151,7 @@ internal sealed class CompiledFixtureAssembly
             optionsProvider: new FixtureAnalyzerConfigOptionsProvider(globalOptions));
         CSharpCompilation input = CSharpCompilation.Create(
             "ViuCompiledFixtureGeneratorInput",
-            references: [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            references: ResolveRuntimeReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriverRunResult run = driver.RunGenerators(input).GetRunResult();
         GeneratorRunResult generator = run.Results.Single();

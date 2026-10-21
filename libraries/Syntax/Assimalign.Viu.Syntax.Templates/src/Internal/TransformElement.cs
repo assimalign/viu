@@ -516,7 +516,7 @@ internal static class TransformElement
         {
             arguments.Add(
                 directive.Name == "model" && runtime is not null
-                    ? VModelTransform.CreateNativeBinding(directive.Expression, directive.Modifiers)
+                    ? VModelTransform.CreateNativeBinding(directive.Expression, directive.Modifiers, context)
                     : directive.Expression);
         }
 

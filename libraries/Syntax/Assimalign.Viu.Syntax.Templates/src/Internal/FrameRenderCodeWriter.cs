@@ -913,6 +913,10 @@ internal sealed class FrameRenderCodeWriter
                 ? ".RenderGlue.ComponentListener("
                 : ".RenderGlue.Handler(");
             expression.Append(handler);
+            if (purpose == PropertyValuePurpose.Component)
+            {
+                expression.Append(", component.Context!.Lifecycle");
+            }
             expression.Append(")");
             return expression;
         }
@@ -956,6 +960,10 @@ internal sealed class FrameRenderCodeWriter
             ? ".RenderGlue.ComponentListener("
             : ".RenderGlue.Handler(");
         AppendExpression(handler);
+        if (purpose == PropertyValuePurpose.Component)
+        {
+            Push(", component.Context!.Lifecycle");
+        }
         Push(");");
         EndLine();
 
@@ -1024,7 +1032,8 @@ internal sealed class FrameRenderCodeWriter
             ? ".RenderGlue.ComponentListener("
             : ".RenderGlue.Handler(");
         Push(handlerName);
-        Push(".Value);");
+        Push(purpose == PropertyValuePurpose.Component
+            ? ".Value, component.Context!.Lifecycle);" : ".Value);");
         EndLine();
         indentLevel--;
         AppendLine("}");
@@ -1160,6 +1169,9 @@ internal sealed class FrameRenderCodeWriter
             $"{ComponentsNamespace}.ComponentSlot {slotName} = ({parameterName}) =>");
         AppendLine("{");
         indentLevel++;
+        AppendLine("try");
+        AppendLine("{");
+        indentLevel++;
 
         CodeExpression value;
         if (function.Returns is SyntaxList<TemplateChildNode> children)
@@ -1181,6 +1193,16 @@ internal sealed class FrameRenderCodeWriter
         Push(";");
         EndLine();
         indentLevel--;
+        AppendLine("}");
+        AppendLine("catch");
+        AppendLine("{");
+        indentLevel++;
+        // The outlet's render recovery resets its own frame, not this declaring frame.
+        AppendStatement("frame.ResetBlockTracking();");
+        AppendStatement("throw;");
+        indentLevel--;
+        AppendLine("}");
+        indentLevel--;
         AppendLine("};");
         return CodeExpression.Literal(slotName);
     }
@@ -1194,9 +1216,19 @@ internal sealed class FrameRenderCodeWriter
 
         if (children.Count == 1)
         {
+            // [CMP-37] A slot runs after its declaring render has closed its blocks. Its
+            // element root must collect its own dynamic descendants: tracking only the root
+            // at the outlet loses nested updates when the root has positive patch flags.
+            if (children[0] is ElementNode element
+                && result.GetCodegenNode(element) is VirtualNodeCall { IsBlock: false } elementCall)
+            {
+                return EmitVirtualNode(elementCall with { IsBlock = true });
+            }
+
             return EmitVirtualValue(children[0]);
         }
 
+        AppendStatement("frame.OpenBlock();");
         CodeExpression childCollection = EmitChildren(children);
         string fragmentName = NextName("slotFragment");
         BeginLine();
@@ -1206,7 +1238,7 @@ internal sealed class FrameRenderCodeWriter
         Push(ComponentsNamespace);
         Push(".FragmentNode(");
         AppendExpression(childCollection);
-        Push(");");
+        Push($", renderPlan: new {ComponentsNamespace}.RenderPlan({ComponentsNamespace}.PatchFlags.StableFragment, dynamicChildren: frame.CloseBlock()));");
         EndLine();
         return CodeExpression.Literal(fragmentName);
     }

@@ -112,3 +112,7 @@ hierarchical dependency channel (`[CMP-24]`).
 All activation is registration-based. The package uses
 no runtime constructor discovery, reflection serialization, emitted code, or dynamic activation
 path (`[CMP-6]`, `[EXE-4]`).
+
+## Route collection registration
+
+`ICollection<RouteRecord>` extension members support `routes.Add("/", "HomePage", "Home")` and `routes.Add<HomePage>("/", "Home")` ([RTR-31]). They return the added eager record, default its route name to the registered component name, and copy metadata before applying a nonnull title. Optional children, arguments resolver, and explicit route name preserve the ordinary RouteRecord model.

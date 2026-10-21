@@ -392,6 +392,21 @@ public sealed class ComponentLifecycle : IDisposable
         }
     }
 
+    /// <summary>
+    /// Observes an already-started asynchronous operation as work owned by this component. Faults use
+    /// the mounted component's error channel and teardown drains pending work. Component-lifetime
+    /// cancellation is suppressed. Specified by <c>[CMP-23]</c> and <c>[SFC-CG-12]</c>.
+    /// </summary>
+    /// <param name="task">The operation to observe.</param>
+    /// <param name="diagnosticInformation">The operation description passed to error handlers.</param>
+    public void ObserveTask(Task task, string diagnosticInformation)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentException.ThrowIfNullOrEmpty(diagnosticInformation);
+        Observe(task, diagnosticInformation);
+    }
+
     private void Observe(Task? task, string diagnosticInformation)
     {
         Action<Exception, string>? faultHandler = _observedTaskFaultHandler;

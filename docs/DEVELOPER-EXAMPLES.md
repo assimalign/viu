@@ -800,6 +800,41 @@ For Pinia-shaped member APIs, State also provides `StateStore<TState>` with type
 `Patch`, `Reset`, `Subscribe`, and `OnAction` support over a source-generated
 `IReactiveObject`. Setup-style stores remain the smaller default.
 
+## Generated components, routes, and hosting
+
+Generated `.viu` and `.vue` template components implement `IComponentDefinition`. Browser applications
+normally need only a typed root; their compiler-generated aggregate includes catalogs marked on
+referenced assemblies ([CMP-35], [CMP-36]):
+
+```csharp
+await new BrowserApplicationBuilder()
+    .ConfigureApplication(options => options.RootComponent = ComponentNode.For<App>())
+    .Build()
+    .RunAsync();
+
+ICollection<RouteRecord> routes = new List<RouteRecord>();
+routes.Add("/", "HomePage", "Home");
+routes.Add<AboutPage>("/about", "About");
+
+ComponentFactory components = new();
+components.RegisterGeneratedComponents();
+ServerRenderRegistry serverRenders = new();
+serverRenders.RegisterGeneratedRenders();
+```
+
+The route helpers copy metadata, default the route name to the registered component name, and place
+the optional title in `meta["title"]` ([RTR-31]). Root and route handles never instantiate a component.
+Expose a library component through an authored `public partial class` declaration when another assembly
+needs its typed handle. To override the default file-derived registration name, declare one constant
+in `@script`, for example `public const string RegisteredName = "Acme.Home";`. Duplicate registration
+names produce located diagnostics. An explicit `ApplicationOptions.Components` factory takes precedence
+over automatic population. `ViuAutoRegisterGeneratedCatalogs=false` keeps explicit catalogs available
+while disabling automatic module initialization.
+
+Host SDKs can query `GetViuBrowserClientInfo` through a normal `ProjectReference`; the target returns
+project identity, assembly and output paths, and static-web-assets manifest paths ([PKG-HOST-1]).
+See [the SDK contract](../sdks/README.md). No runtime reflection or assembly scanning is used.
+
 ## 7. Boundaries to remember
 
 - Components owns the virtual-node and authored-component vocabulary and depends only on

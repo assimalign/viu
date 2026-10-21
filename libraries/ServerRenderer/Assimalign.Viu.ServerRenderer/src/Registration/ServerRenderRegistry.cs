@@ -22,6 +22,30 @@ public sealed class ServerRenderRegistry : IServerRenderRegistry
     private readonly object _synchronization = new();
     private Dictionary<ComponentReference, ServerRenderRegistration>? _registrations = [];
     private FrozenDictionary<ComponentReference, ServerRenderRegistration>? _frozenRegistrations;
+    private readonly HashSet<string> _generatedCatalogs = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Registers available generated catalogs once per assembly identity, in ordinal order. Call before
+    /// freezing; distinct catalogs with conflicting component identities throw. Specified by <c>[CMP-36]</c>.
+    /// </summary>
+    public void RegisterGeneratedRenders() => GeneratedServerRenderCatalogs.Apply(this);
+
+    internal void RegisterGeneratedCatalog(string identity, Action<ServerRenderRegistry> register)
+    {
+        lock (_synchronization)
+        {
+            if (_registrations is null)
+            {
+                throw new InvalidOperationException("The server render registry is frozen.");
+            }
+            if (_generatedCatalogs.Contains(identity))
+            {
+                return;
+            }
+            register(this);
+            _generatedCatalogs.Add(identity);
+        }
+    }
 
     /// <summary>
     /// Registers one compiler-produced server render, throwing when frozen or on a duplicate

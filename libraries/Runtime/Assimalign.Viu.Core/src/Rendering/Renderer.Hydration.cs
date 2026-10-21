@@ -1248,15 +1248,20 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        if (binding.Value is null or bool)
+        string name = binding.Name.ToString();
+        if (binding.Value is null
+            || (binding.Value is bool && !name.StartsWith("aria-", StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
-        string name = binding.Name.ToString();
-        string expected = binding.Value is IFormattable formattable
-            ? formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty
-            : binding.Value.ToString() ?? string.Empty;
+        // [RND-ARIA-1] ARIA booleans are enumerated tokens, not presence attributes.
+        string expected = binding.Value switch
+        {
+            bool boolean => boolean ? "true" : "false",
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
+            _ => binding.Value.ToString() ?? string.Empty,
+        };
         string? actual = reader.Attribute(node, name);
         bool equivalent = string.Equals(
             binding.Name.LocalName,

@@ -68,3 +68,5 @@ Assimalign.Viu.DevTools.Client.WebSocketDevToolsClientTransport.StartAsync(Syste
 Assimalign.Viu.DevTools.Client.WebSocketDevToolsClientTransport.WebSocketDevToolsClientTransport(System.Uri! endpoint) -> void
 static Assimalign.Viu.DevTools.Client.GeneratedViuComponents.Register(Assimalign.Viu.Components.ComponentFactory! factory) -> void
 static Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport.CreateAsync(string! targetOrigin, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.DevTools.Client.PostMessageDevToolsClientTransport!>
+Assimalign.Viu.DevTools.Client.GeneratedViuComponents_a77517a3d476d892
+static Assimalign.Viu.DevTools.Client.GeneratedViuComponents_a77517a3d476d892.Register(Assimalign.Viu.Components.ComponentFactory! factory) -> void

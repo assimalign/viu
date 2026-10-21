@@ -64,9 +64,9 @@ public static class SingleFileComponentDiagnostics
         HelpLink: HelpLink("VIU1004"));
 
     /// <summary>
-    /// Generated types still collide with a type or namespace after the selective namespace rule.
-    /// Reported at the source file so authors can rename it before C# emission. Specified by
-    /// <c>[SFC-CG-10]</c> and <c>[SFC-DIAG-4]</c>.
+    /// Generated type identities or registered names conflict, or a RegisteredName override is invalid.
+    /// Reported at the source file so authors can correct the identity before registration. Specified by
+    /// <c>[SFC-CG-10]</c>, <c>[SFC-DIAG-4]</c>, and <c>[CMP-35]</c>.
     /// </summary>
     public static readonly SingleFileComponentDiagnosticDescriptor ConflictingComponentIdentity = new(
         Id: "VIU1005",

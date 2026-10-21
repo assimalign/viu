@@ -456,3 +456,20 @@ Each is deliberate, forced by the no-dynamic-codegen rule or the immutable-AST m
 - Stringification of `v-for`/`v-if` body runs, and of runs interleaved with `TextCall` text (see above).
 - Constant-expression evaluation for stringifying constant interpolations / `:bind="1"` (needs an evaluator
   Viu deliberately does not have).
+
+## Merged text and typed write-back
+
+Slot closures execute under the outlet component's render effect after the declaring frame has
+closed its render blocks. A single-element slot root therefore opens and closes its own block;
+multiple siblings use a stable fragment block. The declaring mount still owns caches and handlers,
+and the outlet tracks the returned boundary. This keeps positive flags on a form or other wrapper
+from hiding nested model-dependent bindings, and contains conditional branch keys within their
+fixed slot positions ([CMP-37]).
+
+The generated slot closure resets incomplete block assembly in its declaring frame if content
+throws. The invoking component's ordinary render recovery owns a different frame, so relying on
+that recovery alone would leave the slot's frame unbalanced for later invocations.
+
+The single-text-child fast path can leave a CompoundExpressionNode in mutable working children. Freezing wraps it as a TextCallNode rather than casting it to TemplateChildNode, so server and client profiles retain the same text semantics ([SFC-CG-11]).
+
+Model assignment uses generated overloads whose target-typed second argument preserves C# overload resolution for string, boolean, numeric, nullable, and object targets without runtime type discovery. Static receiver and method delegate metadata arrive from the shared script projection. Runtime errors from Task-returning component events use the component lifecycle observer ([SFC-CG-12]).

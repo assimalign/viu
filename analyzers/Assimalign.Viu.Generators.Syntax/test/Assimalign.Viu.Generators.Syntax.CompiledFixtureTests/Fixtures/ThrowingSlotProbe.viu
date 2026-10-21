@@ -1,0 +1,13 @@
+<template>
+    <Card title="Throwing slot">
+        <form><button>{{ Content }}</button></form>
+    </Card>
+</template>
+
+@script {
+    using System;
+
+    public bool MustThrow = false;
+
+    public string Content => MustThrow ? throw new InvalidOperationException("slot failure") : "recovered";
+}

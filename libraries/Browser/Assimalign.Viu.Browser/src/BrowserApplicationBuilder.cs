@@ -12,16 +12,20 @@ namespace Assimalign.Viu.Browser;
 /// <remarks>
 /// The builder does not construct a dependency-injection container. The resulting application
 /// borrows every supplied resolver. Specified by <c>[APP-2]</c>.
+/// When Components is unset, Build creates a factory and registers generated catalogs; an explicitly
+/// supplied factory takes precedence and is never supplemented. Specified by <c>[CMP-36]</c>.
 /// </remarks>
 [SupportedOSPlatform("browser")]
 public sealed class BrowserApplicationBuilder : IApplicationBuilder
 {
-    private readonly ApplicationOptions _options = new();
+    private readonly ApplicationOptions _options;
+    private readonly ComponentFactory _generatedComponents = new();
     private readonly BrowserApplicationOptions _browserOptions = new();
 
     /// <summary>Creates a command-buffered browser application builder targeting <c>#app</c>.</summary>
     public BrowserApplicationBuilder()
     {
+        _options = new ApplicationOptions { Components = _generatedComponents };
     }
 
     /// <summary>Configures composition and diagnostics that are frozen by each build.</summary>
@@ -55,9 +59,11 @@ public sealed class BrowserApplicationBuilder : IApplicationBuilder
         VirtualNode rootComponent = _options.RootComponent
             ?? throw new InvalidOperationException(
                 "Configure ApplicationOptions.RootComponent before building the application.");
-        IComponentFactory components = _options.Components
-            ?? throw new InvalidOperationException(
-                "Configure ApplicationOptions.Components with a component resolver.");
+        IComponentFactory components = _options.Components ?? _generatedComponents;
+        if (ReferenceEquals(components, _generatedComponents))
+        {
+            _generatedComponents.RegisterGeneratedComponents();
+        }
         var applicationOptions = new ApplicationOptions
         {
             RootComponent = rootComponent,

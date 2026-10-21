@@ -13,6 +13,20 @@ namespace Assimalign.Viu.Components.Tests;
 public sealed class ComponentLifecycleTests
 {
     [Fact]
+    public async Task ObserveTask_ComponentEventFault_RoutesAndDrainsWithTheOwningLifecycle()
+    {
+        // [SFC-CG-12], [CMP-23] Async event failures must not escape through async void.
+        using ComponentLifecycle lifecycle = new();
+        List<string> errors = [];
+        lifecycle.SetObservedTaskFaultHandler((error, source) => errors.Add(source + ":" + error.Message));
+        TaskCompletionSource completion = new();
+        lifecycle.ObserveTask(completion.Task, "component event listener");
+        completion.SetException(new InvalidOperationException("failed"));
+        await lifecycle.DrainAsync();
+        errors.ShouldBe(["component event listener:failed"]);
+    }
+
+    [Fact]
     public void InvokeEveryOrdinaryPhase_SynchronousCallbacksRunInPhaseOrder()
     {
         // The named phase surface and per-phase registration order are fixed by [CMP-20].
