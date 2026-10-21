@@ -534,6 +534,7 @@ elseif ($PackagedVuePublish) {
 else {
     @(
         'EndToEndBrowserApp',
+        'EndToEndBrowserComponents',
         'EndToEndCustomElementApp',
         'EndToEndHydrationApp',
         'EndToEndHydrationShared',

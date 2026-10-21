@@ -1,0 +1,4 @@
+<template>
+    <header>Standalone slot regression</header>
+    <RouterView />
+</template>

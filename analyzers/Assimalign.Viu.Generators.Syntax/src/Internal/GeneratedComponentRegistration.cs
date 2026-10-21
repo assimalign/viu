@@ -12,4 +12,7 @@ internal readonly record struct GeneratedComponentRegistration(
     string? Namespace,
     string ClassName,
     string FilePath,
-    bool HasServerRender);
+    bool HasServerRender)
+{
+    internal string RegisteredName { get; init; } = ClassName.TrimStart('@');
+}

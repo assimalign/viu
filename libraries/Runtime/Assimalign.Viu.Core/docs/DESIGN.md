@@ -28,6 +28,10 @@ diff. Absent optimization data always falls back to the correct generic path
 (`[RND-BLOCK-1]` through `[RND-BLOCK-7]`, `[RND-FLAGS-1]` through `[RND-FLAGS-6]`). Keyed children
 preserve retained identities and minimize moves while enforcing the key contract (`[RND-KEY-1]`
 through `[RND-KEY-6]`).
+Stable fragments retain positional reconciliation if their block fast path cannot run, including
+when a conditional changes the dynamic-child count. Branch keys select replacement at a fixed
+position without classifying fixed keyless siblings as a mixed keyed collection (`[RND-KEY-1]`,
+`[RND-PATCH-2]`). Generic and keyed collections retain their key diagnostics.
 
 `RendererOptions<TNode>` is the entire host contract. Required operations create, place, remove,
 navigate, and patch host nodes; optional operations expose teleport targets, commit batching, static
@@ -182,3 +186,9 @@ Core does not own authored node vocabulary, host namespace and binding policy, b
 server HTML rules, router behavior, dependency disposal, automatic dependency-injection scopes, or
 compiler parsing and lowering. A host consumes public renderer and application seams; it is not a
 compile-time friend of Core.
+
+## Enumerated boolean hydration
+
+The generic boolean presence-attribute skip does not apply to `aria-*`. Those bindings participate in
+ordinary string-token comparison so hydration validates the same values emitted by both hosts.
+The existing non-destructive attribute-mismatch policy remains in force ([RND-ARIA-1]).

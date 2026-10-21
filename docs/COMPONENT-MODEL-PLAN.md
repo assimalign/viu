@@ -582,6 +582,16 @@ control.
 
 ### 9.2 Code-first components — `ComponentRegistration.Define`
 
+**Generated definition and catalog refinement ([CMP-35], [CMP-36]).** Generated components also
+implement `IComponentDefinition` for `ComponentNode.For<TComponent>()`. The interface's static
+registration and assembly catalog attributes carry identity across assemblies; they belong to the
+public tier. Compile-time reference discovery emits direct catalog delegates into module initialization.
+`GeneratedComponentCatalogs` and `GeneratedServerRenderCatalogs` own shared registry state, so neither
+can be consumer-internal glue. Method-group casts and typed model conversion remain consumer-internal
+glue. Typed handler adaptation discards synchronous results while preserving Task and Task<T> completion.
+Task-returning component listeners give their work to `ComponentLifecycle.ObserveTask`, preserving
+component error routing and teardown. No name-bound runtime discovery API is introduced.
+
 The class-based path (`RouterView`-style: implement the authored contract, register it) already
 exists and stays. The addition is the delegate flavor:
 

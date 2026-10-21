@@ -34,6 +34,47 @@ does not require `wasm-tools`.
 
 ## Browser WebAssembly application
 
+Generated component catalogs aggregate at compile time across referenced assemblies ([CMP-36]).
+Executable compilations enable module initialization by default, including host projects using another
+SDK when the Viu generator is in their compilation. A library can opt in with
+`ViuAutoRegisterGeneratedCatalogs=true`; any project can opt out with `false`, retaining the explicit
+`GeneratedViuComponents.Register` and `GeneratedViuServerRenders.Register` entry points. Browser builders
+populate generated components when `ApplicationOptions.Components` is unset; supplying a factory takes
+precedence. Hosts call `ComponentFactory.RegisterGeneratedComponents()` and
+`ServerRenderRegistry.RegisterGeneratedRenders()` without generated type aliases. Full assembly identity
+deduplicates catalogs across reference paths; different catalogs with conflicting registered names throw.
+Hot reload keeps existing registration objects and updates generated render methods.
+Metadata-only executable test hosts can set `ViuAutoRegisterGeneratedCatalogs=false` to avoid rooting
+runtime catalogs; the component-library template's metadata tests use this opt-out.
+
+Base-SDK component styles flow through either PackageReference or ProjectReference. The Browser SDK
+queries each built project reference's `GetViuComponentLibraryStyles` target, includes transitive styles,
+and copies CSS to `wwwroot/_content/<PackageId>/<PackageId>.viu.css`. It strips foreign MSBuild output
+metadata from Content items so compression reads CSS. Both Build and Publish inject library stylesheet
+links in ordinal order before the application bundle, preserving the application's final cascade
+position and avoiding duplicate authored links ([PKG-STYLE-1]).
+
+### Browser client identity for host SDKs
+
+`GetViuBrowserClientInfo` is a public read-only target ([PKG-HOST-1]). Call it via MSBuild's `Projects`
+parameter with the host's ordinary ProjectReference items. It returns one item with the absolute client
+project path as identity and these metadata:
+
+| Metadata | Meaning |
+| --- | --- |
+| IsViuBrowserApplication | `true` for this SDK |
+| AssemblyName | Managed assembly name |
+| TargetFramework | Selected target framework |
+| TargetPath | Absolute managed assembly path |
+| OutputDirectory | Absolute target directory |
+| StaticWebAssetsRuntimeManifestPath | Runtime manifest in the target directory |
+| StaticWebAssetsEndpointsManifestPath | Endpoints manifest in the target directory |
+
+The target computes paths without building or guaranteeing file existence. Build the client first when
+the host requires artifacts. For multi-target projects, supply TargetFramework explicitly. The target
+is absent from base-SDK component libraries; hosts may use SkipNonexistentTargets when querying a mixed
+reference set. Host-specific ProjectReference metadata remains the host SDK's concern.
+
 A browser application uses the Browser SDK directly; using the bare base SDK is not an application
 compatibility path:
 
@@ -135,14 +176,15 @@ Set one project-level property when the assembly must expose compiler-produced s
 The property works with the base SDK and with the derived Browser SDK. The SDK adds the exact-version
 ordinary `Assimalign.Viu.ServerRenderer` package and the generator emits both the normal client
 virtual-node body and the direct server-markup body. It also emits the reflection-free assembly
-catalog `GeneratedViuServerRenders`. A host composes the two generated catalogs explicitly:
+catalog `GeneratedViuServerRenders`. An executable host with aggregation enabled populates both
+application-owned registries without assembly-specific catalog names:
 
 ```csharp
 ComponentFactory components = new();
-GeneratedViuComponents.Register(components);
+components.RegisterGeneratedComponents();
 
 ServerRenderRegistry serverRenders = new();
-GeneratedViuServerRenders.Register(serverRenders);
+serverRenders.RegisterGeneratedRenders();
 
 ServerRenderAdaptor<RequestContext> adaptor = new(requestScopeFactory, serverRenders);
 ```

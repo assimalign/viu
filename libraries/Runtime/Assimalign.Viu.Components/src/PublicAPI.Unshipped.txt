@@ -1,4 +1,5 @@
 #nullable enable
+Assimalign.Viu.Components.ComponentLifecycle.ObserveTask(System.Threading.Tasks.Task! task, string! diagnosticInformation) -> void
 *REMOVED*Assimalign.Viu.Components.ComponentInvocation.ComponentInvocation(System.Collections.Generic.IReadOnlyDictionary<string!, object?>? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, Assimalign.Viu.Components.SlotFlags slotStability = Assimalign.Viu.Components.SlotFlags.Stable) -> void
 *REMOVED*Assimalign.Viu.Components.ComponentInvocation.SlotStability.get -> Assimalign.Viu.Components.SlotFlags
 *REMOVED*Assimalign.Viu.Components.PatchFlags.DevRootFragment = 2048 -> Assimalign.Viu.Components.PatchFlags
@@ -48,3 +49,15 @@ Assimalign.Viu.Components.IComponentInspectionStateProvider.GetInspectionState()
 Assimalign.Viu.Components.ComponentRenderCacheSizeProvider
 Assimalign.Viu.Components.ComponentContract.ComponentContract(string? displayName, Assimalign.Viu.Components.ComponentRenderCacheSizeProvider! renderCacheSizeProvider, Assimalign.Viu.Components.ComponentFlags flags = Assimalign.Viu.Components.ComponentFlags.InheritFallthroughBindings, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentParameter!>? parameters = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentEvent!>? events = null) -> void
 virtual Assimalign.Viu.Components.ComponentRenderCacheSizeProvider.Invoke() -> int
+Assimalign.Viu.Components.IComponentDefinition
+Assimalign.Viu.Components.ComponentCatalogAttribute
+Assimalign.Viu.Components.GeneratedComponentCatalogs
+Assimalign.Viu.Components.ComponentMetadataAttribute
+static Assimalign.Viu.Components.ComponentNode.For<TComponent>(Assimalign.Viu.Components.ComponentInvocation? invocation = null, object? key = null) -> Assimalign.Viu.Components.ComponentNode!
+static Assimalign.Viu.Components.GeneratedComponentCatalogs.Register(string! identity, System.Action<Assimalign.Viu.Components.ComponentFactory!>! register) -> void
+Assimalign.Viu.Components.ComponentMetadataAttribute.ComponentMetadataAttribute(string! name) -> void
+Assimalign.Viu.Components.ComponentMetadataAttribute.Name.get -> string!
+Assimalign.Viu.Components.ComponentFactory.RegisterGeneratedComponents() -> void
+Assimalign.Viu.Components.ComponentCatalogAttribute.ComponentCatalogAttribute(System.Type! catalogType) -> void
+Assimalign.Viu.Components.ComponentCatalogAttribute.CatalogType.get -> System.Type!
+Assimalign.Viu.Components.IComponentDefinition.Registration.get -> Assimalign.Viu.Components.ComponentRegistration!

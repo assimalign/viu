@@ -16,6 +16,8 @@
                                       Expression="#[.{fingerprint}]!" />
   </ItemGroup>
   <ItemGroup>
+    <!-- External consumer: exercise a base-SDK component library exactly as the showcase does. -->
+    <ProjectReference Include="../EndToEndBrowserComponents/EndToEndBrowserComponents.csproj" />
     <!-- External-consumer references are deliberately package-based. [V01.01.11.03], #87. -->
     <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Browser.Router" Version="$(ViuConsumerVersion)" />

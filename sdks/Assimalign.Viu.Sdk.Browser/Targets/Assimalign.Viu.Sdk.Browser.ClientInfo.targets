@@ -1,0 +1,16 @@
+<Project>
+    <!-- [PKG-HOST-1] Read-only identity query; call Build first when artifacts must exist. -->
+    <Target Name="GetViuBrowserClientInfo" DependsOnTargets="GetTargetPath" Returns="@(_ViuBrowserClientInfo)">
+        <ItemGroup>
+            <_ViuBrowserClientInfo Include="$(MSBuildProjectFullPath)" KeepMetadata="">
+                <IsViuBrowserApplication>true</IsViuBrowserApplication>
+                <AssemblyName>$(AssemblyName)</AssemblyName>
+                <TargetFramework>$(TargetFramework)</TargetFramework>
+                <TargetPath>$(TargetPath)</TargetPath>
+                <OutputDirectory>$(TargetDir)</OutputDirectory>
+                <StaticWebAssetsRuntimeManifestPath>$(TargetDir)$(AssemblyName).staticwebassets.runtime.json</StaticWebAssetsRuntimeManifestPath>
+                <StaticWebAssetsEndpointsManifestPath>$(TargetDir)$(AssemblyName).staticwebassets.endpoints.json</StaticWebAssetsEndpointsManifestPath>
+            </_ViuBrowserClientInfo>
+        </ItemGroup>
+    </Target>
+</Project>

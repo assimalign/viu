@@ -13,7 +13,7 @@ using Assimalign.Viu.ServerRenderer;
 using ViuApplication;
 
 ServerRenderRegistry serverRenders = new();
-GeneratedViuServerRenders.Register(serverRenders);
+serverRenders.RegisterGeneratedRenders();
 ServerRenderAdaptor<HttpContext> renderer = new(
     new RequestScopeFactory(),
     serverRenders);
@@ -39,7 +39,7 @@ static async Task<string> RenderDocumentAsync(
     HttpContext context)
 {
     TextBufferOutput output = new();
-    ComponentNode root = new(ComponentReference.ForName("Counter"));
+    ComponentNode root = ComponentNode.For<Counter>();
     ServerRenderResult result = await renderer.RenderAsync(
         new ServerRenderRequest<HttpContext>(root, context),
         output,
@@ -75,7 +75,7 @@ internal sealed class RequestScopeFactory :
     {
         cancellationToken.ThrowIfCancellationRequested();
         ComponentFactory components = new();
-        GeneratedViuComponents.Register(components);
+        components.RegisterGeneratedComponents();
         return ValueTask.FromResult<IServerRenderRequestScope>(
             new RequestScope(
                 new ServerRenderApplication(request.RootComponent, components),

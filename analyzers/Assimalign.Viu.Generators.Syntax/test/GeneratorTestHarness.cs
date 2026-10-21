@@ -85,7 +85,8 @@ internal static class GeneratorTestHarness
         string? projectDirectory,
         string? configuration = null,
         string? emitHotReloadMetadata = null,
-        string? serverRendering = null)
+        string? serverRendering = null,
+        string? autoRegisterGeneratedCatalogs = "true")
     {
         var globalOptions = new Dictionary<string, string>(StringComparer.Ordinal);
         if (rootNamespace is not null)
@@ -107,6 +108,10 @@ internal static class GeneratorTestHarness
         if (serverRendering is not null)
         {
             globalOptions["build_property.ViuServerRendering"] = serverRendering;
+        }
+        if (autoRegisterGeneratedCatalogs is not null)
+        {
+            globalOptions["build_property.ViuAutoRegisterGeneratedCatalogs"] = autoRegisterGeneratedCatalogs;
         }
 
         return CSharpGeneratorDriver.Create(

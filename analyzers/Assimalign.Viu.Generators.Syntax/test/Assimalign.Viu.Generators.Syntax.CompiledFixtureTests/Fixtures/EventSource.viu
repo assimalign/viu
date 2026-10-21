@@ -1,0 +1,8 @@
+<template><button @click="Raise">raise typed events</button></template>
+
+@script {
+    using Assimalign.Viu.Components;
+    [Event] public partial void Changed(int count);
+    [Event] public partial void Finished(int count);
+    private void Raise() { Changed(7); Finished(9); }
+}

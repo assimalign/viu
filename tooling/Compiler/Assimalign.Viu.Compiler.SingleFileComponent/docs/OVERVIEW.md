@@ -60,3 +60,9 @@ types remain internal, and only the projection core's own tests receive friend a
 - Conformance is pinned by test: `SingleFileComponentProjectionConformanceTests`
   (`analyzers/Assimalign.Viu.Generators.Syntax/test`) holds the generator host and this facade
   ordinal-identical on generated source, hint names, and diagnostics.
+
+## Typed bindings and generated identity
+
+Script binding metadata records static receivers and declared method delegate types. Template reads qualify static members with their declaring type, and method-group listeners carry explicit delegate casts. Model setter glue infers the declared assignment type and converts supported scalars with invariant culture ([SFC-6], [SFC-CG-12]).
+
+Generated definitions implement IComponentDefinition and carry ComponentMetadataAttribute. A string literal constant named RegisteredName overrides the registration name without changing the generated C# identity; conflicting names produce located diagnostics ([CMP-35]). Assembly catalogs carry metadata for compile-time aggregation ([CMP-36]).

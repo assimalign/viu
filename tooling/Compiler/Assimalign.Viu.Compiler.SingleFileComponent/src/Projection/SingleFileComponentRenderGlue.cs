@@ -32,6 +32,28 @@ public static class SingleFileComponentRenderGlue
             [global::System.CodeDom.Compiler.GeneratedCode("Assimalign.Viu.Generators.Syntax", "1.0.0.0")]
             internal static class RenderGlue
             {
+                internal static global::System.Action AdaptHandler(global::System.Action handler) => handler;
+
+                internal static global::System.Action<TEvent> AdaptHandler<TEvent>(global::System.Action<TEvent> handler) => handler;
+
+                internal static global::System.Func<global::System.Threading.Tasks.Task> AdaptHandler(
+                    global::System.Func<global::System.Threading.Tasks.Task> handler) => handler;
+
+                internal static global::System.Func<TEvent, global::System.Threading.Tasks.Task> AdaptHandler<TEvent>(
+                    global::System.Func<TEvent, global::System.Threading.Tasks.Task> handler) => handler;
+
+                internal static global::System.Func<global::System.Threading.Tasks.Task> AdaptHandler<TResult>(
+                    global::System.Func<global::System.Threading.Tasks.Task<TResult>> handler) => handler;
+
+                internal static global::System.Func<TEvent, global::System.Threading.Tasks.Task> AdaptHandler<TEvent, TResult>(
+                    global::System.Func<TEvent, global::System.Threading.Tasks.Task<TResult>> handler) => handler;
+
+                internal static global::System.Action AdaptHandler<TResult>(global::System.Func<TResult> handler)
+                    => () => { handler(); };
+
+                internal static global::System.Action<TEvent> AdaptHandler<TEvent, TResult>(global::System.Func<TEvent, TResult> handler)
+                    => value => { handler(value); };
+
                 internal static global::System.Action Handler(global::System.Action handler)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
@@ -86,17 +108,17 @@ public static class SingleFileComponentRenderGlue
                     return handler;
                 }
 
-                internal static global::System.Func<object?, global::System.Threading.Tasks.Task> Handler<TEvent>(
+                internal static global::System.Func<TEvent, global::System.Threading.Tasks.Task> Handler<TEvent>(
                     global::System.Func<TEvent, global::System.Threading.Tasks.Task> handler)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
-                    return value => handler((TEvent)value!);
+                    return handler;
                 }
 
-                internal static global::System.Action<object?> Handler<TEvent>(global::System.Action<TEvent> handler)
+                internal static global::System.Action<TEvent> Handler<TEvent>(global::System.Action<TEvent> handler)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
-                    return value => handler((TEvent)value!);
+                    return handler;
                 }
 
                 internal static global::System.Delegate Handler(global::System.Delegate handler)
@@ -136,39 +158,130 @@ public static class SingleFileComponentRenderGlue
                 }
 
                 internal static global::Assimalign.Viu.Components.ComponentEventListener ComponentListener(
-                    global::System.Action handler)
+                    global::System.Action handler, global::Assimalign.Viu.Components.ComponentLifecycle lifecycle)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
                     return arguments => handler();
                 }
 
                 internal static global::Assimalign.Viu.Components.ComponentEventListener ComponentListener(
-                    global::System.Action<object?> handler)
+                    global::System.Action<object?> handler, global::Assimalign.Viu.Components.ComponentLifecycle lifecycle)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
                     return arguments => handler(FirstArgument(arguments));
                 }
 
                 internal static global::Assimalign.Viu.Components.ComponentEventListener ComponentListener(
-                    global::System.Func<object?> handler)
+                    global::System.Func<object?> handler, global::Assimalign.Viu.Components.ComponentLifecycle lifecycle)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
                     return arguments => handler();
                 }
 
                 internal static global::Assimalign.Viu.Components.ComponentEventListener ComponentListener(
-                    global::System.Func<object?, object?> handler)
+                    global::System.Func<object?, object?> handler, global::Assimalign.Viu.Components.ComponentLifecycle lifecycle)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
                     return arguments => handler(FirstArgument(arguments));
                 }
 
                 internal static global::Assimalign.Viu.Components.ComponentEventListener ComponentListener<TEvent>(
-                    global::System.Action<TEvent> handler)
+                    global::System.Action<TEvent> handler, global::Assimalign.Viu.Components.ComponentLifecycle lifecycle)
                 {
                     global::System.ArgumentNullException.ThrowIfNull(handler);
                     return arguments => handler((TEvent)FirstArgument(arguments)!);
                 }
+
+                internal static global::Assimalign.Viu.Components.ComponentEventListener ComponentListener(
+                    global::System.Func<global::System.Threading.Tasks.Task> handler,
+                    global::Assimalign.Viu.Components.ComponentLifecycle lifecycle)
+                    => arguments => lifecycle.ObserveTask(handler(), "component event listener");
+
+                internal static global::Assimalign.Viu.Components.ComponentEventListener ComponentListener<TEvent>(
+                    global::System.Func<TEvent, global::System.Threading.Tasks.Task> handler,
+                    global::Assimalign.Viu.Components.ComponentLifecycle lifecycle)
+                    => arguments => lifecycle.ObserveTask(handler((TEvent)FirstArgument(arguments)!), "component event listener");
+
+                // The second argument supplies the assignment type without reflection. Known script
+                // declarations use default(T), avoiding an additional target getter read. Overloads convert scalars;
+                // the generic fallback preserves object and explicitly typed component payloads.
+                internal static TValue ModelValue<TValue>(object? value, TValue current)
+                    => (TValue)value!;
+
+                internal static string ModelValue(object? value, string? current)
+                    => global::System.Convert.ToString(value, global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+
+                internal static bool ModelValue(object? value, bool current)
+                    => global::System.Convert.ToBoolean(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static bool? ModelValue(object? value, bool? current)
+                    => value is null or "" ? null : global::System.Convert.ToBoolean(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static byte ModelValue(object? value, byte current)
+                    => global::System.Convert.ToByte(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static byte? ModelValue(object? value, byte? current)
+                    => value is null or "" ? null : global::System.Convert.ToByte(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static sbyte ModelValue(object? value, sbyte current)
+                    => global::System.Convert.ToSByte(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static sbyte? ModelValue(object? value, sbyte? current)
+                    => value is null or "" ? null : global::System.Convert.ToSByte(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static short ModelValue(object? value, short current)
+                    => global::System.Convert.ToInt16(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static short? ModelValue(object? value, short? current)
+                    => value is null or "" ? null : global::System.Convert.ToInt16(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static ushort ModelValue(object? value, ushort current)
+                    => global::System.Convert.ToUInt16(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static ushort? ModelValue(object? value, ushort? current)
+                    => value is null or "" ? null : global::System.Convert.ToUInt16(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static int ModelValue(object? value, int current)
+                    => global::System.Convert.ToInt32(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static int? ModelValue(object? value, int? current)
+                    => value is null or "" ? null : global::System.Convert.ToInt32(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static uint ModelValue(object? value, uint current)
+                    => global::System.Convert.ToUInt32(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static uint? ModelValue(object? value, uint? current)
+                    => value is null or "" ? null : global::System.Convert.ToUInt32(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static long ModelValue(object? value, long current)
+                    => global::System.Convert.ToInt64(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static long? ModelValue(object? value, long? current)
+                    => value is null or "" ? null : global::System.Convert.ToInt64(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static ulong ModelValue(object? value, ulong current)
+                    => global::System.Convert.ToUInt64(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static ulong? ModelValue(object? value, ulong? current)
+                    => value is null or "" ? null : global::System.Convert.ToUInt64(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static float ModelValue(object? value, float current)
+                    => global::System.Convert.ToSingle(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static float? ModelValue(object? value, float? current)
+                    => value is null or "" ? null : global::System.Convert.ToSingle(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static double ModelValue(object? value, double current)
+                    => global::System.Convert.ToDouble(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static double? ModelValue(object? value, double? current)
+                    => value is null or "" ? null : global::System.Convert.ToDouble(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static decimal ModelValue(object? value, decimal current)
+                    => global::System.Convert.ToDecimal(value, global::System.Globalization.CultureInfo.InvariantCulture);
+
+                internal static decimal? ModelValue(object? value, decimal? current)
+                    => value is null or "" ? null : global::System.Convert.ToDecimal(value, global::System.Globalization.CultureInfo.InvariantCulture);
 
                 internal static void OnBeforeMount(
                     global::Assimalign.Viu.Components.ComponentContext context,

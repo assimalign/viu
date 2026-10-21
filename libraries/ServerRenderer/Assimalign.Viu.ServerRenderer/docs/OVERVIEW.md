@@ -124,3 +124,9 @@ from `IApplicationContext`. The low-level renderer never disposes them; the host
 only the request scope explicitly returned by the downstream factory. The test project includes a
 BCL-only loopback HTTP smoke host, proving that neither the contract nor its execution requires
 ASP.NET Core or Kestrel.
+
+## Generated server catalogs
+
+`ServerRenderRegistry.RegisterGeneratedRenders()` applies compiler-published catalogs before Freeze, without generated type aliases ([CMP-36]). Catalog publication and registry population are synchronized. Repeated aggregate paths apply each full assembly identity once per registry; conflicting component identities remain errors.
+
+Compound interpolation text emits the same escaped HTML as virtual-tree traversal ([SFC-CG-11]). ARIA boolean bindings serialize as lowercase enumerated tokens, including `false`, matching Browser rendering and hydration ([RND-ARIA-1]).

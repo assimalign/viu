@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -28,6 +29,309 @@ namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 /// </summary>
 public sealed class GeneratedComponentFixtureTests
 {
+    [Theory]
+    [InlineData("SlotConditionalProbe")]
+    [InlineData("RootConditionalProbe")]
+    public void ConditionalSibling_ComponentModelToggles_DoNotWarnOrRemountFixedSibling(string componentName)
+    {
+        // PR #379 follow-up, [CMP-37], [RND-KEY-1]: identical fixed sibling positions
+        // in a lazy slot and a component root retain compiler-generated branch identity.
+        List<string> warnings = [];
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentNode root = new(ComponentReference.ForName(componentName));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container,
+            CreateApplication(root, CreateFactory(fixtures), warningHandler: warnings.Add));
+        host.RunScheduledFlushes();
+        CompiledFixtureNode button = host.FindElements("button").Single();
+        CompiledFixtureNode fixedSibling = button.Parent!;
+        object toggle = FindInstance(renderer, host, "ConditionalToggle");
+        int toggleUpdates = 0;
+        renderer.GetMountedComponentViews(host.Container).Single(view => ReferenceEquals(view.Instance, toggle))
+            .Context.Lifecycle.OnUpdated(() => toggleUpdates++);
+
+        for (int click = 0; click < 6; click++)
+        {
+            host.FindElements("p").Count.ShouldBe(click % 2 == 0 ? 1 : 0);
+            InvokeHostListener(button.Bindings.Values.OfType<Delegate>().Single());
+            host.RunScheduledFlushes();
+            host.FindElements("p").Count.ShouldBe(click % 2 == 0 ? 0 : 1);
+            button.Bindings["aria-checked"].ShouldBe(click % 2 != 0);
+            host.FindElements("button").Single().ShouldBeSameAs(button);
+            button.Parent.ShouldBeSameAs(fixedSibling);
+            FindInstance(renderer, host, "ConditionalToggle").ShouldBeSameAs(toggle);
+            toggleUpdates.ShouldBe(click + 1);
+            warnings.ShouldBeEmpty();
+        }
+
+        host.MoveCount.ShouldBe(0);
+        renderer.Render(null, host.Container);
+        host.Container.Children.ShouldBeEmpty();
+        warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Slot_ThrowingContentResetsDeclaringFrameAndCanRenderAgain()
+    {
+        // [CMP-37]: the outlet and declaring component use different frames. A failed
+        // lazy slot must leave no incomplete block in the declaring mount's frame.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentNode root = new(ComponentReference.ForName("ThrowingSlotProbe"));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container, CreateApplication(root, CreateFactory(fixtures)));
+        host.RunScheduledFlushes();
+        object instance = FindInstance(renderer, host, "ThrowingSlotProbe");
+        ComponentRenderFrame frame = new(64);
+        ComponentNode invocation = (ComponentNode)instance.GetType()
+            .GetMethod("__ViuRender", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [instance, frame])!;
+        ComponentSlot slot = invocation.Invocation.Slots["default"];
+        Dictionary<string, object?> arguments = [];
+        instance.GetType().GetField("MustThrow")!.SetValue(instance, true);
+
+        Should.Throw<InvalidOperationException>(() => slot(arguments)).Message.ShouldBe("slot failure");
+        Should.Throw<InvalidOperationException>(() => frame.CloseBlock());
+        instance.GetType().GetField("MustThrow")!.SetValue(instance, false);
+        slot(arguments).ShouldBeOfType<ElementNode>().RenderPlan.DynamicChildren.ShouldNotBeNull();
+        Should.Throw<InvalidOperationException>(() => frame.CloseBlock());
+        renderer.Render(null, host.Container);
+    }
+
+    [Theory]
+    [InlineData("TasksPage")]
+    [InlineData("TasksPageSibling")]
+    public void TasksPage_SlottedFormAndConditionalKeyedList_UpdateModelDependents(string componentName)
+    {
+        // [CMP-37], [RND-BLOCK-2]: mirror the ci.4 two-root TasksPage and its Card outlets.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        factory.Register(RouterLink.Registration);
+        factory.Register(new ComponentRegistration(ComponentReference.ForName("RouterLink"),
+            RouterLink.Registration.Contract, RouterLink.Registration.Activator));
+        ComponentNode root = new(ComponentReference.ForName(componentName));
+        using ViuRouter router = new(RouterHistory.CreateMemory(), []);
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container, CreateApplication(root, factory, new RouterServiceProvider(router)));
+        host.RunScheduledFlushes();
+        object instance = FindInstance(renderer, host, componentName);
+        MountedComponentView<CompiledFixtureNode>[] cards = renderer.GetMountedComponentViews(host.Container)
+            .Where(view => view.Instance.GetType().Name == "Card").ToArray();
+        int formUpdates = 0;
+        int listUpdates = 0;
+        int pageUpdates = 0;
+        cards[0].Context.Lifecycle.OnUpdated(() => formUpdates++);
+        cards[1].Context.Lifecycle.OnUpdated(() => listUpdates++);
+        renderer.GetMountedComponentViews(host.Container).Single(view => ReferenceEquals(view.Instance, instance))
+            .Context.Lifecycle.OnUpdated(() => pageUpdates++);
+        CompiledFixtureNode input = host.FindElements("input").Single(node =>
+            node.Bindings.TryGetValue("aria-label", out object? value) && Equals(value, "Task title"));
+        CompiledFixtureNode button = host.FindElements("button").Single(node =>
+            node.Bindings.TryGetValue("type", out object? value) && Equals(value, "submit"));
+        button.DescendantText.ShouldBe("Add []");
+        button.Bindings["disabled"].ShouldBe(true);
+
+        input.ModelBinding.ShouldNotBeNull().Setter("From JS");
+        instance.GetType().GetProperty("NewTitleText")!.GetValue(instance).ShouldBe("From JS");
+        host.RunScheduledFlushes();
+        button.DescendantText.ShouldBe("Add [From JS]");
+        button.Bindings["disabled"].ShouldBe(false);
+        formUpdates.ShouldBe(1);
+        listUpdates.ShouldBe(0);
+        pageUpdates.ShouldBe(0);
+        if (componentName == "TasksPageSibling")
+        {
+            host.FindElements("small").Single().DescendantText.ShouldBe("[From JS]");
+        }
+        input.ModelBinding!.Setter("From JS");
+        host.RunScheduledFlushes();
+        formUpdates.ShouldBe(1);
+        input.ModelBinding.Setter(string.Empty);
+        host.RunScheduledFlushes();
+        formUpdates.ShouldBe(2);
+        button.DescendantText.ShouldBe("Add []");
+        button.Bindings["disabled"].ShouldBe(true);
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
+    public async Task NativeHandlerShapes_ModifierAndKeyWrappersRetainBrowserDelegatesAndGuards()
+    {
+        // [SFC-CG-11] Sync/Task handlers, with/without an event, all retain the concrete Browser event.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentNode root = new(ComponentReference.ForName("HandlerShapes"));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container, CreateApplication(root, CreateFactory(fixtures)));
+        host.RunScheduledFlushes();
+        object instance = FindInstance(renderer, host, "HandlerShapes");
+        foreach (CompiledFixtureNode node in host.FindElements("button").Concat(host.FindElements("input")))
+        {
+            Delegate listener = node.Bindings.Values.OfType<Delegate>().Single();
+            listener.GetType().ShouldBe(node.Bindings.ContainsKey("data-async")
+                ? typeof(Func<BrowserEvent, Task>) : typeof(Action<BrowserEvent>));
+            bool keyboard = node.Description == "input";
+            BrowserEvent rejected = new(keyboard ? "keydown" : "click", 0, "Escape", "", BrowserEventModifiers.None,
+                -1, 0, 0, 0, 0, false, null, false, null);
+            BrowserEvent accepted = new(keyboard ? "keydown" : "click", 0, "Enter", "", BrowserEventModifiers.None,
+                -1, 0, 0, 0, 0, true, null, false, null);
+            int previous = GetIntProperty(instance, "Calls");
+            await InvokeNativeHandlerAsync(listener, rejected);
+            GetIntProperty(instance, "Calls").ShouldBe(previous);
+            await InvokeNativeHandlerAsync(listener, accepted);
+            GetIntProperty(instance, "Calls").ShouldBe(previous + 1);
+            if (!keyboard)
+            {
+                accepted.DefaultPrevented.ShouldBeTrue();
+                accepted.PropagationStopped.ShouldBeTrue();
+            }
+        }
+        GetIntProperty(instance, "Calls").ShouldBe(16);
+        renderer.Render(null, host.Container);
+    }
+
+    private static async Task InvokeNativeHandlerAsync(Delegate handler, BrowserEvent value)
+    {
+        switch (handler)
+        {
+            case Action<BrowserEvent> synchronous:
+                handler.GetType().ShouldBe(typeof(Action<BrowserEvent>));
+                synchronous(value);
+                break;
+            case Func<BrowserEvent, Task> asynchronous:
+                handler.GetType().ShouldBe(typeof(Func<BrowserEvent, Task>));
+                await asynchronous(value);
+                break;
+            default:
+                throw new InvalidOperationException("Generated native handler lost its Browser event type.");
+        }
+    }
+
+    [Fact]
+    public void ScalarModels_AllNumericAndNullableTargetsConvertWithoutTypeErasure()
+    {
+        // [SFC-CG-12] All supported numeric target declarations compile and receive typed values.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentNode root = new(ComponentReference.ForName("ScalarModels"));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container, CreateApplication(root, CreateFactory(fixtures)));
+        host.RunScheduledFlushes();
+        object instance = FindInstance(renderer, host, "ScalarModels");
+        CompiledFixtureNode[] inputs = host.FindElements("input").ToArray();
+        for (int index = 0; index < inputs.Length; index++)
+        {
+            ModelBinding binding = inputs[index].ModelBinding.ShouldNotBeNull();
+            binding.Setter(13d);
+            PropertyInfo property = instance.GetType().GetProperty("Value" + index)!;
+            Convert.ToDecimal(property.GetValue(instance)).ShouldBe(13m);
+            if (index % 2 != 0)
+            {
+                binding.Setter("");
+                property.GetValue(instance).ShouldBeNull();
+            }
+        }
+        renderer.Render(null, host.Container);
+    }
+
+    [Theory]
+    [InlineData("InteractionProbe")]
+    [InlineData("SingleSlotModelProbe")]
+    public void SlotModel_BrowserDispatch_CommitsParentAndRerendersDependents(string componentName)
+    {
+        // [SFC-CG-7] Exercise shipping Browser directives, not just the generated setter.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        ComponentNode root = new(ComponentReference.ForName(componentName), new ComponentInvocation(
+            arguments: new Dictionary<string, object?> { ["title"] = "slotted" }));
+        ApplicationContext application = new(new ApplicationOptions
+        {
+            RootComponent = root,
+            Components = factory,
+            Directives = new DirectiveRegistry([new KeyValuePair<Type, IDirective>(typeof(VModelText), VModelText.Instance)]),
+            ErrorHandler = (error, _, _) => throw new InvalidOperationException("Browser dispatch failed.", error),
+        });
+        Queue<Action> scheduled = [];
+        Scheduler.Reset();
+        using IDisposable dispatcher = Scheduler.UseFlushDispatcher(scheduled.Enqueue);
+        try
+        {
+            List<byte[]> frames = [];
+            var host = new BrowserRendererHost((frame, length) =>
+            {
+                frames.Add(frame.AsSpan(0, length).ToArray());
+                return [];
+            });
+            host.ObserveForeignHandle(1000);
+#pragma warning disable CA1416 // Injected command applier and DOM-less dispatch avoid JavaScript imports.
+            using IDisposable activation = host.Activate();
+            Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
+            renderer.Render(root, 1000, application);
+            while (scheduled.TryDequeue(out Action? flush)) { flush(); }
+            object parent = renderer.GetMountedComponentViews(1000).Single(view =>
+                view.Instance.GetType().Name == componentName).Instance;
+            int input = (int)parent.GetType().GetField("Input")!.GetValue(parent)!;
+            frames.Clear();
+            host.DispatchEvent(input, false, new BrowserEvent("input", 0, "", "", BrowserEventModifiers.None,
+                -1, 0, 0, 0, 0, true, "from slot", false, null));
+#pragma warning restore CA1416
+            GetReferenceValue(parent, "Model").ShouldBe("from slot");
+            while (scheduled.TryDequeue(out Action? flush)) { flush(); }
+            Encoding.UTF8.GetString(frames.SelectMany(frame => frame).ToArray()).ShouldContain("from slot");
+            renderer.Render(null, 1000, application);
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
+    }
+
+    [Fact]
+    public void TypedBindings_ConvertDeclaredTargetsAndInvokeTypedComponentEvents()
+    {
+        // [SFC-CG-12] Every carrier setter compiles against its target's declared type.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        ComponentNode root = new(ComponentReference.ForName("BindingSeams"));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container, CreateApplication(root, factory));
+        host.RunScheduledFlushes();
+        object instance = FindInstance(renderer, host, "BindingSeams");
+        CompiledFixtureNode[] inputs = host.FindElements("input").ToArray();
+        int getterReads = GetIntProperty(instance, "ReferenceGetterCount");
+        object?[] values = ["typed", true, 12d, "", "trimmed", true, 4.5d, "counted", null, true];
+        for (int index = 0; index < values.Length; index++)
+        {
+            inputs[index].ModelBinding.ShouldNotBeNull().Setter(values[index]);
+        }
+        instance.GetType().GetProperty("Text")!.GetValue(instance).ShouldBe("typed");
+        instance.GetType().GetProperty("Checked")!.GetValue(instance).ShouldBe(true);
+        instance.GetType().GetProperty("Count")!.GetValue(instance).ShouldBe(12);
+        Should.Throw<FormatException>(() => inputs[2].ModelBinding!.Setter("invalid"));
+        instance.GetType().GetProperty("NullableCount")!.GetValue(instance).ShouldBeNull();
+        GetReferenceValue(instance, "TextReference").ShouldBe("trimmed");
+        GetReferenceValue(instance, "CheckedReference").ShouldBe(true);
+        GetReferenceValue(instance, "CountReference").ShouldBe(4.5m);
+        GetIntProperty(instance, "ReferenceGetterCount").ShouldBe(getterReads + 1);
+        instance.GetType().GetProperty("NullableText")!.GetValue(instance).ShouldBeNull();
+        instance.GetType().GetProperty("NullableChecked")!.GetValue(instance).ShouldBe(true);
+        instance.GetType().GetProperty("NullableText")!.SetValue(instance, "before component update");
+        Delegate listener = host.FindElements("button").Single().Bindings.Values.OfType<Delegate>().Single();
+        InvokeHostListener(listener);
+        GetIntProperty(instance, "LastChanged").ShouldBe(7);
+        GetIntProperty(instance, "LastFinished").ShouldBe(9);
+        InvokeHostListener(host.FindElements("a").Single().Bindings.Values.OfType<Delegate>().Single());
+        GetIntProperty(instance, "Count").ShouldBe(17);
+        instance.GetType().GetProperty("Checked")!.GetValue(instance).ShouldBe(false);
+        GetReferenceValue(instance, "TextReference").ShouldBe("component");
+        instance.GetType().GetProperty("NullableText")!.GetValue(instance).ShouldBeNull();
+        fixtures.GeneratedSources.Single(pair => pair.Key.EndsWith("BindingSeams.SingleFileComponent.g.cs", StringComparison.Ordinal))
+            .Value.ShouldContain("global::ViuCompiledFixtures.BindingSeams.Format");
+        renderer.Render(null, host.Container);
+    }
+
     [Fact]
     public async Task ServerTargetedFixture_CompiledAndTraversalProfiles_AreByteIdentical()
     {
@@ -749,6 +1053,8 @@ public sealed class GeneratedComponentFixtureTests
         model.Setter("updated");
         object instance = FindInstance(renderer, host, "InteractionProbe");
         GetReferenceValue(instance, "Model").ShouldBe("updated");
+        host.RunScheduledFlushes();
+        host.Container.DescendantText.ShouldContain("updated");
         renderer.Render(null, host.Container);
     }
 
@@ -883,7 +1189,8 @@ public sealed class GeneratedComponentFixtureTests
         ComponentNode root,
         ComponentFactory factory,
         IServiceProvider? services = null,
-        Action<Exception, ComponentContext?, string>? errorHandler = null)
+        Action<Exception, ComponentContext?, string>? errorHandler = null,
+        Action<string>? warningHandler = null)
     {
         var directives = new DirectiveRegistry(
         [
@@ -911,7 +1218,7 @@ public sealed class GeneratedComponentFixtureTests
                 Directives = directives,
                 Services = services,
                 ErrorHandler = errorHandler,
-                WarnHandler = warning => throw new InvalidOperationException(warning),
+                WarnHandler = warningHandler ?? (warning => throw new InvalidOperationException(warning)),
             });
     }
 

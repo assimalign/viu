@@ -13,4 +13,14 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// </summary>
 /// <param name="Name">The member name exactly as declared in the <c>@script</c> block.</param>
 /// <param name="Type">The classified binding type that drives ref-unwrapping decisions in the template.</param>
-public readonly record struct ScriptBinding(string Name, BindingType Type);
+public readonly record struct ScriptBinding(string Name, BindingType Type)
+{
+    /// <summary>Whether access uses the declaring type rather than an instance ([SFC-6]).</summary>
+    public bool IsStatic { get; init; }
+
+    /// <summary>The declared delegate shape for a method group; null otherwise ([SFC-CG-12]).</summary>
+    public string? HandlerType { get; init; }
+
+    /// <summary>The declared model value type, unwrapping a known reactive reference ([SFC-CG-12]).</summary>
+    public string? ModelValueType { get; init; }
+}

@@ -673,7 +673,9 @@ public sealed partial class Renderer<TNode>
         RuntimeComponentContext? owner,
         PatchFlags flags)
     {
-        return (int)flags > 0 && (flags & PatchFlags.UnkeyedFragment) != 0
+        // [RND-KEY-1] Stable fragments retain their fixed positions when block patching
+        // falls back, including when conditional branches change the dynamic-child count.
+        return (int)flags > 0 && (flags & (PatchFlags.StableFragment | PatchFlags.UnkeyedFragment)) != 0
             ? PatchUnkeyedChildren(
                 tree,
                 current,

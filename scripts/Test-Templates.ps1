@@ -7,8 +7,9 @@
     dotnet CLI home, and proves the eight-row application nullable-by-SSR, library nullable, and
     kebab-case naming matrix against that package feed. Generated projects never consume repository
     project references. The
-    application cases build, all SSR cases execute a server render, and the default case also
-    publishes. The component-library cases build, test, and pack.
+    application cases build, all SSR cases execute a server render, and the default application and
+    default SSR application publish. The SSR publish validates ProjectReference CSS, link injection,
+    and compressed bytes. The component-library cases build, test, and pack.
 
     This script-driven harness is intentional: validation must cross the installed template-package
     and custom MSBuild-SDK resolver boundaries, which source-only template verification does not
@@ -617,6 +618,7 @@ try {
                 $expectedFiles = @(
                     "Components/$($case.Name).Components.csproj",
                     'Components/Counter.viu',
+                    'Components/Counter.cs',
                     'global.json',
                     'Properties/launchSettings.json',
                     'Program.cs',
@@ -724,7 +726,7 @@ try {
                 }
             }
 
-            if ($case.Name -eq 'TemplateAppDefault') {
+            if ($case.Name -in @('TemplateAppDefault', 'TemplateAppSsrDefault')) {
                 $publishDirectory = Join-Path $caseDirectory 'publish'
                 $publishArguments = @(
                     'publish',
@@ -746,6 +748,40 @@ try {
                     -Arguments $publishArguments
                 if (-not [System.IO.File]::Exists((Join-Path $publishDirectory 'wwwroot/index.html'))) {
                     throw "$($case.Name) did not produce a published wwwroot/index.html."
+                }
+                if ($case.Ssr) {
+                    # [PKG-STYLE-1] Exercise a real base-SDK ProjectReference through compression,
+                    # including the host-page link when the Browser project has no own components.
+                    $packageId = "$($case.Name).Components"
+                    $styleRoute = "_content/$packageId/$packageId.viu.css"
+                    $stylePath = Join-Path $publishDirectory "wwwroot/$styleRoute"
+                    $styleText = [System.IO.File]::ReadAllText($stylePath)
+                    if (-not $styleText.Contains('.counter', [System.StringComparison]::Ordinal)) {
+                        throw "The project-referenced component CSS was not published: $stylePath"
+                    }
+                    $html = [System.IO.File]::ReadAllText((Join-Path $publishDirectory 'wwwroot/index.html'))
+                    if (-not $html.Contains($styleRoute, [System.StringComparison]::Ordinal)) {
+                        throw 'The project-referenced library stylesheet link was not injected.'
+                    }
+                    foreach ($suffix in @('.gz', '.br')) {
+                        $stream = [System.IO.File]::OpenRead("$stylePath$suffix")
+                        try {
+                            $decompressor = if ($suffix -eq '.gz') {
+                                [System.IO.Compression.GZipStream]::new($stream, [System.IO.Compression.CompressionMode]::Decompress)
+                            }
+                            else {
+                                [System.IO.Compression.BrotliStream]::new($stream, [System.IO.Compression.CompressionMode]::Decompress)
+                            }
+                            $reader = [System.IO.StreamReader]::new($decompressor)
+                            try {
+                                if ($reader.ReadToEnd() -cne $styleText) {
+                                    throw "Compression did not read the project-referenced CSS: $stylePath$suffix"
+                                }
+                            }
+                            finally { $reader.Dispose() }
+                        }
+                        finally { $stream.Dispose() }
+                    }
                 }
             }
         }

@@ -8,6 +8,17 @@ namespace Assimalign.Viu.Components;
 /// <remarks>Specified by <c>[CMP-7]</c>.</remarks>
 public sealed class ComponentNode : VirtualNode
 {
+    /// <summary>
+    /// Describes a typed component without activation or reflection. The definition supplies its
+    /// exact registration reference. Specified by <c>[CMP-35]</c>.
+    /// </summary>
+    /// <typeparam name="TComponent">The generated or code-first component definition.</typeparam>
+    /// <param name="invocation">Optional parent-created inputs.</param>
+    /// <param name="key">Optional sibling identity.</param>
+    /// <returns>An immutable component invocation.</returns>
+    public static ComponentNode For<TComponent>(ComponentInvocation? invocation = null, object? key = null)
+        where TComponent : IComponentDefinition => new(TComponent.Registration.Reference, invocation, key);
+
     /// <summary>Initializes an immutable component invocation node.</summary>
     /// <param name="component">The definition reference.</param>
     /// <param name="invocation">Raw parent-created inputs.</param>

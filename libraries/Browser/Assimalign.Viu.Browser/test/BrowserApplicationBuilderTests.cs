@@ -13,6 +13,33 @@ namespace Assimalign.Viu.Browser.Tests;
 public sealed class BrowserApplicationBuilderTests
 {
     [Fact]
+    public async Task GeneratedDefaults_PopulateOnlyWhenComponentsIsUnset()
+    {
+        // [CMP-36] An explicit resolver retains complete composition precedence.
+        ComponentRegistration registration = ComponentRegistration.Define("generated-builder-test",
+            new ComponentContract(), _ => _ => null);
+        GeneratedComponentCatalogs.Register("browser-builder-test", factory => factory.Register(registration));
+        try
+        {
+            await using BrowserApplication automatic = new BrowserApplicationBuilder()
+                .ConfigureApplication(options => options.RootComponent = new TextNode("root")).Build();
+            automatic.Context.Components.Resolve(registration.Reference).ShouldBeSameAs(registration);
+            ComponentFactory explicitComponents = new();
+            await using BrowserApplication explicitApplication = new BrowserApplicationBuilder()
+                .ConfigureApplication(options =>
+                {
+                    options.RootComponent = new TextNode("root");
+                    options.Components = explicitComponents;
+                }).Build();
+            explicitApplication.Context.Components.TryResolve(registration.Reference, out _).ShouldBeFalse();
+        }
+        finally
+        {
+            GeneratedComponentCatalogs.Register("browser-builder-test", _ => { });
+        }
+    }
+
+    [Fact]
     public async Task ConfigureBrowser_HydrationAndSelector_AreSnapshottedByBuild()
     {
         BrowserApplication application = new BrowserApplicationBuilder()

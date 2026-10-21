@@ -1,0 +1,9 @@
+<template>
+    <button type="button" role="switch" :aria-checked="ModelValue" @click="Flip">Visible</button>
+</template>
+@script {
+    using Assimalign.Viu.Components;
+    [Parameter] public bool ModelValue { get; set; }
+    [Event("update:modelValue")] public partial void UpdateModelValue(bool value);
+    private void Flip() => UpdateModelValue(!ModelValue);
+}

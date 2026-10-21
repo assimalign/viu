@@ -46,6 +46,14 @@ internal static class TransformFreeze
             CodegenNode = workingFor.CodegenNode,
             Location = workingFor.Location,
         },
+        // [SFC-CG-11] The single-text-child fast path leaves merged expressions unwrapped.
+        // The immutable child view used by server emission still needs a text child.
+        CompoundExpressionNode compound => new TextCallNode
+        {
+            Content = compound,
+            CodegenNode = Ir.CallExpression(HelperNames.CreateText, new object[] { compound }),
+            Location = compound.Location,
+        },
         TemplateChildNode templateChild => templateChild,
         _ => (TemplateChildNode)node,
     };

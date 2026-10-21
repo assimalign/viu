@@ -240,6 +240,10 @@ public sealed class SingleFileComponentTemplateSourceMapTests
             """
             namespace Assimalign.Viu.Components
             {
+                internal interface IComponentDefinition
+                {
+                    static abstract ComponentRegistration Registration { get; }
+                }
                 internal abstract class VirtualNode { }
                 internal sealed class TextNode : VirtualNode
                 {

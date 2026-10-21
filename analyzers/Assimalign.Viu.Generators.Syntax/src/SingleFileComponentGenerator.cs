@@ -123,10 +123,18 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 result.Model.Namespace,
                 result.Model.ClassName,
                 result.Model.FilePath,
-                result.Model.ServerRenderBody is not null))
+                result.Model.ServerRenderBody is not null)
+            {
+                RegisteredName = result.Model.RegisteredName,
+            })
             .Collect();
-        var assemblyEmission = generatedComponents.Combine(
-            projectOptions.Select(static (options, _) => options.RootNamespace));
+        var assemblyEmission = generatedComponents.Combine(projectOptions)
+            .Combine(context.CompilationProvider.Select(static (compilation, _) =>
+                (Identity: compilation.Assembly.Identity.ToString(), Catalogs: ReadCatalogs(compilation),
+                    IsApplication: compilation.Options.OutputKind is OutputKind.ConsoleApplication or OutputKind.WindowsApplication)))
+            .Combine(context.AnalyzerConfigOptionsProvider.Select(static (provider, _) =>
+                provider.GlobalOptions.TryGetValue("build_property.ViuAutoRegisterGeneratedCatalogs", out var value)
+                    ? (bool?)IsEnabled(value) : null));
 
         // [SFC-USE-1] The component declarations this compilation can read: the attribute-declared
         // surfaces of the .viu components being generated here, plus everything Roslyn can see through
@@ -139,7 +147,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         // the compilation-wide catalog.
         var localDeclarations = emittedResults
             .Select(static (result, _) => new ComponentDeclarationEntry(
-                result.Model.ClassName,
+                result.Model.RegisteredName,
                 result.Model.Declarations.Parameters)
             {
                 IsParameterSurfaceKnown =
@@ -163,11 +171,39 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             assemblyEmission,
             static (production, pair) =>
             {
-                if (!pair.Left.IsDefaultOrEmpty)
+                var registrations = pair.Left.Left.Left;
+                var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (GeneratedComponentRegistration registration in registrations)
+                {
+                    counts.TryGetValue(registration.RegisteredName, out int count);
+                    counts[registration.RegisteredName] = count + 1;
+                }
+                var valid = ImmutableArray.CreateBuilder<GeneratedComponentRegistration>();
+                foreach (GeneratedComponentRegistration registration in registrations)
+                {
+                    if (counts[registration.RegisteredName] > 1)
+                    {
+                        production.ReportDiagnostic(SingleFileComponentDiagnosticAdapter.ToDiagnostic(
+                            SingleFileComponentDiagnostics.CreateFileRule(
+                                SingleFileComponentDiagnostics.ConflictingComponentIdentity,
+                                "Multiple components declare the registered name '" + registration.RegisteredName + "'.",
+                                registration.FilePath)));
+                    }
+                    else
+                    {
+                        valid.Add(registration);
+                    }
+                }
+                registrations = valid.ToImmutable();
+                var options = pair.Left.Left.Right;
+                var references = pair.Left.Right;
+                bool autoRegister = pair.Right ?? references.IsApplication;
+                if (!pair.Left.Left.Left.IsDefaultOrEmpty || (autoRegister && !references.Catalogs.IsDefaultOrEmpty))
                 {
                     production.AddSource(
                         SingleFileComponentAssemblyEmitter.HintName,
-                        SingleFileComponentAssemblyEmitter.Emit(pair.Right, pair.Left));
+                        SingleFileComponentAssemblyEmitter.Emit(options.RootNamespace, registrations,
+                            references.Identity, references.Catalogs, autoRegister));
                 }
             });
         context.RegisterSourceOutput(
@@ -181,6 +217,32 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                         SingleFileComponentHotReloadHandlerEmitter.Emit());
                 }
             });
+    }
+
+    private static ImmutableArray<GeneratedCatalogReference> ReadCatalogs(Compilation compilation)
+    {
+        var catalogs = ImmutableArray.CreateBuilder<GeneratedCatalogReference>();
+        foreach (MetadataReference reference in compilation.References)
+        {
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol assembly)
+            {
+                continue;
+            }
+            foreach (AttributeData attribute in assembly.GetAttributes())
+            {
+                string? name = attribute.AttributeClass?.ToDisplayString();
+                bool isServer = name == "Assimalign.Viu.ServerRenderer.ServerRenderCatalogAttribute";
+                if ((isServer || name == "Assimalign.Viu.Components.ComponentCatalogAttribute")
+                    && attribute.ConstructorArguments.Length == 1
+                    && attribute.ConstructorArguments[0].Value is INamedTypeSymbol catalog)
+                {
+                    catalogs.Add(new GeneratedCatalogReference(assembly.Identity.ToString(),
+                        catalog.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), isServer));
+                }
+            }
+        }
+        catalogs.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Identity, right.Identity));
+        return catalogs.ToImmutable();
     }
 
     private static bool IsSingleFileComponentFile(string path)

@@ -604,20 +604,45 @@ public static class ScriptBlockAnalyzer
                 var type = ClassifyField(field);
                 foreach (var variable in field.Declaration.Variables)
                 {
-                    bindings.Add(new ScriptBinding(variable.Identifier.Text, type));
+                    bindings.Add(new ScriptBinding(variable.Identifier.Text, type)
+                    {
+                        IsStatic = field.Modifiers.Any(SyntaxKind.StaticKeyword)
+                            || field.Modifiers.Any(SyntaxKind.ConstKeyword),
+                        ModelValueType = ModelValueType(field.Declaration.Type),
+                    });
                 }
 
                 break;
             }
 
             case PropertyDeclarationSyntax property:
-                bindings.Add(new ScriptBinding(property.Identifier.Text, ClassifyProperty(property)));
+                bindings.Add(new ScriptBinding(property.Identifier.Text, ClassifyProperty(property))
+                {
+                    IsStatic = property.Modifiers.Any(SyntaxKind.StaticKeyword),
+                    ModelValueType = ModelValueType(property.Type),
+                });
                 break;
 
             case MethodDeclarationSyntax method:
                 // A method is a fixed callable, never a reactive reference and never unwrapped — the
                 // render path emits a direct call, not a .Value access.
-                bindings.Add(new ScriptBinding(method.Identifier.Text, BindingType.SetupConstant));
+                string? handlerType = null;
+                if (method.TypeParameterList is null && method.ParameterList.Parameters.Count <= 1)
+                {
+                    string argument = method.ParameterList.Parameters.Count == 0
+                        ? string.Empty : method.ParameterList.Parameters[0].Type + ", ";
+                    bool returnsVoid = method.ReturnType is PredefinedTypeSyntax predefined
+                        && predefined.Keyword.IsKind(SyntaxKind.VoidKeyword);
+                    handlerType = returnsVoid
+                        ? (argument.Length == 0 ? "global::System.Action"
+                            : "global::System.Action<" + method.ParameterList.Parameters[0].Type + ">")
+                        : "global::System.Func<" + argument + method.ReturnType + ">";
+                }
+                bindings.Add(new ScriptBinding(method.Identifier.Text, BindingType.SetupConstant)
+                {
+                    IsStatic = method.Modifiers.Any(SyntaxKind.StaticKeyword),
+                    HandlerType = handlerType,
+                });
                 break;
         }
     }
@@ -794,6 +819,34 @@ public static class ScriptBlockAnalyzer
     {
         var name = GetSimpleTypeName(type);
         return name is not null && ReferenceTypeNames.Contains(name);
+    }
+
+    private static string ModelValueType(TypeSyntax type)
+    {
+        if (!IsReferenceType(type))
+        {
+            return type.ToString();
+        }
+        TypeSyntax current = type;
+        while (true)
+        {
+            switch (current)
+            {
+                case NullableTypeSyntax nullable:
+                    current = nullable.ElementType;
+                    break;
+                case QualifiedNameSyntax qualified:
+                    current = qualified.Right;
+                    break;
+                case AliasQualifiedNameSyntax alias:
+                    current = alias.Name;
+                    break;
+                case GenericNameSyntax generic when generic.TypeArgumentList.Arguments.Count == 1:
+                    return generic.TypeArgumentList.Arguments[0].ToString();
+                default:
+                    return type.ToString();
+            }
+        }
     }
 
     // The right-most simple identifier of a type reference, unwrapping nullable annotations and namespace

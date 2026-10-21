@@ -81,6 +81,20 @@ public sealed class CompiledServerRenderDifferentialTests
     }
 
     [Fact]
+    public async Task CompiledMarkup_CompoundInterpolationAsOnlyChild_EmitsExactHtml()
+    {
+        // [SFC-CG-11] Both interpolations and their separator survive the text merge.
+        MethodInfo renderMethod = CompileServerRender(
+            "<span class=\"x\">{{ title }} / {{ body }}</span>", out object component);
+        string markup = await ServerRender.RenderCompiledToStringAsync(
+            new ServerRenderApplication(new ComponentTextNode("unused"), new ComponentFactory()),
+            state => (Task)renderMethod.Invoke(null,
+                [state, component, new ComponentRenderFrame(), null])!);
+
+        markup.ShouldBe("<span class=\"x\">&lt;heading&gt; / body &amp; text</span>");
+    }
+
+    [Fact]
     public async Task CompiledMarkup_Teleport_UsesUnchangedMarkerAndTargetProtocol()
     {
         const string source = "<Teleport to=\"#target\"><span>{{ body }}</span></Teleport>";

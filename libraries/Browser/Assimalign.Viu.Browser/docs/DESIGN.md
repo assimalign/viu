@@ -178,3 +178,9 @@ application composition dependencies, routing, or server serialization. Routing 
 Browser.Router. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367). The single-element
 `CssVariables.Bind` directive stays supported; generated reactive `v-bind()` application for ordinary
 component styles remains deferred (`[STY-6]`–`[STY-8]`).
+
+## Portable handlers and generated composition
+
+Generated native-handler glue preserves delegate type identity. Converting `Action<BrowserEvent>` to `Action<object?>` selects the object-payload bridge and loses the DOM event and its synchronous prevention flags. Keeping the typed delegate lets the existing invoker dispatch modifier/key wrappers directly ([SFC-CG-11]).
+
+Automatic catalog population creates an application-owned ComponentFactory only when no explicit resolver was supplied. It neither scans assemblies nor modifies an externally supplied factory ([CMP-36]). ARIA booleans use enumerated tokens consistently with server serialization and hydration ([RND-ARIA-1]).

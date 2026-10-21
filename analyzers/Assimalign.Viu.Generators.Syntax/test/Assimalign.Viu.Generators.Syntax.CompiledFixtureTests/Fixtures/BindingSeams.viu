@@ -1,0 +1,47 @@
+<template>
+    <main>
+        <input v-model="Text" />
+        <input type="checkbox" v-model="Checked" />
+        <input v-model.number="Count" />
+        <input v-model.number="NullableCount" />
+        <input v-model.trim.lazy="TextReference" />
+        <input type="checkbox" v-model="CheckedReference" />
+        <input v-model.number="CountReference" />
+        <input v-model="CountedText" />
+        <input v-model="NullableText" />
+        <input type="checkbox" v-model="NullableChecked" />
+        <EventSource @changed="Changed" @finished="Finished" />
+        <ModelSource v-model="Count" v-model:enabled="Checked" v-model:text="TextReference" v-model:nullable-text="NullableText" />
+        <form @submit.prevent="Submit"><input @keydown.enter="Enter" /></form>
+        <p>{{ Format(Count) }}</p>
+    </main>
+</template>
+
+@script {
+    using System.Threading.Tasks;
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.Reactivity;
+
+    public string Text { get; set; } = "initial";
+    public bool Checked { get; set; }
+    public int Count { get; set; }
+    public int? NullableCount { get; set; }
+    public Reference<string> TextReference = Reactive.Reference("initial");
+    public Reference<bool> CheckedReference = Reactive.Reference(false);
+    public Reference<decimal> CountReference = Reactive.Reference(0m);
+    public string? NullableText { get; set; } = "initial";
+    public bool? NullableChecked { get; set; }
+    private readonly Reference<string> StoredText = Reactive.Reference("initial");
+    public int ReferenceGetterCount { get; private set; }
+    public Reference<string> CountedText
+    {
+        get { ReferenceGetterCount++; return StoredText; }
+    }
+    public int LastChanged { get; private set; }
+    public int LastFinished { get; private set; }
+    private void Changed(int count) => LastChanged = count;
+    private Task Finished(int count) { LastFinished = count; return Task.CompletedTask; }
+    private void Submit(IElementEvent value) { }
+    private Task Enter(IElementEvent value) => Task.CompletedTask;
+    private static string Format(int count) => "count=" + count;
+}

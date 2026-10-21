@@ -15,6 +15,27 @@ namespace Assimalign.Viu.Core.Tests;
 /// </summary>
 public sealed class HydrationMismatchParityTests
 {
+    [Theory]
+    [InlineData(true, "true", false)]
+    [InlineData(false, "false", false)]
+    [InlineData(true, "false", true)]
+    [InlineData(false, "true", true)]
+    public void Hydrate_AriaBoolean_ComparesLowercaseEnumeratedTokens(bool value, string serverToken, bool mismatch)
+    {
+        // [RND-ARIA-1] https://www.w3.org/TR/2023/REC-wai-aria-1.2-20230606/#aria-checked
+        HydrationWalkerFakeHost host = new();
+        HydrationWalkerHostNode server = host.CreateServerElement("button");
+        server.Attributes["aria-checked"] = serverToken;
+        host.AppendServerChild(host.Root, server);
+        ElementNode client = new(new QualifiedName("button"),
+            bindings: [ElementBinding.Attribute(new QualifiedName("aria-checked"), value)]);
+        List<string> warnings = [];
+        RendererFactory.CreateRenderer(host.Options).Hydrate(client, host.Root, CreateApplication(client, warnings));
+        warnings.Count.ShouldBe(mismatch ? 1 : 0);
+        host.Root.Children.ShouldBe([server]);
+        host.ClientCreationCount.ShouldBe(0);
+    }
+
     [Fact]
     public void Hydrate_SemanticallyEquivalentClassAndStyle_AdoptsWithoutWarnings()
     {

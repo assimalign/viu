@@ -1,0 +1,66 @@
+<!-- A content card. Shows default and named slots, slot fallback content, and Context.Bindings. -->
+<template>
+    <section class="card">
+        <header class="card__header">
+            <h2>{{ Title }}</h2>
+            <slot name="badge" />
+        </header>
+        <div class="card__body">
+            <slot>
+                <p class="card__empty">Nothing to show yet.</p>
+            </slot>
+        </div>
+        <footer v-if="HasFooter" class="card__footer">
+            <slot name="footer" />
+        </footer>
+    </section>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+
+    /// <summary>Gets or sets the card heading.</summary>
+    [Parameter(IsRequired = true)]
+    public string Title { get; set; } = string.Empty;
+
+    // Slots are read from the mounted context, so the footer only renders when a parent supplies one.
+    public bool HasFooter => Context!.Bindings.Slots.ContainsKey("footer");
+}
+
+<style>
+    .card {
+        display: grid;
+        border: 1px solid var(--viu-border, #e2e8f0);
+        border-radius: 0.75rem;
+        background: var(--viu-surface, #ffffff);
+        overflow: hidden;
+    }
+
+    .card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem 0;
+    }
+
+    .card__header h2 {
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    .card__body {
+        padding: 1rem 1.25rem;
+    }
+
+    .card__empty {
+        margin: 0;
+        color: var(--viu-text-muted, #64748b);
+    }
+
+    .card__footer {
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid var(--viu-border, #e2e8f0);
+        background: var(--viu-surface-muted, #f8fafc);
+    }
+</style>

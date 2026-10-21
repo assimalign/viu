@@ -11,6 +11,34 @@ namespace Assimalign.Viu.ServerRenderer.Tests;
 public sealed class ServerRenderRegistryTests
 {
     [Fact]
+    public void GeneratedCatalogs_RepeatedPathsApplyOnceAndFrozenRegistryRejectsPopulation()
+    {
+        // [CMP-36] Population happens once per registry and before its freeze boundary.
+        ServerRenderRegistration registration = CreateRegistration("generated-catalog-registry-test");
+        int calls = 0;
+        GeneratedServerRenderCatalogs.Register("server-registry-test", registry =>
+        {
+            calls++;
+            registry.Register(registration);
+        });
+        try
+        {
+            ServerRenderRegistry registry = new();
+            registry.RegisterGeneratedRenders();
+            registry.RegisterGeneratedRenders();
+            calls.ShouldBe(1);
+            registry.TryResolve(registration.Reference, out ServerRenderRegistration? resolved).ShouldBeTrue();
+            resolved.ShouldBeSameAs(registration);
+            registry.Freeze();
+            Should.Throw<InvalidOperationException>(registry.RegisterGeneratedRenders);
+        }
+        finally
+        {
+            GeneratedServerRenderCatalogs.Register("server-registry-test", _ => { });
+        }
+    }
+
+    [Fact]
     public void Freeze_RepeatedCalls_ReturnSameRegistryAndRejectPostFreezeRegistration()
     {
         ServerRenderRegistry registry = new();

@@ -23,6 +23,15 @@ public sealed class BindingMetadata
     /// <summary>The empty, permissive metadata used when no component model is supplied.</summary>
     public static readonly BindingMetadata Empty = new();
 
+    /// <summary>Compile-time type-qualified receivers for static script members ([SFC-6]).</summary>
+    public IReadOnlyDictionary<string, string> StaticReceivers { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>Declared delegate types used to bind script method groups without inference ([SFC-CG-12]).</summary>
+    public IReadOnlyDictionary<string, string> HandlerTypes { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>Declared script model value types, retaining nullable annotations ([SFC-CG-12]).</summary>
+    public IReadOnlyDictionary<string, string> ModelValueTypes { get; init; } = new Dictionary<string, string>();
+
     private readonly IReadOnlyDictionary<string, BindingType> bindings;
     private readonly IReadOnlyDictionary<string, string>? propertyAliases;
 

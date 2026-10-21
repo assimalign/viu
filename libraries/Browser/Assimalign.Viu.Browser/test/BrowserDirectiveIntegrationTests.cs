@@ -14,6 +14,18 @@ namespace Assimalign.Viu.Browser.Tests;
 // Pins Browser's qualified directive tokens and host-local command path [CMP-7], [SFC-CG-6..7].
 public sealed class BrowserDirectiveIntegrationTests
 {
+    [Theory]
+    [InlineData(true, "true")]
+    [InlineData(false, "false")]
+    public void AriaBoolean_Mount_WritesEnumeratedToken(bool value, string token)
+    {
+        // [RND-ARIA-1], WAI-ARIA 1.2 https://www.w3.org/TR/2023/REC-wai-aria-1.2-20230606/#aria-checked
+        string frames = RenderAndReadFrames(new ElementNode(new QualifiedName("button"),
+            bindings: [ElementBinding.Attribute(new QualifiedName("aria-checked"), value)]));
+        frames.ShouldContain("aria-checked");
+        frames.ShouldContain(token);
+    }
+
     [Fact]
     public void TextModel_Mount_RegistersListenersAndReflectsTheInitialValue()
     {

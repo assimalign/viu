@@ -155,3 +155,9 @@ of it.
   the compile-only concerns (module accessor map, `v-bind()` binding-metadata rewrite) on top of it.
 - **A public API.** If a third consumer ever appears, promoting a stable facade to `Abstraction/` is
   a deliberate follow-up work item, not an incidental change.
+
+## Typed binding projection
+
+The shared projection records method signatures and static receiver type names in value-equatable script bindings. Both build and editor paths consume those bindings, avoiding separate authoring syntax or runtime reflection. Explicit method-group casts solve input-type inference while preserving Task returns. ModelValue overloads use the assignment target's C# type and explicit scalar conversions; the generic fallback casts already-typed payloads. Conversion is consumer-internal glue, not a new runtime ABI ([SFC-CG-2], [SFC-CG-12]).
+
+RegisteredName is an ordinary C# string literal constant in the script. Metadata and registration emission use that name, while file-derived type identity remains unchanged. Generated accessibility remains unchanged; authors expose reusable types with public partial declarations ([CMP-35]).

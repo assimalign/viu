@@ -57,3 +57,11 @@ browser observer, event listener, or scheduler callback (`[HYD-LAZY-1]`).
 
 Adopted disposition:
 [`../../../../docs/COMPONENT-MODEL-PLAN.md`](../../../../docs/COMPONENT-MODEL-PLAN.md) §2/§2a.
+
+## Generated definitions and catalogs
+
+`IComponentDefinition` provides a static registration for `ComponentNode.For<TComponent>()` without activation or reflection ([CMP-35]). Generated template classes carry `ComponentMetadataAttribute`; an authored public partial declaration exposes a library component's typed handle. A script can override the registered name with a nonempty string literal constant named `RegisteredName`.
+
+`ComponentCatalogAttribute` marks a public assembly catalog for compile-time reference discovery. `GeneratedComponentCatalogs` receives direct generated delegates, and `ComponentFactory.RegisterGeneratedComponents()` applies them in ordinal full-assembly-identity order, once per factory ([CMP-36]). Different catalogs with conflicting component names still throw. Publication snapshots are synchronized; target factories remain single-threaded. The registry performs no runtime scanning.
+
+`ComponentLifecycle.ObserveTask` gives generated Task-returning component listeners the same error routing, cancellation, and teardown observation as other instance-owned asynchronous work ([SFC-CG-12]).

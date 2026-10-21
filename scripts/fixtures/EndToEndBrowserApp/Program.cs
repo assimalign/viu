@@ -6,6 +6,7 @@ using Assimalign.Viu.Browser;
 using Assimalign.Viu.Browser.Router;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Router;
+using Assimalign.Viu.State;
 
 using ViuRouter = Assimalign.Viu.Router.Router;
 
@@ -17,6 +18,7 @@ internal static class Program
     {
         ComponentFactory components = new();
         GeneratedViuComponents.Register(components);
+        EndToEndBrowserComponents.GeneratedViuComponents.Register(components);
         components.Register(RouterView.Registration);
         components.Register(RegisterByName("RouterView", RouterView.Registration));
         components.Register(RouterLink.Registration);
@@ -32,19 +34,33 @@ internal static class Program
                 new RouteRecord(
                     "/second",
                     component: new ComponentNode(ComponentReference.ForName("SecondPage"))),
+                new RouteRecord(
+                    "/tasks",
+                    component: new ComponentNode(ComponentReference.ForName("TasksPage"))),
+                new RouteRecord(
+                    "/tasks-sibling",
+                    component: new ComponentNode(ComponentReference.ForName("TasksPageSibling"))),
+                new RouteRecord(
+                    "/slot-conditional",
+                    component: new ComponentNode(ComponentReference.ForName("SlotConditionalProbe"))),
+                new RouteRecord(
+                    "/root-conditional",
+                    component: new ComponentNode(ComponentReference.ForName("RootConditionalProbe"))),
             ]);
         router.ScrollBehavior = static (_, _, savedPosition) =>
             Task.FromResult<ScrollTarget?>(
                 new ScrollTarget(savedPosition ?? new ScrollPosition(0, 0)));
         RouterServiceProvider services = new(router);
+        using IStateStoreRegistry state = StateStores.CreateRegistry(services, new ApplicationWatchScheduler());
 
         await using BrowserApplication application = new BrowserApplicationBuilder()
             .ConfigureApplication(
                 options =>
                 {
-                    options.RootComponent = new ComponentNode(RouterView.Registration.Reference);
+                    options.RootComponent = new ComponentNode(ComponentReference.ForName("App"));
                     options.Components = components;
                     options.Services = services;
+                    options.State = state;
                     options.ErrorHandler = ReportError;
                     options.WarnHandler = ReportWarning;
                 })

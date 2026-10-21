@@ -16,6 +16,84 @@ namespace Assimalign.Viu.Core.Tests;
 /// </summary>
 public sealed class RendererKeyedParityTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Render_StableFragmentConditionalSibling_PreservesPositionsWithoutWarnings(
+        bool includeBlockMetadata)
+    {
+        // [RND-KEY-1], [RND-PATCH-2]: branch keys identify replacements at a fixed position.
+        // A changing dynamic-child count must retain positional fallback for the stable fragment.
+        FragmentNode initial = ConditionalFragment(true, 0, includeBlockMetadata);
+        List<string> warnings = [];
+        var application = new ApplicationContext(new ApplicationOptions
+        {
+            RootComponent = initial,
+            WarnHandler = warnings.Add,
+        });
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(initial, host.Container, application);
+        RendererParityNode first = host.Container.Children.Single(node => node.Description == "div");
+        RendererParityNode last = host.Container.Children.Single(node => node.Description == "span");
+        host.ResetOperationCounts();
+
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            renderer.Render(ConditionalFragment(false, 0, includeBlockMetadata), host.Container);
+            host.Container.Children.ShouldNotContain(node => node.Description == "p");
+            renderer.Render(ConditionalFragment(true, 0, includeBlockMetadata), host.Container);
+            RendererParityNode branch = host.Container.Children.Single(node => node.Description == "p");
+            renderer.Render(ConditionalFragment(true, 1, includeBlockMetadata), host.Container);
+            host.Container.Children.Single(node => node.Description == "p").ShouldNotBeSameAs(branch);
+            host.Container.Children.Single(node => node.Description == "div").ShouldBeSameAs(first);
+            host.Container.Children.Single(node => node.Description == "span").ShouldBeSameAs(last);
+        }
+
+        warnings.ShouldBeEmpty();
+        host.MoveCount.ShouldBe(0);
+        renderer.Render(null, host.Container);
+        host.Container.Children.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(PatchFlags.None)]
+    [InlineData(PatchFlags.Bail)]
+    [InlineData(PatchFlags.KeyedFragment)]
+    public void Render_FragmentWithoutPositionalDeclaration_WarnsForMixedChildren(PatchFlags flags)
+    {
+        // [RND-KEY-1], [RND-KEY-3]: the stable-fragment fallback does not suppress
+        // diagnostics for generic, bailed-out, or explicitly keyed collections.
+        FragmentNode initial = new([]);
+        List<string> warnings = [];
+        var application = new ApplicationContext(new ApplicationOptions
+        {
+            RootComponent = initial,
+            WarnHandler = warnings.Add,
+        });
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(initial, host.Container, application);
+
+        renderer.Render(new FragmentNode(
+            [new ElementNode(new QualifiedName("div")), KeyedElement("branch")],
+            renderPlan: new RenderPlan(flags, dynamicChildren: [])), host.Container);
+
+        warnings.ShouldHaveSingleItem().ShouldBe("A sibling collection mixes keyed and keyless non-comment nodes.");
+    }
+
+    private static FragmentNode ConditionalFragment(bool visible, int branchKey, bool includeBlockMetadata)
+    {
+        VirtualNode branch = visible
+            ? new ElementNode(new QualifiedName("p"), children: [new TextNode("visible")], key: branchKey)
+            : new CommentNode("v-if");
+        return new FragmentNode(
+            [new ElementNode(new QualifiedName("div")), branch, new ElementNode(new QualifiedName("span"))],
+            renderPlan: new RenderPlan(
+                PatchFlags.StableFragment,
+                dynamicChildren: includeBlockMetadata ? (visible ? [branch] : []) : null));
+    }
+
     [Fact]
     public void Render_ReversedKeyedList_PreservesIdentityWithMinimalMoves()
     {

@@ -1,0 +1,34 @@
+<template>
+    <main>
+        <button @click.stop.prevent.self.once="HandleSynchronously">sync</button>
+        <button @click.stop.prevent.self.once="HandleWithEvent">sync event</button>
+        <button data-async="true" @click.stop.prevent.self.once="HandleAsynchronously">async</button>
+        <button data-async="true" @click.stop.prevent.self.once="HandleEventAsynchronously">async event</button>
+        <button @click.stop.prevent.self.once="ReturnValue">value</button>
+        <button @click.stop.prevent.self.once="ReturnEventValue">event value</button>
+        <button data-async="true" @click.stop.prevent.self.once="ReturnTaskValue">task value</button>
+        <button data-async="true" @click.stop.prevent.self.once="ReturnTaskEventValue">task event value</button>
+        <input @keydown.enter="HandleSynchronously" />
+        <input @keydown.enter="HandleWithEvent" />
+        <input data-async="true" @keydown.enter="HandleAsynchronously" />
+        <input data-async="true" @keydown.enter="HandleEventAsynchronously" />
+        <input @keydown.enter="ReturnValue" />
+        <input @keydown.enter="ReturnEventValue" />
+        <input data-async="true" @keydown.enter="ReturnTaskValue" />
+        <input data-async="true" @keydown.enter="ReturnTaskEventValue" />
+    </main>
+</template>
+
+@script {
+    using System.Threading.Tasks;
+    using Assimalign.Viu.Components;
+    public int Calls { get; private set; }
+    private void HandleSynchronously() => Calls++;
+    private void HandleWithEvent(IElementEvent value) => Calls++;
+    private Task HandleAsynchronously() { Calls++; return Task.CompletedTask; }
+    private Task HandleEventAsynchronously(IElementEvent value) { Calls++; return Task.CompletedTask; }
+    private int ReturnValue() => ++Calls;
+    private int ReturnEventValue(IElementEvent value) => ++Calls;
+    private async Task<int> ReturnTaskValue() { await Task.Yield(); return ++Calls; }
+    private async Task<int> ReturnTaskEventValue(IElementEvent value) { await Task.Yield(); return ++Calls; }
+}

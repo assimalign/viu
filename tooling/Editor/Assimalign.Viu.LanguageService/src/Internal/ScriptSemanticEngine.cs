@@ -2134,7 +2134,7 @@ internal sealed class ScriptSemanticEngine
         declarations.Add(
             new TemplateComponentDeclaration(
                 new ComponentDeclarationEntry(
-                    model.ClassName,
+                    model.RegisteredName,
                     model.Declarations.Parameters)
                 {
                     IsParameterSurfaceKnown =

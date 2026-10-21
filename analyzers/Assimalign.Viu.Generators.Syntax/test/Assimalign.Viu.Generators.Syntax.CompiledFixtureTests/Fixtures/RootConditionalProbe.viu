@@ -1,0 +1,8 @@
+<template>
+    <div><ConditionalToggle v-model="Enabled" /></div>
+    <p v-if="Enabled">visible</p>
+</template>
+@script {
+    using Assimalign.Viu.Reactivity;
+    public Reference<bool> Enabled { get; } = Reactive.Reference(true);
+}

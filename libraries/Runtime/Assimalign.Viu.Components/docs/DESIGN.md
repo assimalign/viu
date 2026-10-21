@@ -90,3 +90,9 @@ interpret event propagation or browser modifiers, own application lifetime, disc
 or provide an ambient hierarchical dependency API. Scoped CSS and style-scope identity were removed
 on 2026-09-14 ([V01.01.06.17], #367); ordinary component styles and CSS Modules remain supported
 without component-contract members (`[CMP-24]`).
+
+## Compile-time identity and aggregation
+
+Static interface dispatch provides typed definition identity without constructing components or inspecting `typeof(T)` metadata ([CMP-35]). Assembly catalog attributes are compiler input only. The runtime registry owns shared delegate identity, which must unify across assemblies; stateless model conversion and listener adaptation remain consumer-internal generated glue.
+
+Catalog identities are full assembly identities. Repeated reference paths replace the same published callback, and a target factory records successfully applied catalogs. Application factories remain separate. Catalog replacement affects later factory population; existing registration objects remain stable during hot reload ([CMP-36]).

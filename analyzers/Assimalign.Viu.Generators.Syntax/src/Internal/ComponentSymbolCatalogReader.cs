@@ -155,8 +155,18 @@ internal static class ComponentSymbolCatalogReader
             }
         }
 
+        string registeredName = type.Name;
+        foreach (AttributeData attribute in type.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString() == "Assimalign.Viu.Components.ComponentMetadataAttribute"
+                && attribute.ConstructorArguments.Length == 1
+                && attribute.ConstructorArguments[0].Value is string name)
+            {
+                registeredName = name;
+            }
+        }
         context.Entries.Add(new ComponentDeclarationEntry(
-            type.Name,
+            registeredName,
             parameters is null
                 ? EquatableArray<ComponentParameterDeclaration>.Empty
                 : new EquatableArray<ComponentParameterDeclaration>(parameters.ToArray()))

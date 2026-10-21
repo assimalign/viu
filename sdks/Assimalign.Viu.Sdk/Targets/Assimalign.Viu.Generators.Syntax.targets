@@ -18,6 +18,10 @@
         </ItemGroup>
     Disable the whole feature with <EnableSingleFileComponentGeneration>false</EnableSingleFileComponentGeneration>.
   -->
+  <PropertyGroup>
+    <ViuAutoRegisterGeneratedCatalogs Condition="'$(ViuAutoRegisterGeneratedCatalogs)' == '' and ('$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe')">true</ViuAutoRegisterGeneratedCatalogs>
+    <ViuAutoRegisterGeneratedCatalogs Condition="'$(ViuAutoRegisterGeneratedCatalogs)' == ''">false</ViuAutoRegisterGeneratedCatalogs>
+  </PropertyGroup>
   <ItemGroup Condition="'$(EnableSingleFileComponentGeneration)' == 'true'">
     <ViuSingleFileComponent Include="**/*.viu;**/*.vue"
                               Exclude="@(ViuSingleFileComponentExclude);$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
