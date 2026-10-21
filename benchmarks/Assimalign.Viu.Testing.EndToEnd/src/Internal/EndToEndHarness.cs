@@ -1818,6 +1818,15 @@ internal sealed partial class EndToEndHarness
                 "slot-form-" + route,
                 page => RunSlotFormScenarioAsync(page, browserAddress, route));
         }
+        foreach (string route in new[] { "slot-conditional", "root-conditional" })
+        {
+            await RunScenarioAsync(
+                browser,
+                browserEngine,
+                route + "-no-warnings",
+                page => RunConditionalSiblingScenarioAsync(page, browserAddress, route),
+                requireNoWarnings: true);
+        }
         await RunScenarioAsync(
             browser,
             browserEngine,
@@ -1862,7 +1871,8 @@ internal sealed partial class EndToEndHarness
         IBrowser browser,
         BrowserEngine browserEngine,
         string scenario,
-        Func<IPage, Task> execute)
+        Func<IPage, Task> execute,
+        bool requireNoWarnings = false)
     {
         string engineDirectory = Path.Combine(
             _options.ArtifactDirectory,
@@ -1893,7 +1903,10 @@ internal sealed partial class EndToEndHarness
         IPage page = await context.NewPageAsync();
         page.Console += (_, message) =>
         {
-            if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase)
+                || (requireNoWarnings
+                    && (string.Equals(message.Type, "warning", StringComparison.OrdinalIgnoreCase)
+                        || message.Text.StartsWith("Viu application warning:", StringComparison.Ordinal))))
             {
                 lock (browserErrors)
                 {
@@ -1936,7 +1949,7 @@ internal sealed partial class EndToEndHarness
             if (errors.Length > 0)
             {
                 throw new InvalidOperationException(
-                    "Unexpected browser errors:\n" + string.Join("\n", errors));
+                    "Unexpected browser diagnostics:\n" + string.Join("\n", errors));
             }
 
             string[] failedRequests;
@@ -2145,6 +2158,34 @@ internal sealed partial class EndToEndHarness
                 StringComparison.Ordinal);
     }
 
+    private static async Task RunConditionalSiblingScenarioAsync(IPage page, Uri browserAddress, string route)
+    {
+        // PR #379 follow-up, [CMP-37], [RND-KEY-1]: a branch key beside a fixed
+        // keyless div must not warn, either in a referenced Card's slot or a root fragment.
+        // RunScenarioAsync rejects console warnings and the application's warning-handler output.
+        await NavigateAsync(page, new Uri(browserAddress, "#/" + route).AbsoluteUri);
+        ILocator toggle = page.GetByRole(AriaRole.Switch, new() { Name = "Visible" });
+        await toggle.WaitForAsync();
+        ILocator paragraph = page.Locator("p").Filter(new() { HasText = "visible" });
+        await WaitUntilAsync(async () => await paragraph.CountAsync() == 1
+            && await toggle.GetAttributeAsync("aria-checked") == "true",
+            "the initial conditional paragraph", AssertionTimeout);
+        await toggle.EvaluateAsync("button => button.conditionalSiblingMarker = true");
+
+        for (int click = 0; click < 6; click++)
+        {
+            await toggle.ClickAsync();
+            bool visible = click % 2 != 0;
+            await WaitUntilAsync(async () => await paragraph.CountAsync() == (visible ? 1 : 0)
+                && await toggle.GetAttributeAsync("aria-checked") == (visible ? "true" : "false"),
+                "the conditional paragraph after toggle " + (click + 1), AssertionTimeout);
+            if (!await toggle.EvaluateAsync<bool>("button => button.conditionalSiblingMarker === true"))
+            {
+                throw new InvalidOperationException("The fixed toggle sibling was remounted.");
+            }
+        }
+    }
+
     private static async Task RunSlotFormScenarioAsync(IPage page, Uri browserAddress, string route)
     {
         // [CMP-18], [RND-BLOCK-2], [V01.01.11.03]: fresh hash navigation, a multi-root page,
@@ -2176,9 +2217,14 @@ internal sealed partial class EndToEndHarness
         await WaitUntilAsync(async () => await input.InputValueAsync() == ""
             && await submit.IsDisabledAsync() && await page.Locator(".task-list li").CountAsync() == 2,
             "the prevented submit to append a keyed row and reset the model", AssertionTimeout);
-        while (await page.Locator("button[aria-label='Remove']").CountAsync() > 0)
+        ILocator removeButtons = page.Locator("button[aria-label='Remove']");
+        int remaining = await removeButtons.CountAsync();
+        while (remaining > 0)
         {
-            await page.Locator("button[aria-label='Remove']").First.ClickAsync();
+            await removeButtons.First.ClickAsync();
+            remaining--;
+            await WaitUntilAsync(async () => await removeButtons.CountAsync() == remaining,
+                "the keyed row removal", AssertionTimeout);
         }
         await WaitUntilAsync(async () => (await page.Locator(".card__body").Nth(1).TextContentAsync())?.Trim() == "All clear.",
             "the conditional empty branch", AssertionTimeout);

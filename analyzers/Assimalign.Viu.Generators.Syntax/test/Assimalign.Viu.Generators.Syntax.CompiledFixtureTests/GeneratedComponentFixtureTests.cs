@@ -29,6 +29,48 @@ namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 /// </summary>
 public sealed class GeneratedComponentFixtureTests
 {
+    [Theory]
+    [InlineData("SlotConditionalProbe")]
+    [InlineData("RootConditionalProbe")]
+    public void ConditionalSibling_ComponentModelToggles_DoNotWarnOrRemountFixedSibling(string componentName)
+    {
+        // PR #379 follow-up, [CMP-37], [RND-KEY-1]: identical fixed sibling positions
+        // in a lazy slot and a component root retain compiler-generated branch identity.
+        List<string> warnings = [];
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentNode root = new(ComponentReference.ForName(componentName));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container,
+            CreateApplication(root, CreateFactory(fixtures), warningHandler: warnings.Add));
+        host.RunScheduledFlushes();
+        CompiledFixtureNode button = host.FindElements("button").Single();
+        CompiledFixtureNode fixedSibling = button.Parent!;
+        object toggle = FindInstance(renderer, host, "ConditionalToggle");
+        int toggleUpdates = 0;
+        renderer.GetMountedComponentViews(host.Container).Single(view => ReferenceEquals(view.Instance, toggle))
+            .Context.Lifecycle.OnUpdated(() => toggleUpdates++);
+
+        for (int click = 0; click < 6; click++)
+        {
+            host.FindElements("p").Count.ShouldBe(click % 2 == 0 ? 1 : 0);
+            InvokeHostListener(button.Bindings.Values.OfType<Delegate>().Single());
+            host.RunScheduledFlushes();
+            host.FindElements("p").Count.ShouldBe(click % 2 == 0 ? 0 : 1);
+            button.Bindings["aria-checked"].ShouldBe(click % 2 != 0);
+            host.FindElements("button").Single().ShouldBeSameAs(button);
+            button.Parent.ShouldBeSameAs(fixedSibling);
+            FindInstance(renderer, host, "ConditionalToggle").ShouldBeSameAs(toggle);
+            toggleUpdates.ShouldBe(click + 1);
+            warnings.ShouldBeEmpty();
+        }
+
+        host.MoveCount.ShouldBe(0);
+        renderer.Render(null, host.Container);
+        host.Container.Children.ShouldBeEmpty();
+        warnings.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Slot_ThrowingContentResetsDeclaringFrameAndCanRenderAgain()
     {
@@ -1147,7 +1189,8 @@ public sealed class GeneratedComponentFixtureTests
         ComponentNode root,
         ComponentFactory factory,
         IServiceProvider? services = null,
-        Action<Exception, ComponentContext?, string>? errorHandler = null)
+        Action<Exception, ComponentContext?, string>? errorHandler = null,
+        Action<string>? warningHandler = null)
     {
         var directives = new DirectiveRegistry(
         [
@@ -1175,7 +1218,7 @@ public sealed class GeneratedComponentFixtureTests
                 Directives = directives,
                 Services = services,
                 ErrorHandler = errorHandler,
-                WarnHandler = warning => throw new InvalidOperationException(warning),
+                WarnHandler = warningHandler ?? (warning => throw new InvalidOperationException(warning)),
             });
     }
 

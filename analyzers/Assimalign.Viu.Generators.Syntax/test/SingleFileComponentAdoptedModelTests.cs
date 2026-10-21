@@ -15,6 +15,40 @@ public sealed class SingleFileComponentAdoptedModelTests
     private const string ProjectDirectory = "C:/project";
     private const string RootNamespace = "Demo";
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConditionalSiblings_EmitStableFragmentWithBranchKeyOnly(bool inSlot)
+    {
+        // PR #379 follow-up, [CMP-37], [RND-KEY-1]: fixed siblings keep their
+        // positions; the generated key identifies the conditional branch, not a keyed list.
+        const string children = "<div><Toggle v-model=\"Enabled\" /></div><p v-if=\"Enabled\">visible</p>";
+        string source = "<template>" + (inSlot ? "<Card>" + children + "</Card>" : children)
+            + "</template>\n@script {\n"
+            + "using Assimalign.Viu.Reactivity;\n"
+            + "public Reference<bool> Enabled { get; } = Reactive.Reference(true);\n}\n";
+        var outcome = GeneratorTestHarness.RunAll(
+            new[]
+            {
+                (ProjectDirectory + "/ConditionalProbe.viu", source),
+                (ProjectDirectory + "/Card.viu", "<template><article><slot /></article></template>"),
+                (ProjectDirectory + "/Toggle.viu", "<template><button /></template>\n@script {\n"
+                    + "[global::Assimalign.Viu.Components.Parameter] public bool ModelValue { get; set; }\n"
+                    + "[global::Assimalign.Viu.Components.Event(\"update:modelValue\")] "
+                    + "public partial void UpdateModelValue(bool value);\n}\n"),
+            },
+            RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        string generated = GeneratorTestHarness.GeneratedSource(outcome, "ConditionalProbe.SingleFileComponent.g.cs");
+        generated.ShouldContain(inSlot ? "PatchFlags.StableFragment" : "/* STABLE_FRAGMENT */");
+        generated.ShouldContain("frame.CloseBlock()");
+        generated.ShouldContain("[\"key\"] = 0");
+        generated.Split(["[\"key\"] ="], StringSplitOptions.None).Length.ShouldBe(2);
+        generated.ShouldNotContain("KEYED_FRAGMENT");
+        generated.ShouldNotContain("PatchFlags.KeyedFragment");
+    }
+
     [Fact]
     public void Scaffold_EmitsContractRegistrationAndFrameTakingSetup()
     {

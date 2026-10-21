@@ -54,7 +54,9 @@ public enum PatchFlags
 
     /// <summary>
     /// A fragment whose child order is stable, allowing children to patch pairwise without
-    /// reconciliation.
+    /// keyed reconciliation, including when its block fast path falls back.
+    /// Conditional branch keys still distinguish replacements at each position.
+    /// Specified by <c>[RND-KEY-1]</c> and <c>[RND-PATCH-2]</c>.
     /// </summary>
     StableFragment = 1 << 6,
 

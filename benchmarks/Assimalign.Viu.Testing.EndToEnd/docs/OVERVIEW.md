@@ -20,7 +20,13 @@ keyed DOM moves, component unmount cleanup with Browser node and listener-regist
 scheduler/`NextTickAsync` ordering, Browser adoption of server-rendered nodes, and visible lazy
 hydration through `IntersectionObserver`. A failed scenario records its engine and name and retains
 a full-page screenshot plus Playwright trace. Unexpected browser console/page errors and failed
-network requests fail that scenario.
+network requests fail that scenario. Scenarios can additionally require zero console and application
+warnings; intentional invalid-attribute warnings remain exercised by the custom-element lane.
+
+The conditional sibling scenarios toggle a component model six times beside a fixed keyless
+`div`, both in a referenced Card slot and in a component root fragment. They require the paragraph
+to disappear and return, the toggle's DOM identity to survive, and zero console or application
+warnings (`[CMP-37]`, `[RND-KEY-1]`, PR #379 follow-up).
 
 The two static prerender scenarios publish `EndToEndPrerenderApp` with
 `ViuStaticPrerender=true`. The packaged base SDK builds and invokes the package-only server host,

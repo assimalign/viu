@@ -359,8 +359,11 @@ its dynamic descendants in its own block, even when that root has positive bindi
 flags. Multiple slot siblings form a stable fragment block. An outlet tracks the returned root in
 its own frame, so nested model-dependent text, bindings, and conditional or keyed descendants MUST
 update without an unrelated declaring-component render. Compiler-generated conditional branch keys
-inside these fixed slot siblings retain their branch identity. A failed slot invocation MUST discard
-incomplete block assembly in the declaring frame before propagating the error to the outlet.
+inside these fixed slot siblings retain their branch identity.
+Stable slot fragments use positional reconciliation under `[RND-KEY-1]` when block patching falls
+back; generated conditional keys beside keyless fixed siblings MUST NOT produce mixed-key warnings.
+A failed slot invocation MUST discard incomplete block assembly in the declaring frame before
+propagating the error to the outlet.
 
 ### 4.7 Lifecycle
 
@@ -871,11 +874,16 @@ differs. Comment patching updates registration only.
 ### 6.5 Keyed reconciliation
 
 `[RND-KEY-1]` `PatchChildren` selects **positional reconciliation** when the parent's patch flags
-are positive and include `UnkeyedFragment` — the compiler's declaration that the children never
-reorder. Every other case uses the keyed algorithm.
+are positive and include `StableFragment` or `UnkeyedFragment` — the compiler's declaration that
+child positions never reorder. This also applies when a stable fragment's block fast path cannot
+run, for example because toggling a conditional changes the dynamic-child count. Conditional branch
+keys distinguish replacements at their fixed position; they do not require keyed sibling matching
+or produce mixed-key warnings in these positional collections. Every other case uses the keyed
+algorithm, including `None` and `Bail` trees without a trusted positional declaration.
 
 `[RND-KEY-2]` **Positional reconciliation** patches the common prefix pairwise, unmounts the surplus
-old children, and mounts the surplus new children. No key comparison is performed.
+old children, and mounts the surplus new children. Keys are not searched to match sibling positions;
+each pair still obeys `[RND-PATCH-2]`, so a different branch key replaces the node at that position.
 
 `[RND-KEY-3]` **Keyed reconciliation** runs in three passes:
 

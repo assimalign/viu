@@ -40,6 +40,12 @@ internal static class Program
                 new RouteRecord(
                     "/tasks-sibling",
                     component: new ComponentNode(ComponentReference.ForName("TasksPageSibling"))),
+                new RouteRecord(
+                    "/slot-conditional",
+                    component: new ComponentNode(ComponentReference.ForName("SlotConditionalProbe"))),
+                new RouteRecord(
+                    "/root-conditional",
+                    component: new ComponentNode(ComponentReference.ForName("RootConditionalProbe"))),
             ]);
         router.ScrollBehavior = static (_, _, savedPosition) =>
             Task.FromResult<ScrollTarget?>(
