@@ -92,6 +92,10 @@ internal sealed class CompiledFixtureAssembly
         [
             // Verbatim physical copies of the shipping compiled-component source constants.
             "AttributedCard.viu",
+            "ScopedOwner.viu",
+            "ScopedReceiver.viu",
+            "StyleBindingProbe.viu",
+            "ReactiveTransitionProbe.viu",
             "Button.viu",
             "Input.viu",
             "NativeCollisionHost.viu",

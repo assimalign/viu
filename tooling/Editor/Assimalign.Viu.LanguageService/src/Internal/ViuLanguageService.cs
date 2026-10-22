@@ -23,9 +23,9 @@ internal sealed class ViuLanguageService :
             // as migration guidance during the transition window.
             ["template"] = "**`<template>`** contains the component's template markup, compiled to a render function at build time.",
             ["@script"] = "**`@script`** contains C# members merged into the generated partial component.",
-            ["style"] = "**`<style>`** contains ordinary global component CSS or a CSS `module`.",
+            ["style"] = "**`<style>`** contains component CSS and can be `scoped` or a CSS `module`.",
             ["@template"] = "**`@template { }`** is the legacy Viu template container. Rewrite the block as `<template>...</template>`; block options become tag attributes.",
-            ["@style"] = "**`@style { }`** is the legacy Viu style container. Rewrite the block as `<style>...</style>`; block options become tag attributes such as `module`.",
+            ["@style"] = "**`@style { }`** is the legacy Viu style container. Rewrite the block as `<style>...</style>`; block options become tag attributes such as `scoped`.",
             ["v-if"] = "**`v-if`** conditionally renders an element or component.",
             ["v-for"] = "**`v-for`** repeats an element or component for values in a source.",
             ["v-model"] = "**`v-model`** creates a two-way form value binding.",
@@ -951,14 +951,38 @@ internal sealed class ViuLanguageService :
             // nothing rather than the member-and-snippet list that is illegal there.
             return contextKind == ScriptCompletionContextKind.UsingDirective
                 ? Array.Empty<LanguageCompletionItem>()
-                : GetSyntaxOnlyScriptCompletions(linePrefix, document.Syntax);
+                : WithScriptIdentifierRange(
+                    GetSyntaxOnlyScriptCompletions(linePrefix, document.Syntax), document.Text, offset, word);
         }
 
         // The engine already restricted a using directive's lookup to namespaces and types and
         // ordered namespaces first; appending the scaffold or keyword catalogs would put them back.
-        return contextKind == ScriptCompletionContextKind.UsingDirective
+        var completions = contextKind == ScriptCompletionContextKind.UsingDirective
             ? semantic.Items
             : MergeScriptSemanticCompletions(semantic, word);
+        return WithScriptIdentifierRange(completions, document.Text, offset, word);
+    }
+
+    // [V01.01.12.07.18] The suffix belongs to the current identifier, never the next dotted segment.
+    // At a token's end the client's ordinary insertion behavior remains sufficient.
+    private static IReadOnlyList<LanguageCompletionItem> WithScriptIdentifierRange(
+        IReadOnlyList<LanguageCompletionItem> completions, string text, int offset, string prefix)
+    {
+        int end = offset;
+        while (end < text.Length && (char.IsLetterOrDigit(text[end]) || text[end] == '_'))
+        {
+            end++;
+        }
+
+        if (end == offset || completions.Count == 0)
+        {
+            return completions;
+        }
+
+        var range = new LanguageRange(
+            TextCoordinateConverter.GetPosition(text, offset - prefix.Length),
+            TextCoordinateConverter.GetPosition(text, end));
+        return completions.Select(item => item with { EditRange = range }).ToArray();
     }
 
     // The semantic gate ([V01.01.12.23], #259): only an (implicitly or explicitly) C# script

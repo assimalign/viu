@@ -29,6 +29,91 @@ namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 /// </summary>
 public sealed class GeneratedComponentFixtureTests
 {
+    [Fact]
+    public void Transition_ReferenceReadOnlyInsideAuthoredSlot_TracksBothToggleDirections()
+    {
+        // [BLT-7], [CMP-37]: the button does not read Visible; only the Transition slot reads it.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        factory.Register(new ComponentRegistration(ComponentReference.ForName("Transition"),
+            Transition.Registration.Contract, Transition.Registration.Activator));
+        ComponentNode root = new(ComponentReference.ForName("ReactiveTransitionProbe"));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        renderer.Render(root, host.Container, CreateApplication(root, factory));
+        host.RunScheduledFlushes();
+        CompiledFixtureNode button = host.FindElements("button").Single();
+        int transitionUpdates = 0;
+        renderer.GetMountedComponentViews(host.Container).Single(view => view.Instance is Transition)
+            .Context.Lifecycle.OnUpdated(() => transitionUpdates++);
+        for (int click = 0; click < 4; click++)
+        {
+            host.FindElements("p").Count.ShouldBe(click % 2 == 0 ? 1 : 0);
+            InvokeHostListener(button.Bindings.Values.OfType<Delegate>().Single());
+            host.RunScheduledFlushes();
+            transitionUpdates.ShouldBe(click + 1);
+            host.FindElements("p").Count.ShouldBe(click % 2 == 0 ? 0 : 1);
+            host.FindElements("button").Single().ShouldBeSameAs(button);
+        }
+        renderer.Render(null, host.Container);
+        host.Container.Children.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task StyleBinding_ObjectDictionary_UsesHostPropertyAndUpdatesWithoutStringifying()
+    {
+        // [SFC-CG-2], [V01.01.06.07.01]: style objects must reach the host style patcher.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentNode root = new(ComponentReference.ForName("StyleBindingProbe"));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        ComponentFactory factory = CreateFactory(fixtures);
+        renderer.Render(root, host.Container, CreateApplication(root, factory));
+        host.RunScheduledFlushes();
+        CompiledFixtureNode paragraph = host.FindElements("p").Single();
+        paragraph.BindingKinds["style"].ShouldBe(ElementBindingKind.Property);
+        paragraph.BindingKinds["class"].ShouldBe(ElementBindingKind.Property);
+        host.FindElements("i").Single().BindingKinds["style"].ShouldBe(ElementBindingKind.Attribute);
+        ((IReadOnlyDictionary<string, object?>)paragraph.Bindings["style"]!)["color"].ShouldBe("green");
+
+        InvokeHostListener(host.FindElements("button").Single().Bindings.Values.OfType<Delegate>().Single());
+        host.RunScheduledFlushes();
+        ((IReadOnlyDictionary<string, object?>)paragraph.Bindings["style"]!)["color"].ShouldBe("gray");
+        paragraph.Bindings["class"].ShouldBe("inactive");
+
+        string markup = await ServerRender.RenderToStringAsync(new ServerRenderApplication(root, factory));
+        markup.ShouldContain("color:green");
+        markup.ShouldNotContain("Dictionary");
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
+    public async Task ScopedStyles_ProjectedSlotRoots_KeepAuthorScopeAndGainReceiverSuffix()
+    {
+        // [STY-1] Scoped CSS follows native authoring ownership, including projected slot roots.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentNode root = new(ComponentReference.ForName("ScopedOwner"));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+        var factory = CreateFactory(fixtures);
+        renderer.Render(root, host.Container, CreateApplication(root, factory));
+        host.RunScheduledFlushes();
+        var paragraph = host.FindElements("p").Single();
+        string receiverScope = paragraph.Bindings.Keys.Single(name => name.StartsWith("data-v-", StringComparison.Ordinal));
+        foreach (var span in host.FindElements("span"))
+        {
+            span.Bindings.Keys.ShouldContain(receiverScope + "-s");
+            span.Bindings.Keys.ShouldNotContain(receiverScope);
+            span.Bindings.Keys.Count(name => name.StartsWith("data-v-", StringComparison.Ordinal)).ShouldBe(2);
+        }
+
+        string markup = await ServerRender.RenderToStringAsync(new ServerRenderApplication(root, factory));
+        markup.ShouldContain(receiverScope + "-s");
+        markup.ShouldContain(">1</span>");
+        renderer.Render(null, host.Container);
+        host.Container.Children.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("SlotConditionalProbe")]
     [InlineData("RootConditionalProbe")]
@@ -769,7 +854,7 @@ public sealed class GeneratedComponentFixtureTests
                     "RouterBuiltInsView.SingleFileComponent.g.cs",
                     StringComparison.Ordinal))
                 .Value;
-            generated.ShouldContain("TransitionNode");
+            generated.ShouldContain("ComponentReference.ForName(\"Transition\")");
             generated.ShouldContain("ComponentReference.ForName(\"TransitionGroup\")");
             generated.ShouldContain("KeepAliveNode");
             generated.ShouldContain("TeleportNode");
@@ -1178,6 +1263,9 @@ public sealed class GeneratedComponentFixtureTests
 
     private static void RegisterTransitionGroup(ComponentFactory factory)
     {
+        // A DOM-less host supplies the same built-in aliases as BrowserApplication.
+        factory.Register(new ComponentRegistration(ComponentReference.ForName("Transition"),
+            Transition.Registration.Contract, Transition.Registration.Activator));
         factory.Register(
             new ComponentRegistration(
                 ComponentReference.ForName("TransitionGroup"),

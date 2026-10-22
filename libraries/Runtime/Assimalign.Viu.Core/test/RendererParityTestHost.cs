@@ -91,6 +91,10 @@ internal sealed class RendererParityHost : IDisposable
 
     internal int BindingPatchCount { get; private set; }
 
+    internal int ParentReadCount { get; private set; }
+
+    internal int SiblingReadCount { get; private set; }
+
     internal List<string> BindingPatchNames { get; } = [];
 
     internal int CommitCount { get; private set; }
@@ -109,8 +113,8 @@ internal sealed class RendererParityHost : IDisposable
                 CreateText = CreateText,
                 CreateComment = CreateComment,
                 SetText = SetText,
-                ParentNode = static node => node.Parent,
-                NextSibling = NextSibling,
+                ParentNode = node => { ParentReadCount++; return node.Parent; },
+                NextSibling = node => { SiblingReadCount++; return NextSibling(node); },
                 PatchAttribute = PatchBinding,
                 ResolveTeleportTarget = ResolveTeleportTarget,
                 Commit = () => CommitCount++,
@@ -128,6 +132,8 @@ internal sealed class RendererParityHost : IDisposable
 
     internal void ResetOperationCounts()
     {
+        ParentReadCount = 0;
+        SiblingReadCount = 0;
         InsertCount = 0;
         MoveCount = 0;
         RemoveCount = 0;

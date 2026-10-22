@@ -179,7 +179,8 @@ public static class SingleFileComponentProjection
         var cssVariableBindings = new List<CssVariableBindingEntry>();
         var moduleTemplateNames = new Dictionary<string, string>(StringComparer.Ordinal);
         var extractedStyles = CompileStyles(
-            input, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, bindingMetadata, cancellationToken);
+            input, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, bindingMetadata, cancellationToken,
+            out var scopeId);
 
         var model = new SingleFileComponentModel(
             input.Namespace,
@@ -195,6 +196,7 @@ public static class SingleFileComponentProjection
             Bindings: bindings,
             RenderBody: null,
             RenderCacheSize: 0,
+            ScopeId: scopeId,
             ExtractedStyles: extractedStyles,
             ModuleClasses: moduleClasses.Count == 0
                 ? EquatableArray<CssModuleClassEntry>.Empty
@@ -221,7 +223,7 @@ public static class SingleFileComponentProjection
             cssModules,
             diagnostics,
             cancellationToken,
-            RenderFunctionTargetProfile.VirtualNodeTree);
+            RenderFunctionTargetProfile.VirtualNodeTree, scopeId);
         var serverRender = input.EmitServerRendering
             ? CompileRenderFunction(
                 input,
@@ -230,7 +232,7 @@ public static class SingleFileComponentProjection
                 cssModules,
                 diagnostics,
                 cancellationToken,
-                RenderFunctionTargetProfile.ServerMarkup)
+                RenderFunctionTargetProfile.ServerMarkup, scopeId)
             : default;
         model = model with
         {
@@ -523,7 +525,8 @@ public static class SingleFileComponentProjection
         CssModuleAccessors cssModules,
         List<DiagnosticInfo> diagnostics,
         CancellationToken cancellationToken,
-        RenderFunctionTargetProfile targetProfile)
+        RenderFunctionTargetProfile targetProfile,
+        string? scopeId)
     {
         foreach (var sourceResult in parse.SourceResults)
         {
@@ -538,6 +541,7 @@ public static class SingleFileComponentProjection
             var blockContentStart = sourceResult.Node.ContentLocation.Start;
             var transformOptions = TransformOptions.CreateDom();
             transformOptions.PrefixIdentifiers = true;
+            transformOptions.ScopeId = scopeId;
             transformOptions.BindingMetadata = bindingMetadata;
             transformOptions.IsServerRendering =
                 targetProfile == RenderFunctionTargetProfile.ServerMarkup;
@@ -615,9 +619,11 @@ public static class SingleFileComponentProjection
         List<CssVariableBindingEntry> cssVariableBindings,
         Dictionary<string, string> moduleTemplateNames,
         BindingMetadata bindingMetadata,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        out string? scopeId)
     {
         var compilation = SingleFileComponentStyleCompiler.Compile(parse, input.CssHashSalt, cancellationToken);
+        scopeId = compilation.ScopeId;
 
         foreach (var moduleClass in compilation.ModuleClasses)
         {

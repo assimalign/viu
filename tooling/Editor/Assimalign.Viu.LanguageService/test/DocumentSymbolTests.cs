@@ -24,7 +24,7 @@ public class DocumentSymbolTests
             "@script {\n" +
             "    public int Count;\n" +
             "}\n" +
-            "<style module>\n" +
+            "<style scoped>\n" +
             ".card { }\n" +
             "</style>\n";
         var service = LanguageServices.Create();
@@ -56,7 +56,7 @@ public class DocumentSymbolTests
         var style = symbols[2];
         style.Name.ShouldBe("<style>");
         style.Kind.ShouldBe(LanguageSymbolKind.Module);
-        style.Detail.ShouldBe("module");
+        style.Detail.ShouldBe("scoped");
         style.SelectionRange.ShouldBe(
             new LanguageRange(
                 new LanguagePosition(6, 1),

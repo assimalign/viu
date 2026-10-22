@@ -13,7 +13,7 @@ namespace Assimalign.Viu.Browser;
 /// warning through <see cref="ComponentContext.Warn"/>. Specified by <c>[BLT-7]</c> through
 /// <c>[BLT-9]</c>.
 /// </remarks>
-public sealed class TransitionGroup : IComponent
+public sealed class TransitionGroup : IComponent, IComponentDefinition
 {
     private static readonly IReadOnlyList<ComponentParameter> Parameters = CreateParameters();
     private static readonly ComponentContract Contract = new(

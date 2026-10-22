@@ -30,7 +30,7 @@ public class ViuSectionScannerTests
             "    public int Count { get; set; }",
             "}",
             "",
-            "<style module>",
+            "<style scoped>",
             "    div { color: red; }",
             "</style>",
         ];
@@ -61,7 +61,7 @@ public class ViuSectionScannerTests
             "@template {",
             "    <div>Hello</div>",
             "}",
-            "@style module {",
+            "@style scoped {",
             "    div { color: red; }",
             "}",
         ];

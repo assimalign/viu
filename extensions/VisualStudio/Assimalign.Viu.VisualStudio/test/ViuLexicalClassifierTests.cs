@@ -9,6 +9,22 @@ namespace Assimalign.Viu.VisualStudio;
 
 public class ViuLexicalClassifierTests
 {
+    [Theory]
+    [InlineData("using System.Collections.Generic;")]
+    [InlineData("using System.Collections.")]
+    [InlineData("using System.Col")]
+    [InlineData("global using System.Collections;")]
+    public void Classify_UsingDirectiveDuringTyping_KeepsNamespaceCategory(string directive)
+    {
+        string[] lines = ["@script {", directive, "}"];
+
+        var spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Namespace).ShouldContain("System");
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Type).ShouldBeEmpty();
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Keyword).ShouldContain("using");
+    }
+
     [Fact]
     public void Classify_UnsupportedScopedOption_IsAnOrdinaryAttribute()
     {

@@ -1,10 +1,9 @@
 # Assimalign.Viu.Testing.EndToEnd
 
 This test-only executable drives Viu exclusively from the browser side through Playwright .NET. It
-is a test harness, not a benchmark. It sits under `benchmarks/` for historical reasons — the
-performance benchmark suite that once shared the folder now lives in the sibling
-`viu-benchmarks` repository, and browser orchestration, trace capture, startup measurement, and the
-loopback static server stayed here because they need this repository's source. It is never
+lives under `tests/EndToEnd/` and is a test harness. Performance suites live in the sibling
+`viu-benchmarks` repository. Browser orchestration, trace capture, startup measurement, and the
+loopback static server remain here because they need this repository's source. It is never
 packed and no shipping library references it. Purpose-built package-consumer applications remain
 under `scripts/fixtures/`, beside the script that stages them.
 

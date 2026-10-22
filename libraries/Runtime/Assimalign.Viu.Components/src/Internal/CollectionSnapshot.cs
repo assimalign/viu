@@ -51,11 +51,10 @@ internal static class CollectionSnapshot
     {
         if (source is null || source.Count == 0)
         {
-            return new ReadOnlyDictionary<string, TValue>(
-                new Dictionary<string, TValue>(StringComparer.Ordinal));
+            return EmptyDictionary<TValue>.Value;
         }
 
-        Dictionary<string, TValue> snapshot = new(StringComparer.Ordinal);
+        Dictionary<string, TValue> snapshot = new(source.Count, StringComparer.Ordinal);
         foreach (KeyValuePair<string, TValue> entry in source)
         {
             ArgumentException.ThrowIfNullOrEmpty(entry.Key);
@@ -82,5 +81,12 @@ internal static class CollectionSnapshot
         }
 
         return snapshot;
+    }
+
+    // [V01.01.11.07] The empty dictionary is immutable and holds no caller-owned collection.
+    private static class EmptyDictionary<TValue>
+    {
+        internal static readonly IReadOnlyDictionary<string, TValue> Value =
+            new ReadOnlyDictionary<string, TValue>(new Dictionary<string, TValue>(StringComparer.Ordinal));
     }
 }

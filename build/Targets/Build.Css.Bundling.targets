@@ -120,7 +120,7 @@
        Deviates from the repo build-system rule (no raw <ProjectReference>) per design decision: a build-order
        edge the ViuProjectReference transform cannot express — a netstandard2.0 task referenced with
        ReferenceOutputAssembly=false and UndefineProperties to cross the app's TFM/RID boundary, mirroring
-       frameworks/Assimalign.Viu.App.Refs. -->
+       libraries/Runtime/Assimalign.Viu.App.Refs. -->
   <ItemGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\src\Assimalign.Viu.Sdk.Tasks.csproj')">
     <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\src\Assimalign.Viu.Sdk.Tasks.csproj"
                       ReferenceOutputAssembly="false"

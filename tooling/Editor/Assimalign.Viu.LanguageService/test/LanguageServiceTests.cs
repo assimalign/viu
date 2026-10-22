@@ -12,27 +12,6 @@ public class LanguageServiceTests
     private const string DocumentUri = "file:///workspace/Counter.viu";
     private const string VueDocumentUri = "file:///workspace/Counter.vue";
 
-    [Theory]
-    [InlineData(DocumentUri, "VIU1018", LanguageDiagnosticSeverity.Error)]
-    [InlineData(VueDocumentUri, "VIU1019", LanguageDiagnosticSeverity.Warning)]
-    public void GetDiagnostics_ScopedStyle_ReportsRemovalAtOptionName(
-        string documentUri,
-        string code,
-        LanguageDiagnosticSeverity severity)
-    {
-        // [V01.01.06.17] uses the same parser diagnostics in the editor, including compatibility severity.
-        var service = LanguageServices.Create();
-        service.OpenDocument(documentUri, "<style scoped />", 1);
-
-        var diagnostic = service.GetDiagnostics(documentUri).Single();
-
-        diagnostic.Code.ShouldBe(code);
-        diagnostic.Severity.ShouldBe(severity);
-        diagnostic.Message.ShouldBe("Scoped styles are not supported; Viu compiles component styles as ordinary global stylesheets. Remove the scoped option or use a CSS module.");
-        diagnostic.Range.Start.ShouldBe(new LanguagePosition(0, 7));
-        diagnostic.Range.End.ShouldBe(new LanguagePosition(0, 13));
-    }
-
     [Fact]
     public void GetDiagnostics_MalformedBlockHeader_ProjectsParserDiagnostic()
     {
@@ -104,7 +83,7 @@ public class LanguageServiceTests
             .InsertText.ShouldBe("@script {\n\t$0\n}");
         completions.Single(item => item.Label == "style")
             .InsertText.ShouldBe("<style>\n\t$0\n</style>");
-        completions.ShouldNotContain(item => item.Label == "style scoped");
+        completions.ShouldContain(item => item.Label == "style scoped");
         completions.ShouldContain(item => item.Label == "style module");
         completions.ShouldNotContain(item => item.Label == "@template");
         completions.ShouldNotContain(item => item.Label == "@style");
@@ -362,7 +341,7 @@ public class LanguageServiceTests
             DocumentUri,
             new LanguagePosition(0, 7));
 
-        completions.ShouldNotContain(item => item.Label == "scoped");
+        completions.ShouldContain(item => item.Label == "scoped");
         completions.ShouldContain(item => item.Label == "module");
         completions.ShouldContain(item => item.Label == "lang=\"css\"");
     }
@@ -406,7 +385,7 @@ public class LanguageServiceTests
             DocumentUri,
             new LanguagePosition(0, 7));
 
-        completions.ShouldNotContain(item => item.Label == "scoped");
+        completions.ShouldContain(item => item.Label == "scoped");
         completions.ShouldContain(item => item.Label == "module");
         completions.ShouldContain(item => item.Label == "lang=\"css\"");
     }

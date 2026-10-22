@@ -16,10 +16,10 @@ Shared build logic is centralized under `build/` and imported repo-wide via `Dir
 (→ `build/Build.props`) and `Directory.Build.targets` (→ `build/Build.targets`). **Shared build logic
 belongs in `build/`, never duplicated in individual csprojs** — this is the most drift-prone area.
 
-## Where a .props/.targets file lives — exactly two homes
+## Where a .props/.targets file lives
 
-Every MSBuild props/targets file belongs to **one** of these, and per-project `build/` folders scattered
-next to a library's or analyzer's `src/` are not a third option:
+Every MSBuild props/targets file belongs to **one** of these locations. Per-project `build/` folders
+scattered next to a library's or analyzer's `src/` are not an additional option:
 
 1. **The owning SDK segment's `Targets/` folder** —
    `sdks/Assimalign.Viu.Sdk/Targets/` holds host-neutral generator and component-library pack logic;
@@ -31,6 +31,12 @@ next to a library's or analyzer's `src/` are not a third option:
    `build/Targets/Build.References.Analyzers.targets` under `$(ViuUseSingleFileComponents)`), so the
    packaged and dogfooded paths cannot drift.
 2. **`build/`** (repository root) — it supports this repository's own pipeline.
+3. **The framework producer's library area** — owner-authorized exception of 2026-10-22
+   ([V01.01.12.37], #381). `libraries/Runtime/Assimalign.Viu.App.{props,targets}` and
+   `Assimalign.Viu.App.Pack.props` own the base manifest, shared pack writer, and producer defaults;
+   `libraries/Browser/Assimalign.Viu.App.Browser.props` extends the manifest for Browser.
+   Keep one shared writer; Browser imports Runtime rather than copying its implementation.
+   This exception covers framework pack production only; general shared logic stays in `build/`.
 
 A file that must reach consumers under a *different* packaged name stays in `build/` and is packed with
 an explicit `PackagePath` (the component-CSS bundling and hot-reload targets do this). An analyzer
@@ -54,7 +60,7 @@ project ships only source and its DLL.
   and consumer properties; it remains outside every Viu SDK and framework surface.
 - Ecosystem integrations live under `extensions/{VisualStudio|VisualStudioCode|dotnet}`; the templates
   project is `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives under
-  `benchmarks/Assimalign.Viu.Testing.EndToEnd`. SDK task projects use
+  `tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd`. SDK task projects use
   `sdks/<SdkId>/Tasks/{src,test}`.
 
 ## Reference projects and packages by name
@@ -64,7 +70,7 @@ test, or example csproj. Use the by-name item groups the build system resolves:
 
 - **`<ViuProjectReference Include="Assimalign.Viu.Components" />`** — public project reference (flows as a
   `.nupkg` dependency). Resolved by assembly name against every indexed code root —
-  `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `extensions/`, and `benchmarks/` — see
+  `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `extensions/`, and `tests/` — see
   `build/Targets/Build.References.Projects.targets`.
 - **`<ViuPrivateProjectReference Include="..." />`** — private reference (`PrivateAssets=all`; does not
   flow to consumers).
@@ -148,8 +154,8 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
 5. If the library is host-neutral framework runtime, add it to `@(ViuFrameworkAssembly)` in
-   `frameworks/Assimalign.Viu.App.props`. If it is Browser-only, add it to the Browser segment in
-   `frameworks/Assimalign.Viu.App.Browser.props`. Do not make a host-neutral library depend on the
+   `libraries/Runtime/Assimalign.Viu.App.props`. If it is Browser-only, add it to the Browser segment in
+   `libraries/Browser/Assimalign.Viu.App.Browser.props`. Do not make a host-neutral library depend on the
    Browser segment.
 6. If the library is packable, add its package id to `$script:ViuLibraryPackageIds` in
    `scripts/modules/ViuPackaging.psm1`; the drift guard scans both `libraries/` and `tooling/` and
@@ -161,19 +167,19 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 External consumers use the SDK matching their topology — never `ViuProjectReference`, which is the
 **in-repo dogfooding** mechanism:
 
-- **`frameworks/Assimalign.Viu.App.props`** — the authoritative host-neutral
+- **`libraries/Runtime/Assimalign.Viu.App.props`** — the authoritative host-neutral
   `@(ViuFrameworkAssembly)` / `@(ViuFrameworkAnalyzer)` manifest: Reactivity, Components, State,
-  Core, and the generator/parser closure. `frameworks/Assimalign.Viu.App.Refs/` produces the
+  Core, and the generator/parser closure. `libraries/Runtime/Assimalign.Viu.App.Refs/` produces the
   targeting-only `Assimalign.Viu.App.Ref` package with `ref/<tfm>/`, `data/FrameworkList.xml`, the
   four-entry `data/PackageOverrides.txt`, and analyzers under `analyzers/dotnet/cs/`. The base
   framework is targeting-only and has no runtime package.
-- **`frameworks/Assimalign.Viu.App.Browser.props`** — the Browser-only manifest adds
-  `Assimalign.Viu.Browser`. `frameworks/Assimalign.Viu.App.Browser.Refs/` produces
+- **`libraries/Browser/Assimalign.Viu.App.Browser.props`** — the Browser-only manifest adds
+  `Assimalign.Viu.Browser`. `libraries/Browser/Assimalign.Viu.App.Browser.Refs/` produces
   `Assimalign.Viu.App.Browser.Ref`, containing the Browser reference and its one override entry;
-  `frameworks/Assimalign.Viu.App.Browser.Runtime/` produces
+  `libraries/Browser/Assimalign.Viu.App.Browser.Runtime/` produces
   `Assimalign.Viu.App.Browser.Runtime.browser-wasm`, containing the base-plus-Browser implementation
   closure and `data/RuntimeList.xml`. The runtime pack never carries `PackageOverrides.txt`.
-- **`frameworks/Assimalign.Viu.App.targets`** remains the shared manifest writer and pack-layout
+- **`libraries/Runtime/Assimalign.Viu.App.targets`** remains the shared manifest writer and pack-layout
   implementation. Segment props select the assemblies, analyzers, framework name, and Ref/Runtime
   kind; do not duplicate the writer in the Browser segment.
 - **`sdks/Assimalign.Viu.Sdk/`** — the component-library SDK. Its task source and tests use the
@@ -194,6 +200,6 @@ External consumers use the SDK matching their topology — never `ViuProjectRefe
   in the base SDK; browser-only logic stays in the Browser SDK.
 - **Local loop**: `scripts/Install-Local.ps1` packs both SDKs, both targeting packs, and the one
   Browser runtime pack into `_out/packages` (gitignored). Consumption docs: `sdks/README.md`.
-- The `frameworks/` csprojs carry documented deviations from the no-raw-`ProjectReference` rule
+- The framework pack csprojs under `libraries/Runtime/` and `libraries/Browser/` carry documented deviations from the no-raw-`ProjectReference` rule
   (build-order edges needing `ReferenceOutputAssembly=false` + `UndefineProperties` metadata the
   `ViuProjectReference` transform does not carry).
