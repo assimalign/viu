@@ -152,6 +152,7 @@ internal sealed class FrameRenderCodeWriter
     private CodeExpression EmitElementNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
         ElementPropertyEmission properties = EmitElementProperties(node.Properties);
+        AppendScopeBinding(properties);
         CodeExpression children = EmitChildren(node.Children);
         CodeExpression directives = EmitDirectiveInvocations(node.Directives);
         CodeExpression dynamicBindingIndices = EmitDynamicBindingIndices(
@@ -311,6 +312,7 @@ internal sealed class FrameRenderCodeWriter
     private CodeExpression EmitDynamicNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
         ElementPropertyEmission elementProperties = EmitElementProperties(node.Properties);
+        AppendScopeBinding(elementProperties);
         ComponentInvocationEmission componentInvocation = EmitComponentInvocation(
             node.Properties,
             node.Children,
@@ -395,6 +397,18 @@ internal sealed class FrameRenderCodeWriter
 
         defaultSlot = null!;
         return false;
+    }
+
+    private void AppendScopeBinding(ElementPropertyEmission properties)
+    {
+        if (string.IsNullOrEmpty(result.ScopeId))
+        {
+            return;
+        }
+
+        AppendStatement(
+            $"{properties.BindingsName}.Add({ComponentsNamespace}.ElementBinding.Attribute(new "
+            + $"{ComponentsNamespace}.QualifiedName({StringLiteral(result.ScopeId!)}), string.Empty));");
     }
 
     private CodeExpression EmitCallAsVirtualValue(CallExpression call)
@@ -1363,6 +1377,10 @@ internal sealed class FrameRenderCodeWriter
         AppendLine("{");
         indentLevel++;
         AppendStatement($"{resultName} = {slotNameLocal}({argumentsName});");
+        if (!string.IsNullOrEmpty(result.ScopeId))
+        {
+            AppendStatement($"{resultName} = {GeneratedNamespace}.RenderGlue.ApplySlottedScope({resultName}, {StringLiteral(result.ScopeId + "-s")});");
+        }
         indentLevel--;
         AppendLine("}");
         AppendLine("else");
@@ -2204,16 +2222,16 @@ internal sealed class FrameRenderCodeWriter
                 return new VirtualNodeTag(VirtualNodeTagKind.Suspense, CodeExpression.Literal("null"));
             }
 
-            if (helper == HelperNames.BaseTransition || helper == HelperNames.Transition)
+            if (helper == HelperNames.BaseTransition)
             {
                 return new VirtualNodeTag(VirtualNodeTagKind.Transition, CodeExpression.Literal("null"));
             }
 
-            if (helper == HelperNames.TransitionGroup)
+            if (helper == HelperNames.Transition || helper == HelperNames.TransitionGroup)
             {
                 return new VirtualNodeTag(
                     VirtualNodeTagKind.Component,
-                    ComponentReferenceForName("TransitionGroup"));
+                    ComponentReferenceForName(helper == HelperNames.Transition ? "Transition" : "TransitionGroup"));
             }
         }
 
@@ -2599,6 +2617,8 @@ internal sealed class FrameRenderCodeWriter
 
     private static string GeneratedHostPropertyNameTest(string expression) =>
         $"global::System.String.Equals({expression}, \"value\", global::System.StringComparison.Ordinal)"
+        + $" || global::System.String.Equals({expression}, \"class\", global::System.StringComparison.Ordinal)"
+        + $" || global::System.String.Equals({expression}, \"style\", global::System.StringComparison.Ordinal)"
         + $" || global::System.String.Equals({expression}, \"checked\", global::System.StringComparison.Ordinal)"
         + $" || global::System.String.Equals({expression}, \"selected\", global::System.StringComparison.Ordinal)"
         + $" || global::System.String.Equals({expression}, \"muted\", global::System.StringComparison.Ordinal)"

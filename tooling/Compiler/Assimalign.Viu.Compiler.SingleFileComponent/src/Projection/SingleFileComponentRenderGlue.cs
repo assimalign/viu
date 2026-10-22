@@ -32,6 +32,33 @@ public static class SingleFileComponentRenderGlue
             [global::System.CodeDom.Compiler.GeneratedCode("Assimalign.Viu.Generators.Syntax", "1.0.0.0")]
             internal static class RenderGlue
             {
+                // [STY-1] Projection preserves author scope and adds the receiver's slotted identity
+                // to native slot roots. Component and trusted-markup boundaries keep their ownership.
+                internal static global::Assimalign.Viu.Components.VirtualNode? ApplySlottedScope(
+                    global::Assimalign.Viu.Components.VirtualNode? node, string scopeId)
+                {
+                    if (node is global::Assimalign.Viu.Components.ElementNode element)
+                    {
+                        var bindings = new global::System.Collections.Generic.List<global::Assimalign.Viu.Components.ElementBinding>(element.Bindings);
+                        bindings.Add(global::Assimalign.Viu.Components.ElementBinding.Attribute(
+                            new global::Assimalign.Viu.Components.QualifiedName(scopeId), string.Empty));
+                        return new global::Assimalign.Viu.Components.ElementNode(element.Name, bindings,
+                            element.Children, element.Directives, element.Key, element.MountReference);
+                    }
+
+                    if (node is global::Assimalign.Viu.Components.FragmentNode fragment)
+                    {
+                        var children = new global::System.Collections.Generic.List<global::Assimalign.Viu.Components.VirtualNode>(fragment.Children.Count);
+                        foreach (var child in fragment.Children)
+                        {
+                            children.Add(ApplySlottedScope(child, scopeId)!);
+                        }
+                        return new global::Assimalign.Viu.Components.FragmentNode(children, fragment.Key);
+                    }
+
+                    return node;
+                }
+
                 internal static global::System.Action AdaptHandler(global::System.Action handler) => handler;
 
                 internal static global::System.Action<TEvent> AdaptHandler<TEvent>(global::System.Action<TEvent> handler) => handler;

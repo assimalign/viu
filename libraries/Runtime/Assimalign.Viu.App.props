@@ -1,4 +1,6 @@
 <Project>
+    <!-- Deviates from the repo central-build-system file-location rule per owner decision
+         2026-10-22 (#381): framework-specific build files live beside their pack producers. -->
     <!--
         Host-neutral targeting-framework manifest ([V01.01.12.27], #323).
 

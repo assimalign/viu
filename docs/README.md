@@ -8,8 +8,8 @@ more than one project. Documentation scoped to a single project lives with that 
 1. **Project-scoped documentation** lives in `<project folder>/docs/` — the `OVERVIEW.md` (what it
    is) and `DESIGN.md` (why it is shaped that way) pair described in
    [`CONTRIBUTING.md`](CONTRIBUTING.md), plus focused topic docs and library-local ADRs. This applies
-   to every project folder: `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `frameworks/`,
-   `benchmarks/`, and `extensions/`.
+   to every project folder: `libraries/`, `tooling/`, `analyzers/`, `sdks/`, framework packs in the library areas,
+   `tests/`, and `extensions/`.
 2. **`README.md` stays put.** Any folder may carry its own `README.md` as that folder's entry point.
 3. **Everything else lives here**, in the repository-root `docs/`.
 

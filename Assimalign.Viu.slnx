@@ -102,24 +102,25 @@
 		<File Path="docs/PLAN.md" />
 		<File Path="docs/UTILITY-CSS-DESIGN.md" />
 	</Folder>
-	<Folder Name="/viu/frameworks/">
-		<File Path="frameworks/Assimalign.Viu.App.props" />
-		<File Path="frameworks/Assimalign.Viu.App.Browser.props" />
-		<File Path="frameworks/Assimalign.Viu.App.targets" />
-		<File Path="frameworks/Directory.Build.props" />
-		<File Path="frameworks/Directory.Build.targets" />
+	<Folder Name="/viu/libraries/Runtime/">
+		<File Path="libraries/Runtime/Assimalign.Viu.App.props" />
+		<File Path="libraries/Runtime/Assimalign.Viu.App.targets" />
+		<File Path="libraries/Runtime/Assimalign.Viu.App.Pack.props" />
 	</Folder>
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Refs/" />
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Refs/src/">
-		<Project Path="frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj" />
+	<Folder Name="/viu/libraries/Browser/">
+		<File Path="libraries/Browser/Assimalign.Viu.App.Browser.props" />
 	</Folder>
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Refs/" />
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Refs/src/">
-		<Project Path="frameworks/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj" />
+	<Folder Name="/viu/libraries/Runtime/Assimalign.Viu.App.Refs/" />
+	<Folder Name="/viu/libraries/Runtime/Assimalign.Viu.App.Refs/src/">
+		<Project Path="libraries/Runtime/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj" />
 	</Folder>
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Runtime/" />
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Runtime/src/">
-		<Project Path="frameworks/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj" />
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Refs/" />
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Refs/src/">
+		<Project Path="libraries/Browser/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Runtime/" />
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Runtime/src/">
+		<Project Path="libraries/Browser/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj" />
 	</Folder>
 	<Folder Name="/viu/extensions/dotnet/" />
 	<Folder Name="/viu/extensions/dotnet/Assimalign.Viu.Templates/">
@@ -209,12 +210,12 @@
 	<Folder Name="/viu/tooling/Editor/Assimalign.Viu.LanguageServer/test/">
 		<Project Path="tooling/Editor/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.EndToEnd/" />
-	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.EndToEnd/docs/">
-		<File Path="benchmarks/Assimalign.Viu.Testing.EndToEnd/docs/OVERVIEW.md" />
+	<Folder Name="/viu/tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd/" />
+	<Folder Name="/viu/tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd/docs/">
+		<File Path="tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd/docs/OVERVIEW.md" />
 	</Folder>
-	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.EndToEnd/src/">
-		<Project Path="benchmarks/Assimalign.Viu.Testing.EndToEnd/src/Assimalign.Viu.Testing.EndToEnd.csproj" />
+	<Folder Name="/viu/tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd/src/">
+		<Project Path="tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd/src/Assimalign.Viu.Testing.EndToEnd.csproj" />
 	</Folder>
 	<Folder Name="/viu/tooling/Compiler/Assimalign.Viu.Compiler.Css/" />
 	<Folder Name="/viu/tooling/Compiler/Assimalign.Viu.Compiler.Css/docs/">

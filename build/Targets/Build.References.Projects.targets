@@ -47,10 +47,10 @@
              under extensions/ and use the same by-name reference conventions as other code areas. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)extensions\**\*.csproj" />
         <!-- The performance benchmark suite moved to the sibling assimalign/viu-benchmarks repository
-             ([V01.01.11.04], #88), so this root now indexes only the packaged-consumer end-to-end
-             harness. It is kept a first-class code area, like analyzers, so the harness can resolve
+             ([V01.01.11.04], #88). The tests/ root owns the packaged-consumer end-to-end
+             harness ([V01.01.11.03.01], #391). It is a first-class code area so the harness can resolve
              runtime libraries by name if it ever needs to. -->
-        <_ViuProject Include="$(ViuRepositoryDirectory)benchmarks\**\*.csproj" />
+        <_ViuProject Include="$(ViuRepositoryDirectory)tests\**\*.csproj" />
         <_ViuProject Update="@(_ViuProject)" ProjectId="%(_ViuProject.Filename)" ProjectPath="%(_ViuProject.Identity)" />
 
         <!-- Public refs -->

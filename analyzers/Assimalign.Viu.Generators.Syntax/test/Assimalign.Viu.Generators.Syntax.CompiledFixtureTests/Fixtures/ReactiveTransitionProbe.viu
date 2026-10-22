@@ -1,0 +1,9 @@
+<template>
+<button @click="Toggle">Toggle</button>
+<Transition :css="false"><p v-if="Visible">Visible child</p></Transition>
+</template>
+@script {
+using Assimalign.Viu.Reactivity;
+public Reference<bool> Visible { get; } = Reactive.Reference(true);
+private void Toggle() => Visible.Value = !Visible.Value;
+}

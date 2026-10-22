@@ -126,7 +126,7 @@ until reviewed.
     `Assimalign.Viu.Generators.Syntax` generator emits the corresponding current runtime
     qualifiers.
   - Cascade (checklist, none optional): every `ViuProjectReference`; `InternalsVisibleTo` strings
-    (grantors and grantees); `frameworks/Assimalign.Viu.App.props` `@(ViuFrameworkAssembly)` +
+    (grantors and grantees); `libraries/Runtime/Assimalign.Viu.App.props` `@(ViuFrameworkAssembly)` +
     analyzer manifest + FrameworkList entries; root + per-area `slnx` (delete Reactivity's, rename
     RuntimeCore's); CI workflows (`area-reactivity.yml` deleted, `area-runtimecore.yml` →
     `area-core.yml` with new paths/lane names); shared-source `<Compile Include>` link paths (the

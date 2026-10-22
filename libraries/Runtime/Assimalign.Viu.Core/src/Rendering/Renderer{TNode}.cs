@@ -1037,13 +1037,22 @@ public sealed partial class Renderer<TNode>
         for (int index = 0; index < previousDynamic.Count; index++)
         {
             MountedNode<TNode> current = currentDynamic[index];
-            TNode parent = HostParentOrFallback(current.FirstHostNode, fallbackContainer);
+            VirtualNode nextChild = nextDynamic[index];
+            // [V01.01.11.07] Stable native nodes patch through their existing handles. Reading
+            // their parent/sibling would force a Browser command-frame flush for every changed row.
+            bool patchesExistingHandle = ReferenceEquals(current.Value, nextChild)
+                || (current.Value is ElementNode or TextNode or CommentNode
+                    && IsSameNodeType(current.Value, nextChild));
+            TNode parent = patchesExistingHandle
+                ? fallbackContainer
+                : HostParentOrFallback(current.FirstHostNode, fallbackContainer);
+            TNode? anchor = patchesExistingHandle ? default : GetNextHostNode(current);
             MountedNode<TNode> replacement = Patch(
                 tree,
                 current,
-                nextDynamic[index],
+                nextChild,
                 parent,
-                GetNextHostNode(current),
+                anchor,
                 current.Owner);
             if (!ReferenceEquals(current, replacement))
             {
@@ -2193,8 +2202,11 @@ public sealed partial class Renderer<TNode>
     private TNode? GetNextHostNode(MountedNode<TNode> mounted) =>
         _options.NextSibling(mounted.LastHostNode);
 
-    private TNode HostParentOrFallback(TNode node, TNode fallback) =>
-        HasHostNode(_options.ParentNode(node)) ? _options.ParentNode(node)! : fallback;
+    private TNode HostParentOrFallback(TNode node, TNode fallback)
+    {
+        TNode? parent = _options.ParentNode(node);
+        return HasHostNode(parent) ? parent! : fallback;
+    }
 
     private void QueueHostCommit() => Scheduler.QueueHostCommit(_options.Commit);
 

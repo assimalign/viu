@@ -1,0 +1,9 @@
+<template>
+    <ScopedReceiver><span>{{ Count }}</span><span>second</span></ScopedReceiver>
+</template>
+@script {
+    public int Count { get; set; } = 1;
+}
+<style scoped>
+    span { font-weight: bold; }
+</style>

@@ -12,7 +12,6 @@ on:
     branches: [main]
     paths:
       - 'sdks/**'
-      - 'frameworks/**'
       - 'extensions/dotnet/Assimalign.Viu.Templates/**'
       - 'scripts/**'
       - 'libraries/**'
@@ -29,7 +28,6 @@ on:
     branches: [main]
     paths:
       - 'sdks/**'
-      - 'frameworks/**'
       - 'extensions/dotnet/Assimalign.Viu.Templates/**'
       - 'scripts/**'
       - 'libraries/**'

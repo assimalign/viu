@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 using Assimalign.Viu.Components;
 
@@ -7,14 +8,18 @@ namespace Assimalign.Viu.Browser;
 
 /// <summary>Decorates one child with Browser CSS enter, appear, and leave behavior.</summary>
 /// <remarks>
-/// The component emits a host-neutral <see cref="TransitionNode"/> carrying a lazy child slot and
-/// resolved <see cref="TransitionProperties"/>. Core owns identity, cancellation, mode sequencing,
+/// The component evaluates authored slot content during its render effect so slot-only reactive
+/// reads schedule updates, then emits a host-neutral <see cref="TransitionNode"/> carrying that value
+/// and resolved <see cref="TransitionProperties"/>. Core owns identity, cancellation, mode sequencing,
 /// and deferred removal; Browser owns CSS class names, double-frame scheduling, forced reflow, and
 /// transition-end detection. The component is not thread-safe and runs on the browser event loop.
 /// Specified by <c>[BLT-7]</c> and <c>[BLT-8]</c>.
 /// </remarks>
-public sealed class Transition : IComponent
+public sealed class Transition : IComponent, IComponentDefinition
 {
+    private static readonly IReadOnlyDictionary<string, object?> EmptySlotArguments =
+        new ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>());
+
     private static readonly IReadOnlyList<ComponentParameter> Parameters =
     [
         new("name"),
@@ -77,7 +82,7 @@ public sealed class Transition : IComponent
                     ? slot
                     : static _ => null;
             return scope.Attach(
-                child,
+                child(EmptySlotArguments) ?? new CommentNode(string.Empty),
                 ResolveTransitionProperties(context.Bindings.Parameters));
         };
     }

@@ -1180,7 +1180,7 @@ if (-not $HotReload) {
 
     $harnessProject = Join-Path `
         $repositoryRootPath `
-        'benchmarks/Assimalign.Viu.Testing.EndToEnd/src/Assimalign.Viu.Testing.EndToEnd.csproj'
+        'tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd/src/Assimalign.Viu.Testing.EndToEnd.csproj'
     if ($SkipPackRestore) {
         $harnessAssetsPath = Join-Path `
             (Split-Path $harnessProject -Parent) `

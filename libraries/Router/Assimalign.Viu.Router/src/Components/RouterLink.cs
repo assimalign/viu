@@ -23,7 +23,7 @@ namespace Assimalign.Viu.Router;
 /// ignoring query and fragment. Exact-active additionally requires ordinal full-location equality,
 /// including raw suffix spelling and empty delimiters. Specified by <c>[RTR-12]</c>.
 /// </remarks>
-public sealed class RouterLink : IComponent
+public sealed class RouterLink : IComponent, IComponentDefinition
 {
     private static readonly IReadOnlyDictionary<string, object?> EmptySlotArguments =
         new ReadOnlyDictionary<string, object?>(

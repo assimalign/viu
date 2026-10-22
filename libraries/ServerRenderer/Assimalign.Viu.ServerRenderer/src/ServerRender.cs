@@ -211,7 +211,7 @@ public static partial class ServerRender
     /// <param name="elementName">The optional owning element name used for casing and textarea rules.</param>
     /// <returns>Serialized attributes, each including its leading space.</returns>
     /// <remarks>
-    /// Property and event bindings are excluded. Class and style are normalized, boolean attributes
+    /// Event and non-serializable property bindings are excluded. Class and style bindings are normalized, boolean attributes
     /// render by presence, and unsafe dynamic names are dropped. Specified by <c>[SSR-6]</c>.
     /// </remarks>
     public static string SsrRenderAttributes(
@@ -227,7 +227,12 @@ public static partial class ServerRender
         for (int index = 0; index < bindings.Count; index++)
         {
             ElementBinding binding = bindings[index];
-            if (binding.Kind != ElementBindingKind.Attribute)
+            // Class/style are host properties in compiled trees but retain their HTML representation.
+            // [V01.01.06.07.01] preserves browser/server output when the compiler chooses the host patcher.
+            bool serializableStyleProperty = binding.Kind == ElementBindingKind.Property
+                && binding.Name.NamespaceName is null
+                && binding.Name.LocalName is "class" or "style";
+            if (binding.Kind != ElementBindingKind.Attribute && !serializableStyleProperty)
             {
                 continue;
             }

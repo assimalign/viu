@@ -1,0 +1,14 @@
+<template>
+<button @click="Toggle">Toggle</button>
+<p :style="Style" :class="CssClass">Styled</p>
+<i :style.attr="RawStyle">Explicit attribute</i>
+</template>
+@script {
+using System.Collections.Generic;
+using Assimalign.Viu.Reactivity;
+public Reference<bool> Active { get; } = Reactive.Reference(true);
+public object Style => new Dictionary<string, object?> { ["color"] = Active.Value ? "green" : "gray" };
+public string CssClass => Active.Value ? "active" : "inactive";
+public string RawStyle => "color: blue";
+private void Toggle() => Active.Value = !Active.Value;
+}

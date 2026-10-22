@@ -163,17 +163,17 @@ foreach ($libraryProject in $configuredLibraryProjects) {
 }
 
 $runtimeProject = Join-Path $repositoryDirectory `
-    'frameworks/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj'
+    'libraries/Browser/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj'
 Invoke-PackageBuild `
     -Project $runtimeProject `
     -AdditionalArguments @('-p:RuntimeIdentifier=browser-wasm')
 
 $referenceProject = Join-Path $repositoryDirectory `
-    'frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj'
+    'libraries/Runtime/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj'
 Invoke-PackageBuild -Project $referenceProject
 
 $browserReferenceProject = Join-Path $repositoryDirectory `
-    'frameworks/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj'
+    'libraries/Browser/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj'
 Invoke-PackageBuild -Project $browserReferenceProject
 
 $sdkProject = Join-Path $repositoryDirectory `

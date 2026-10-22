@@ -142,7 +142,7 @@
         where Sdk.props points $(ViuBundleCssTaskAssembly), and every Viu build fails to
         load the ViuBundleCss task. Folder-only PackagePath is the same form the analyzer
         and shared-framework packs use (build/Targets/Build.References.Analyzers.targets,
-        frameworks/Assimalign.Viu.App.targets).
+        libraries/Runtime/Assimalign.Viu.App.targets).
     -->
     <Target Name="CollectSdkTaskFiles">
         <ItemGroup>

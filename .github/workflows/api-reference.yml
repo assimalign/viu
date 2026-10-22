@@ -19,7 +19,6 @@ on:
             - "tooling/**"
             - "analyzers/**"
             - "build/**"
-            - "frameworks/**"
             - "sdks/**"
             - "extensions/**/README.md"
             - "README.md"

@@ -21,8 +21,9 @@ holds the measurement of it. A benchmark added here is a mistake, not a shortcut
 
 `viu-benchmarks` owns:
 
-- `benchmarks/Assimalign.Viu.Testing.Benchmarks` — BenchmarkDotNet wall-clock benchmarks and the
-  deterministic interop-count harness, plus its tests.
+- `harness/Assimalign.Viu.Testing.Benchmarks/{src,test}` — reusable benchmark fixtures and the
+  deterministic interop-count harness with its tests. Area suites live under
+  `benchmarks/{libraries,tooling}/<Area>/benchmarks/`.
 - `benchmarks/baselines/InteropCounts.json` — the reviewed interop-crossing ceilings.
 - `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`,
   `scripts/budgets/PublishBudgets.json`, and their hermetic tests — the publish-size, trimming, and
@@ -31,8 +32,8 @@ holds the measurement of it. A benchmark added here is a mistake, not a shortcut
 
 This repository still owns the *measurement subject*, and that division is deliberate:
 
-- `benchmarks/Assimalign.Viu.Testing.EndToEnd` — the packaged-consumer Playwright harness. It is a
-  **test harness, not a benchmark**, and the folder it sits in is a historical name. It is driven by
+- `tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd` — the packaged-consumer Playwright harness. It is a
+  **test harness, not a benchmark**, under the dedicated test root. It is driven by
   `scripts/Test-EndToEnd.ps1` and gated here by `end-to-end.yml`.
 - `scripts/Test-EndToEnd.ps1`, `scripts/Install-Local.ps1`, and `scripts/fixtures/**` — packing,
   publishing, serving, and driving a real browser. These need this repository's source, so moving

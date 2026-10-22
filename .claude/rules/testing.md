@@ -13,7 +13,7 @@ paths:
   (`Assimalign.Viu.<Name>.Tests`), `IsPackable=false`, referencing its `src` via `ViuProjectReference`.
   Compiler and editor projects follow the same shape under
   `tooling/<Area>/Assimalign.Viu.<Name>/test/`; the end-to-end harness lives under
-  `benchmarks/Assimalign.Viu.Testing.EndToEnd`.
+  `tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd`.
 - Class `{Feature}Tests`; method names describe `Method_Scenario_ExpectedBehavior` (or an equally explicit
   phrase). Arrange / Act / Assert.
 
@@ -41,6 +41,6 @@ paths:
 - Unit tests must not require a browser. Exercise the runtime through an in-memory adapter/renderer (the
   Core `FakeDomAdapter` today; the shipping `Assimalign.Viu.Testing` renderer once
   [V01.01.11.01] lands). Real-browser coverage is the separate
-  `benchmarks/Assimalign.Viu.Testing.EndToEnd` harness ([V01.01.11.03]).
+  `tests/EndToEnd/Assimalign.Viu.Testing.EndToEnd` harness ([V01.01.11.03]).
 - Use `InternalsVisibleTo` (in `src/Properties/AssemblyInfo.cs`) for tests that probe internal engine
   state.

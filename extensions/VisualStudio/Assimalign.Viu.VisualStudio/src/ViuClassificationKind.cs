@@ -83,4 +83,7 @@ internal enum ViuClassificationKind
 
     /// <summary>A CSS custom property name (<c>--name</c>) — a theme token.</summary>
     StyleCustomProperty,
+
+    /// <summary>A namespace name in a using directive, including an incomplete dotted name.</summary>
+    Namespace,
 }

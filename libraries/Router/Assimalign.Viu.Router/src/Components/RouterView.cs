@@ -22,7 +22,7 @@ namespace Assimalign.Viu.Router;
 /// Not thread-safe; Viu drives it on the host event loop. Specified by <c>[RTR-4]</c>,
 /// <c>[RTR-7]</c>, <c>[CMP-7]</c>, and <c>[CMP-33]</c>.
 /// </remarks>
-public sealed class RouterView : IComponent
+public sealed class RouterView : IComponent, IComponentDefinition
 {
     private static readonly ComponentContract Contract = new(
         renderCacheSize: 0,

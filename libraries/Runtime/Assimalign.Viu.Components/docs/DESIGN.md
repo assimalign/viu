@@ -87,12 +87,15 @@ Browser-only response intents and modifier policy remain outside Components
 
 Components does not mount or patch trees, schedule updates, implement built-ins, serialize HTML,
 interpret event propagation or browser modifiers, own application lifetime, discover constructors,
-or provide an ambient hierarchical dependency API. Scoped CSS and style-scope identity were removed
-on 2026-09-14 ([V01.01.06.17], #367); ordinary component styles and CSS Modules remain supported
-without component-contract members (`[CMP-24]`).
+or provide an ambient hierarchical dependency API. Scoped CSS identities are compiler-owned native attributes and require no component-contract members or runtime root restamping (`[STY-1]`, `[CMP-24]`).
 
 ## Compile-time identity and aggregation
 
 Static interface dispatch provides typed definition identity without constructing components or inspecting `typeof(T)` metadata ([CMP-35]). Assembly catalog attributes are compiler input only. The runtime registry owns shared delegate identity, which must unify across assemblies; stateless model conversion and listener adaptation remain consumer-internal generated glue.
 
 Catalog identities are full assembly identities. Repeated reference paths replace the same published callback, and a target factory records successfully applied catalogs. Application factories remain separate. Catalog replacement affects later factory population; existing registration objects remain stable during hot reload ([CMP-36]).
+
+
+## Scoped style ownership - 2026-10-22
+
+Owner decision [V01.01.06.19] (#383) supersedes the 2026-09-14 removal. Scoped CSS is restored through compiler-emitted native attributes and selector rewriting. Native slot roots retain author identity and receive the receiver's slotted suffix through immutable generated glue. Component roots have no implicit parent identity or runtime restamping. See SPECIFICATION.md [STY-1].
