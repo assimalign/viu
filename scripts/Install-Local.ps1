@@ -198,19 +198,19 @@ if (-not $SkipFramework) {
                     '-p:BuildProjectReferences=false')
             }
             Invoke-ViuPack `
-                -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Browser.Runtime\src\Assimalign.Viu.App.Browser.Runtime.csproj') `
+                -Project (Join-Path $repoRoot 'libraries\Browser\Assimalign.Viu.App.Browser.Runtime\src\Assimalign.Viu.App.Browser.Runtime.csproj') `
                 -AdditionalArguments $runtimePackArguments
         }
     }
 
     Write-Host '[framework] Packing Assimalign.Viu.App.Ref' -ForegroundColor Green
     Invoke-ViuPack `
-        -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Refs\src\Assimalign.Viu.App.Refs.csproj')
+        -Project (Join-Path $repoRoot 'libraries\Runtime\Assimalign.Viu.App.Refs\src\Assimalign.Viu.App.Refs.csproj')
 
     if (-not $BaseOnly) {
         Write-Host '[framework] Packing Assimalign.Viu.App.Browser.Ref' -ForegroundColor Green
         Invoke-ViuPack `
-            -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Browser.Refs\src\Assimalign.Viu.App.Browser.Refs.csproj')
+            -Project (Join-Path $repoRoot 'libraries\Browser\Assimalign.Viu.App.Browser.Refs\src\Assimalign.Viu.App.Browser.Refs.csproj')
     }
 }
 

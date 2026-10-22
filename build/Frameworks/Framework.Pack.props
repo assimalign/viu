@@ -1,5 +1,4 @@
 <Project>
-    <Import Project="..\Directory.Build.props" />
 
     <!--
         Framework Ref/Runtime pack producers ([V01.01.12.19], #174).
@@ -14,6 +13,8 @@
              packs keep it and the owning targets remove the empty producer assembly; Ref packs
              override it to false because they deliberately publish no symbol package. -->
         <ViuContainerPackage>true</ViuContainerPackage>
+        <IsAotCompatible>false</IsAotCompatible>
+        <ViuPackageReadmeSource>$(ViuRepositoryDirectory)README.md</ViuPackageReadmeSource>
         <IncludeBuildOutput>true</IncludeBuildOutput>
         <!-- Shared-framework manifests and copied assets form one lockstep release. -->
         <ViuPackageDependencyVersionRange>[$(ViuVersion)]</ViuPackageDependencyVersionRange>

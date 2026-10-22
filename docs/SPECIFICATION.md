@@ -563,6 +563,9 @@ the same registration used by the assembly catalog. ComponentNode.For<TComponent
 reference without activation. The default registered name is the sanitized file base name [SFC-CG-10].
 An authored public partial declaration exposes a component across assembly boundaries; generation
 preserves the existing default accessibility.
+The Browser `Transition` and `TransitionGroup` components and Browser.Router `RouterView` and
+`RouterLink` components also implement `IComponentDefinition`; their typed references use the same
+registration as their built-in catalog entries ([V01.01.06.18], #374).
 A script may override it with one nonempty string literal constant named RegisteredName. Conflicting
 overrides or duplicate registered names within a compilation produce a located diagnostic.
 
@@ -1127,7 +1130,7 @@ provide styles while construction is pending and remain when construction or ado
 Styles containing imports or relative resource URLs keep native link loading to preserve resolution
 against the stylesheet URL. A shared observer refreshes roots when the host document's stylesheet
 links change, including stylesheet URL updates from hot reload. It stops when its last root leaves.
-Viu does not extract CSS per component at runtime or restore removed scoped CSS
+Viu does not extract CSS per component at runtime or infer scoped CSS identities at runtime
 [STY-1]. CSS Modules retain their generated class names [STY-2] through [STY-5]. With
 `UseShadowRoot = false`, the element renders into its light DOM and relies on the document's
 stylesheets.
@@ -1220,6 +1223,10 @@ removal — and knows nothing about CSS.
 Browser
 owns class names, double-animation-frame scheduling, forced reflow, computed or explicit end timing,
 and element handles.
+The template `Transition` helper resolves the registered Browser component. That component evaluates
+its authored default slot inside its render effect before wrapping the result in a structural
+`TransitionNode`, so references read only by the slot still schedule updates ([V01.01.04.07.07], #387).
+`BaseTransition` retains direct construction of the lazy host-neutral structural node in [BLT-7].
 
 `[BLT-9]` Transition execution MAY attach one shared internal transition state to multiple immutable
 children and finish a pending enter phase before a host performs layout measurement. The host sees
@@ -1479,6 +1486,10 @@ three tiers:
 calls bound by generated member names; Browser directive values remain bound by type identity. No
 `Assimalign.Viu.Syntax.*` assembly
 references a runtime assembly.
+
+Dynamic native `class` and `style` bindings use the host property contract, preserving normalized
+objects for the host's class/style patcher. An explicit attribute modifier keeps attribute semantics
+([V01.01.06.07.01], #386).
 
 `[SFC-CG-3]` A component that declares its surface by attribute ([CMP-26], [CMP-30]) emits one static
 `ComponentContract` carried by its `ComponentRegistration`, so the runtime and tooling read
@@ -1758,14 +1769,7 @@ grammar.
 `[VUE-2]` The compatibility descriptor is deliberately distinct from the canonical one: the `.vue`
 format allows one ordinary `<script>` and one `<script setup>` in the same file, while `.viu` has a
 single uniform `@script` slot. Both descriptor types reuse the same immutable block, option,
-diagnostic, and source-location values wherever their semantics are identical. A `.vue`
-`<style scoped>` block reports a located Warning (`VueScopedStyleNotSupported`, 1019;
-`VIU1002` from the generator) and compiles as ordinary global CSS. The same option in `.viu`,
-including legacy `@style scoped`, reports a located Error (`ScopedStyleNotSupported`, 1018;
-`VIU1001`). Both report: "Scoped styles are not supported; Viu compiles component styles as ordinary
-global stylesheets. Remove the scoped option or use a CSS module." The parsers preserve the option
-for tooling diagnostics. This is the owner-authorized compatibility decision of 2026-09-14,
-[V01.01.06.17] (#367); CSS Modules remain supported [STY-2]–[STY-5].
+diagnostic, and source-location values wherever their semantics are identical. Both containers support scoped styles [STY-1].
 
 `[VUE-3]` **Both engines share one internal tag scanner** (`SingleFileComponentTagScanner`) —
 opening-tag and attribute parsing, the nested-`<template>` boundary, the raw-text closing-tag
@@ -1815,22 +1819,29 @@ compatibility", "Generator compatibility contract"; `sdks/README.md`;
 
 ### 10.1 Scoped CSS
 
-> **Removed — non-normative history (2026-09-14).**
+`[STY-1]` **Restored by owner decision 2026-10-22, [V01.01.06.19] (#383).**
+A `.viu` or `.vue` component with `<style scoped>` computes one stable `data-v-<hash>`
+attribute from its project-relative path. Selectors gain that attribute on their last compound;
+generated native elements and static markup carry the identical empty attribute in both interactive
+and server output [SSR-COMPILE-3]. Multiple scoped blocks share one identity. Ordinary style blocks
+remain global; scoped blocks can also use CSS Modules. Content edits preserve the identity.
 
-`[STY-1]` **REMOVED AS A VIU FEATURE.** Scoped CSS formerly rewrote component selectors and emitted
-matching attributes into generated interactive and server markup. The style option, selector
-rewrite, attribute stamping, scope-identifier plumbing, and deferred runtime restamping plan were
-removed on 2026-09-14 by owner decision [V01.01.06.17]
-([#367](https://github.com/assimalign/viu/issues/367)); #319 was closed as superseded. This clause
-retains its stable id and the former boundary as design history only. It imposes no normative Viu
-core requirement.
+Scope follows native authoring ownership. A child component retains its own identity, without
+implicit parent-root restamping. Slot content retains its author's identity; a scoped receiver adds
+`data-v-<hash>-s` to outermost native slot roots, including roots inside transparent fragments.
+This is consumer-internal generated glue using immutable public node descriptions [SFC-CG-2].
+It does not mutate the author's tree or attach scope state to a component contract or context.
+Component and hand-authored trusted-markup slot roots retain their own ownership boundary.
+Fallback slot content is authored by the receiver and receives its ordinary scope.
 
-Ordinary component stylesheets retain compilation, bundling, library `.viu.css` packing, and hot
-reload. CSS Modules remain supported [STY-2]–[STY-5]. The container diagnostic behavior is recorded
-under [VUE-2]; `v-bind()` compile-time processing and its deferred runtime design remain separate
-[STY-6]–[STY-8].
+`:deep(inner)` moves the scope attribute before an unscoped descendant selector;
+`:global(inner)` emits the unscoped selector; `:slotted(inner)` selects native slot roots with the
+`-s` identity. Keyframe names and their animation references are renamed with the same hash.
+Legacy deep combinators and nested deep-pseudo expansion remain unsupported by the selector rewriter.
+Hand-authored trees receive no implicit scope. CSS-variable runtime application remains the separate
+deferred design in [STY-6] through [STY-8].
 
-*Historical, non-normative sources: [V01.01.06.04] (#60), [V01.01.06.17] (#367).*
+The 2026-09-14 removal (#367) is superseded; it remains historical work, not a current diagnostic rule.
 
 ### 10.2 CSS Modules
 
@@ -1925,7 +1936,7 @@ instance without invoking client hooks.
 
 `[SSR-6]` Escaping targets **WHATWG HTML serialization**: `"`, `&`, `'`, `<`, `>` are escaped, and
 comment terminators are repeatedly removed from comment content. Attribute serialization skips
-renderer metadata, event listeners, forced properties, and child overrides; normalizes class and
+renderer metadata, event listeners, forced properties other than `class` and `style`, and child overrides; normalizes class and
 style; renders boolean attributes by presence; preserves SVG and custom-element casing; and **drops**
 an unsafe dynamic attribute name rather than attempting to escape it. `innerHTML` is the explicit
 raw-HTML path; `textContent` and a textarea's `value` are escaped and suppress child serialization.
@@ -1949,7 +1960,7 @@ unsupported subtrees use a subtree-local virtual-node fallback and rejoin the sa
 
 `[SSR-COMPILE-3]` Direct output obeys [SSR-6]: interpolation and attributes escape identically;
 class and style use the shared normalizers; model directives emit `value`, `checked`, or `selected`;
-show directives append `display:none`. Suspense renders its default content, Transition is a
+show directives append `display:none`; scoped native elements carry the same attribute as interactive output [STY-1]. Suspense renders its default content, Transition is a
 markup pass-through, and Teleport uses the ordinary context target buffer and unchanged marker protocol.
 
 `[SSR-COMPILE-4]` `CompiledServerRender` and `ServerRender.RenderCompiledTo{String,Stream}Async`
@@ -2783,7 +2794,7 @@ consumer* surfaces. The in-repo build deliberately does not consume either SDK, 
 be developed without a pack/restore cycle in the loop.
 
 *Authority: `sdks/README.md`; `sdks/Assimalign.Viu.Sdk/`;
-`sdks/Assimalign.Viu.Sdk.Browser/`; `frameworks/`;
+`sdks/Assimalign.Viu.Sdk.Browser/`; `build/Frameworks/` and the Runtime and Browser framework pack producers;
 `.claude/rules/build-system.md`; `docs/RELEASING.md`.*
 
 ---
@@ -2872,7 +2883,7 @@ correct-looking values.
 | Generalized handler caching | Deliberately dropped: syntax alone cannot prove a member-expression delegate has a stable receiver or infer every delegate arity; caching it could freeze mutable receiver state. Authors can supply an explicitly stable delegate when identity matters |
 | Slot/`v-for` destructuring | Deliberately unsupported: C# lambda parameters cannot represent generalized object/array destructuring without choosing new missing-member, null, and conversion semantics. A single valid C# identifier is accepted; other aliases report a located actionable template diagnostic and emit no invalid C# |
 | Server rendering | Static prerendering ships for explicit routes [SSG-1] through [SSG-6]; automatic route discovery, whole-site transactions, byte-oriented writer integration, and directive-specific server properties remain deferred |
-| Scoped CSS | **Removed 2026-09-14 by owner decision [V01.01.06.17] (#367).** `.viu` reports an error; `.vue` warns and compiles ordinary global CSS [VUE-2]. Use ordinary component styles or CSS Modules; [STY-1] is non-normative history. |
+| Scoped CSS | Implemented by compile-time selector rewriting, native attribute emission, and slot-root projection [STY-1]. |
 | `v-bind()` in CSS | Compile-time extraction and rewriting remain; generated reactive application is deferred for ordinary component styles [STY-6]–[STY-8]. |
 | Utility-CSS add-on | **Standalone and non-normative for Viu core.** The engine is independently published from `libraries/Utilities/`, remains outside every Viu SDK/framework surface, and has consumer MSBuild integration tracked by #346 [STY-9]. |
 

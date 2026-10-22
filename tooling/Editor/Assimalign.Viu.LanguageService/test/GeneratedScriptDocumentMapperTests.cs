@@ -264,7 +264,7 @@ public class GeneratedScriptDocumentMapperTests
             name.Namespace,
             name.ClassName,
             name.HintName,
-            CssComponentHash.Resolve(FilePath, ScriptSemanticFixture.ProjectDirectory),
+            StyleScopeId.Resolve(FilePath, ScriptSemanticFixture.ProjectDirectory),
             HotReloadComponentIdentifier: null,
             HasCanonicalPeer: false);
         var projection = SingleFileComponentProjection.Project(input, CancellationToken.None);

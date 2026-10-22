@@ -12,7 +12,7 @@
         <TargetFrameworkForVisualStudioClassicExtensions>net48</TargetFrameworkForVisualStudioClassicExtensions>
         <TargetFrameworkForLanguageServers>$(TargetFrameworkLatest)</TargetFrameworkForLanguageServers>
         <!--
-            Alias consumed by the framework Ref/Runtime targets (frameworks\Assimalign.Viu.App.targets)
+            Alias consumed by the framework Ref/Runtime targets (build\Frameworks\Assimalign.Viu.App.targets)
             in path construction. Kept derived from TargetFramework so bumping the TFM here continues to
             drive everything from one place.
         -->

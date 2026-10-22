@@ -1,7 +1,7 @@
 <Project>
     <!--
-        Assimalign.Viu.App framework build targets ([V01.01.12.19], #174 -
-        the Viu port of cohesion's frameworks/Assimalign.Cohesion.App.targets).
+        Shared Viu framework manifest and packaging targets ([V01.01.12.19], #174).
+        Runtime and Browser own the producers; build/Frameworks owns their shared implementation.
 
         Imported by:
           Assimalign.Viu.App.Browser.Runtime/src/...csproj  (per-RID runtime pack)

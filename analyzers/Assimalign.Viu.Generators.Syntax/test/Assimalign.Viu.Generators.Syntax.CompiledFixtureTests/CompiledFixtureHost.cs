@@ -42,6 +42,9 @@ internal sealed class CompiledFixtureNode
     internal Dictionary<string, object?> Bindings { get; } =
         new(StringComparer.Ordinal);
 
+    internal Dictionary<string, ElementBindingKind> BindingKinds { get; } =
+        new(StringComparer.Ordinal);
+
     internal ModelBinding? ModelBinding { get; set; }
 
     internal string DescendantText
@@ -244,10 +247,12 @@ internal sealed class CompiledFixtureHost : IDisposable
         if (current is null)
         {
             element.Bindings.Remove(binding.Name.LocalName);
+            element.BindingKinds.Remove(binding.Name.LocalName);
         }
         else
         {
             element.Bindings[binding.Name.LocalName] = binding.Value;
+            element.BindingKinds[binding.Name.LocalName] = binding.Kind;
         }
 
         BindingPatchCount++;

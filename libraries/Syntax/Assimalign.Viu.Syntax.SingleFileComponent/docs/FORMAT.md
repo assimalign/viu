@@ -6,7 +6,7 @@ syntax and the block parser (`SingleFileComponentParser.Parse`). It matches the 
 suite (`libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/test/`) pins every rule stated here.
 
 Work items: **[V01.01.06.01]** (original @-block format), **[V01.01.06.10]** (hybrid-container pivot,
-#257), and **[V01.01.06.17]** (scoped CSS removal, #367). Viu's block semantics are defined by
+#257), and **[V01.01.06.19]** (scoped CSS restoration, #383). Viu's block semantics are defined by
 `docs/SPECIFICATION.md`. The separate `.vue` compatibility parser accepts the foreign container
 format; its format reference is
 [Vue 3.5.34 container parsing](https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts).
@@ -46,7 +46,7 @@ custom blocks keep the `@`-form.
 The block parser slices the file into blocks and records their source spans. It does not parse
 template markup, C#, or CSS. Viu's template and style semantics are defined by
 `docs/SPECIFICATION.md`; accepting the `.vue` container does not add foreign runtime semantics.
-In particular, scoped CSS is unsupported in both containers (§5.1).
+Both containers support scoped styles (§5.1).
 The template markup is parsed later by the template compiler (`Assimalign.Viu.Syntax.Templates`,
 [V01.01.05.01]); the C# in `@script` is analysed by [V01.01.06.03].
 
@@ -262,21 +262,16 @@ All other options remain available through `SingleFileComponentBlock.HasOption(n
 order, each with its own source span; unknown options and any options on custom blocks are preserved
 rather than rejected.
 
-### 5.1 Removed scoped option
+### 5.1 Scoped styles
 
-Scoped CSS was removed by owner decision on 2026-09-14 ([V01.01.06.17], #367).
-The generic option token remains in the descriptor so tooling can diagnose its exact name span:
+`<style scoped>` (and legacy `@style scoped`) is supported in both `.viu` and `.vue` files.
+`SingleFileComponentStyleBlock.Scoped` reads the option without changing the preserved option spans.
+The style compiler rewrites selectors and native template output with one path-stable scope attribute.
+Scoped blocks can also use `module`; ordinary blocks remain global. See `docs/SPECIFICATION.md`
+[STY-1] for native ownership, slot-root projection, selector escape forms, and server output.
 
-- In a `.viu` file, `<style scoped>` and legacy `@style scoped { }` report
-  `ScopedStyleNotSupported` (1018, **Error**).
-- In a `.vue` compatibility file, `<style scoped>` reports `VueScopedStyleNotSupported`
-  (1019, **Warning**), and compilation treats the block as ordinary global component CSS.
-
-Both diagnostics say: "Scoped styles are not supported; Viu compiles component styles as ordinary
-global stylesheets. Remove the scoped option or use a CSS module." The source generator surfaces
-1018 as `VIU1001` and 1019 as `VIU1002`; the language service uses `VIU1018` and `VIU1019`.
-Plain component styles still bundle and hot reload; CSS Modules remain supported ([STY-2]–[STY-5]).
-There is no typed `Scoped` accessor, selector rewriting, or scope attribute generation.
+Owner decision 2026-10-22 [V01.01.06.19] (#383) supersedes the 2026-09-14 removal (#367).
+The former unsupported-style diagnostics 1018 and 1019 are no longer emitted.
 
 ## 6. Migration rules
 
@@ -350,7 +345,7 @@ Parsing is **recoverable**: malformed input is reported through `SingleFileCompo
 never throws for bad content (a `null` source argument throws `ArgumentNullException` — that is API
 misuse, not input). Multiple problems are reported in a single pass, each with a code, a message, a
 catalog severity, and a source location. Since [V01.01.06.10], `Errors` carries **all severities** —
-the legacy-container diagnostics (1015/1016) and compatibility scoped-style diagnostic (1019)
+the legacy-container diagnostics (1015/1016)
 are warnings; check `Severity` before treating an entry
 as fatal.
 

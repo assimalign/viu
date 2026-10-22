@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	<Import Project="$(ViuRepositoryDirectory)build\Frameworks\Framework.Pack.props" />
 	<PropertyGroup>
 
 		<RootNamespace>Assimalign.Viu</RootNamespace>
@@ -6,7 +7,7 @@
 		<!--
 			This project produces the Assimalign.Viu.App targeting pack
 			(Assimalign.Viu.App.Ref.nupkg). It compiles nothing of its own:
-			frameworks/Assimalign.Viu.App.targets generates
+			build/Frameworks/Assimalign.Viu.App.targets generates
 			data/FrameworkList.xml from the authoritative
 			@(ViuFrameworkAssembly) list (imported below) and packs the
 			matching assemblies copied from its by-name framework project
@@ -29,10 +30,10 @@
 
 	<!-- Import the authoritative framework manifest so the manifest writer
 	     in Assimalign.Viu.App.targets can iterate it. -->
-	<Import Project="..\..\Assimalign.Viu.App.props" />
+	<Import Project="$(ViuRepositoryDirectory)build\Frameworks\Assimalign.Viu.App.props" />
 	<ItemGroup>
 		<ViuProjectReference Include="@(ViuFrameworkAssembly)" />
 	</ItemGroup>
 
-	<Import Project="..\..\Assimalign.Viu.App.targets" />
+	<Import Project="$(ViuRepositoryDirectory)build\Frameworks\Assimalign.Viu.App.targets" />
 </Project>

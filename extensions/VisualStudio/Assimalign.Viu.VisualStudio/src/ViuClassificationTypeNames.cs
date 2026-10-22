@@ -169,6 +169,7 @@ internal static class ViuClassificationTypeNames
             ViuClassificationKind.Punctuation => Punctuation,
             ViuClassificationKind.String => String,
             ViuClassificationKind.Type => ClassName,
+            ViuClassificationKind.Namespace => NamespaceName,
 
             // Template, markup, and style: the Viu palette.
             ViuClassificationKind.FrameworkTag => Tag,

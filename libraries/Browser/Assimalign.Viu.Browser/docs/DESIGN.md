@@ -141,8 +141,7 @@ packaged component libraries on the same build path. Runtime extraction of one c
 would require an additional generated dependency manifest and could omit selectors shared by its
 children. A separate per-component style registry would duplicate the bundler's authority. Copying
 CSS text into every root would repeat parsing and retain one copy per element. Relying only on
-document links would leave shadow content unstyled. Removed scoped CSS is not an alternative
-isolation mechanism (`[STY-1]`); the shadow root supplies the boundary.
+document links would leave shadow content unstyled. Scoped selector rewriting supplies attribute-based ownership (`[STY-1]`); a shadow root additionally supplies a DOM boundary.
 
 In shadow mode, invocation slot delegates render native default and named `<slot>` nodes. A direct
 text node or direct element with an absent or empty `slot` attribute supplies the default slot;
@@ -175,7 +174,9 @@ serialization, runtime member discovery, emitted code, or dynamically generated 
 
 Browser does not own the virtual-node vocabulary, mounted diff engine, component activation,
 application composition dependencies, routing, or server serialization. Routing joins through
-Browser.Router. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367). The single-element
+Browser.Router. Scoped CSS is compiler-owned: authored native elements and native slot roots
+receive attributes at build time; Browser does not infer component ownership or restamp subtrees
+([STY-1], [V01.01.06.19], #383). This supersedes the removal in #367. The single-element
 `CssVariables.Bind` directive stays supported; generated reactive `v-bind()` application for ordinary
 component styles remains deferred (`[STY-6]`–`[STY-8]`).
 
@@ -184,3 +185,8 @@ component styles remains deferred (`[STY-6]`–`[STY-8]`).
 Generated native-handler glue preserves delegate type identity. Converting `Action<BrowserEvent>` to `Action<object?>` selects the object-payload bridge and loses the DOM event and its synchronous prevention flags. Keeping the typed delegate lets the existing invoker dispatch modifier/key wrappers directly ([SFC-CG-11]).
 
 Automatic catalog population creates an application-owned ComponentFactory only when no explicit resolver was supplied. It neither scans assemblies nor modifies an externally supplied factory ([CMP-36]). ARIA booleans use enumerated tokens consistently with server serialization and hydration ([RND-ARIA-1]).
+
+
+## Scoped style ownership - 2026-10-22
+
+Owner decision [V01.01.06.19] (#383) supersedes the 2026-09-14 removal. Scoped CSS is restored through compiler-emitted native attributes and selector rewriting. Native slot roots retain author identity and receive the receiver's slotted suffix through immutable generated glue. Component roots have no implicit parent identity or runtime restamping. See SPECIFICATION.md [STY-1].

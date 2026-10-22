@@ -34,6 +34,7 @@ public class ViuClassificationTypeNamesTests
         [nameof(ViuClassificationKind.Punctuation), "punctuation"],
         [nameof(ViuClassificationKind.Identifier), "identifier"],
         [nameof(ViuClassificationKind.Type), "class name"],
+        [nameof(ViuClassificationKind.Namespace), "namespace name"],
         [nameof(ViuClassificationKind.Method), "method name"],
         [nameof(ViuClassificationKind.FrameworkTag), "viu.tag"],
         [nameof(ViuClassificationKind.MarkupNode), "viu.element"],

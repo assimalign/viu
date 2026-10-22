@@ -102,24 +102,23 @@
 		<File Path="docs/PLAN.md" />
 		<File Path="docs/UTILITY-CSS-DESIGN.md" />
 	</Folder>
-	<Folder Name="/viu/frameworks/">
-		<File Path="frameworks/Assimalign.Viu.App.props" />
-		<File Path="frameworks/Assimalign.Viu.App.Browser.props" />
-		<File Path="frameworks/Assimalign.Viu.App.targets" />
-		<File Path="frameworks/Directory.Build.props" />
-		<File Path="frameworks/Directory.Build.targets" />
+	<Folder Name="/viu/build/Frameworks/">
+		<File Path="build/Frameworks/Assimalign.Viu.App.props" />
+		<File Path="build/Frameworks/Assimalign.Viu.App.Browser.props" />
+		<File Path="build/Frameworks/Assimalign.Viu.App.targets" />
+		<File Path="build/Frameworks/Framework.Pack.props" />
 	</Folder>
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Refs/" />
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Refs/src/">
-		<Project Path="frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj" />
+	<Folder Name="/viu/libraries/Runtime/Assimalign.Viu.App.Refs/" />
+	<Folder Name="/viu/libraries/Runtime/Assimalign.Viu.App.Refs/src/">
+		<Project Path="libraries/Runtime/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj" />
 	</Folder>
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Refs/" />
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Refs/src/">
-		<Project Path="frameworks/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj" />
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Refs/" />
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Refs/src/">
+		<Project Path="libraries/Browser/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj" />
 	</Folder>
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Runtime/" />
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Runtime/src/">
-		<Project Path="frameworks/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj" />
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Runtime/" />
+	<Folder Name="/viu/libraries/Browser/Assimalign.Viu.App.Browser.Runtime/src/">
+		<Project Path="libraries/Browser/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj" />
 	</Folder>
 	<Folder Name="/viu/extensions/dotnet/" />
 	<Folder Name="/viu/extensions/dotnet/Assimalign.Viu.Templates/">

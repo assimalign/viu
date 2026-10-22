@@ -118,12 +118,28 @@ internal sealed class ViuClassifier : IClassifier, IViuSemanticClassificationLis
             return intersectingSpans;
         }
 
-        foreach (ClassificationSpan classificationSpan in this.GetSnapshotSpans(span.Snapshot))
+        IReadOnlyList<ClassificationSpan> snapshotSpans = this.GetSnapshotSpans(span.Snapshot);
+        // Merged spans are ordered and non-overlapping. Skip directly to the visible range instead
+        // of scanning every token again for every editor line request. [V01.01.12.07.18]
+        int low = 0;
+        int high = snapshotSpans.Count;
+        while (low < high)
         {
-            if (classificationSpan.Span.IntersectsWith(span))
+            int middle = low + (high - low) / 2;
+            if (snapshotSpans[middle].Span.End.Position <= span.Start.Position)
             {
-                intersectingSpans.Add(classificationSpan);
+                low = middle + 1;
             }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        for (int index = low; index < snapshotSpans.Count &&
+            snapshotSpans[index].Span.Start.Position < span.End.Position; index++)
+        {
+            intersectingSpans.Add(snapshotSpans[index]);
         }
 
         return intersectingSpans;

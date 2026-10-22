@@ -11,7 +11,7 @@ and complements [`.claude/rules/documentation.md`](../.claude/rules/documentatio
 Three rules decide where a Markdown file lives, and [`docs/README.md`](README.md) indexes the result:
 
 1. **Documentation scoped to one project** lives in `<project folder>/docs/` — under `libraries/`,
-   `tooling/`, `analyzers/`, `sdks/`, `frameworks/`, `benchmarks/`, or `extensions/`.
+   `tooling/`, `analyzers/`, `sdks/`, framework packs in the library areas, `benchmarks/`, or `extensions/`.
 2. **`README.md` stays put.** Any folder may carry its own `README.md` as that folder's entry point.
 3. **Everything else** lives in the repository-root `docs/`.
 
@@ -24,7 +24,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 
 | Document | Location | What it holds |
 | --- | --- | --- |
-| Root `README.md` | repository root | The project mission, the repository map (projects under `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `frameworks/`, `benchmarks/`, and `extensions/`), the external showcase link, and clone/build instructions. |
+| Root `README.md` | repository root | The project mission, the repository map (projects under `libraries/`, `tooling/`, `analyzers/`, `sdks/`, framework packs in the library areas, `benchmarks/`, and `extensions/`), the external showcase link, and clone/build instructions. |
 | `docs/README.md` | [`docs/README.md`](README.md) | The index of repository-level documentation and the placement policy above. |
 | `SPECIFICATION.md` | [`docs/SPECIFICATION.md`](SPECIFICATION.md) | **Normative.** What Viu is and what it guarantees, in numbered clauses with stable ids. Highest authority for semantics; every other document below is subordinate to it and must not contradict it. |
 | `API-HARDENING-PLAN.md` | [`docs/API-HARDENING-PLAN.md`](API-HARDENING-PLAN.md) | The completion record for `[V01.01.14]`: public-surface decisions, terminal work disposition, gates, and deferred platform-segmentation trigger. |

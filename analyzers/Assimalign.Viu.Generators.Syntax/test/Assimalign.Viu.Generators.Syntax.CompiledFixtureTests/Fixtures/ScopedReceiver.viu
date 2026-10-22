@@ -1,0 +1,7 @@
+<template>
+    <section><slot /><p>receiver</p></section>
+</template>
+<style scoped>
+    p { color: red; }
+    :slotted(span) { color: blue; }
+</style>

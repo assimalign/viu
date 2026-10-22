@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="$(ViuRepositoryDirectory)build\Frameworks\Framework.Pack.props" />
     <PropertyGroup>
         <RootNamespace>Assimalign.Viu.Browser</RootNamespace>
         <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -13,6 +14,6 @@
         <ViuFrameworkKind>Runtime</ViuFrameworkKind>
     </PropertyGroup>
 
-    <Import Project="..\..\Assimalign.Viu.App.Browser.props" />
-    <Import Project="..\..\Assimalign.Viu.App.targets" />
+    <Import Project="$(ViuRepositoryDirectory)build\Frameworks\Assimalign.Viu.App.Browser.props" />
+    <Import Project="$(ViuRepositoryDirectory)build\Frameworks\Assimalign.Viu.App.targets" />
 </Project>

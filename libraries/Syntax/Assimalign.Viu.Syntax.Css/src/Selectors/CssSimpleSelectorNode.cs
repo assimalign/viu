@@ -1,8 +1,11 @@
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// One simple selector with its classification and authored text. Module class renaming updates
-/// this text, and serializers consume the updated value.
+/// A simple selector — a type, universal, class, id, or attribute selector. Its
+/// <see cref="SyntaxNode.Location"/><c>.Source</c> is the exact authored text (e.g. <c>.foo</c>,
+/// <c>#bar</c>, <c>div</c>, <c>[type="text"]</c>), which the serializer emits verbatim. A simple selector
+/// is a candidate for the scoped rewrite's attribute-insertion point: the attribute is placed after the
+/// last simple selector of the last compound in a complex selector.
 /// </summary>
 public sealed record CssSimpleSelectorNode : CssSelectorPartNode
 {

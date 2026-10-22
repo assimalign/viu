@@ -16,7 +16,7 @@ public class SingleFileComponentSyntaxParserTests
         "<template>\n" +
         "    <div>{{ message }}</div>\n" +
         "</template>\n" +
-        "<style module lang=\"scss\">\n" +
+        "<style scoped lang=\"scss\">\n" +
         "    .box { color: red; }\n" +
         "</style>\n" +
         "@script {\n" +

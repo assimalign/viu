@@ -160,7 +160,12 @@ function Get-ViuLibraryProject {
                     -ErrorAction SilentlyContinue
             } |
             ForEach-Object { [System.IO.Path]::GetFullPath($_.FullName) } |
-            Where-Object { Test-ViuProjectPackable -ProjectPath $_ }
+            Where-Object {
+                # [V01.01.12.37] Framework containers are packed separately with Ref/Runtime layouts.
+                $project = [xml](Get-Content -LiteralPath $_ -Raw)
+                -not $project.SelectSingleNode('/Project/PropertyGroup/ViuFrameworkKind') -and
+                    (Test-ViuProjectPackable -ProjectPath $_)
+            }
     )
 
     $difference = @(Compare-Object ($configured | Sort-Object) ($discovered | Sort-Object))

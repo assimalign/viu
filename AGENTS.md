@@ -13,7 +13,7 @@ reflection-based serialization and dynamic code generation are forbidden.
 product feature ([V01.01.06.09], #250), alongside WHATWG HTML serialization and Language Server
 Protocol compatibility. Tailwind CSS v4.3.3 is only the target of the standalone add-on at
 `libraries/Utilities/Assimalign.Viu.UtilityCss`; it is not a Viu core compatibility target (owner
-decision, 2026-08-13). Component `<style>` CSS remains fully supported, including CSS Modules, bundling,
+decision, 2026-08-13). Component `<style>` CSS remains fully supported, including scoping, bundling,
 and hot reload.
 
 ## Layout
@@ -102,8 +102,8 @@ target.
 - `libraries/Utilities/Assimalign.Viu.UtilityCss/{src,test}` is the independently published,
   standalone UtilityCss add-on library. It is not integrated into a Viu SDK or framework surface;
   consumer MSBuild integration arrives separately through [V01.01.12.30] (#346). Utility CSS remains
-  non-normative for Viu core. Component `<style>` CSS remains fully supported, including CSS Modules,
-  bundling, and hot reload. Scoped CSS was removed on 2026-09-14 ([V01.01.06.17], #367).
+  non-normative for Viu core. Component `<style>` CSS remains fully supported, including scoping,
+  bundling, and hot reload.
 - Ecosystem integrations use `extensions/{VisualStudio|VisualStudioCode|dotnet}`; templates live at
   `extensions/dotnet/Assimalign.Viu.Templates`. End-to-end testing lives at
   `benchmarks/Assimalign.Viu.Testing.EndToEnd`, and SDK task projects use
@@ -111,7 +111,7 @@ target.
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
   `docs/`; the base and Browser consumer-facing MSBuild SDKs live in `sdks/`, and the
   `Assimalign.Viu.App` / `Assimalign.Viu.App.Browser` shared-framework pack producers live in
-  `frameworks/` (see [`.claude/rules/build-system.md`](.claude/rules/build-system.md)).
+  `libraries/Runtime/` and `libraries/Browser/` (see [`.claude/rules/build-system.md`](.claude/rules/build-system.md)).
 
 ### Namespaces
 
@@ -306,8 +306,8 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
 5. Add host-neutral runtime framework members to `@(ViuFrameworkAssembly)` in
-   `frameworks/Assimalign.Viu.App.props`; add Browser-only members to
-   `frameworks/Assimalign.Viu.App.Browser.props`. Do not make the base depend on Browser.
+   `build/Frameworks/Assimalign.Viu.App.props`; add Browser-only members to
+   `build/Frameworks/Assimalign.Viu.App.Browser.props`. Do not make the base depend on Browser.
 
 ### SDK and shared-framework packaging ([V01.01.12.19], #174; [V01.01.12.27], #323)
 
@@ -325,18 +325,18 @@ External consumers use the SDK matching their topology — never `ViuProjectRefe
   base SDK and chains
   `Microsoft.NET.Sdk.WebAssembly`, registers `Assimalign.Viu.App.Browser`, and owns browser assets,
   application and component CSS bundling, hot reload, WebAssembly fixes, and publish-budget hooks.
-- **`frameworks/Assimalign.Viu.App.Refs`** produces `Assimalign.Viu.App.Ref`: Reactivity,
+- **`libraries/Runtime/Assimalign.Viu.App.Refs`** produces `Assimalign.Viu.App.Ref`: Reactivity,
   Components, State, Core, four package overrides, and the generator/parser closure. It is
   targeting-only.
-- **`frameworks/Assimalign.Viu.App.Browser.Refs`** produces
+- **`libraries/Browser/Assimalign.Viu.App.Browser.Refs`** produces
   `Assimalign.Viu.App.Browser.Ref` with Browser and its override;
-  **`frameworks/Assimalign.Viu.App.Browser.Runtime`** produces
+  **`libraries/Browser/Assimalign.Viu.App.Browser.Runtime`** produces
   `Assimalign.Viu.App.Browser.Runtime.browser-wasm` with the base-plus-Browser runtime closure.
-- **`frameworks/Assimalign.Viu.App.targets`** is the shared manifest writer/pack implementation;
+- **`build/Frameworks/Assimalign.Viu.App.targets`** is the shared manifest writer/pack implementation;
   segment props select content. Runtime packs do not carry `PackageOverrides.txt`.
 - **Local loop**: `scripts/Install-Local.ps1` packs both SDKs, two targeting packs, and the one
   Browser runtime pack into `_out/packages` (gitignored). Consumption docs: `sdks/README.md`.
-- The `frameworks/` csprojs carry documented deviations from the no-raw-`ProjectReference` rule
+- The framework pack csprojs under `libraries/Runtime/` and `libraries/Browser/` carry documented deviations from the no-raw-`ProjectReference` rule
   (build-order edges needing `ReferenceOutputAssembly=false` + `UndefineProperties` metadata the
   `ViuProjectReference` transform does not carry).
 

@@ -19,7 +19,7 @@ on:
             - "tooling/**"
             - "analyzers/**"
             - "build/**"
-            - "frameworks/**"
+            - "build/Frameworks/**"
             - "sdks/**"
             - "extensions/**/README.md"
             - "README.md"

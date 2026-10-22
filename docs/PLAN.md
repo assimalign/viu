@@ -123,9 +123,9 @@ These eight dated decisions define Viu's C# and WebAssembly architecture:
    `libraries/Syntax/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
    explicitly scoped tag-based `.vue` compatibility input. Both containers feed the same Viu
    template compiler.
-   **2026-09-14 owner decision:** scoped CSS was removed by [V01.01.06.17]
+   **Historical decision, superseded 2026-10-22 by [V01.01.06.19] (#383):** scoped CSS was removed by [V01.01.06.17]
    ([#367](https://github.com/assimalign/viu/issues/367)), including compiler attribute stamping and
-   the deferred runtime restamping plan (#319, closed as superseded). Ordinary component styles,
+   the deferred runtime restamping plan (#319, closed as superseded). Scoped styles now use compiler-owned native attributes and slot projection ([STY-1]). Ordinary component styles,
    CSS Modules, bundling, library style packing, and hot reload remain supported.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer
    applied by one JS call per flush; events use one delegated JS listener forwarding into .NET;
@@ -419,8 +419,9 @@ conformance) are likewise parked and superseded by the 2026-08-13 removal. Their
 retained as non-normative design history in [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) for the
 standalone add-on now published from `libraries/Utilities/`. Consumer MSBuild integration is tracked
 by [V01.01.12.30] (#346). Component CSS bundling, CSS Modules,
-and component-style hot reload remain active Viu features. Scoped CSS was removed on 2026-09-14
-([V01.01.06.17], #367).
+and component-style hot reload remain active Viu features. Scoped CSS is restored by
+[V01.01.06.19] (#383), superseding the 2026-09-14 removal ([V01.01.06.17], #367); ownership and
+component boundaries are specified by [STY-1].
 
 ### [V01.01.13] Framework - Documentation (W02, P003)
 
@@ -466,4 +467,10 @@ of this in-repository delivery.
 - Working conventions: [.claude/rules/workflow.md](../.claude/rules/workflow.md)
 - Performance research policy: [PERFORMANCE-RESEARCH.md](PERFORMANCE-RESEARCH.md)
 
+
+
+
+## Scoped style ownership - 2026-10-22
+
+Owner decision [V01.01.06.19] (#383) supersedes the 2026-09-14 removal. Scoped CSS is restored through compiler-emitted native attributes and selector rewriting. Native slot roots retain author identity and receive the receiver's slotted suffix through immutable generated glue. Component roots have no implicit parent identity or runtime restamping. See SPECIFICATION.md [STY-1].
 

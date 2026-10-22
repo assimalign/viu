@@ -37,6 +37,30 @@ public sealed class CssVisitorExhaustivenessTests
             nameof(UnsupportedCssNode));
 
     [Fact]
+    public void ScopedRewriter_UnsupportedRule_Throws()
+        => ShouldThrowUnsupported(
+            () => CssScopedRewriter.Rewrite(CreateStylesheet(new UnsupportedCssNode { Location = EmptyLocation }), "data-v-test"),
+            nameof(UnsupportedCssNode));
+
+    [Fact]
+    public void ScopedRewriter_UnsupportedRuleNestedInKeyframes_Throws()
+    {
+        var unsupported = new UnsupportedCssNode { Location = EmptyLocation };
+        var keyframes = new CssAtRuleNode
+        {
+            Name = "keyframes",
+            Prelude = "spin",
+            HasBlock = true,
+            Body = new SyntaxList<CssSyntaxNode>([unsupported]),
+            Location = EmptyLocation,
+        };
+
+        ShouldThrowUnsupported(
+            () => CssScopedRewriter.Rewrite(CreateStylesheet(keyframes), "data-v-test"),
+            nameof(UnsupportedCssNode));
+    }
+
+    [Fact]
     public void StylesheetWriter_UnsupportedSelectorPart_Throws()
         => ShouldThrowUnsupported(
             () => CssStylesheetWriter.Write(CreateStylesheetWithPart(new UnsupportedSelectorPartNode { Location = EmptyLocation })),
@@ -48,6 +72,14 @@ public sealed class CssVisitorExhaustivenessTests
             () => CssModuleRewriter.Rewrite(
                 CreateStylesheetWithPart(new UnsupportedSelectorPartNode { Location = EmptyLocation }),
                 "salt"),
+            nameof(UnsupportedSelectorPartNode));
+
+    [Fact]
+    public void ScopedRewriter_UnsupportedSelectorPart_Throws()
+        => ShouldThrowUnsupported(
+            () => CssScopedRewriter.Rewrite(
+                CreateStylesheetWithPart(new UnsupportedSelectorPartNode { Location = EmptyLocation }),
+                "data-v-test"),
             nameof(UnsupportedSelectorPartNode));
 
     [Fact]
@@ -65,6 +97,13 @@ public sealed class CssVisitorExhaustivenessTests
     public void StylesheetWriter_UnsupportedCombinatorKind_Throws()
         => ShouldThrowUnsupportedCombinator(
             () => CssStylesheetWriter.Write(CreateStylesheetWithPart(CreateUnsupportedCombinator())));
+
+    [Fact]
+    public void ScopedRewriter_UnsupportedCombinatorKind_Throws()
+        => ShouldThrowUnsupportedCombinator(
+            () => CssScopedRewriter.Rewrite(
+                CreateStylesheetWithPart(CreateUnsupportedCombinator()),
+                "data-v-test"));
 
     [Fact]
     public void SyntaxFactory_UnsupportedCombinatorKind_Throws()

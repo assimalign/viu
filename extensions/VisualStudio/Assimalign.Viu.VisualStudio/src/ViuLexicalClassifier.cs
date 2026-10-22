@@ -70,6 +70,10 @@ internal static class ViuLexicalClassifier
         @"\b[A-Za-z_][A-Za-z0-9_]*",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    private static readonly Regex ScriptUsingNamespaceExpression = new(
+        @"^\s*(?:global\s+)?using\s+(?<name>(?:global::)?[A-Za-z_][A-Za-z0-9_.]*)(?:\s*;?\s*)(?://.*)?$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static readonly Regex NumberExpression = new(
         @"(?<![A-Za-z0-9_])(?:0[xX][0-9A-Fa-f]+|\d+(?:\.\d+)?)(?:[uUlLfFdDmM]+)?\b",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -424,7 +428,7 @@ internal static class ViuLexicalClassifier
 
     // Classifies a top-level container tag header: the tag punctuation as delimiters, the tag name as
     // the framework tag it always is at this position, and attributes (valueless ones such as
-    // 'module' included) as markup attributes with their quoted values.
+    // 'scoped' included) as markup attributes with their quoted values.
     private static void ClassifyTagHeader(
         string line,
         int lineNumber,
@@ -895,6 +899,24 @@ internal static class ViuLexicalClassifier
                 ViuClassificationKind.Comment,
                 occupiedCharacters,
                 spans);
+        }
+
+        // [V01.01.12.07.18] Imports retain their C# namespace category between semantic publications.
+        // The type-name heuristic would otherwise repaint every PascalCase namespace while typing.
+        Match namespaceMatch = ScriptUsingNamespaceExpression.Match(line);
+        if (namespaceMatch.Success)
+        {
+            Group namespaceName = namespaceMatch.Groups["name"];
+            foreach (Match identifier in ScriptIdentifierExpression.Matches(namespaceName.Value))
+            {
+                if (identifier.Value == "global")
+                {
+                    continue;
+                }
+
+                AddSpan(lineNumber, namespaceName.Index + identifier.Index, identifier.Length,
+                    ViuClassificationKind.Namespace, occupiedCharacters, spans);
+            }
         }
 
         ClassifyCSharpTokens(line, lineNumber, 0, line.Length, occupiedCharacters, spans);

@@ -2,7 +2,8 @@ namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
 /// A combinator between two compound selectors (descendant, child, next-sibling, or subsequent-sibling).
-/// The whitespace it spans is normalized on serialization.
+/// A combinator is never the attribute-insertion point of the scoped rewrite; the whitespace it may span
+/// is normalized on serialization.
 /// </summary>
 public sealed record CssCombinatorNode : CssSelectorPartNode
 {

@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Syntax.Css;
 
 // The programmatic CSS construction and deterministic emission surface ([V01.01.12.11]): building the
 // existing record-graph node types from code (CssSyntaxFactory / CssStylesheetBuilder) and serializing them
-// through the same canonical serializer path CssStylesheetWriter uses, per CSS Syntax
+// through the same canonical serializer path CssStylesheetWriter / CssScopedRewriter use, per CSS Syntax
 // Module Level 3 (https://www.w3.org/TR/css-syntax-3/). Pins construction + serialization against fixed
 // expected CSS text (including nested @media), the synthetic-location divergence from the exact-slice
 // SourceLocation invariant, byte-identical determinism (the incremental-cache contract), and value equality.
@@ -229,7 +229,7 @@ public class CssConstructionTests
         CssSyntheticLocation.Create("x").Source.ShouldBe("x");
     }
 
-    // ---- the builder, and flow through the serializer ----
+    // ---- the builder, and flow through the scoped rewriter ----
 
     [Fact]
     public void Builder_AccumulatesRules_EqualsFactoryStylesheet()
@@ -244,16 +244,17 @@ public class CssConstructionTests
     }
 
     [Fact]
-    public void Write_ConstructedGraph_FlowsThroughStylesheetWriter()
+    public void Scope_ConstructedGraph_FlowsThroughScopedRewriter()
     {
-        // The serializer handles a constructed record graph exactly as a parsed one.
+        // A constructed graph retains its record nodes, so the scoped rewrite (which needs the parsed
+        // parts to find the attribute-insertion point) handles it exactly as a parsed one.
         var stylesheet = CssSyntaxFactory.Stylesheet(new CssSyntaxNode[]
         {
             ClassRule(".foo", CssSyntaxFactory.Declaration("color", "red")),
         });
 
-        CssStylesheetWriter.Write(stylesheet)
-            .ShouldBe(".foo {\n  color: red;\n}\n");
+        CssScopedRewriter.Rewrite(stylesheet, "data-v-test")
+            .ShouldBe(".foo[data-v-test] {\n  color: red;\n}\n");
     }
 
     // ---- argument validation (matches the serializer entry points) ----

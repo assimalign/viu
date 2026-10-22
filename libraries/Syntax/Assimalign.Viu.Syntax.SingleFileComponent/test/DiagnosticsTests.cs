@@ -30,13 +30,13 @@ public class DiagnosticsTests
     [Fact]
     public void Parse_UnterminatedTagBlock_ReportsAndRecoversToEndOfFile()
     {
-        var source = "<style module>\n.card {\n  display: grid;\n}";
+        var source = "<style scoped>\n.card {\n  display: grid;\n}";
 
         var result = SingleFileComponentParser.Parse(source);
 
         result.Errors.Count.ShouldBe(1);
         result.Errors[0].Code.ShouldBe(SingleFileComponentErrorCode.UnterminatedTagBlock);
-        result.Errors[0].Location.Source.ShouldBe("<style module>");
+        result.Errors[0].Location.Source.ShouldBe("<style scoped>");
         result.Descriptor.Styles.Count.ShouldBe(1);
         result.Descriptor.Styles[0].Content.ShouldBe("\n.card {\n  display: grid;\n}");
     }
@@ -239,7 +239,7 @@ public class DiagnosticsTests
             "<template>",
             "<template lang=\"x",
             "<template junk=>",
-            "<style module module>",
+            "<style scoped scoped>",
             "<script>",
             "<script",
             "<!--",
