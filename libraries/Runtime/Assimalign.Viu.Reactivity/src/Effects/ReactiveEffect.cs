@@ -96,10 +96,11 @@ public sealed class ReactiveEffect : Subscriber, IDisposable
         }
         Flags |= SubscriberFlags.Running;
         SubscriberOperations.PrepareDependencies(this);
-        var previousSubscriber = ReactivityState.ActiveSubscriber;
-        var previousShouldTrack = ReactivityState.ShouldTrack;
-        ReactivityState.ActiveSubscriber = this;
-        ReactivityState.ShouldTrack = true;
+        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
+        var previousSubscriber = state.ActiveSubscriber;
+        var previousShouldTrack = state.ShouldTrack;
+        state.ActiveSubscriber = this;
+        state.ShouldTrack = true;
         bool succeeded = false;
         if (ReactivityInspection.IsEnabled)
         {
@@ -112,10 +113,10 @@ public sealed class ReactiveEffect : Subscriber, IDisposable
         }
         finally
         {
-            Debug.Assert(ReferenceEquals(ReactivityState.ActiveSubscriber, this), "Active subscriber stack corrupted.");
+            Debug.Assert(ReferenceEquals(state.ActiveSubscriber, this), "Active subscriber stack corrupted.");
             SubscriberOperations.CleanupDependencies(this);
-            ReactivityState.ActiveSubscriber = previousSubscriber;
-            ReactivityState.ShouldTrack = previousShouldTrack;
+            state.ActiveSubscriber = previousSubscriber;
+            state.ShouldTrack = previousShouldTrack;
             Flags &= ~SubscriberFlags.Running;
             if (ReactivityInspection.IsEnabled)
             {

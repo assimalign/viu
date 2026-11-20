@@ -11,10 +11,16 @@ internal static class StateExecutionIsolation
     private static readonly AsyncLocal<StateExecutionState?> IsolatedState = new();
     private static readonly StateExecutionState SharedState = new();
 
-    internal static StateExecutionState Current => IsolatedState.Value ?? SharedState;
+    // Flips once, the first time any execution flow is isolated, and never flips back. Until then
+    // every lookup resolves to the shared state without consulting the execution context.
+    private static volatile bool _hasIsolatedFlows;
+
+    internal static StateExecutionState Current =>
+        _hasIsolatedFlows ? IsolatedState.Value ?? SharedState : SharedState;
 
     internal static IDisposable Enter()
     {
+        _hasIsolatedFlows = true;
         StateExecutionState? previous = IsolatedState.Value;
         IsolatedState.Value = new StateExecutionState();
         return new IsolationLease(previous);
