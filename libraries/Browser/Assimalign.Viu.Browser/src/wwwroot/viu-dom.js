@@ -184,6 +184,27 @@ function readCommandFrame(memoryView) {
     return target
 }
 
+// Most command strings are short ASCII (tag names, attribute names, class tokens). Building those
+// from char codes is cheaper than a TextDecoder call plus the subarray it needs; anything longer or
+// non-ASCII falls back to the decoder, which is the only path that understands multi-byte UTF-8.
+const asciiDecodeLimit = 32
+
+function readCommandString(bytes, offset, byteLength) {
+    if (byteLength <= asciiDecodeLimit) {
+        let text = ''
+        const end = offset + byteLength
+        for (let index = offset; index < end; index++) {
+            const byte = bytes[index]
+            if (byte >= 0x80) {
+                return textDecoder.decode(bytes.subarray(offset, end))
+            }
+            text += String.fromCharCode(byte)
+        }
+        return text
+    }
+    return textDecoder.decode(bytes.subarray(offset, offset + byteLength))
+}
+
 function readCommandStrings(bytes, view, offset) {
     const count = view.getInt32(offset, true)
     offset += 4
@@ -191,7 +212,7 @@ function readCommandStrings(bytes, view, offset) {
     for (let index = 0; index < count; index++) {
         const byteLength = view.getInt32(offset, true)
         offset += 4
-        strings[index] = textDecoder.decode(bytes.subarray(offset, offset + byteLength))
+        strings[index] = readCommandString(bytes, offset, byteLength)
         offset += byteLength
     }
     return strings

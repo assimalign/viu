@@ -183,6 +183,49 @@ public sealed class BrowserEventsTests
         received.ShouldBeSameAs(payload);
     }
 
+    [Theory]
+    [InlineData(2)]
+    [InlineData(20)]
+    public void EventRegistry_PurgeReleasedHandles_DropsEveryInvokerOfReleasedNodesOnly(int releasedCount)
+    {
+        // [RND-IO-2] A purge removes the invokers of released nodes and nothing else, whether the
+        // released set is small enough to probe or large enough to hash.
+        const int nodeCount = 30;
+        int removeListenerCalls = 0;
+        BrowserEventInvokerRegistry registry = new(
+            static (_, _, _, _, _) => { },
+            (_, _, _) => removeListenerCalls++);
+        List<int> invoked = [];
+        for (int handle = 1; handle <= nodeCount; handle++)
+        {
+            int captured = handle;
+            registry.SetListener(handle, "onClick", (Action<IElementEvent>)(_ => invoked.Add(captured)));
+            registry.SetListener(handle, "onInput", (Action<IElementEvent>)(_ => invoked.Add(-captured)));
+        }
+
+        int[] released = new int[releasedCount];
+        int releasedLiveNodes = 0;
+        for (int index = 0; index < releasedCount; index++)
+        {
+            released[index] = (index + 1) * 2;
+            if (released[index] <= nodeCount)
+            {
+                releasedLiveNodes++;
+            }
+        }
+
+        registry.PurgeReleasedHandles(released);
+
+        registry.InvokerCount.ShouldBe((nodeCount - releasedLiveNodes) * 2);
+        removeListenerCalls.ShouldBe(0);
+        registry.Dispatch(2, capture: false, CreateEvent(eventName: "click"));
+        registry.Dispatch(2, capture: false, CreateEvent(eventName: "input"));
+        invoked.ShouldBeEmpty();
+        registry.Dispatch(3, capture: false, CreateEvent(eventName: "click"));
+        registry.Dispatch(3, capture: false, CreateEvent(eventName: "input"));
+        invoked.ShouldBe([3, -3]);
+    }
+
     private static BrowserEvent CreateEvent(
         string eventName = "click",
         string key = "",
