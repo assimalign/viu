@@ -15,10 +15,17 @@ internal static class CoreExecutionIsolation
     private static readonly AsyncLocal<CoreExecutionState?> IsolatedState = new();
     private static readonly CoreExecutionState SharedState = new();
 
-    internal static CoreExecutionState Current => IsolatedState.Value ?? SharedState;
+    // Flips once, the first time any execution flow is isolated, and never flips back. Until then
+    // every lookup resolves to the shared state without consulting the execution context, which
+    // keeps the Browser's single-event-loop hot paths free of AsyncLocal reads.
+    private static volatile bool _hasIsolatedFlows;
+
+    internal static CoreExecutionState Current =>
+        _hasIsolatedFlows ? IsolatedState.Value ?? SharedState : SharedState;
 
     internal static IDisposable Enter()
     {
+        _hasIsolatedFlows = true;
         CoreExecutionState? previous = IsolatedState.Value;
         IsolatedState.Value = new CoreExecutionState();
         IDisposable reactivity = Reactive.EnterExecutionFlow();

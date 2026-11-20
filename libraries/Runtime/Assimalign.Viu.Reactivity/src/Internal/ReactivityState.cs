@@ -71,8 +71,11 @@ internal static class ReactivityState
         state.BatchedSubscriber = subscriber;
     }
 
-    /// <summary>Increments the batch depth; triggers are queued until the matching <see cref="EndBatch"/>.</summary>
+    /// <summary>Increments the batch depth; triggers are queued until the matching <see cref="EndBatch()"/>.</summary>
     internal static void StartBatch() => ReactivityExecutionIsolation.Current.BatchDepth++;
+
+    /// <summary>Increments the batch depth of an already resolved execution state.</summary>
+    internal static void StartBatch(ReactivityExecutionState state) => state.BatchDepth++;
 
     /// <summary>
     /// Decrements the batch depth and, when it reaches zero, flushes queued subscribers. Computeds
@@ -81,9 +84,11 @@ internal static class ReactivityState
     /// effect never strands the others mid-flush.
     /// </summary>
     /// <exception cref="InvalidOperationException">There is no open batch to close.</exception>
-    internal static void EndBatch()
+    internal static void EndBatch() => EndBatch(ReactivityExecutionIsolation.Current);
+
+    /// <summary>Closes a batch on an already resolved execution state; see <see cref="EndBatch()"/>.</summary>
+    internal static void EndBatch(ReactivityExecutionState state)
     {
-        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
         if (state.BatchDepth == 0)
         {
             throw new InvalidOperationException("EndBatch called without a matching StartBatch.");

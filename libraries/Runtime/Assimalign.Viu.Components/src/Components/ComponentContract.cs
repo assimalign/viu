@@ -19,6 +19,7 @@ public sealed class ComponentContract
     private readonly bool _hasCompilerRenderCacheSize;
     private readonly int _renderCacheSize;
     private readonly ComponentRenderCacheSizeProvider? _renderCacheSizeProvider;
+    private ComponentContractAliases? _aliases;
 
     /// <summary>
     /// Initializes an immutable component contract without compiler cache-size metadata.
@@ -148,6 +149,12 @@ public sealed class ComponentContract
 
     /// <summary>Gets the optional diagnostic display name.</summary>
     public string? DisplayName { get; }
+
+    /// <summary>
+    /// The alias tables resolution uses, built on first use and shared by every resolution of this
+    /// contract. The contract is immutable, so the tables never go stale.
+    /// </summary>
+    internal ComponentContractAliases Aliases => _aliases ??= new ComponentContractAliases(this);
 
     /// <summary>Gets static input-resolution behavior.</summary>
     public ComponentFlags Flags { get; }

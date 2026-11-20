@@ -338,6 +338,54 @@ public sealed class SchedulerTests : IDisposable
         _pump.RunUntilIdle();
     }
 
+    [Fact]
+    public void InvalidateJob_QueuedJob_RemovesOnlyThatJobBeforeTheFlush()
+    {
+        // [SCH-2] An invalidated job leaves the queue without disturbing its neighbours.
+        var order = new List<string>();
+        var first = new SchedulerJob(() => order.Add("first")) { Identifier = 1 };
+        var second = new SchedulerJob(() => order.Add("second")) { Identifier = 2 };
+        var third = new SchedulerJob(() => order.Add("third")) { Identifier = 3 };
+        Scheduler.QueueJob(first);
+        Scheduler.QueueJob(second);
+        Scheduler.QueueJob(third);
+
+        Scheduler.InvalidateJob(second);
+        _pump.RunUntilIdle();
+
+        order.ShouldBe(["first", "third"]);
+    }
+
+    [Fact]
+    public void InvalidateJob_JobThatIsNotQueued_IsIgnoredAndTheJobStaysQueueable()
+    {
+        int runs = 0;
+        var job = new SchedulerJob(() => runs++);
+
+        Scheduler.InvalidateJob(job);
+        Scheduler.QueueJob(job);
+        _pump.RunUntilIdle();
+        Scheduler.InvalidateJob(job);
+        Scheduler.QueueJob(job);
+        _pump.RunUntilIdle();
+
+        runs.ShouldBe(2);
+    }
+
+    [Fact]
+    public void InvalidateJob_InvalidatedThenRequeuedJob_RunsOnce()
+    {
+        int runs = 0;
+        var job = new SchedulerJob(() => runs++);
+        Scheduler.QueueJob(job);
+        Scheduler.InvalidateJob(job);
+
+        Scheduler.QueueJob(job);
+        _pump.RunUntilIdle();
+
+        runs.ShouldBe(1);
+    }
+
     private sealed class DeterministicFlushPump : IDisposable
     {
         private readonly Queue<Action> _pending = [];
