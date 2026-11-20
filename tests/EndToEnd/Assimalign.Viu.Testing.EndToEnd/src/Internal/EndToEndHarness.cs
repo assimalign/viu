@@ -1905,7 +1905,8 @@ internal sealed partial class EndToEndHarness
         {
             if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase)
                 || (requireNoWarnings
-                    && (string.Equals(message.Type, "warning", StringComparison.OrdinalIgnoreCase)
+                    && ((string.Equals(message.Type, "warning", StringComparison.OrdinalIgnoreCase)
+                            && !IsBrowserEngineWarning(message.Text))
                         || message.Text.StartsWith("Viu application warning:", StringComparison.Ordinal))))
             {
                 lock (browserErrors)
@@ -2158,12 +2159,31 @@ internal sealed partial class EndToEndHarness
                 StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Recognizes console warnings that a browser engine emits about the harness or the .NET
+    /// WebAssembly runtime rather than about the Viu application under test, so a
+    /// <c>requireNoWarnings</c> scenario keeps rejecting every application-originated warning.
+    /// </summary>
+    private static bool IsBrowserEngineWarning(string text) =>
+        // Firefox 148+ reports the legacy WebAssembly exception-handling 'try' opcode that the
+        // .NET runtime's dotnet.native.wasm is compiled with. Viu does not produce that binary.
+        text.Contains(
+            "The WebAssembly exception handling 'try' instruction is deprecated",
+            StringComparison.Ordinal)
+        // Firefox attributes Playwright's own injected evaluation to "debugger eval code"; a
+        // forced-layout warning from that source is the harness probing the DOM, not app code.
+        || (text.Contains("Layout was forced before the page was fully loaded", StringComparison.Ordinal)
+            && text.Contains("{file: \"debugger eval code\"", StringComparison.Ordinal));
+
     private static async Task RunConditionalSiblingScenarioAsync(IPage page, Uri browserAddress, string route)
     {
         // PR #379 follow-up, [CMP-37], [RND-KEY-1]: a branch key beside a fixed
         // keyless div must not warn, either in a referenced Card's slot or a root fragment.
         // RunScenarioAsync rejects console warnings and the application's warning-handler output.
         await NavigateAsync(page, new Uri(browserAddress, "#/" + route).AbsoluteUri);
+        // Let the document finish loading before probing it, so harness DOM queries do not force
+        // layout ahead of the stylesheets (Firefox reports that as a console warning).
+        await page.WaitForLoadStateAsync(LoadState.Load);
         ILocator toggle = page.GetByRole(AriaRole.Switch, new() { Name = "Visible" });
         await toggle.WaitForAsync();
         ILocator paragraph = page.Locator("p").Filter(new() { HasText = "visible" });
