@@ -98,16 +98,21 @@ public sealed partial class Renderer<TNode>
             }
 
             QueueMountedLifecycle(mounted);
-            mounted.HotReloadRegistration = ComponentHotReload.RegisterMountedComponent(
-                activation.Instance.GetType(),
-                change =>
-                {
-                    if (change is ComponentHotReloadChangeKind.Template
-                        or ComponentHotReloadChangeKind.ScriptReset)
+            Type componentType = activation.Instance.GetType();
+            if (ComponentHotReload.HasMetadata(componentType))
+            {
+                mounted.HotReloadRegistration = ComponentHotReload.RegisterMountedComponent(
+                    componentType,
+                    change =>
                     {
-                        QueueComponentRemount(tree, mounted, container);
-                    }
-                });
+                        if (change is ComponentHotReloadChangeKind.Template
+                            or ComponentHotReloadChangeKind.ScriptReset)
+                        {
+                            QueueComponentRemount(tree, mounted, container);
+                        }
+                    });
+            }
+
             return mounted;
         }
         catch
@@ -264,10 +269,15 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        TNode parent = HostParentOrFallback(
-            mounted.Subtree.FirstHostNode,
-            fallbackContainer);
-        TNode? anchor = GetNextHostNode(mounted.Subtree);
+        // [V01.01.11.07] A root that patches through its existing native handle never consults the
+        // host for its parent or next sibling; on the Browser each such read forces the pending
+        // command frame to flush, so the reads are reserved for roots that may be replaced or that
+        // insert children beside themselves (fragments and built-ins).
+        bool patchesExistingHandle = PatchesExistingHandle(mounted.Subtree, mounted.PendingTree);
+        TNode parent = patchesExistingHandle
+            ? fallbackContainer
+            : HostParentOrFallback(mounted.Subtree.FirstHostNode, fallbackContainer);
+        TNode? anchor = patchesExistingHandle ? default : GetNextHostNode(mounted.Subtree);
         SuspenseBoundary? previousBoundary = _activeSuspenseBoundary;
         _activeSuspenseBoundary = mounted.Context.SuspenseBoundary;
         try

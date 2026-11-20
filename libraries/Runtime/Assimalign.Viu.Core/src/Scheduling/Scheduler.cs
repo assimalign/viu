@@ -340,10 +340,18 @@ public static partial class Scheduler
         SchedulerExecutionState state = State;
         lock (state.Synchronization)
         {
-            int index = _queue.IndexOf(job);
-            if (index > _flushIndex)
+            // A job without the queued flag is not in the pending queue, or is the recursing job
+            // that is running right now; neither can be removed, so skip the linear search.
+            if ((job.Flags & SchedulerJobFlags.Queued) == 0)
             {
-                _queue.RemoveAt(index);
+                return;
+            }
+
+            List<SchedulerJob> queue = state.Queue;
+            int index = queue.IndexOf(job);
+            if (index > state.FlushIndex)
+            {
+                queue.RemoveAt(index);
                 job.Flags &= ~SchedulerJobFlags.Queued;
             }
         }
@@ -487,13 +495,17 @@ public static partial class Scheduler
                 BeginInspectionFlush(state);
             }
 
+            List<SchedulerJob> queue = state.Queue;
             try
             {
                 do
                 {
-                    for (_flushIndex = 0; _flushIndex < _queue.Count; _flushIndex++)
+                    // The flush index lives on the execution state so jobs queued while flushing
+                    // insert after the running position; read the queue count each iteration
+                    // because a job may append to it.
+                    for (state.FlushIndex = 0; state.FlushIndex < queue.Count; state.FlushIndex++)
                     {
-                        SchedulerJob job = _queue[_flushIndex];
+                        SchedulerJob job = queue[state.FlushIndex];
                         if (job.IsDisposed)
                         {
                             job.Flags &= ~SchedulerJobFlags.Queued;
@@ -522,13 +534,13 @@ public static partial class Scheduler
                         job.Flags &= ~SchedulerJobFlags.Queued;
                     }
 
-                    _queue.Clear();
-                    _flushIndex = -1;
+                    queue.Clear();
+                    state.FlushIndex = -1;
                     FlushHostCommits();
                     FlushPostFlushCallbacks();
                     FlushHostCommits();
                 }
-                while (_queue.Count > 0 || _pendingPostFlushCallbacks.Count > 0);
+                while (queue.Count > 0 || state.PendingPostFlushCallbacks.Count > 0);
 
                 _isFlushing = false;
                 CompleteFlushChain();

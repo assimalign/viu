@@ -177,17 +177,17 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
 
         List<ComponentBindingDiagnostic> diagnostics = [];
         ComponentBindings resolved = Run(
-            () => ComponentBindings.Resolve(_contract, invocation, diagnostics));
-        Dictionary<string, object?> parameters = new(StringComparer.Ordinal);
-        foreach (KeyValuePair<string, object?> parameter in resolved.Parameters)
-        {
-            parameters.Add(parameter.Key, parameter.Value);
-        }
+            (contract: _contract, invocation, diagnostics),
+            static state => ComponentBindings.Resolve(state.contract, state.invocation, state.diagnostics));
 
+        // The resolved snapshot is immutable, so it is reused as-is unless a default must be
+        // materialized; only that case needs a mutable copy of the parameter table.
+        Dictionary<string, object?>? parameters = null;
         foreach (ComponentParameter parameter in _contract.Parameters)
         {
-            if (parameters.ContainsKey(parameter.Name)
-                || parameter.DefaultFactory is null)
+            if (parameter.DefaultFactory is null
+                || resolved.Parameters.ContainsKey(parameter.Name)
+                || (parameters is not null && parameters.ContainsKey(parameter.Name)))
             {
                 continue;
             }
@@ -196,6 +196,17 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
             {
                 defaultValue = Run(parameter.DefaultFactory);
                 _defaultValues.Add(parameter.Name, defaultValue);
+            }
+
+            if (parameters is null)
+            {
+                parameters = new Dictionary<string, object?>(
+                    resolved.Parameters.Count + 1,
+                    StringComparer.Ordinal);
+                foreach (KeyValuePair<string, object?> supplied in resolved.Parameters)
+                {
+                    parameters.Add(supplied.Key, supplied.Value);
+                }
             }
 
             parameters.Add(parameter.Name, defaultValue);
@@ -211,10 +222,9 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
             }
         }
 
-        _bindings = new ComponentBindings(
-            parameters,
-            resolved.Slots,
-            resolved.FallthroughBindings);
+        _bindings = parameters is null
+            ? resolved
+            : new ComponentBindings(parameters, resolved.Slots, resolved.FallthroughBindings);
         _listeners = invocation.Listeners;
 
         foreach (ComponentBindingDiagnostic diagnostic in diagnostics)
@@ -261,6 +271,26 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
         try
         {
             action();
+        }
+        finally
+        {
+            executionState.CurrentComponent = previous;
+        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="function"/> with this component current, passing <paramref name="state"/>
+    /// through so a static lambda can be used and no closure is allocated per call.
+    /// </summary>
+    internal TResult Run<TState, TResult>(TState state, Func<TState, TResult> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        CoreExecutionState executionState = CoreExecutionIsolation.Current;
+        RuntimeComponentContext? previous = executionState.CurrentComponent;
+        executionState.CurrentComponent = this;
+        try
+        {
+            return function(state);
         }
         finally
         {
