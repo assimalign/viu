@@ -93,7 +93,13 @@ public sealed partial class Renderer<TNode>
         {
             if (mounted.ChildrenMounted)
             {
-                MoveChildren(mounted.Children, originContainer, mounted.EndAnchor);
+                // The children of a teleport that was already disabled sit before the end anchor;
+                // moving them again would cost one host insert per child on every update.
+                if (!previous.IsDisabled)
+                {
+                    MoveChildren(mounted.Children, originContainer, mounted.EndAnchor);
+                }
+
                 PatchTeleportChildren(
                     tree,
                     mounted,
@@ -161,6 +167,12 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
+        // Mounted children of an enabled teleport already sit before its target anchor. They are
+        // moved again only when they were in the origin (the teleport was disabled) or the target
+        // was re-resolved to a new anchor; otherwise every update would cost one host insert per
+        // child.
+        bool childrenAtTarget = !previous.IsDisabled && mounted.ChildrenMounted && mounted.HasTarget;
+        TNode? previousTargetAnchor = mounted.TargetAnchor;
         if (!canReuseDeferredTarget
             && !EnsureTeleportTarget(
                 tree,
@@ -181,10 +193,15 @@ public sealed partial class Renderer<TNode>
 
         if (mounted.ChildrenMounted)
         {
-            MoveChildren(
-                mounted.Children,
-                mounted.TargetContainer!,
-                mounted.TargetAnchor);
+            if (!childrenAtTarget
+                || !NodeComparer.Equals(mounted.TargetAnchor!, previousTargetAnchor!))
+            {
+                MoveChildren(
+                    mounted.Children,
+                    mounted.TargetContainer!,
+                    mounted.TargetAnchor);
+            }
+
             PatchTeleportChildren(
                 tree,
                 mounted,
@@ -314,7 +331,7 @@ public sealed partial class Renderer<TNode>
         {
             tree.Application?.WarnHandler?.Invoke(
                 $"Failed to resolve teleport target '{value.TargetIdentifier}'.");
-            RemoveTeleportTargetAnchor(mounted);
+            RemoveTeleportTargetAnchor(tree, mounted);
             return false;
         }
 
@@ -325,12 +342,13 @@ public sealed partial class Renderer<TNode>
             return true;
         }
 
-        RemoveTeleportTargetAnchor(mounted);
+        RemoveTeleportTargetAnchor(tree, mounted);
         TNode targetAnchor = _options.CreateComment(HydrationMarkers.TeleportAnchorData);
         _options.Insert(targetAnchor, resolved!, default);
         mounted.TargetContainer = resolved;
         mounted.TargetAnchor = targetAnchor;
         mounted.HasTarget = true;
+        tree.TargetedTeleportCount++;
         if (moveChildrenToTarget && mounted.ChildrenMounted)
         {
             MoveChildren(mounted.Children, resolved!, targetAnchor);
@@ -349,11 +367,18 @@ public sealed partial class Renderer<TNode>
             value,
             moveChildrenToTarget: !value.IsDisabled);
 
-    private void RemoveTeleportTargetAnchor(MountedTeleport<TNode> mounted)
+    private void RemoveTeleportTargetAnchor(
+        MountedTree<TNode> tree,
+        MountedTeleport<TNode> mounted)
     {
-        if (mounted.HasTarget && HasHostNode(mounted.TargetAnchor))
+        if (mounted.HasTarget)
         {
-            _options.Remove(mounted.TargetAnchor!);
+            if (HasHostNode(mounted.TargetAnchor))
+            {
+                _options.Remove(mounted.TargetAnchor!);
+            }
+
+            tree.TargetedTeleportCount--;
         }
 
         mounted.TargetAnchor = default;
@@ -384,7 +409,7 @@ public sealed partial class Renderer<TNode>
             UnmountChildren(tree, mounted.Children, removeHostNodes: true);
         }
 
-        RemoveTeleportTargetAnchor(mounted);
+        RemoveTeleportTargetAnchor(tree, mounted);
         if (removeHostNodes)
         {
             RemoveRange(mounted.StartAnchor, mounted.EndAnchor);
@@ -442,7 +467,10 @@ public sealed partial class Renderer<TNode>
 
     private void NormalizeTeleportTargetOrder(MountedTree<TNode> tree)
     {
-        if (tree.Root is null)
+        // Ordering only matters when at least two teleports can share one target. The count is
+        // maintained where target ranges are installed and released, so an ordinary component
+        // update never pays for a walk of the whole mounted tree.
+        if (tree.Root is null || tree.TargetedTeleportCount < 2)
         {
             return;
         }

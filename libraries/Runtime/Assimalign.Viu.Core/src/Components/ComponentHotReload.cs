@@ -97,12 +97,30 @@ public static class ComponentHotReload
         }
     }
 
-    internal static IDisposable RegisterMountedComponent(
+    /// <summary>
+    /// Returns whether <paramref name="componentType"/> registered development metadata. Updates
+    /// are only ever applied to types with metadata, so a mount of any other type can skip the
+    /// update subscription entirely.
+    /// </summary>
+    internal static bool HasMetadata(Type componentType) => Metadata.ContainsKey(componentType);
+
+    /// <summary>
+    /// Subscribes one mounted component to update notifications for its type, or returns
+    /// <see langword="null"/> when the type never registered development metadata. Updates are
+    /// only ever applied to types with metadata, so a build without metadata emission mounts
+    /// components without allocating a registration, a handler, or a per-type handler list.
+    /// </summary>
+    internal static IDisposable? RegisterMountedComponent(
         Type componentType,
         Action<ComponentHotReloadChangeKind> handler)
     {
         ArgumentNullException.ThrowIfNull(componentType);
         ArgumentNullException.ThrowIfNull(handler);
+        if (!Metadata.ContainsKey(componentType))
+        {
+            return null;
+        }
+
         ComponentHotReloadUpdateRegistration registration = new(componentType, handler);
         if (!UpdateHandlers.TryGetValue(
             componentType,

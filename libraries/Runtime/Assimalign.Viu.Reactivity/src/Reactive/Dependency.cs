@@ -55,8 +55,11 @@ public sealed class Dependency
     /// <summary>Core of <see cref="Track()"/>; returns the (new or reused) link for computed reads.</summary>
     internal SubscriberLink? TrackLink(object? owner = null, object? memberKey = null)
     {
-        var subscriber = ReactivityState.ActiveSubscriber;
-        if (subscriber is null || !ReactivityState.ShouldTrack || ReferenceEquals(subscriber, Computed))
+        // Resolve the ambient state once: this is the hottest path in the engine, entered by
+        // every reactive read.
+        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
+        var subscriber = state.ActiveSubscriber;
+        if (subscriber is null || !state.ShouldTrack || ReferenceEquals(subscriber, Computed))
         {
             return null;
         }
@@ -128,19 +131,27 @@ public sealed class Dependency
     internal void TriggerWithAttribution(object? owner, object? memberKey)
     {
         Version++;
-        ReactivityState.GlobalVersion++;
-        Notify(owner, memberKey, isWrite: true);
+        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
+        state.GlobalVersion++;
+        Notify(state, owner, memberKey, isWrite: true);
     }
 
     /// <summary>Notifies subscribers without bumping versions (used by computed propagation).</summary>
-    internal void Notify(object? owner = null, object? memberKey = null, bool isWrite = false)
+    internal void Notify(object? owner = null, object? memberKey = null, bool isWrite = false) =>
+        Notify(ReactivityExecutionIsolation.Current, owner, memberKey, isWrite);
+
+    private void Notify(
+        ReactivityExecutionState state,
+        object? owner,
+        object? memberKey,
+        bool isWrite)
     {
         if (ReactivityInspection.IsEnabled)
         {
-            ReactivityInspection.NotifyDependency(this, ReactivityState.ActiveSubscriber,
+            ReactivityInspection.NotifyDependency(this, state.ActiveSubscriber,
                 owner, memberKey, triggered: true, isWrite);
         }
-        ReactivityState.StartBatch();
+        ReactivityState.StartBatch(state);
         try
         {
             for (var link = Subscribers; link is not null; link = link.PreviousSubscriber)
@@ -158,7 +169,7 @@ public sealed class Dependency
         }
         finally
         {
-            ReactivityState.EndBatch();
+            ReactivityState.EndBatch(state);
         }
     }
 }

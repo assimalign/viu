@@ -7,28 +7,40 @@ using System.Threading.Tasks;
 
 namespace Assimalign.Viu.LanguageServer;
 
+/// <summary>
+/// Reads Language Server Protocol base-protocol frames (<c>Content-Length</c> header block, blank
+/// line, UTF-8 JSON payload) from one stream. The reader owns a read-ahead buffer, so the header
+/// is scanned byte by byte in memory rather than with one stream read per byte, and bytes that
+/// belong to the next frame are kept for the next call. Because of that read-ahead, exactly one
+/// reader may consume a given stream. Not thread-safe: calls to <see cref="ReadAsync"/> must not
+/// overlap. Base-protocol reference:
+/// <see href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#baseProtocol"/>.
+/// </summary>
 internal sealed class LanguageServerProtocolMessageReader
 {
     private const int MaximumHeaderLength = 64 * 1024;
     private const int MaximumPayloadLength = 16 * 1024 * 1024;
+    private const int ReadAheadLength = 8 * 1024;
 
     private readonly Stream input;
+    private readonly byte[] readAhead = new byte[ReadAheadLength];
+    private byte[] header = new byte[256];
+    private int readAheadOffset;
+    private int readAheadCount;
 
     internal LanguageServerProtocolMessageReader(Stream input)
         => this.input = input ?? throw new ArgumentNullException(nameof(input));
 
     internal async ValueTask<JsonDocument?> ReadAsync(CancellationToken cancellationToken = default)
     {
-        using var header = new MemoryStream();
+        var headerLength = 0;
         var terminatorMatchLength = 0;
 
         while (true)
         {
-            var next = new byte[1];
-            var count = await input.ReadAsync(next, cancellationToken).ConfigureAwait(false);
-            if (count == 0)
+            if (readAheadOffset == readAheadCount && !await FillReadAheadAsync(cancellationToken).ConfigureAwait(false))
             {
-                if (header.Length == 0)
+                if (headerLength == 0)
                 {
                     return null;
                 }
@@ -36,21 +48,26 @@ internal sealed class LanguageServerProtocolMessageReader
                 throw new EndOfStreamException("The language-server message header ended unexpectedly.");
             }
 
-            header.WriteByte(next[0]);
-            if (header.Length > MaximumHeaderLength)
+            var next = readAhead[readAheadOffset++];
+            if (headerLength == header.Length)
+            {
+                Array.Resize(ref header, Math.Min(header.Length * 2, MaximumHeaderLength + 1));
+            }
+
+            header[headerLength++] = next;
+            if (headerLength > MaximumHeaderLength)
             {
                 throw new InvalidDataException("The language-server message header is too large.");
             }
 
-            terminatorMatchLength = AdvanceHeaderTerminator(next[0], terminatorMatchLength);
+            terminatorMatchLength = AdvanceHeaderTerminator(next, terminatorMatchLength);
             if (terminatorMatchLength == 4)
             {
                 break;
             }
         }
 
-        var headerBytes = header.ToArray();
-        var headerText = Encoding.ASCII.GetString(headerBytes, 0, headerBytes.Length - 4);
+        var headerText = Encoding.ASCII.GetString(header, 0, headerLength - 4);
         var contentLength = ParseContentLength(headerText);
         if (contentLength > MaximumPayloadLength)
         {
@@ -58,7 +75,13 @@ internal sealed class LanguageServerProtocolMessageReader
         }
 
         var payload = new byte[contentLength];
-        var received = 0;
+        var received = Math.Min(readAheadCount - readAheadOffset, contentLength);
+        if (received > 0)
+        {
+            Array.Copy(readAhead, readAheadOffset, payload, 0, received);
+            readAheadOffset += received;
+        }
+
         while (received < payload.Length)
         {
             var count = await input
@@ -73,6 +96,13 @@ internal sealed class LanguageServerProtocolMessageReader
         }
 
         return JsonDocument.Parse(payload);
+    }
+
+    private async ValueTask<bool> FillReadAheadAsync(CancellationToken cancellationToken)
+    {
+        readAheadOffset = 0;
+        readAheadCount = await input.ReadAsync(readAhead, cancellationToken).ConfigureAwait(false);
+        return readAheadCount > 0;
     }
 
     private static int AdvanceHeaderTerminator(byte value, int currentMatchLength)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 
 using Assimalign.Viu.Components;
 
@@ -530,7 +531,15 @@ public sealed partial class Renderer<TNode>
         }
 
         UpdateReference(tree, mounted, previous.MountReference, next.MountReference);
-        ReplaceValue(tree, mounted, next);
+        if (blockPatched)
+        {
+            ReplaceValueAfterBlockPatch(tree, mounted, next);
+        }
+        else
+        {
+            ReplaceValue(tree, mounted, next);
+        }
+
         mounted.DirectiveBindings = nextDirectiveBindings;
         BindDirectiveHostElements(mounted, nextDirectiveBindings);
         QueueVirtualNodeLifecycleHook(
@@ -644,7 +653,14 @@ public sealed partial class Renderer<TNode>
                 mounted.Children);
         }
 
-        ReplaceValue(tree, mounted, next);
+        if (blockPatched)
+        {
+            ReplaceValueAfterBlockPatch(tree, mounted, next);
+        }
+        else
+        {
+            ReplaceValue(tree, mounted, next);
+        }
     }
 
     private List<MountedNode<TNode>> MountChildren(
@@ -811,8 +827,9 @@ public sealed partial class Renderer<TNode>
         TNode? endAnchor,
         RuntimeComponentContext? owner)
     {
-        Dictionary<object, int> keyToNextIndex = [];
-        bool hasKeyed = false;
+        // The key map is only built once a key is seen: keyless sibling lists (the common
+        // hand-authored and bail-out shape) reconcile positionally without a dictionary.
+        Dictionary<object, int>? keyToNextIndex = null;
         bool hasKeyless = false;
         for (int index = 0; index < nextValues.Count; index++)
         {
@@ -827,7 +844,7 @@ public sealed partial class Renderer<TNode>
                 continue;
             }
 
-            hasKeyed = true;
+            keyToNextIndex ??= new Dictionary<object, int>(nextValues.Count - index);
             if (!keyToNextIndex.TryAdd(key, index))
             {
                 tree.Application?.WarnHandler?.Invoke(
@@ -835,7 +852,7 @@ public sealed partial class Renderer<TNode>
             }
         }
 
-        if (hasKeyed && hasKeyless)
+        if (keyToNextIndex is not null && hasKeyless)
         {
             tree.Application?.WarnHandler?.Invoke(
                 "A sibling collection mixes keyed and keyless non-comment nodes.");
@@ -846,6 +863,9 @@ public sealed partial class Renderer<TNode>
         bool[] claimed = new bool[nextValues.Count];
         bool moved = false;
         int greatestNextIndex = 0;
+        // Every position before this cursor is claimed or keyed, so a keyless search never
+        // revisits it; keyless lists reconcile in linear time instead of rescanning from zero.
+        int keylessSearchStart = 0;
 
         for (int previousIndex = 0; previousIndex < current.Count; previousIndex++)
         {
@@ -854,19 +874,23 @@ public sealed partial class Renderer<TNode>
                 ? previousValues[previousIndex]
                 : previousMounted.Value;
             int nextIndex = -1;
-            if (previousValue.Key is { } key
-                && keyToNextIndex.TryGetValue(key, out int keyedIndex)
-                && !claimed[keyedIndex]
-                && IsSameNodeType(previousValue, nextValues[keyedIndex]))
+            if (previousValue.Key is { } key)
             {
-                nextIndex = keyedIndex;
+                if (keyToNextIndex is not null
+                    && keyToNextIndex.TryGetValue(key, out int keyedIndex)
+                    && !claimed[keyedIndex]
+                    && IsSameNodeType(previousValue, nextValues[keyedIndex]))
+                {
+                    nextIndex = keyedIndex;
+                }
             }
-            else if (previousValue.Key is null)
+            else
             {
                 nextIndex = FindNextKeylessIndex(
                     previousValue,
                     nextValues,
-                    claimed);
+                    claimed,
+                    ref keylessSearchStart);
             }
 
             if (nextIndex < 0)
@@ -940,12 +964,26 @@ public sealed partial class Renderer<TNode>
         return result;
     }
 
+    /// <summary>
+    /// Finds the lowest unclaimed keyless sibling of the same node type as <paramref name="previous"/>.
+    /// <paramref name="searchStart"/> is first advanced past the leading run of positions that are
+    /// claimed or keyed, which can never match a later keyless node, so repeated calls over a
+    /// keyless list reconcile in linear time while returning exactly what a scan from zero would.
+    /// </summary>
     private static int FindNextKeylessIndex(
         VirtualNode previous,
         IReadOnlyList<VirtualNode> nextValues,
-        IReadOnlyList<bool> claimed)
+        bool[] claimed,
+        ref int searchStart)
     {
-        for (int index = 0; index < nextValues.Count; index++)
+        int count = nextValues.Count;
+        while (searchStart < count
+            && (claimed[searchStart] || nextValues[searchStart].Key is not null))
+        {
+            searchStart++;
+        }
+
+        for (int index = searchStart; index < count; index++)
         {
             if (!claimed[index]
                 && nextValues[index].Key is null
@@ -1040,9 +1078,7 @@ public sealed partial class Renderer<TNode>
             VirtualNode nextChild = nextDynamic[index];
             // [V01.01.11.07] Stable native nodes patch through their existing handles. Reading
             // their parent/sibling would force a Browser command-frame flush for every changed row.
-            bool patchesExistingHandle = ReferenceEquals(current.Value, nextChild)
-                || (current.Value is ElementNode or TextNode or CommentNode
-                    && IsSameNodeType(current.Value, nextChild));
+            bool patchesExistingHandle = PatchesExistingHandle(current, nextChild);
             TNode parent = patchesExistingHandle
                 ? fallbackContainer
                 : HostParentOrFallback(current.FirstHostNode, fallbackContainer);
@@ -2056,13 +2092,12 @@ public sealed partial class Renderer<TNode>
             }
         }
 
-        HashSet<MountedNode<TNode>> visited = new(ReferenceEqualityComparer.Instance);
+        UnmountedBlockChildren visited = new(dynamicChildren);
         for (int index = 0; index < dynamicChildren.Count; index++)
         {
-            MountedNode<TNode> dynamicMounted = dynamicChildren[index];
-            if (visited.Add(dynamicMounted))
+            if (visited.MarkUnmounted(index))
             {
-                Unmount(tree, dynamicMounted, removeHostNodes);
+                Unmount(tree, dynamicChildren[index], removeHostNodes);
             }
         }
 
@@ -2071,10 +2106,68 @@ public sealed partial class Renderer<TNode>
         return true;
     }
 
+    /// <summary>
+    /// The block children a block teardown has unmounted. A block within
+    /// <see cref="ScannedBlockAssociationLimit"/> entries is answered by a reference scan of its own
+    /// list, so tearing down a row-sized block allocates nothing; a larger block hashes its entries
+    /// to keep each lookup constant-time.
+    /// </summary>
+    private readonly struct UnmountedBlockChildren
+    {
+        private readonly IReadOnlyList<MountedNode<TNode>> _children;
+        private readonly HashSet<MountedNode<TNode>>? _hashed;
+
+        internal UnmountedBlockChildren(IReadOnlyList<MountedNode<TNode>> children)
+        {
+            _children = children;
+            _hashed = children.Count > ScannedBlockAssociationLimit
+                ? new HashSet<MountedNode<TNode>>(children.Count, ReferenceEqualityComparer.Instance)
+                : null;
+        }
+
+        /// <summary>Marks the entry at <paramref name="index"/>; false when the same node appeared earlier.</summary>
+        internal bool MarkUnmounted(int index)
+        {
+            MountedNode<TNode> mounted = _children[index];
+            if (_hashed is not null)
+            {
+                return _hashed.Add(mounted);
+            }
+
+            for (int earlier = 0; earlier < index; earlier++)
+            {
+                if (ReferenceEquals(_children[earlier], mounted))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        internal bool Contains(MountedNode<TNode> mounted)
+        {
+            if (_hashed is not null)
+            {
+                return _hashed.Contains(mounted);
+            }
+
+            for (int index = 0; index < _children.Count; index++)
+            {
+                if (ReferenceEquals(_children[index], mounted))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     private void ReleaseSkippedChildren(
         MountedTree<TNode> tree,
         IReadOnlyList<MountedNode<TNode>> children,
-        HashSet<MountedNode<TNode>> visited)
+        UnmountedBlockChildren visited)
     {
         for (int index = 0; index < children.Count; index++)
         {
@@ -2098,7 +2191,7 @@ public sealed partial class Renderer<TNode>
     private void ReleaseSkippedNode(
         MountedTree<TNode> tree,
         MountedNode<TNode> mounted,
-        HashSet<MountedNode<TNode>> visited)
+        UnmountedBlockChildren visited)
     {
         if (visited.Contains(mounted))
         {
@@ -2131,7 +2224,7 @@ public sealed partial class Renderer<TNode>
     private void ReleaseOrUnmountSkippedNode(
         MountedTree<TNode> tree,
         MountedNode<TNode> mounted,
-        HashSet<MountedNode<TNode>> visited)
+        UnmountedBlockChildren visited)
     {
         if (visited.Contains(mounted))
         {
@@ -2182,20 +2275,32 @@ public sealed partial class Renderer<TNode>
         }
     }
 
+    /// <summary>
+    /// Removes every host node from <paramref name="first"/> through <paramref name="last"/>. The
+    /// siblings are read before the first removal: a host that buffers writes must flush them
+    /// before answering a read, so interleaving reads with removals would cost a crossing per node
+    /// where reading the whole range first costs one flush for all the removals.
+    /// </summary>
     private void RemoveRange(TNode first, TNode last)
     {
-        TNode current = first;
-        while (true)
+        if (NodeComparer.Equals(first, last))
         {
-            bool isLast = NodeComparer.Equals(current, last);
-            TNode? next = isLast ? default : _options.NextSibling(current);
-            _options.Remove(current);
-            if (isLast)
-            {
-                break;
-            }
+            _options.Remove(first);
+            return;
+        }
 
-            current = RequireHostNode(next, "range sibling");
+        List<TNode> range = [first];
+        TNode current = first;
+        do
+        {
+            current = RequireHostNode(_options.NextSibling(current), "range sibling");
+            range.Add(current);
+        }
+        while (!NodeComparer.Equals(current, last));
+
+        for (int index = 0; index < range.Count; index++)
+        {
+            _options.Remove(range[index]);
         }
     }
 
@@ -2402,6 +2507,17 @@ public sealed partial class Renderer<TNode>
         };
     }
 
+    /// <summary>
+    /// Returns whether <paramref name="next"/> patches <paramref name="current"/> through its
+    /// existing native host handle. Such a patch never needs the host parent or next sibling, so
+    /// callers skip the structural host reads that would force a Browser command-frame flush.
+    /// Specified by <c>[RND-BLOCK-5]</c> and <c>[RND-IO-1]</c> ([V01.01.11.07]).
+    /// </summary>
+    private static bool PatchesExistingHandle(MountedNode<TNode> current, VirtualNode next) =>
+        ReferenceEquals(current.Value, next)
+        || (current.Value is ElementNode or TextNode or CommentNode
+            && IsSameNodeType(current.Value, next));
+
     private void Register(
         MountedTree<TNode> tree,
         VirtualNode value,
@@ -2428,12 +2544,40 @@ public sealed partial class Renderer<TNode>
         RefreshBlockChildren(mounted);
     }
 
+    /// <summary>
+    /// Replaces the description of a block whose dynamic occurrences were just patched by
+    /// <see cref="TryPatchBlockChildren"/>. That patch already threaded the block-local occurrence
+    /// list, so only the <c>[RND-BLOCK-4]</c> ambiguity rule remains to be re-checked.
+    /// </summary>
+    private static void ReplaceValueAfterBlockPatch(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted,
+        VirtualNode next)
+    {
+        _ = tree;
+        mounted.Value = next;
+        VerifyBlockChildren(mounted);
+    }
+
     private static void Unregister(MountedTree<TNode> tree, MountedNode<TNode> mounted)
     {
         _ = tree;
         mounted.BlockChildren = null;
     }
 
+    // Block-local occurrence lists are only ever read or replaced, never mutated in place, so
+    // every static block can share one empty list.
+    private static readonly List<MountedNode<TNode>> EmptyBlockChildren = [];
+
+    // Blocks tracking more descendants than this fall back to the hashed association. A compiled
+    // template tracks a handful of dynamic descendants per block, so the reference scan below is
+    // both allocation-free and faster for the common shape.
+    private const int ScannedBlockAssociationLimit = 32;
+
+    /// <summary>
+    /// Rebuilds the block-local mounted occurrence list from the mounted children, or clears it
+    /// when the association is ambiguous. Specified by <c>[RND-BLOCK-4]</c>.
+    /// </summary>
     private static void RefreshBlockChildren(MountedNode<TNode> mounted)
     {
         if (mounted.Value is not CompositeVirtualNode composite
@@ -2444,12 +2588,92 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        if (dynamicValues.Count == 0)
+        int count = dynamicValues.Count;
+        if (count == 0)
         {
-            mounted.BlockChildren = [];
+            mounted.BlockChildren = EmptyBlockChildren;
             return;
         }
 
+        if (count > ScannedBlockAssociationLimit)
+        {
+            mounted.BlockChildren = AssociateBlockChildrenHashed(dynamicValues, children);
+            return;
+        }
+
+        // The k-th occurrence of a description in traversal order fills the k-th tracked position
+        // of that description, which is the lowest position still open for it. Traversal is
+        // post-order within non-block descendants, the same order block teardown relies on.
+        var blockChildren = new List<MountedNode<TNode>>(count);
+        CollectionsMarshal.SetCount(blockChildren, count);
+        Span<MountedNode<TNode>> slots = CollectionsMarshal.AsSpan(blockChildren);
+        for (int index = 0; index < children.Count; index++)
+        {
+            if (!AssociateBlockOccurrences(children[index], dynamicValues, slots))
+            {
+                // [RND-BLOCK-4] Description identity cannot identify which occurrences are
+                // dynamic when the same description also occurs outside the tracked list.
+                mounted.BlockChildren = null;
+                return;
+            }
+        }
+
+        for (int index = 0; index < slots.Length; index++)
+        {
+            if (slots[index] is null)
+            {
+                // A tracked description with fewer occurrences than tracked positions.
+                mounted.BlockChildren = null;
+                return;
+            }
+        }
+
+        mounted.BlockChildren = blockChildren;
+    }
+
+    private static bool AssociateBlockOccurrences(
+        MountedNode<TNode> mounted,
+        IReadOnlyList<VirtualNode> dynamicValues,
+        Span<MountedNode<TNode>> slots)
+    {
+        if (!mounted.Value.RenderPlan.IsBlock
+            && OwnedChildren(mounted) is { } children)
+        {
+            for (int index = 0; index < children.Count; index++)
+            {
+                if (!AssociateBlockOccurrences(children[index], dynamicValues, slots))
+                {
+                    return false;
+                }
+            }
+        }
+
+        VirtualNode value = mounted.Value;
+        bool isTracked = false;
+        for (int index = 0; index < dynamicValues.Count; index++)
+        {
+            if (!ReferenceEquals(dynamicValues[index], value))
+            {
+                continue;
+            }
+
+            if (slots[index] is null)
+            {
+                slots[index] = mounted;
+                return true;
+            }
+
+            isTracked = true;
+        }
+
+        // A tracked description with more occurrences than tracked positions is ambiguous.
+        return !isTracked;
+    }
+
+    private static List<MountedNode<TNode>>? AssociateBlockChildrenHashed(
+        IReadOnlyList<VirtualNode> dynamicValues,
+        IReadOnlyList<MountedNode<TNode>> children)
+    {
         var occurrences = new Dictionary<VirtualNode, Queue<MountedNode<TNode>>>(
             ReferenceEqualityComparer.Instance);
         for (int index = 0; index < children.Count; index++)
@@ -2475,8 +2699,7 @@ public sealed partial class Renderer<TNode>
             {
                 // [RND-BLOCK-4] Description identity cannot identify which occurrences are
                 // dynamic when the same description also occurs outside the tracked list.
-                mounted.BlockChildren = null;
-                return;
+                return null;
             }
         }
 
@@ -2488,14 +2711,84 @@ public sealed partial class Renderer<TNode>
                     out Queue<MountedNode<TNode>>? candidates)
                 || candidates.Count == 0)
             {
-                mounted.BlockChildren = null;
-                return;
+                return null;
             }
 
             blockChildren.Add(candidates.Dequeue());
         }
 
-        mounted.BlockChildren = blockChildren;
+        return blockChildren;
+    }
+
+    /// <summary>
+    /// Re-checks the <c>[RND-BLOCK-4]</c> ambiguity rule after a successful block patch. The
+    /// occurrence list is exact at this point (each entry was patched to its tracked description),
+    /// so the only remaining failure is a tracked description that also occurs untracked in the
+    /// block scope, which clears the list so the next render takes the full child diff.
+    /// </summary>
+    private static void VerifyBlockChildren(MountedNode<TNode> mounted)
+    {
+        if (mounted.BlockChildren is not { } blockChildren
+            || mounted.Value is not CompositeVirtualNode composite
+            || composite.RenderPlan.DynamicChildren is not { } dynamicValues
+            || blockChildren.Count != dynamicValues.Count
+            || OwnedChildren(mounted) is not { } children)
+        {
+            RefreshBlockChildren(mounted);
+            return;
+        }
+
+        if (dynamicValues.Count > ScannedBlockAssociationLimit)
+        {
+            RefreshBlockChildren(mounted);
+            return;
+        }
+
+        for (int index = 0; index < children.Count; index++)
+        {
+            if (!HasOnlyTrackedOccurrences(children[index], dynamicValues, blockChildren))
+            {
+                mounted.BlockChildren = null;
+                return;
+            }
+        }
+    }
+
+    private static bool HasOnlyTrackedOccurrences(
+        MountedNode<TNode> mounted,
+        IReadOnlyList<VirtualNode> dynamicValues,
+        List<MountedNode<TNode>> blockChildren)
+    {
+        if (!mounted.Value.RenderPlan.IsBlock
+            && OwnedChildren(mounted) is { } children)
+        {
+            for (int index = 0; index < children.Count; index++)
+            {
+                if (!HasOnlyTrackedOccurrences(children[index], dynamicValues, blockChildren))
+                {
+                    return false;
+                }
+            }
+        }
+
+        for (int index = 0; index < blockChildren.Count; index++)
+        {
+            if (ReferenceEquals(blockChildren[index], mounted))
+            {
+                return true;
+            }
+        }
+
+        VirtualNode value = mounted.Value;
+        for (int index = 0; index < dynamicValues.Count; index++)
+        {
+            if (ReferenceEquals(dynamicValues[index], value))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static IReadOnlyList<MountedNode<TNode>>? OwnedChildren(

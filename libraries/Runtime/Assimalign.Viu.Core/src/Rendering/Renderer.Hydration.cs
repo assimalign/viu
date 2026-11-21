@@ -684,16 +684,21 @@ public sealed partial class Renderer<TNode>
             Register(tree, value, mounted);
             UpdateReference(tree, mounted, null, value.MountReference);
             QueueMountedLifecycle(mounted);
-            mounted.HotReloadRegistration = ComponentHotReload.RegisterMountedComponent(
-                activation.Instance.GetType(),
-                change =>
-                {
-                    if (change is ComponentHotReloadChangeKind.Template
-                        or ComponentHotReloadChangeKind.ScriptReset)
+            Type componentType = activation.Instance.GetType();
+            if (ComponentHotReload.HasMetadata(componentType))
+            {
+                mounted.HotReloadRegistration = ComponentHotReload.RegisterMountedComponent(
+                    componentType,
+                    change =>
                     {
-                        QueueComponentRemount(tree, mounted, container);
-                    }
-                });
+                        if (change is ComponentHotReloadChangeKind.Template
+                            or ComponentHotReloadChangeKind.ScriptReset)
+                        {
+                            QueueComponentRemount(tree, mounted, container);
+                        }
+                    });
+            }
+
             return (mounted, next);
         }
         catch

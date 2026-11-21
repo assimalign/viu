@@ -58,32 +58,14 @@ public sealed class ComponentBindings
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(invocation);
 
-        Dictionary<string, ComponentParameter> parameterAliases =
-            new(StringComparer.Ordinal);
-        Dictionary<string, ComponentEvent> eventAliases =
-            new(StringComparer.Ordinal);
+        // The alias tables depend only on the immutable contract, so they are built once per
+        // contract and replay their declaration-time diagnostics into every resolution.
+        ComponentContractAliases aliases = contract.Aliases;
+        aliases.ReportDiagnostics(diagnostics);
+        Dictionary<string, ComponentParameter> parameterAliases = aliases.Parameters;
+        Dictionary<string, ComponentEvent> eventAliases = aliases.Events;
 
-        foreach (ComponentParameter parameter in contract.Parameters)
-        {
-            AddAliases(
-                parameterAliases,
-                parameter.Name,
-                parameter,
-                "parameter",
-                diagnostics);
-        }
-
-        foreach (ComponentEvent componentEvent in contract.Events)
-        {
-            AddAliases(
-                eventAliases,
-                componentEvent.Name,
-                componentEvent,
-                "event",
-                diagnostics);
-        }
-
-        Dictionary<string, object?> parameters = new(StringComparer.Ordinal);
+        Dictionary<string, object?> parameters = new(invocation.Arguments.Count, StringComparer.Ordinal);
         Dictionary<string, string> suppliedAliases = new(StringComparer.Ordinal);
         Dictionary<string, object?> fallthrough = new(StringComparer.Ordinal);
         foreach (KeyValuePair<string, object?> argument in invocation.Arguments)
@@ -132,66 +114,13 @@ public sealed class ComponentBindings
                     $"Required parameter '{parameter.Name}' was not supplied."));
             }
         }
-        return new ComponentBindings(parameters, invocation.Slots, fallthrough);
-    }
-
-    private static void AddAliases<TDeclaration>(
-        Dictionary<string, TDeclaration> aliases,
-        string name,
-        TDeclaration declaration,
-        string declarationKind,
-        ICollection<ComponentBindingDiagnostic>? diagnostics)
-        where TDeclaration : class
-    {
-        AddAlias(aliases, name, declaration, declarationKind, diagnostics);
-
-        string camelizedName = NameNormalization.Camelize(name);
-        if (!string.Equals(camelizedName, name, StringComparison.Ordinal))
-        {
-            AddAlias(
-                aliases,
-                camelizedName,
-                declaration,
-                declarationKind,
-                diagnostics);
-        }
-
-        string hyphenatedName = NameNormalization.Hyphenate(name);
-        if (!string.Equals(hyphenatedName, name, StringComparison.Ordinal)
-            && !string.Equals(hyphenatedName, camelizedName, StringComparison.Ordinal))
-        {
-            AddAlias(
-                aliases,
-                hyphenatedName,
-                declaration,
-                declarationKind,
-                diagnostics);
-        }
-    }
-
-    private static void AddAlias<TDeclaration>(
-        Dictionary<string, TDeclaration> aliases,
-        string alias,
-        TDeclaration declaration,
-        string declarationKind,
-        ICollection<ComponentBindingDiagnostic>? diagnostics)
-        where TDeclaration : class
-    {
-        if (aliases.TryGetValue(alias, out TDeclaration? existing))
-        {
-            if (!ReferenceEquals(existing, declaration))
-            {
-                diagnostics?.Add(new ComponentBindingDiagnostic(
-                    ComponentBindingDiagnosticKind.DuplicateAlias,
-                    alias,
-                    $"Component {declarationKind} alias '{alias}' is declared more than once; "
-                        + "the first declaration is used."));
-            }
-
-            return;
-        }
-
-        aliases.Add(alias, declaration);
+        // The tables were built here and nothing else holds them, so the bindings adopt them as
+        // snapshots instead of copying them a second time; the invocation's slot snapshot is
+        // adopted the same way.
+        return new ComponentBindings(
+            new SnapshotDictionary<object?>(parameters, isNullFree: false),
+            invocation.Slots,
+            new SnapshotDictionary<object?>(fallthrough, isNullFree: false));
     }
 
     private static bool IsDeclaredEventListener(

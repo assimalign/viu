@@ -29,6 +29,9 @@ namespace Assimalign.Viu.Browser;
 /// </summary>
 internal sealed class BrowserEventInvokerRegistry
 {
+    /// <summary>Released-handle and invoker counts above which a purge hashes the released set.</summary>
+    private const int HashedPurgeThreshold = 8;
+
     private readonly Dictionary<(int NodeHandle, string EventName, bool Capture), BrowserEventInvoker> _invokers = [];
     private readonly Action<int, string, bool, bool, bool> _addListener;
     private readonly Action<int, string, bool> _removeListener;
@@ -308,10 +311,21 @@ internal sealed class BrowserEventInvokerRegistry
         {
             return;
         }
+        // A commit that tears down a large subtree releases hundreds of handles while hundreds of
+        // invokers stay live; a linear probe per invoker made that quadratic. Hash the released set
+        // once it is big enough for the set to pay for itself, and keep the probe for the common
+        // handful of releases.
+        HashSet<int>? releasedSet = releasedHandles.Length > HashedPurgeThreshold
+            && _invokers.Count > HashedPurgeThreshold
+            ? new HashSet<int>(releasedHandles)
+            : null;
         List<(int, string, bool)>? stale = null;
         foreach (var key in _invokers.Keys)
         {
-            if (Array.IndexOf(releasedHandles, key.NodeHandle) >= 0)
+            bool released = releasedSet is not null
+                ? releasedSet.Contains(key.NodeHandle)
+                : Array.IndexOf(releasedHandles, key.NodeHandle) >= 0;
+            if (released)
             {
                 (stale ??= []).Add(key);
             }

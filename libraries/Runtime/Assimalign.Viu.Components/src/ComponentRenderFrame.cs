@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace Assimalign.Viu.Components;
@@ -117,9 +116,14 @@ public sealed class ComponentRenderFrame
             return null;
         }
 
-        return block.DynamicChildren is null
-            ? Array.Empty<VirtualNode>()
-            : new ReadOnlyCollection<VirtualNode>(block.DynamicChildren.ToArray());
+        if (block.DynamicChildren is not { Count: > 0 } dynamicChildren)
+        {
+            return Array.Empty<VirtualNode>();
+        }
+
+        // Track rejects null, so the snapshot is null-free and a RenderPlan adopts it without a
+        // second copy or a second validation pass.
+        return new SnapshotList<VirtualNode>(dynamicChildren.ToArray(), isNullFree: true);
     }
 
     /// <summary>Returns a cached value, creating it once for this mount when absent.</summary>

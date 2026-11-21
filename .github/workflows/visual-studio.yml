@@ -84,12 +84,17 @@ jobs:
         run: ./extensions/VisualStudio/Build.ps1 -Configuration Release
 
       # The packed-consumer semantic round trip ([V01.01.12.23], #259, acceptance criterion 5):
-      # pack the SDK + framework feed, then drive the published single-file server over stdio
+      # pack the host-neutral feed, then drive the published single-file server over stdio
       # against a restored consumer scaffold. Runs here because this is the only lane that builds
       # the server payload; the packaging lane never does. Cost: roughly six to eight minutes.
+      # The scaffold is a component library on the base Assimalign.Viu.Sdk, so it consumes only
+      # Assimalign.Viu.Sdk and the Assimalign.Viu.App.Ref targeting pack; -BaseOnly packs exactly
+      # that path. The Browser runtime pack is deliberately left out: packing it for browser-wasm
+      # requires the wasm-tools workload (NETSDK1147 since SDK 10.0.404), which this lane does
+      # not install. The packaging lane packs and validates the Browser path with the workload.
       - name: Install local Viu packages
         shell: pwsh
-        run: ./scripts/Install-Local.ps1
+        run: ./scripts/Install-Local.ps1 -BaseOnly
 
       - name: Verify packed-consumer semantic round trip
         shell: pwsh
